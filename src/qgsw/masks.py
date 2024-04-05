@@ -26,7 +26,7 @@ class Masks:
 
     """
 
-    def __init__(self, mask_hgrid):
+    def __init__(self, mask_hgrid: torch.Tensor):
         """
         Computes automatically several masks given the binary mask on the h grid.
         as well as the irregulare boundary points
