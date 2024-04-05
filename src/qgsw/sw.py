@@ -243,7 +243,7 @@ class SW:
             Masks: Mask.
         """
         # If 'mask' key does not exist
-        if "mask" not in param.keys():
+        if key not in param.keys():
             print("  - no mask provided, domain assumed to be rectangular")
             mask = torch.ones(
                 self.nx,
@@ -253,7 +253,7 @@ class SW:
             )
             return Masks(mask)
 
-        mask = param["mask"]
+        mask: torch.Tensor = param[key]
         shape = mask.shape[0], mask.shape[1]
         # Verify shape
         if shape != (self.nx, self.ny):
@@ -375,6 +375,7 @@ class SW:
         """Set utils and flux function without compilation."""
         self.comp_ke = comp_ke
         self.interp_TP = interp_TP
+        a = self.masks.v_sten_hy_eq2[..., 1:-1]
         self.h_flux_y = lambda h, v: flux(
             h,
             v,
