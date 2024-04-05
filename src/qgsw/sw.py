@@ -41,7 +41,7 @@ def replicate_pad(f, mask):
     return mask_ * f_ + (1 - mask_) * f_out
 
 
-def reverse_cumsum(x, dim):
+def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     """Pytorch cumsum in the reverse order
     Example:
     reverse_cumsum(torch.arange(1,4), dim=-1)
@@ -124,21 +124,21 @@ class SW:
         # verifications
 
         # grid
-        self.nx = param["nx"]
-        self.ny = param["ny"]
-        self.nl = param["nl"]
-        self.dx = param["dx"]
-        self.dy = param["dy"]
-        self.H = self._validate_H(param=param, key="H")
+        self.nx: int = param["nx"]
+        self.ny: int = param["ny"]
+        self.nl: int = param["nl"]
+        self.dx: float = param["dx"]
+        self.dy: float = param["dy"]
         print(f"  - nx, ny, nl =  {self.nx, self.ny, self.nl}")
         self.area = self.dx * self.dy
 
+        # Input Validation
+        # H
+        self.H = self._validate_H(param=param, key="H")
         # optional mask
         self.masks = self._validate_mask(param=param, key="mask")
-
         # boundary conditions
         self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
-
         # Coriolis parameter
         self.f = self._validate_coriolis_param(param=param, key="f")
 
@@ -165,34 +165,13 @@ class SW:
         print(f"  - integration time step {self.dt:.3e}")
 
         # ensemble
-        self.n_ens = param["n_ens"] if "n_ens" in param.keys() else 1
+        self.n_ens = param.get("n_ens", 1)
 
-        # topography and ref values
-        self.h_ref = self.H * self.area
-        self.eta_ref = -self.H.sum(dim=-3) + reverse_cumsum(self.H, dim=-3)
-        self.p_ref = torch.cumsum(self.g_prime * self.eta_ref, dim=-3)
-        if self.h_ref.shape[-2] != 1 and self.h_ref.shape[-1] != 1:
-            h_ref_ugrid = F.pad(self.h_ref, (0, 0, 1, 1), mode="replicate")
-            self.h_ref_ugrid = 0.5 * (
-                h_ref_ugrid[..., 1:, :] + h_ref_ugrid[..., :-1, :]
-            )
-            h_ref_vgrid = F.pad(self.h_ref, (1, 1), mode="replicate")
-            self.h_ref_vgrid = 0.5 * (
-                h_ref_vgrid[..., 1:] + h_ref_vgrid[..., :-1]
-            )
-            self.dx_p_ref = torch.diff(self.p_ref, dim=-2)
-            self.dy_p_ref = torch.diff(self.p_ref, dim=-1)
-        else:
-            self.h_ref_ugrid = self.h_ref
-            self.h_ref_vgrid = self.h_ref
-            self.dx_p_ref = 0.0
-            self.dy_p_ref = 0.0
+        # Set Topography and Ref values
+        self._set_ref_variables()
 
         # initialize variables
-        base_shape = (
-            self.n_ens,
-            self.nl,
-        )
+        base_shape = (self.n_ens, self.nl)
         self.h = torch.zeros(
             base_shape + (self.nx, self.ny), **self.arr_kwargs
         )
@@ -206,141 +185,30 @@ class SW:
         self.interp_TP = interp_TP
         self.compute_diagnostic_variables()
 
-        # utils and flux computation functions
-        self.comp_ke = comp_ke
-        self.interp_TP = interp_TP
-        self.h_flux_y = lambda h, v: flux(
-            h,
-            v,
-            dim=-1,
-            n_points=6,
-            rec_func_2=linear2_centered,
-            rec_func_4=wenoz4_left,
-            rec_func_6=wenoz6_left,
-            mask_2=self.masks.v_sten_hy_eq2[..., 1:-1],
-            mask_4=self.masks.v_sten_hy_eq4[..., 1:-1],
-            mask_6=self.masks.v_sten_hy_gt6[..., 1:-1],
-        )
-        self.h_flux_x = lambda h, u: flux(
-            h,
-            u,
-            dim=-2,
-            n_points=6,
-            rec_func_2=linear2_centered,
-            rec_func_4=wenoz4_left,
-            rec_func_6=wenoz6_left,
-            mask_2=self.masks.u_sten_hx_eq2[..., 1:-1, :],
-            mask_4=self.masks.u_sten_hx_eq4[..., 1:-1, :],
-            mask_6=self.masks.u_sten_hx_gt6[..., 1:-1, :],
-        )
-
-        self.w_flux_y = lambda w, v_ugrid: flux(
-            w,
-            v_ugrid,
-            dim=-1,
-            n_points=6,
-            rec_func_2=linear2_centered,
-            rec_func_4=wenoz4_left,
-            rec_func_6=wenoz6_left,
-            mask_2=self.masks.u_sten_wy_eq2[..., 1:-1, :],
-            mask_4=self.masks.u_sten_wy_eq4[..., 1:-1, :],
-            mask_6=self.masks.u_sten_wy_gt4[..., 1:-1, :],
-        )
-        self.w_flux_x = lambda w, u_vgrid: flux(
-            w,
-            u_vgrid,
-            dim=-2,
-            n_points=6,
-            rec_func_2=linear2_centered,
-            rec_func_4=wenoz4_left,
-            rec_func_6=wenoz6_left,
-            mask_2=self.masks.v_sten_wx_eq2[..., 1:-1],
-            mask_4=self.masks.v_sten_wx_eq4[..., 1:-1],
-            mask_6=self.masks.v_sten_wx_gt6[..., 1:-1],
-        )
-
         # barotropic waves filtering for SW
-        self.barotropic_filter = False
-        if "barotropic_filter" in param.keys() and param["barotropic_filter"]:
+        if param.get("barotropic_filter", False):
             class_name = self.__class__.__name__
             if class_name == "SW":
                 print("  - Using barotropic filter ", end="")
                 self.barotropic_filter = param["barotropic_filter"]
                 self.tau = 2 * self.dt
-                if param["barotropic_filter_spectral"]:
-                    print("spectral approximation")
-                    self.barotropic_filter_spectral = True
-                    self.H_tot = self.H.sum(dim=-3, keepdim=True)
-                    self.lambd = 1.0 / (
-                        self.g * self.dt * self.tau * self.H_tot
-                    )
-                    self.helm_solver = HelmholtzNeumannSolver(
-                        self.nx,
-                        self.ny,
-                        self.dx,
-                        self.dy,
-                        self.lambd,
-                        self.dtype,
-                        self.device,
-                        mask=self.masks.h[0, 0],
-                    )
+                self.barotropic_filter_spectral = param.get(
+                    "barotropic_filter_spectral", False
+                )
+                if self.barotropic_filter_spectral:
+                    self._set_barotropic_filter_spectral()
                 else:
-                    self.barotropic_filter_spectral = False
-                    print("in exact form")
-                    coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]
-                    coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
-                    lambd = 1.0 / (self.g * self.dt * self.tau)
-                    self.helm_solver = MG_Helmholtz(
-                        self.dx,
-                        self.dy,
-                        self.nx,
-                        self.ny,
-                        coef_ugrid,
-                        coef_vgrid=coef_vgrid,
-                        lambd=lambd,
-                        device=self.device,
-                        dtype=self.dtype,
-                        mask=self.masks.h[0, 0],
-                        niter_bottom=20,
-                        use_compilation=False,
-                    )
+                    self._set_barotropic_filter_exact()
             else:
                 print(
                     f"  - class {class_name}!=SW, ignoring barotropic filter "
                 )
 
+        # utils and flux computation functions
+        self._set_utils_before_compilation()
         # precompile torch functions
-        use_compilation = (
-            param["compile"] if "compile" in param.keys() else True
-        )
-        if use_compilation:
-            print(f"  - torch version {torch.__version__} ", end="")
-            if torch.__version__[0] == "2":
-                print(">= 2.0, using torch.compile for compilation.")
-                self.comp_ke = torch.compile(self.comp_ke)
-                self.interp_TP = torch.compile(self.interp_TP)
-                self.h_flux_y = torch.compile(self.h_flux_y)
-                self.h_flux_x = torch.compile(self.h_flux_x)
-                self.w_flux_y = torch.compile(self.w_flux_y)
-                self.w_flux_x = torch.compile(self.w_flux_x)
-            else:
-                print("< 2.0, using torch.jit.trace for compilation.")
-                self.comp_ke = torch.jit.trace(
-                    self.comp_ke, (self.u, self.U, self.v, self.V)
-                )
-                self.interp_TP = torch.jit.trace(self.interp_TP, (self.U,))
-                self.h_flux_y = torch.jit.trace(
-                    self.h_flux_y, (self.h, self.V[..., 1:-1])
-                )
-                self.h_flux_x = torch.jit.trace(
-                    self.h_flux_x, (self.h, self.U[..., 1:-1, :])
-                )
-                self.w_flux_y = torch.jit.trace(
-                    self.w_flux_y, (self.omega[..., 1:-1, :], self.V_m)
-                )
-                self.w_flux_x = torch.jit.trace(
-                    self.w_flux_x, (self.omega[..., 1:-1], self.U_m)
-                )
+        if param.get("compile", True):
+            self._set_utils_with_compilation()
         else:
             print("  - No compilation")
 
@@ -440,6 +308,159 @@ class SW:
             msg = f"Invalid f shape {shape=}!=({self.nx},{self.ny})"
             raise KeyError(msg)
         return value.unsqueeze(0)
+
+    def _set_ref_variables(self) -> None:
+        """Set reference variables values.
+
+        Concerned variables:
+        - self.h_ref
+        - self.eta_ref
+        - self.p_ref
+        - self.h_ref_ugrid
+        - self.h_ref_vgrid
+        - self.dx_p_ref
+        - self.dy_p_ref
+        """
+        self.h_ref = self.H * self.area
+        self.eta_ref = -self.H.sum(dim=-3) + reverse_cumsum(self.H, dim=-3)
+        self.p_ref = torch.cumsum(self.g_prime * self.eta_ref, dim=-3)
+        if self.h_ref.shape[-2] != 1 and self.h_ref.shape[-1] != 1:
+            h_ref_ugrid = F.pad(self.h_ref, (0, 0, 1, 1), mode="replicate")
+            self.h_ref_ugrid = 0.5 * (
+                h_ref_ugrid[..., 1:, :] + h_ref_ugrid[..., :-1, :]
+            )
+            h_ref_vgrid = F.pad(self.h_ref, (1, 1), mode="replicate")
+            self.h_ref_vgrid = 0.5 * (
+                h_ref_vgrid[..., 1:] + h_ref_vgrid[..., :-1]
+            )
+            self.dx_p_ref = torch.diff(self.p_ref, dim=-2)
+            self.dy_p_ref = torch.diff(self.p_ref, dim=-1)
+        else:
+            self.h_ref_ugrid = self.h_ref
+            self.h_ref_vgrid = self.h_ref
+            self.dx_p_ref = 0.0
+            self.dy_p_ref = 0.0
+
+    def _set_utils_with_compilation(self) -> None:
+        """Set utils and flux function for compilation."""
+        print(f"  - torch version {torch.__version__} ", end="")
+        if torch.__version__[0] == "2":
+            print(">= 2.0, using torch.compile for compilation.")
+            self.comp_ke = torch.compile(self.comp_ke)
+            self.interp_TP = torch.compile(self.interp_TP)
+            self.h_flux_y = torch.compile(self.h_flux_y)
+            self.h_flux_x = torch.compile(self.h_flux_x)
+            self.w_flux_y = torch.compile(self.w_flux_y)
+            self.w_flux_x = torch.compile(self.w_flux_x)
+        else:
+            print("< 2.0, using torch.jit.trace for compilation.")
+            self.comp_ke = torch.jit.trace(
+                self.comp_ke, (self.u, self.U, self.v, self.V)
+            )
+            self.interp_TP = torch.jit.trace(self.interp_TP, (self.U,))
+            self.h_flux_y = torch.jit.trace(
+                self.h_flux_y, (self.h, self.V[..., 1:-1])
+            )
+            self.h_flux_x = torch.jit.trace(
+                self.h_flux_x, (self.h, self.U[..., 1:-1, :])
+            )
+            self.w_flux_y = torch.jit.trace(
+                self.w_flux_y, (self.omega[..., 1:-1, :], self.V_m)
+            )
+            self.w_flux_x = torch.jit.trace(
+                self.w_flux_x, (self.omega[..., 1:-1], self.U_m)
+            )
+
+    def _set_utils_before_compilation(self) -> None:
+        """Set utils and flux function without compilation."""
+        self.comp_ke = comp_ke
+        self.interp_TP = interp_TP
+        self.h_flux_y = lambda h, v: flux(
+            h,
+            v,
+            dim=-1,
+            n_points=6,
+            rec_func_2=linear2_centered,
+            rec_func_4=wenoz4_left,
+            rec_func_6=wenoz6_left,
+            mask_2=self.masks.v_sten_hy_eq2[..., 1:-1],
+            mask_4=self.masks.v_sten_hy_eq4[..., 1:-1],
+            mask_6=self.masks.v_sten_hy_gt6[..., 1:-1],
+        )
+        self.h_flux_x = lambda h, u: flux(
+            h,
+            u,
+            dim=-2,
+            n_points=6,
+            rec_func_2=linear2_centered,
+            rec_func_4=wenoz4_left,
+            rec_func_6=wenoz6_left,
+            mask_2=self.masks.u_sten_hx_eq2[..., 1:-1, :],
+            mask_4=self.masks.u_sten_hx_eq4[..., 1:-1, :],
+            mask_6=self.masks.u_sten_hx_gt6[..., 1:-1, :],
+        )
+
+        self.w_flux_y = lambda w, v_ugrid: flux(
+            w,
+            v_ugrid,
+            dim=-1,
+            n_points=6,
+            rec_func_2=linear2_centered,
+            rec_func_4=wenoz4_left,
+            rec_func_6=wenoz6_left,
+            mask_2=self.masks.u_sten_wy_eq2[..., 1:-1, :],
+            mask_4=self.masks.u_sten_wy_eq4[..., 1:-1, :],
+            mask_6=self.masks.u_sten_wy_gt4[..., 1:-1, :],
+        )
+        self.w_flux_x = lambda w, u_vgrid: flux(
+            w,
+            u_vgrid,
+            dim=-2,
+            n_points=6,
+            rec_func_2=linear2_centered,
+            rec_func_4=wenoz4_left,
+            rec_func_6=wenoz6_left,
+            mask_2=self.masks.v_sten_wx_eq2[..., 1:-1],
+            mask_4=self.masks.v_sten_wx_eq4[..., 1:-1],
+            mask_6=self.masks.v_sten_wx_gt6[..., 1:-1],
+        )
+
+    def _set_barotropic_filter_spectral(self) -> None:
+        """Set Helmoltz Solver for barotropic and spectral."""
+        print("spectral approximation")
+        self.H_tot = self.H.sum(dim=-3, keepdim=True)
+        self.lambd = 1.0 / (self.g * self.dt * self.tau * self.H_tot)
+        self.helm_solver = HelmholtzNeumannSolver(
+            self.nx,
+            self.ny,
+            self.dx,
+            self.dy,
+            self.lambd,
+            self.dtype,
+            self.device,
+            mask=self.masks.h[0, 0],
+        )
+
+    def _set_barotropic_filter_exact(self) -> None:
+        """Set Helmoltz Solver for barotropic and exact form."""
+        print("in exact form")
+        coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]
+        coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
+        lambd = 1.0 / (self.g * self.dt * self.tau)
+        self.helm_solver = MG_Helmholtz(
+            self.dx,
+            self.dy,
+            self.nx,
+            self.ny,
+            coef_ugrid=coef_ugrid,
+            coef_vgrid=coef_vgrid,
+            lambd=lambd,
+            device=self.device,
+            dtype=self.dtype,
+            mask=self.masks.h[0, 0],
+            niter_bottom=20,
+            use_compilation=False,
+        )
 
     def set_wind_forcing(self, taux, tauy):
         nx, ny = self.nx, self.ny
