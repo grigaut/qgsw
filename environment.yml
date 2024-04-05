@@ -1,0 +1,7 @@
+name: py39_QGSW
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.9.2
