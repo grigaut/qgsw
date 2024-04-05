@@ -5,14 +5,32 @@ Louis Thiry, 2023
 """
 
 import torch.nn.functional as F
+import torch
+from typing import Callable
 
 
-def stencil_2pts(q, dim):
+def stencil_2pts(
+    q: torch.Tensor, dim: int
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+]:
     n = q.shape[dim]
-    return q.narrow(dim, 0, n - 1), q.narrow(dim, 1, n - 1)
+    return (
+        q.narrow(dim, 0, n - 1),
+        q.narrow(dim, 1, n - 1),
+    )
 
 
-def stencil_4pts(q, dim):
+def stencil_4pts(
+    q: torch.Tensor, dim: int
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
     n = q.shape[dim]
     return (
         q.narrow(dim, 0, n - 3),
@@ -22,7 +40,17 @@ def stencil_4pts(q, dim):
     )
 
 
-def stencil_6pts(q, dim):
+def stencil_6pts(
+    q: torch.Tensor, dim: int
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
     n = q.shape[dim]
     return (
         q.narrow(dim, 0, n - 5),
@@ -35,16 +63,16 @@ def stencil_6pts(q, dim):
 
 
 def flux(
-    q,
-    u,
-    dim,
-    n_points,
-    rec_func_2,
-    rec_func_4,
-    rec_func_6,
-    mask_2,
-    mask_4,
-    mask_6,
+    q: torch.Tensor,
+    u: torch.Tensor,
+    dim: int,
+    n_points: int,
+    rec_func_2: Callable,
+    rec_func_4: Callable,
+    rec_func_6: Callable,
+    mask_2: torch.Tensor,
+    mask_4: torch.Tensor,
+    mask_6: torch.Tensor,
 ):
     # positive and negative velocities
     u_pos = F.relu(u)
