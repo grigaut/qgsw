@@ -375,7 +375,6 @@ class SW:
         """Set utils and flux function without compilation."""
         self.comp_ke = comp_ke
         self.interp_TP = interp_TP
-        a = self.masks.v_sten_hy_eq2[..., 1:-1]
         self.h_flux_y = lambda h, v: flux(
             h,
             v,
