@@ -186,11 +186,11 @@ class SW:
         self.compute_diagnostic_variables()
 
         # barotropic waves filtering for SW
-        if param.get("barotropic_filter", False):
+        self.barotropic_filter = param.get("barotropic_filter", False)
+        if self.barotropic_filter:
             class_name = self.__class__.__name__
             if class_name == "SW":
                 print("  - Using barotropic filter ", end="")
-                self.barotropic_filter = param["barotropic_filter"]
                 self.tau = 2 * self.dt
                 self.barotropic_filter_spectral = param.get(
                     "barotropic_filter_spectral", False
