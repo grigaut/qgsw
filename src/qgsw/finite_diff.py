@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 
-def interp_TP(f):
+def interp_TP(f: torch.Tensor) -> torch.Tensor:
     return 0.25 * (
         f[..., 1:, 1:] + f[..., 1:, :-1] + f[..., :-1, 1:] + f[..., :-1, :-1]
     )
