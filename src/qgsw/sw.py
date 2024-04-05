@@ -7,7 +7,7 @@ Louis Thiry, Nov 2023 for IFREMER.
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from typing import Any
 from qgsw.finite_diff import interp_TP, comp_ke, div_nofluxbc
 from qgsw.flux import flux
 from qgsw.helmholtz import HelmholtzNeumannSolver
@@ -90,7 +90,7 @@ class SW:
 
     """
 
-    def __init__(self, param):
+    def __init__(self, param: dict[str, Any]):
         """
         Parameters
 
@@ -117,17 +117,11 @@ class SW:
 
         print(f"Creating {self.__class__.__name__} model...")
         self.device = param["device"]
-        self.dtype = (
-            param["dtype"] if "dtype" in param.keys() else torch.float64
-        )
+        self.dtype = param.get("dtype", torch.float64)
         self.arr_kwargs = {"dtype": self.dtype, "device": self.device}
         print(f"  - dtype {self.dtype}, device {self.device}.")
+
         # verifications
-        assert len(param["H"].shape) >= 3, (
-            'H must be a nz x ny x nx tensor '
-            'with nx=1 or ny=1 if H does not vary '
-            f'in x or y direction, got shape {param["H"].shape}.'
-        )
 
         # grid
         self.nx = param["nx"]
@@ -135,52 +129,19 @@ class SW:
         self.nl = param["nl"]
         self.dx = param["dx"]
         self.dy = param["dy"]
-        self.H = param["H"]
+        self.H = self._validate_H(param=param, key="H")
         print(f"  - nx, ny, nl =  {self.nx, self.ny, self.nl}")
         self.area = self.dx * self.dy
-        self.slip_coef = (
-            param["slip_coef"] if "slip_coef" in param.keys() else 1.0
-        )
 
         # optional mask
-        nx, ny = self.nx, self.ny
-        if "mask" in param.keys():
-            mask = param["mask"]
-            shape = mask.shape[0], mask.shape[1]
-            assert shape == (
-                nx,
-                ny,
-            ), f"Invalid mask shape {shape=}!=({nx},{ny})"
-            vals = torch.unique(mask).tolist()
-            assert all([v in [0, 1] for v in vals]) and vals != [
-                0
-            ], f"Invalid mask with non-binary values : {vals}"
-            print(f'  - {"non-" if len(vals)==2 else ""}trivial mask provided')
-
-        else:
-            print("  - no mask provided, domain assumed to be rectangular")
-            mask = torch.ones(nx, ny, dtype=self.dtype, device=self.device)
-        self.masks = Masks(mask)
+        self.masks = self._validate_mask(param=param, key="mask")
 
         # boundary conditions
-        assert (
-            self.slip_coef >= 0 and self.slip_coef <= 1
-        ), f"slip coefficient must be in [0, 1], got {self.slip_coef}"
-        cl_type = (
-            "free-"
-            if self.slip_coef == 1
-            else ("no-" if self.slip_coef == 0 else "partial free-")
-        )
-        print(f"  - {cl_type}slip boundary condition")
+        self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
 
         # Coriolis parameter
-        f = param["f"]
-        shape = f.shape[0], f.shape[1]
-        assert shape == (
-            nx + 1,
-            ny + 1,
-        ), f"Invalid f shape {shape=}!=({nx},{ny})"
-        self.f = f.unsqueeze(0)
+        self.f = self._validate_coriolis_param(param=param, key="f")
+
         self.f0 = self.f.mean()
         self.f_ugrid = 0.5 * (self.f[:, :, 1:] + self.f[:, :, :-1])
         self.f_vgrid = 0.5 * (self.f[:, 1:, :] + self.f[:, :-1, :])
@@ -382,6 +343,103 @@ class SW:
                 )
         else:
             print("  - No compilation")
+
+    def _validate_H(self, param: dict[str, Any], key: str) -> torch.Tensor:
+        """Validate H (unperturbed layer thickness) input value.
+
+        Args:
+            param (dict[str, Any]): Parameters dict.
+            key (str): Key for H value.
+
+        Returns:
+            torch.Tensor: H
+        """
+        value: torch.Tensor = param[key]
+        if len(value.shape) < 3:
+            msg = (
+                "H must be a nz x ny x nx tensor "
+                "with nx=1 or ny=1 if H does not vary "
+                f"in x or y direction, got shape {value.shape}."
+            )
+            raise KeyError(msg)
+        return value
+
+    def _validate_mask(self, param: dict[str, Any], key: str) -> Masks:
+        """Validate Mask value.
+
+        Args:
+            param (dict[str, Any]): Parameters dict.
+            key:
+
+        Returns:
+            Masks: Mask.
+        """
+        # If 'mask' key does not exist
+        if "mask" not in param.keys():
+            print("  - no mask provided, domain assumed to be rectangular")
+            mask = torch.ones(
+                self.nx,
+                self.ny,
+                dtype=self.dtype,
+                device=self.device,
+            )
+            return Masks(mask)
+
+        mask = param["mask"]
+        shape = mask.shape[0], mask.shape[1]
+        # Verify shape
+        if shape != (self.nx, self.ny):
+            msg = f"Invalid mask shape {shape}!=({self.nx},{self.ny})"
+            raise KeyError(msg)
+        vals = torch.unique(mask).tolist()
+        # Verify mask values
+        if not all([v in [0, 1] for v in vals]) or vals == [0]:
+            msg = f"Invalid mask with non-binary values : {vals}"
+            raise KeyError(msg)
+        print(f'  - {"non-" if len(vals)==2 else ""}trivial mask provided')
+        return Masks(mask)
+
+    def _validate_slip_coef(self, param: dict[str, Any], key: str) -> float:
+        """Valide slip coeffciient value.
+
+        Args:
+            param (dict[str, Any]): Parameters dict.
+            key (str): Key for slip coefficient.
+
+        Returns:
+            float: Slip coefficient value.
+        """
+        value = param.get(key, 1.0)
+        # Verify value in [0,1]
+        if (value < 0) or (value > 1):
+            msg = f"slip coefficient must be in [0, 1], got {value}"
+            raise KeyError(msg)
+        cl_type = (
+            "free-"
+            if value == 1
+            else ("no-" if value == 0 else "partial free-")
+        )
+        print(f"  - {cl_type}slip boundary condition")
+        return value
+
+    def _validate_coriolis_param(
+        self, param: dict[str, Any], key: str
+    ) -> torch.Tensor:
+        """Validate f (Coriolis parameter) value.
+
+        Args:
+            param (dict[str, Any]): Parameters dict.
+            key (str): Key for coriolis parameter.
+
+        Returns:
+            torch.Tensor: Coriolis parameter value.
+        """
+        value: torch.Tensor = param[key]
+        shape = value.shape[0], value.shape[1]
+        if shape != (self.nx + 1, self.ny + 1):
+            msg = f"Invalid f shape {shape=}!=({self.nx},{self.ny})"
+            raise KeyError(msg)
+        return value.unsqueeze(0)
 
     def set_wind_forcing(self, taux, tauy):
         nx, ny = self.nx, self.ny
