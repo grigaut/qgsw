@@ -462,16 +462,45 @@ class SW:
             use_compilation=False,
         )
 
-    def set_wind_forcing(self, taux, tauy):
-        nx, ny = self.nx, self.ny
-        assert type(taux) == float or taux.shape == (
-            nx - 1,
-            ny,
-        ), f"taux must be a float or a {(nx-1, ny)} Tensor"
-        assert type(tauy) == float or tauy.shape == (
-            nx,
-            ny - 1,
-        ), f"taux must be a float or a {(nx-1, ny)} Tensor"
+    def set_wind_forcing(
+        self,
+        taux: float | torch.Tensor,
+        tauy: float | torch.Tensor,
+    ) -> None:
+        """Set the winf forcing attributes taux and tauy.
+
+        # TODO: consider implementing validation
+        in taux and tauy properties getters/
+
+        Args:
+            taux (float | torch.Tensor): Taux value.
+            tauy (float | torch.Tensor): Tauy value
+
+        Raises:
+            ValueError: If taux is not a float nor a Tensor.
+            ValueError: If taux if a wrongly-shaped Tensor.
+            ValueError: If tauy is not a float nor a Tensor.
+            ValueError: If tauy if a wrongly-shaped Tensor.
+        """
+
+        is_tensorx = isinstance(taux, torch.Tensor)
+
+        if (not isinstance(taux, float)) and (not is_tensorx):
+            msg = "taux must be a float or a Tensor"
+            raise ValueError(msg)
+        elif is_tensorx and (taux.shape != (self.nx - 1, self.ny)):
+            msg = f"When taux is a Tensor, it must be a {(self.nx-1, self.ny)} Tensor"
+            raise ValueError(msg)
+
+        is_tensory = isinstance(tauy, torch.Tensor)
+
+        if (not isinstance(tauy, float)) and (not is_tensory):
+            msg = "tauy must be a float or a Tensor"
+            raise ValueError(msg)
+        elif is_tensory and (tauy.shape != (self.nx - 1, self.ny)):
+            msg = f"When tauy is a Tensor, it must be a {(self.nx, self.ny-1)} Tensor"
+            raise ValueError(msg)
+
         self.taux = taux
         self.tauy = tauy
 
