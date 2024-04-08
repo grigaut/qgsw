@@ -12,7 +12,13 @@ import torch
 import torch.nn.functional as F
 
 
-def compute_laplace_dctII(nx, ny, dx, dy, arr_kwargs):
+def compute_laplace_dctII(
+    nx: int,
+    ny: int,
+    dx: float,
+    dy: float,
+    arr_kwargs,
+) -> torch.Tensor:
     """DCT-II of standard 5-points laplacian on uniform grid"""
     x, y = torch.meshgrid(
         torch.arange(nx, **arr_kwargs),
@@ -25,7 +31,7 @@ def compute_laplace_dctII(nx, ny, dx, dy, arr_kwargs):
     )
 
 
-def dctII(x, exp_vec):
+def dctII(x: torch.Tensor, exp_vec: torch.Tensor) -> torch.Tensor:
     """
     1D forward type-II discrete cosine transform (DCT-II)
     using fft and precomputed auxillary vector exp_vec.
@@ -35,7 +41,7 @@ def dctII(x, exp_vec):
     return (V * exp_vec).real
 
 
-def idctII(x, iexp_vec):
+def idctII(x: torch.Tensor, iexp_vec: torch.Tensor) -> torch.Tensor:
     """
     1D inverse type-II discrete cosine transform (DCT-II)
     using fft and precomputed auxillary vector iexp_vec.
@@ -56,21 +62,29 @@ def idctII(x, iexp_vec):
     return y
 
 
-def dctII2D(x, exp_vec_x, exp_vec_y):
+def dctII2D(
+    x: torch.Tensor, exp_vec_x: torch.Tensor, exp_vec_y: torch.Tensor
+) -> torch.Tensor:
     """2D forward DCT-II."""
     return dctII(dctII(x, exp_vec_y).transpose(-1, -2), exp_vec_x).transpose(
         -1, -2
     )
 
 
-def idctII2D(x, iexp_vec_x, iexp_vec_y):
+def idctII2D(
+    x: torch.Tensor, iexp_vec_x: torch.Tensor, iexp_vec_y: torch.Tensor
+) -> torch.Tensor:
     """2D inverse DCT-II."""
     return idctII(
         idctII(x, iexp_vec_y).transpose(-1, -2), iexp_vec_x
     ).transpose(-1, -2)
 
 
-def compute_dctII_exp_vecs(N, dtype, device):
+def compute_dctII_exp_vecs(
+    N: int,
+    dtype,
+    device: str,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Compute auxillary exp_vec and iexp_vec used in
     fast DCT-II computations with FFTs."""
     N_range = torch.arange(N, dtype=dtype, device=device)
@@ -80,8 +94,13 @@ def compute_dctII_exp_vecs(N, dtype, device):
 
 
 def solve_helmholtz_dctII(
-    rhs, helmholtz_dctII, exp_vec_x, exp_vec_y, iexp_vec_x, iexp_vec_y
-):
+    rhs: torch.Tensor,
+    helmholtz_dctII: torch.Tensor,
+    exp_vec_x: torch.Tensor,
+    exp_vec_y: torch.Tensor,
+    iexp_vec_x: torch.Tensor,
+    iexp_vec_y: torch.Tensor,
+) -> torch.Tensor:
     """Solves Helmholtz equation with DCT-II fast diagonalisation."""
     rhs_dctII = dctII2D(rhs.type(helmholtz_dctII.dtype), exp_vec_x, exp_vec_y)
     return idctII2D(rhs_dctII / helmholtz_dctII, iexp_vec_x, iexp_vec_y).type(
@@ -89,7 +108,7 @@ def solve_helmholtz_dctII(
     )
 
 
-def dstI1D(x, norm="ortho"):
+def dstI1D(x: torch.Tensor, norm: str = "ortho"):
     """1D type-I discrete sine transform (DST-I), forward and inverse
     since DST-I is auto-inverse."""
     return torch.fft.irfft(-1j * F.pad(x, (1, 1)), dim=-1, norm=norm)[
@@ -97,14 +116,16 @@ def dstI1D(x, norm="ortho"):
     ]
 
 
-def dstI2D(x, norm="ortho"):
+def dstI2D(x: torch.Tensor, norm: str = "ortho"):
     """2D DST-I."""
     return dstI1D(dstI1D(x, norm=norm).transpose(-1, -2), norm=norm).transpose(
         -1, -2
     )
 
 
-def compute_laplace_dstI(nx, ny, dx, dy, arr_kwargs):
+def compute_laplace_dstI(
+    nx: int, ny: int, dx: float, dy: float, arr_kwargs
+) -> torch.Tensor:
     """Type-I discrete sine transform of the usual 5-points
     discrete laplacian operator on uniformly spaced grid."""
     x, y = torch.meshgrid(
@@ -118,7 +139,10 @@ def compute_laplace_dstI(nx, ny, dx, dy, arr_kwargs):
     )
 
 
-def solve_helmholtz_dstI(rhs, helmholtz_dstI):
+def solve_helmholtz_dstI(
+    rhs: torch.Tensor,
+    helmholtz_dstI: torch.Tensor,
+) -> torch.Tensor:
     """Solves 2D Helmholtz equation with DST-I fast diagonalization."""
     return F.pad(
         dstI2D(dstI2D(rhs.type(helmholtz_dstI.dtype)) / helmholtz_dstI),
@@ -126,7 +150,11 @@ def solve_helmholtz_dstI(rhs, helmholtz_dstI):
     ).type(rhs.dtype)
 
 
-def compute_capacitance_matrices(helmholtz_dstI, bound_xids, bound_yids):
+def compute_capacitance_matrices(
+    helmholtz_dstI: torch.Tensor,
+    bound_xids,
+    bound_yids,
+) -> torch.Tensor:
     nl = helmholtz_dstI.shape[-3]
     M = bound_xids.shape[0]
 
