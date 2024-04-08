@@ -167,9 +167,17 @@ class QG(SW):
         self.compute_diagnostic_variables()
 
     def G(
-        self, p, p_i=None
+        self, p: torch.Tensor, p_i: Union[None, torch.Tensor] = None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """G operator."""
+        """G operator.
+
+        Args:
+            p (torch.Tensor): Pressure.
+            p_i (Union[None, torch.Tensor], optional): Interpolated pressures. Defaults to None.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
+        """
         p_i = self.interp_TP(p) if p_i is None else p_i
         dx, dy = self.dx, self.dy
 
