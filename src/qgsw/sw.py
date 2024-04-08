@@ -571,7 +571,7 @@ class SW:
                 f"max: {eta[:,0].max().cpu().item():.5f}"
             )
 
-    def advection_h(self):
+    def advection_h(self) -> torch.Tensor:
         """
         Advection RHS for thickness perturbation h
         dt_h = - div(h_tot [u v]),  h_tot = h_ref + h
@@ -623,7 +623,7 @@ class SW:
         dv[..., -1, :, :] += -self.bottom_drag_coef * self.v[..., -1, :, 1:-1]
         return du, dv
 
-    def compute_omega(self, u, v):
+    def compute_omega(self, u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
         """
         Pad u and v using boundary conditions (free-slip, partial free-slip,
         no-slip).
@@ -634,7 +634,7 @@ class SW:
         dy_u = torch.diff(u_, dim=-1)
         curl_uv = dx_v - dy_u
         alpha = 2 * (1 - self.slip_coef)
-        omega = (
+        omega: torch.Tensor = (
             self.masks.w_valid * curl_uv
             + self.masks.w_cornerout_bound * (1 - self.slip_coef) * curl_uv
             + self.masks.w_vertical_bound * alpha * dx_v
