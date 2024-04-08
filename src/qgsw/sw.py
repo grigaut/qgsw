@@ -152,7 +152,7 @@ class SW:
         self.fstar_hgrid = self.f_hgrid * self.area
 
         # gravity
-        self.g_prime = param["g_prime"]
+        self.g_prime: torch.Tensor = param["g_prime"]
         self.g = self.g_prime[0]
 
         # external top-layer forcing
