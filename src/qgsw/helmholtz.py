@@ -108,7 +108,7 @@ def solve_helmholtz_dctII(
     )
 
 
-def dstI1D(x: torch.Tensor, norm: str = "ortho"):
+def dstI1D(x: torch.Tensor, norm: str = "ortho") -> torch.Tensor:
     """1D type-I discrete sine transform (DST-I), forward and inverse
     since DST-I is auto-inverse."""
     return torch.fft.irfft(-1j * F.pad(x, (1, 1)), dim=-1, norm=norm)[
