@@ -18,7 +18,7 @@ from qgsw.helmholtz import (
 )
 from qgsw.finite_diff import grad_perp
 from qgsw.sw import SW
-from typing import Any
+from typing import Any, Union
 
 
 class QG(SW):
@@ -31,7 +31,7 @@ class QG(SW):
         self.compute_auxillary_matrices()
 
         # precompile functions
-        self.grad_perp = torch.jit.trace(grad_perp, (self.p,))
+        self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
 
     def _validate_H(self, param: dict[str, Any], key: str) -> torch.Tensor:
         """Perform additional validation over H.
@@ -173,7 +173,8 @@ class QG(SW):
 
         Args:
             p (torch.Tensor): Pressure.
-            p_i (Union[None, torch.Tensor], optional): Interpolated pressures. Defaults to None.
+            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
+             ("middle of grid cell"). Defaults to None.
 
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
@@ -194,7 +195,14 @@ class QG(SW):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """(Q o G)^{-1} operator: solve elliptic equation with mass conservation.
 
-        More informatiosn: https://gmd.copernicus.org/articles/17/1749/2024/.
+        More informatiosn: https://gmd.copernicus.org/articles/17/1749/2024/.)
+
+        Args:
+            elliptic_rhs (torch.Tensor): Elliptic equation right hand side value (ω-f_0*h/H).
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Quasi-geostrophique pressure,
+            interpolated quasi-geostroophic pressure ("middle of grid cell").
         """
         # transform to modes
         helmholtz_rhs: torch.Tensor = torch.einsum(
@@ -228,11 +236,22 @@ class QG(SW):
         v: torch.Tensor,
         h: torch.Tensor,
     ) -> torch.Tensor:
-        """Q operator: compute elliptic equation r.h.s."""
+        """Q operator: compute elliptic equation r.h.s.
+
+        Args:
+            u (torch.Tensor): Zonal speed.
+            v (torch.Tensor): Meridional Speed.
+            h (torch.Tensor): Layer  thickness.
+
+        Returns:
+            torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
+        """
         f0, H, area = self.f0, self.H, self.area
+        # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
             u[..., 1:-1, :], dim=-1
         )
+        # Compute ω-f_0*h/H
         elliptic_rhs = (omega - f0 * self.interp_TP(h) / H) * (f0 / area)
         return elliptic_rhs
 
