@@ -124,11 +124,11 @@ class SW:
         # verifications
 
         # grid
-        self.nx: int = param["nx"]
-        self.ny: int = param["ny"]
-        self.nl: int = param["nl"]
-        self.dx: float = param["dx"]
-        self.dy: float = param["dy"]
+        self.nx: int = param["nx"]  # number of points in the x direction
+        self.ny: int = param["ny"]  # number of point in the y direction
+        self.nl: int = param["nl"]  # number of layers
+        self.dx: float = param["dx"]  # x-step
+        self.dy: float = param["dy"]  # y-step
         print(f"  - nx, ny, nl =  {self.nx, self.ny, self.nl}")
         self.area = self.dx * self.dy
 
