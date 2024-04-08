@@ -18,6 +18,7 @@ from qgsw.helmholtz import (
 )
 from qgsw.finite_diff import grad_perp
 from qgsw.sw import SW
+from typing import Any
 
 
 class QG(SW):
@@ -25,17 +26,35 @@ class QG(SW):
 
     def __init__(self, param):
         super().__init__(param)
-        assert self.H.shape[-2:] == (1, 1), (
-            "H must me constant in space for "
-            "qg approximation, i.e. have shape (...,1,1)"
-            f"got shape shape {self.H.shape}"
-        )
 
         # init matrices for elliptic equation
         self.compute_auxillary_matrices()
 
         # precompile functions
         self.grad_perp = torch.jit.trace(grad_perp, (self.p,))
+
+    def _validate_H(self, param: dict[str, Any], key: str) -> torch.Tensor:
+        """Perform additional validation over H.
+
+        Args:
+            param (dict[str, Any]): Parameters dict.
+            key (str): Key for H value.
+
+        Raises:
+            ValueError: if H is not constant in space
+
+        Returns:
+            torch.Tensor: H
+        """
+        value = super()._validate_H(param, key)
+        if value.shape[-2:] != (1, 1):
+            msg = (
+                "H must me constant in space for "
+                "qg approximation, i.e. have shape (...,1,1)"
+                f"got shape shape {self.H.shape}"
+            )
+            raise ValueError(msg)
+        return value
 
     def compute_auxillary_matrices(self):
         # A operator
