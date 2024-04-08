@@ -14,6 +14,7 @@ from qgsw.helmholtz import HelmholtzNeumannSolver
 from qgsw.helmholtz_multigrid import MG_Helmholtz
 from qgsw.masks import Masks
 from qgsw.reconstruction import linear2_centered, wenoz4_left, wenoz6_left
+from typing import Union
 
 
 def replicate_pad(f, mask):
@@ -464,8 +465,8 @@ class SW:
 
     def set_wind_forcing(
         self,
-        taux: float | torch.Tensor,
-        tauy: float | torch.Tensor,
+        taux: Union[float, torch.Tensor],
+        tauy: Union[float, torch.Tensor],
     ) -> None:
         """Set the winf forcing attributes taux and tauy.
 
@@ -497,7 +498,7 @@ class SW:
         if (not isinstance(tauy, float)) and (not is_tensory):
             msg = "tauy must be a float or a Tensor"
             raise ValueError(msg)
-        elif is_tensory and (tauy.shape != (self.nx - 1, self.ny)):
+        elif is_tensory and (tauy.shape != (self.nx, self.ny - 1)):
             msg = f"When tauy is a Tensor, it must be a {(self.nx, self.ny-1)} Tensor"
             raise ValueError(msg)
 
