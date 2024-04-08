@@ -76,6 +76,33 @@ class QG(SW):
             self.A[-1, -1] = 1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
             self.A[-1, -2] = -1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
 
+            # # equivalent computation without for loop
+            # # Invert matrices
+            # H_inv = 1 / H
+            # g_inv = 1 / g_prime
+
+            # # Compute products
+            # hg = H_inv * g_inv
+
+            # # Pad with zeros
+            # hg_shift = H_inv * F.pad(g_inv[1:], (0, 1))
+
+            # # Create diagonal matrices
+            # diag0 = torch.diag_embed(
+            #     input=hg + hg_shift,
+            # )
+            # diag1 = torch.diag_embed(
+            #     input=-hg_shift[:-1],
+            #     offset=1,
+            # )
+            # diag_1 = torch.diag_embed(
+            #     input=-hg[1:],
+            #     offset=-1,
+            # )
+
+            ## Create final matrice
+            # self.A = diag0 + diag1 + diag_1
+
         # layer-to-mode and mode-to-layer matrices
         lambd_r, R = torch.linalg.eig(self.A)
         lambd_l, L = torch.linalg.eig(self.A.T)
