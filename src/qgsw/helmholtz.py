@@ -182,8 +182,13 @@ def compute_capacitance_matrices(
 
 
 def solve_helmholtz_dstI_cmm(
-    rhs, helmholtz_dstI, cap_matrices, bound_xids, bound_yids, mask
-):
+    rhs: torch.Tensor,
+    helmholtz_dstI: torch.Tensor,
+    cap_matrices: torch.Tensor,
+    bound_xids: torch.Tensor,
+    bound_yids: torch.Tensor,
+    mask: torch.Tensor,
+) -> torch.Tensor:
     sol_1 = dstI2D(
         dstI2D(rhs.type(helmholtz_dstI.dtype)) / helmholtz_dstI
     ).type(rhs.dtype)
