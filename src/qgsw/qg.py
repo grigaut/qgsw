@@ -57,6 +57,7 @@ class QG(SW):
         return value
 
     def compute_auxillary_matrices(self):
+        """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
         # A operator
         H, g_prime = self.H.squeeze(), self.g_prime.squeeze()
         self.A = torch.zeros((self.nl, self.nl), **self.arr_kwargs)
@@ -106,7 +107,7 @@ class QG(SW):
         # layer-to-mode and mode-to-layer matrices
         lambd_r, R = torch.linalg.eig(self.A)
         lambd_l, L = torch.linalg.eig(self.A.T)
-        self.lambd = lambd_r.real.reshape((1, self.nl, 1, 1))
+        self.lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
         with np.printoptions(precision=1):
             print(
                 "  - Rossby deformation Radii (km): ",
@@ -114,7 +115,9 @@ class QG(SW):
                 / torch.sqrt(self.f0**2 * self.lambd.squeeze()).cpu().numpy(),
             )
         R, L = R.real, L.real
+        # layer to mode
         self.Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T
+        # mode to layer
         self.Cm2l = R
 
         # For Helmholtz equations
@@ -128,6 +131,7 @@ class QG(SW):
 
         cst_wgrid = torch.ones((1, nl, nx + 1, ny + 1), **self.arr_kwargs)
         if len(self.masks.psi_irrbound_xids) > 0:
+            # Handle Non rectangular geometry
             self.cap_matrices = compute_capacitance_matrices(
                 self.helmholtz_dstI,
                 self.masks.psi_irrbound_xids,
@@ -162,7 +166,9 @@ class QG(SW):
         self.u, self.v, self.h = self.project_qg(self.u, self.v, self.h)
         self.compute_diagnostic_variables()
 
-    def G(self, p, p_i=None):
+    def G(
+        self, p, p_i=None
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """G operator."""
         p_i = self.interp_TP(p) if p_i is None else p_i
         dx, dy = self.dx, self.dy
@@ -170,13 +176,20 @@ class QG(SW):
         # geostrophic balance
         u = -torch.diff(p, dim=-1) / dy / self.f0 * dx
         v = torch.diff(p, dim=-2) / dx / self.f0 * dy
+        # h = diag(H)Ap
         h = self.H * torch.einsum("lm,...mxy->...lxy", self.A, p_i) * self.area
 
         return u, v, h
 
-    def QoG_inv(self, elliptic_rhs):
-        """(Q o G)^{-1} operator: solve elliptic equation with mass conservation"""
-        helmholtz_rhs = torch.einsum(
+    def QoG_inv(
+        self, elliptic_rhs: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """(Q o G)^{-1} operator: solve elliptic equation with mass conservation.
+
+        More informatiosn: https://gmd.copernicus.org/articles/17/1749/2024/.
+        """
+        # transform to modes
+        helmholtz_rhs: torch.Tensor = torch.einsum(
             "lm,...mxy->...lxy", self.Cl2m, elliptic_rhs
         )
         if self.cap_matrices is not None:
@@ -194,11 +207,19 @@ class QG(SW):
         # Add homogeneous solutions to ensure mass conservation
         alpha = -p_modes.mean((-1, -2), keepdim=True) / self.homsol_wgrid_mean
         p_modes += alpha * self.homsol_wgrid
-        p_qg = torch.einsum("lm,...mxy->...lxy", self.Cm2l, p_modes)
+        # transform back to layers
+        p_qg: torch.Tensor = torch.einsum(
+            "lm,...mxy->...lxy", self.Cm2l, p_modes
+        )
         p_qg_i = self.interp_TP(p_qg)
         return p_qg, p_qg_i
 
-    def Q(self, u, v, h):
+    def Q(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+    ) -> torch.Tensor:
         """Q operator: compute elliptic equation r.h.s."""
         f0, H, area = self.f0, self.H, self.area
         omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
