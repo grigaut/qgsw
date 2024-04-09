@@ -1,0 +1,25 @@
+[physics]
+rho = 1000
+slip_coef = 1.0
+f0 = 9.375e-5           # mean coriolis (s^-1)
+beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
+wind_stress_mag = 0.08   # Wind stress magnitude (Pa m-1 kg s-2)
+
+[layers]
+h = [
+    400,
+    1100,
+    2600,
+]
+g_prime = [
+    9.81,
+    0.025,
+    0.0125,
+]
+
+[grid]
+nx = 32 # 128
+ny = 64 # 256
+Lx = 2560.0e3
+Ly = 5120.0e3
+dt = 4000
