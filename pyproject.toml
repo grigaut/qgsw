@@ -43,6 +43,8 @@ ignore = [
     "PLR0913",
     # Missing type annotation for `self` in method
     "ANN101",
+    # Missing type annotation for `cls` in classmethod
+    "ANN102",
     # suppressible-exception
     "SIM105",
 ]
@@ -58,3 +60,5 @@ unfixable = [
     # found comented-out code
     "ERA001",
 ]
+[tool.ruff.lint.pydocstyle]
+convention = "google"
