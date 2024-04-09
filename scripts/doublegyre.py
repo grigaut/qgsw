@@ -59,7 +59,7 @@ param = {
 
 for model, name, dt, start_file in [
     # (QG, 'qg', 4000, ''),
-    (QG, "qg", 4000, ""),
+    (SW, "sw", 4000, ""),
     # (SW, 'sw', 4000, 'run_outputs/qg_256x256_dt4000_slip1.0/uvh_100y_010d.npz'),
 ]:
     # set time step given barotropic mode for SW

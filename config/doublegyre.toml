@@ -20,6 +20,14 @@ g_prime = [
 [grid]
 nx = 32 # 128
 ny = 64 # 256
+dt = 4000
+reference = "distance"
+[grid.spatial]
 Lx = 2560.0e3
 Ly = 5120.0e3
-dt = 4000
+[grid.spatial.latitude]
+min = 0
+max = 5
+[grid.spatial.longitude]
+min = 0
+max = 5

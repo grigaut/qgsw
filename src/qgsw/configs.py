@@ -38,6 +38,15 @@ GRID_KEYS = {
     "timestep": "dt",
 }
 
+SPATIAL_KEYS = {
+    "section": "spatial",
+    "reference": "reference",
+    "total distance x": "Lx",
+    "total distance y": "Ly",
+    "latitude": "latitude",
+    "longitude": "longitude",
+}
+
 
 class ConfigError(Exception):
     """Configuration-Related Error."""
@@ -275,9 +284,23 @@ class GridConfig(_Config):
 
     _nx: str = GRID_KEYS["points nb x"]
     _ny: str = GRID_KEYS["points nb y"]
-    _lx: str = GRID_KEYS["x length"]
-    _ly: str = GRID_KEYS["y length"]
     _dt: str = GRID_KEYS["timestep"]
+    _spatial_section: str = SPATIAL_KEYS["section"]
+    _spatial_ref: str = SPATIAL_KEYS["reference"]
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        """Instantiate Grid Configuration.
+
+        Args:
+            params (dict[str, Any]): Grid configuration dictionnary.
+        """
+        super().__init__(params)
+        self._set_spatial_config(params=params[self._spatial_section])
+
+    @property
+    def spatial(self) -> SpatialCoordsConfig | SpatialDistanceConfig:
+        """Spatial Configuration."""
+        return self._spat
 
     @property
     def nx(self) -> int:
@@ -291,13 +314,13 @@ class GridConfig(_Config):
 
     @property
     def lx(self) -> int:
-        """Total length in the x direction (in meters)."""
-        return self.params[self._lx]
+        """Total distance in the x direction (in meters)."""
+        return self._spat.lx
 
     @property
     def ly(self) -> int:
         """Total length in the y direction (in meters)."""
-        return self.params[self._ly]
+        return self._spat.ly
 
     @property
     def dt(self) -> int:
@@ -322,5 +345,208 @@ class GridConfig(_Config):
 
         Returns:
             dict[str, Any]: Grid parameters.
+        """
+        # Verify that the layers section is present.
+        if self._spatial_section not in params:
+            msg = (
+                "The grid configuration must contain a "
+                f"spatial section, named {self._spatial_section}."
+            )
+            raise ConfigError(msg)
+        return params
+
+    def _set_spatial_config(self, params: dict[str, Any]) -> None:
+        """Set the spatial configuration.
+
+        Args:
+            params (dict[str, Any]): Spatial configuration parameters.
+        """
+        if self.params[self._spatial_ref] == "coordinates":
+            self._spat = SpatialCoordsConfig(params=params)
+        elif self.params[self._spatial_ref] == "distance":
+            self._spat = SpatialDistanceConfig(params=params)
+
+
+class SpatialConfig(_Config, ABC):
+    """Space Configuration."""
+
+    _deg_to_m: int = 111e3
+    _lx: str = SPATIAL_KEYS["total distance x"]
+    _ly: str = SPATIAL_KEYS["total distance y"]
+    _lat: str = SPATIAL_KEYS["latitude"]
+    _lon: str = SPATIAL_KEYS["longitude"]
+
+    @property
+    def deg_to_m(self) -> int:
+        """Degrees to meters conversion factor."""
+        return self._deg_to_m
+
+    @property
+    @abstractmethod
+    def lx(self) -> float:
+        """Total Distance along x."""
+
+    @property
+    @abstractmethod
+    def ly(self) -> float:
+        """Total Distance along y."""
+
+    @property
+    @abstractmethod
+    def lat_min(self) -> float:
+        """Minimum Latitude."""
+
+    @property
+    @abstractmethod
+    def lat_max(self) -> float:
+        """Maximum Latitude."""
+
+    @property
+    @abstractmethod
+    def lon_min(self) -> float:
+        """Minimum Longitude."""
+
+    @property
+    @abstractmethod
+    def lon_max(self) -> float:
+        """Maximum Longitude."""
+
+
+class SpatialCoordsConfig(SpatialConfig):
+    """Spatial Configuration, based on area corners coordinates."""
+
+    @property
+    def lx(self) -> float:
+        """Total distance along x."""
+        return (self.lon_max - self.lon_min) * self.deg_to_m
+
+    @property
+    def ly(self) -> float:
+        """Total distance along y."""
+        return (self.lat_max - self.lat_min) * self.deg_to_m
+
+    @property
+    def lat_min(self) -> float:
+        """Minimum Latitude."""
+        return self.params[self._lat]["min"]
+
+    @property
+    def lat_max(self) -> float:
+        """Maximum Latitude."""
+        return self.params[self._lat]["max"]
+
+    @property
+    def lon_min(self) -> float:
+        """Minimum Longitude."""
+        return self.params[self._lon]["min"]
+
+    @property
+    def lon_max(self) -> float:
+        """Maximum Longitude."""
+        return self.params[self._lon]["max"]
+
+    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Validate Spatial configuration.
+
+        Args:
+            params (dict[str, Any]): Spatial configuration dictionnary.
+
+        Raises:
+            ConfigError: If latitude has no min entry.
+            ConfigError: If latitude has no max entry.
+            ConfigError: If longitude has no min entry.
+            ConfigError: If longitude has no max entry.
+            ConfigError: If some latitude or longitude are not given.
+
+        Returns:
+            dict[str, Any]: Configuration dictionnary.
+        """
+        if "min" not in params[self._lat]:
+            msg = "Latitude section must contain a `min` entry"
+            raise ConfigError(msg)
+        if "max" not in params[self._lat]:
+            msg = "Latitude section must contain a `max` entry"
+            raise ConfigError(msg)
+        if "min" not in params[self._lon]:
+            msg = "Longitude section must contain a `min` entry"
+            raise ConfigError(msg)
+        if "max" not in params[self._lat]:
+            msg = "Longitude section must contain a `max` entry"
+            raise ConfigError(msg)
+
+        are_none = [
+            params[self._lat]["min"] is None,
+            params[self._lat]["max"] is None,
+            params[self._lon]["min"] is None,
+            params[self._lon]["max"] is None,
+        ]
+        if sum(are_none) > 0:
+            msg = "All coordinates extremums must be renseigned."
+            raise ConfigError(msg)
+
+        return params
+
+
+class SpatialDistanceConfig(SpatialConfig):
+    """Spatial Configuration, based on area borders distances."""
+
+    @property
+    def lx(self) -> float:
+        """Total distance along x."""
+        return self.params[self._lx]
+
+    @property
+    def ly(self) -> float:
+        """Total distance along y."""
+        return self.params[self._ly]
+
+    @property
+    def lat_min(self) -> float:
+        """Minimum Latitude."""
+        msg = (
+            "Configuration conducted using diastance not coordinates.\n"
+            "Consider using reference='coordinates' in the configuration "
+            "files in order to access these attributes."
+        )
+        raise ConfigError(msg)
+
+    @property
+    def lat_max(self) -> float:
+        """Maximum Latitude."""
+        msg = (
+            "Configuration conducted using diastance not coordinates.\n"
+            "Consider using reference='coordinates' in the configuration "
+            "files in order to access these attributes."
+        )
+        raise ConfigError(msg)
+
+    @property
+    def lon_min(self) -> float:
+        """Minimum Longitude."""
+        msg = (
+            "Configuration conducted using diastance not coordinates.\n"
+            "Consider using reference='coordinates' in the configuration "
+            "files in order to access these attributes."
+        )
+        raise ConfigError(msg)
+
+    @property
+    def lon_max(self) -> float:
+        """Maximum Longitude."""
+        msg = (
+            "Configuration conducted using diastance not coordinates.\n"
+            "Consider using reference='coordinates' in the configuration "
+            "files in order to access these attributes."
+        )
+        raise ConfigError(msg)
+
+    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Validate Spatial Configuration parmeters.
+
+        Args:
+            params (dict[str, Any]): Spatial Configuration parmeters.
+
+        Returns:
+            dict[str, Any]: Spatial Configuration parmeters.
         """
         return params

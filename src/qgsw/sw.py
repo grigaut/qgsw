@@ -190,7 +190,6 @@ class SW:
         self.barotropic_filter = param.get("barotropic_filter", False)
         if self.barotropic_filter:
             class_name = self.__class__.__name__
-            print(class_name)
             if class_name == "SW":
                 print("  - Using barotropic filter ", end="")
                 self.tau = 2 * self.dt
