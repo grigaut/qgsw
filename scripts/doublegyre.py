@@ -3,109 +3,82 @@ import os
 import numpy as np
 import sys
 import torch
+from pathlib import Path
 
 sys.path.append("../src")
 
 from qgsw.sw import SW
 from qgsw.qg import QG
+from qgsw.configs import RunConfig
+from qgsw.grid import Grid
+from qgsw.forcing.wind import CosineZonalWindForcing
+from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
+
+
+config = RunConfig.from_file(Path("config/doublegyre.toml"))
+grid = Grid.from_runconfig(config)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dtype = torch.float64
 
-### Double-gyre on beta plane with idealized wind forcing
-
-# grid
-# Lx = 5120.0e3
-# nx = 256
-Lx = 2560.0e3
-nx = 128
-Ly = 5120.0e3
-ny = 256
-mask = torch.ones(nx, ny, dtype=dtype, device=device)
+mask = torch.ones(config.grid.nx, config.grid.ny, dtype=dtype, device=device)
 # mask[0,0] = 0
 # mask[0,-1] = 0
 
-H = torch.zeros(3, 1, 1, dtype=dtype, device=device)
-H[0, 0, 0] = 400.0
-H[1, 0, 0] = 1100.0
-H[2, 0, 0] = 2600.0
-
-# density/gravity
-rho = 1000
-g_prime = torch.zeros(3, 1, 1, dtype=dtype, device=device)
-g_prime[0, 0, 0] = 9.81
-g_prime[1, 0, 0] = 0.025
-g_prime[2, 0, 0] = 0.0125
-
-
-# coriolis beta plane
-f0 = 9.375e-5  # mean coriolis (s^-1)
-beta = 1.754e-11  # coriolis gradient (m^-1 s^-1)
-
-# bottom drag
-bottom_drag_coef = 0.5 * f0 * 2.0 / 2600
+wind_forcing = CosineZonalWindForcing.from_runconfig(run_config=config)
+taux, tauy = wind_forcing.compute_over_grid(grid=grid)
 
 param = {
-    "nl": 3,
-    "H": H,
-    "rho": rho,
-    "g_prime": g_prime,
-    "bottom_drag_coef": bottom_drag_coef,
-    "device": device,
+    "nx": config.grid.nx,
+    "ny": config.grid.ny,
+    "nl": config.layers.nl,
+    "dx": config.grid.dx,
+    "dy": config.grid.dy,
+    "H": config.layers.h,
+    "rho": config.physics.rho,
+    "g_prime": config.layers.g_prime,
+    "bottom_drag_coef": config.physics.bottom_drag_coef,
+    "device": DEVICE,
     "dtype": dtype,
-    "slip_coef": 1.0,
+    "slip_coef": config.physics.slip_coef,
     "interp_fd": False,
-    "dt": 4000,  # time-step (s)
+    "dt": config.grid.dt,
     "compile": True,
     "barotropic_filter": True,
     "barotropic_filter_spectral": True,
     "mask": mask,
+    "f": grid.generate_coriolis_grid(
+        f0=config.physics.f0, beta=config.physics.beta
+    ),
+    "taux": taux,
+    "tauy": tauy,
 }
 
 
 for model, name, dt, start_file in [
     # (QG, 'qg', 4000, ''),
-    (SW, "sw", 4000, ""),
+    (QG, "qg", 4000, ""),
     # (SW, 'sw', 4000, 'run_outputs/qg_256x256_dt4000_slip1.0/uvh_100y_010d.npz'),
 ]:
-    param["nx"] = nx
-    param["ny"] = ny
-    param["dt"] = dt
-
-    dx = Lx / nx
-    dy = Ly / ny
-    param["dx"] = dx
-    param["dy"] = dy
-    x, y = torch.meshgrid(
-        torch.linspace(0, Lx, nx + 1, dtype=torch.float64, device=device),
-        torch.linspace(0, Ly, ny + 1, dtype=torch.float64, device=device),
-        indexing="ij",
-    )
-
     # set time step given barotropic mode for SW
     if model == SW:
-        c = torch.sqrt(H.sum() * g_prime[0, 0, 0]).cpu().item()
+        c = (
+            torch.sqrt(config.layers.h.sum() * config.layers.g_prime[0, 0, 0])
+            .cpu()
+            .item()
+        )
+        print(c)
         cfl = 20 if param["barotropic_filter"] else 0.5
-        dt = float(int(cfl * min(dx, dy) / c))
+        print(cfl)
+        dt = float(int(cfl * min(config.grid.dx, config.grid.dy) / c))
         print(f"dt = {dt:.1f} s.")
         param["dt"] = dt
-
-    print(f"Double gyre config, {name} model, {nx}x{ny} grid, dt {dt:.1f}s.")
-
-    # corolis param grid
-    f = f0 + beta * (y - Ly / 2)
-    param["f"] = f
-
-    # wind forcing
-    mag = 0.08  # Wind stress magnitude (Pa m-1 kg s-2)
-    tau0 = mag / rho
-    y_ugrid = 0.5 * (y[:, 1:] + y[:, :-1])
-    taux = tau0 * torch.cos(2 * torch.pi * (y_ugrid - Ly / 2) / Ly)[1:-1, :]
-    tauy = 0.0
-    param["taux"] = taux
-    param["tauy"] = tauy
+    # exit()
+    print(
+        f"Double gyre config, {name} model, {config.grid.nx}x{config.grid.ny} grid, dt {dt:.1f}s."
+    )
 
     qgsw_multilayer = model(param)
 
@@ -128,7 +101,7 @@ for model, name, dt, start_file in [
 
     if freq_save > 0:
         output_dir = (
-            f'run_outputs/{name}_{nx}x{ny}_dt{dt}_'
+            f'run_outputs/{name}_{config.grid.nx}x{config.grid.ny}_dt{dt}_'
             f'slip{param["slip_coef"]}/'
         )
         os.makedirs(output_dir, exist_ok=True)
@@ -236,3 +209,4 @@ for model, name, dt, start_file in [
                     h=h.astype("float32"),
                 )
                 print(f"saved u,v,h to {filename}")
+    break
