@@ -22,12 +22,11 @@ nx = 32 # 128
 ny = 64 # 256
 dt = 4000
 reference = "distance"
-[grid.spatial]
-Lx = 2560.0e3
-Ly = 5120.0e3
-[grid.spatial.latitude]
+[grid.box]
+unit = "m"
+[grid.box.x]
 min = 0
-max = 5
-[grid.spatial.longitude]
+max = 2560.0e3
+[grid.box.y]
 min = 0
-max = 5
+max = 5120.0e3

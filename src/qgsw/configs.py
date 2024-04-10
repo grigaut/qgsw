@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 import toml
 import torch
@@ -12,6 +12,7 @@ from typing_extensions import Self
 if TYPE_CHECKING:
     from pathlib import Path
 
+from qgsw import conversion
 from qgsw.specs import DEVICE
 
 PHYSICS_KEYS = {
@@ -38,13 +39,11 @@ GRID_KEYS = {
     "timestep": "dt",
 }
 
-SPATIAL_KEYS = {
-    "section": "spatial",
-    "reference": "reference",
-    "total distance x": "Lx",
-    "total distance y": "Ly",
-    "latitude": "latitude",
-    "longitude": "longitude",
+BOX_KEYS = {
+    "section": "box",
+    "unit": "unit",
+    "x": "x",
+    "y": "y",
 }
 
 
@@ -285,8 +284,7 @@ class GridConfig(_Config):
     _nx: str = GRID_KEYS["points nb x"]
     _ny: str = GRID_KEYS["points nb y"]
     _dt: str = GRID_KEYS["timestep"]
-    _spatial_section: str = SPATIAL_KEYS["section"]
-    _spatial_ref: str = SPATIAL_KEYS["reference"]
+    _box_section: str = BOX_KEYS["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate Grid Configuration.
@@ -295,12 +293,12 @@ class GridConfig(_Config):
             params (dict[str, Any]): Grid configuration dictionnary.
         """
         super().__init__(params)
-        self._set_spatial_config(params=params[self._spatial_section])
+        self._box = BoxConfig(params=params[self._box_section])
 
     @property
-    def spatial(self) -> SpatialCoordsConfig | SpatialDistanceConfig:
+    def box(self) -> BoxConfig:
         """Spatial Configuration."""
-        return self._spat
+        return self._box
 
     @property
     def nx(self) -> int:
@@ -315,12 +313,12 @@ class GridConfig(_Config):
     @property
     def lx(self) -> int:
         """Total distance in the x direction (in meters)."""
-        return self._spat.lx
+        return self._box.lx
 
     @property
     def ly(self) -> int:
         """Total length in the y direction (in meters)."""
-        return self._spat.ly
+        return self._box.ly
 
     @property
     def dt(self) -> int:
@@ -347,103 +345,27 @@ class GridConfig(_Config):
             dict[str, Any]: Grid parameters.
         """
         # Verify that the layers section is present.
-        if self._spatial_section not in params:
+        if self._box_section not in params:
             msg = (
                 "The grid configuration must contain a "
-                f"spatial section, named {self._spatial_section}."
+                f"box section, named {self._box_section}."
             )
             raise ConfigError(msg)
         return params
 
-    def _set_spatial_config(self, params: dict[str, Any]) -> None:
-        """Set the spatial configuration.
 
-        Args:
-            params (dict[str, Any]): Spatial configuration parameters.
-        """
-        if self.params[self._spatial_ref] == "coordinates":
-            self._spat = SpatialCoordsConfig(params=params)
-        elif self.params[self._spatial_ref] == "distance":
-            self._spat = SpatialDistanceConfig(params=params)
-
-
-class SpatialConfig(_Config, ABC):
+class BoxConfig(_Config):
     """Space Configuration."""
 
-    _deg_to_m: int = 111e3
-    _lx: str = SPATIAL_KEYS["total distance x"]
-    _ly: str = SPATIAL_KEYS["total distance y"]
-    _lat: str = SPATIAL_KEYS["latitude"]
-    _lon: str = SPATIAL_KEYS["longitude"]
+    _unit: str = BOX_KEYS["unit"]
+    _x: str = BOX_KEYS["x"]
+    _y: str = BOX_KEYS["y"]
 
-    @property
-    def deg_to_m(self) -> int:
-        """Degrees to meters conversion factor."""
-        return self._deg_to_m
-
-    @property
-    @abstractmethod
-    def lx(self) -> float:
-        """Total Distance along x."""
-
-    @property
-    @abstractmethod
-    def ly(self) -> float:
-        """Total Distance along y."""
-
-    @property
-    @abstractmethod
-    def lat_min(self) -> float:
-        """Minimum Latitude."""
-
-    @property
-    @abstractmethod
-    def lat_max(self) -> float:
-        """Maximum Latitude."""
-
-    @property
-    @abstractmethod
-    def lon_min(self) -> float:
-        """Minimum Longitude."""
-
-    @property
-    @abstractmethod
-    def lon_max(self) -> float:
-        """Maximum Longitude."""
-
-
-class SpatialCoordsConfig(SpatialConfig):
-    """Spatial Configuration, based on area corners coordinates."""
-
-    @property
-    def lx(self) -> float:
-        """Total distance along x."""
-        return (self.lon_max - self.lon_min) * self.deg_to_m
-
-    @property
-    def ly(self) -> float:
-        """Total distance along y."""
-        return (self.lat_max - self.lat_min) * self.deg_to_m
-
-    @property
-    def lat_min(self) -> float:
-        """Minimum Latitude."""
-        return self.params[self._lat]["min"]
-
-    @property
-    def lat_max(self) -> float:
-        """Maximum Latitude."""
-        return self.params[self._lat]["max"]
-
-    @property
-    def lon_min(self) -> float:
-        """Minimum Longitude."""
-        return self.params[self._lon]["min"]
-
-    @property
-    def lon_max(self) -> float:
-        """Maximum Longitude."""
-        return self.params[self._lon]["max"]
+    _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
+        "deg": conversion.deg_to_m,
+        "km": conversion.km_to_m,
+        "m": conversion.m_to_m,
+    }
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate Spatial configuration.
@@ -461,24 +383,29 @@ class SpatialCoordsConfig(SpatialConfig):
         Returns:
             dict[str, Any]: Configuration dictionnary.
         """
-        if "min" not in params[self._lat]:
-            msg = "Latitude section must contain a `min` entry"
+        if params[self._unit] not in self._conversion:
+            units = self._conversion.keys()
+            msg = f"Box extremums unit must be one of {units}"
             raise ConfigError(msg)
-        if "max" not in params[self._lat]:
-            msg = "Latitude section must contain a `max` entry"
+
+        if "min" not in params[self._x]:
+            msg = "X section must contain a `min` entry"
             raise ConfigError(msg)
-        if "min" not in params[self._lon]:
-            msg = "Longitude section must contain a `min` entry"
+        if "max" not in params[self._x]:
+            msg = "X section must contain a `max` entry"
             raise ConfigError(msg)
-        if "max" not in params[self._lat]:
-            msg = "Longitude section must contain a `max` entry"
+        if "min" not in params[self._y]:
+            msg = "Y section must contain a `min` entry"
+            raise ConfigError(msg)
+        if "max" not in params[self._y]:
+            msg = "Y section must contain a `max` entry"
             raise ConfigError(msg)
 
         are_none = [
-            params[self._lat]["min"] is None,
-            params[self._lat]["max"] is None,
-            params[self._lon]["min"] is None,
-            params[self._lon]["max"] is None,
+            params[self._x]["min"] is None,
+            params[self._x]["max"] is None,
+            params[self._y]["min"] is None,
+            params[self._y]["max"] is None,
         ]
         if sum(are_none) > 0:
             msg = "All coordinates extremums must be renseigned."
@@ -486,67 +413,37 @@ class SpatialCoordsConfig(SpatialConfig):
 
         return params
 
+    @property
+    def xy_unit(self) -> str:
+        """Unit of extremums."""
+        return self.params[self._unit]
 
-class SpatialDistanceConfig(SpatialConfig):
-    """Spatial Configuration, based on area borders distances."""
+    @property
+    def x_min(self) -> float:
+        """X min."""
+        return self.params[self._x]["min"]
+
+    @property
+    def x_max(self) -> float:
+        """X max."""
+        return self.params[self._x]["max"]
+
+    @property
+    def y_min(self) -> float:
+        """Y min."""
+        return self.params[self._y]["min"]
+
+    @property
+    def y_max(self) -> float:
+        """Y max."""
+        return self.params[self._y]["max"]
 
     @property
     def lx(self) -> float:
-        """Total distance along x."""
-        return self.params[self._lx]
+        """Total distance along x (meters)."""
+        return self._conversion[self.xy_unit](self.x_max - self.x_min)
 
     @property
     def ly(self) -> float:
-        """Total distance along y."""
-        return self.params[self._ly]
-
-    @property
-    def lat_min(self) -> float:
-        """Minimum Latitude."""
-        msg = (
-            "Configuration conducted using diastance not coordinates.\n"
-            "Consider using reference='coordinates' in the configuration "
-            "files in order to access these attributes."
-        )
-        raise ConfigError(msg)
-
-    @property
-    def lat_max(self) -> float:
-        """Maximum Latitude."""
-        msg = (
-            "Configuration conducted using diastance not coordinates.\n"
-            "Consider using reference='coordinates' in the configuration "
-            "files in order to access these attributes."
-        )
-        raise ConfigError(msg)
-
-    @property
-    def lon_min(self) -> float:
-        """Minimum Longitude."""
-        msg = (
-            "Configuration conducted using diastance not coordinates.\n"
-            "Consider using reference='coordinates' in the configuration "
-            "files in order to access these attributes."
-        )
-        raise ConfigError(msg)
-
-    @property
-    def lon_max(self) -> float:
-        """Maximum Longitude."""
-        msg = (
-            "Configuration conducted using diastance not coordinates.\n"
-            "Consider using reference='coordinates' in the configuration "
-            "files in order to access these attributes."
-        )
-        raise ConfigError(msg)
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate Spatial Configuration parmeters.
-
-        Args:
-            params (dict[str, Any]): Spatial Configuration parmeters.
-
-        Returns:
-            dict[str, Any]: Spatial Configuration parmeters.
-        """
-        return params
+        """Total distance along y (meters)."""
+        return self._conversion[self.xy_unit](self.y_max - self.y_min)
