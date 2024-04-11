@@ -51,6 +51,8 @@ BATHY_KEYS = {
     "url": "URL",
     "folder": "folder",
     "h top ocean": "htop_ocean",
+    "island minimum area": "island_min_area",
+    "lake minimum area": "lake_min_area",
 }
 
 
@@ -497,6 +499,8 @@ class BathyConfig(_Config):
     _url: str = BATHY_KEYS["url"]
     _folder: str = BATHY_KEYS["folder"]
     _htop: str = BATHY_KEYS["h top ocean"]
+    _lake: str = BATHY_KEYS["lake minimum area"]
+    _island: str = BATHY_KEYS["island minimum area"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate Bathymetry Config."""
@@ -536,6 +540,16 @@ class BathyConfig(_Config):
     def htop_ocean(self) -> int:
         """Value of htop_ocean."""
         return self.params[self._htop]
+
+    @property
+    def lake_min_area(self) -> int:
+        """Lake minimum area (in meters)."""
+        return self.params[self._lake]
+
+    @property
+    def island_min_area(self) -> int:
+        """Lake minimum area (in meters)."""
+        return self.params[self._island]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate Bathymetry parameters.

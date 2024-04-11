@@ -87,7 +87,7 @@ class Grid:
         ys = torch.linspace(
             self._config.y_min,
             self._config.y_max,
-            self.nx + 1,
+            self.ny + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
