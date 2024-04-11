@@ -58,6 +58,10 @@ class ConfigError(Exception):
     """Configuration-Related Error."""
 
 
+class UngivenFieldError(Exception):
+    """Raised when trying to access ungiven configuration fields."""
+
+
 class _Config(ABC):
     """Configuration."""
 
@@ -139,6 +143,12 @@ class RunConfig(_Config):
     @property
     def bathy(self) -> BathyConfig:
         """Configuartion parameters frot he bathymetry."""
+        if self._bathy_section not in self.params:
+            msg = (
+                "The configuration does not contain a "
+                f"bathymetry section, named {self._bathy_section}."
+            )
+            raise UngivenFieldError(msg)
         return self._bathy
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -174,13 +184,7 @@ class RunConfig(_Config):
                 f"grid section, named {self._grid_section}."
             )
             raise ConfigError(msg)
-        # Verify that the bathymetry section is present.
-        if self._bathy_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"bathymetry section, named {self._bathy_section}."
-            )
-            raise ConfigError(msg)
+
         return params
 
 
