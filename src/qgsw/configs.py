@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from pathlib import Path
+from typing import Any, Callable, ClassVar
 
 import numpy as np
 import toml
 import torch
 from typing_extensions import Self
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 from qgsw import conversion
+from qgsw.bathymetry import BathyLoader
 from qgsw.specs import DEVICE
 
 PHYSICS_KEYS = {
@@ -45,6 +44,13 @@ BOX_KEYS = {
     "section": "box",
     "x": "x",
     "y": "y",
+}
+
+BATHY_KEYS = {
+    "section": "bathymetry",
+    "url": "URL",
+    "folder": "folder",
+    "h top ocean": "htop_ocean",
 }
 
 
@@ -99,6 +105,7 @@ class RunConfig(_Config):
     _layers_section: str = LAYERS_KEYS["section"]
     _physics_section: str = PHYSICS_KEYS["section"]
     _grid_section: str = GRID_KEYS["section"]
+    _bathy_section: str = BATHY_KEYS["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate RunConfig.
@@ -112,6 +119,7 @@ class RunConfig(_Config):
             params=self.params[self._physics_section]
         )
         self._grid = GridConfig(params=self.params[self._grid_section])
+        self._bathy = BathyConfig(params=self.params[self._bathy_section])
 
     @property
     def layers(self) -> LayersConfig:
@@ -127,6 +135,11 @@ class RunConfig(_Config):
     def grid(self) -> GridConfig:
         """Configuration parameters dictionnary for the grid."""
         return self._grid
+
+    @property
+    def bathy(self) -> BathyConfig:
+        """Configuartion parameters frot he bathymetry."""
+        return self._bathy
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate configuration parameters.
@@ -159,6 +172,13 @@ class RunConfig(_Config):
             msg = (
                 "The configuration must contain a "
                 f"grid section, named {self._grid_section}."
+            )
+            raise ConfigError(msg)
+        # Verify that the bathymetry section is present.
+        if self._bathy_section not in params:
+            msg = (
+                "The configuration must contain a "
+                f"bathymetry section, named {self._bathy_section}."
             )
             raise ConfigError(msg)
         return params
@@ -465,3 +485,64 @@ class BoxConfig(_Config):
     def y_max(self) -> float:
         """Y max."""
         return self.params[self._y]["max"]
+
+
+class BathyConfig(_Config):
+    """Bathymetry Configuration."""
+
+    _url: str = BATHY_KEYS["url"]
+    _folder: str = BATHY_KEYS["folder"]
+    _htop: str = BATHY_KEYS["h top ocean"]
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        """Instantiate Bathymetry Config."""
+        super().__init__(params)
+        loader = BathyLoader.from_url(
+            url=self.url,
+            savefolder=self.folder,
+        )
+        self._lon, self._lat, self._bathy = loader.retrieve_bathy()
+
+    @property
+    def url(self) -> str:
+        """Data URL."""
+        return self.params[self._url]
+
+    @property
+    def folder(self) -> Path:
+        """Data saving folder."""
+        return Path(self.params[self._folder])
+
+    @property
+    def lons(self) -> np.ndarray:
+        """Bathymetry longitude array."""
+        return self._lon
+
+    @property
+    def lats(self) -> np.ndarray:
+        """Bathymetry latitude array."""
+        return self._lat
+
+    @property
+    def elevation(self) -> np.ndarray:
+        """Bahymetry."""
+        return self._bathy
+
+    @property
+    def htop_ocean(self) -> int:
+        """Value of htop_ocean."""
+        return self.params[self._htop]
+
+    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Validate Bathymetry parameters.
+
+        Args:
+            params (dict[str, Any]): Bathymetry Configuration dictionnary.
+
+        Returns:
+            dict[str, Any]: Bathymetry Configuration dictionnary.
+        """
+        folder = Path(params[self._folder])
+        if not folder.is_dir():
+            folder.mkdir()
+        return params
