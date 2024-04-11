@@ -7,11 +7,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import scipy.io
+import skimage.morphology
 import xarray
 from typing_extensions import Self
 
 if TYPE_CHECKING:
     import numpy as np
+    import torch
+
+    from qgsw.configs import BathyConfig, RunConfig
 
 
 class BathyLoadingError(Exception):
@@ -92,3 +96,105 @@ class BathyLoader:
             urllib.request.urlretrieve(url, savepath)
             print("..done")
         return cls(filepath=savepath)
+
+
+class LandBathyFilter:
+    """Land Bathymetry filter."""
+
+    def __init__(
+        self,
+        lake_min_area: int,
+        island_min_area: int,
+    ) -> None:
+        """Instantiate LandBathyFilter.
+
+        Args:
+            lake_min_area (int): Lake minimum area.
+            island_min_area (int): Island minimum area.
+        """
+        self._lake = lake_min_area
+        self._island = island_min_area
+
+    def filter_sign(self, bathy_field: torch.Tensor) -> torch.Tensor:
+        """Filter positive or negative bathymetry.
+
+        Args:
+            bathy_field (torch.Tensor): Bathymetry field.
+
+        Returns:
+            torch.Tensor: Filtered bathymetry, 1 for positive bathymetry else 0
+        """
+        return bathy_field > 0
+
+    def filter_small_lakes(self, bathy_sign: torch.Tensor) -> torch.Tensor:
+        """Remove small lakes.
+
+        Args:
+            bathy_sign (torch.Tensor): Binary (land / Ocean) bathymetry.
+
+        Returns:
+            torch.Tensor: Filtered Bathymetry.
+        """
+        return skimage.morphology.area_closing(
+            bathy_sign, area_threshold=self._lake
+        )
+
+    def filter_small_islands(self, bathy_sign: torch.Tensor) -> torch.Tensor:
+        """Remove small islands.
+
+        Args:
+            bathy_sign (torch.Tensor): Binary (land / Ocean) bathymetry.
+
+        Returns:
+            torch.Tensor: Filtered Bathymetry.
+        """
+        return ~(
+            skimage.morphology.area_closing(
+                ~bathy_sign,
+                area_threshold=self._island,
+            )
+        )
+
+
+class OceanBathyFilter:
+    """Ocean bathymetry Filter."""
+
+
+class Bathymetry:
+    """Bathymetry."""
+
+    def __init__(self, bathy_config: BathyConfig) -> None:
+        """Instantiate Bathymetry."""
+        self._config = bathy_config
+        loader = BathyLoader.from_url(
+            url=self._config.url,
+            savefolder=self._config.folder,
+        )
+        self._lon, self._lat, self._bathy = loader.retrieve_bathy()
+
+    @property
+    def lons(self) -> np.ndarray:
+        """Bathymetry longitude array."""
+        return self._lon
+
+    @property
+    def lats(self) -> np.ndarray:
+        """Bathymetry latitude array."""
+        return self._lat
+
+    @property
+    def elevation(self) -> np.ndarray:
+        """Bahymetry."""
+        return self._bathy
+
+    @classmethod
+    def from_runconfig(cls, run_config: RunConfig) -> Self:
+        """Construct the Bathymetry given a RunConfig object.
+
+        Args:
+            run_config (RunConfig): Run Configuration Object.
+
+        Returns:
+            Self: Corresponding Bathymetry.
+        """
+        return cls(bathy_config=run_config.bathy)

@@ -12,7 +12,6 @@ import torch
 from typing_extensions import Self
 
 from qgsw import conversion
-from qgsw.bathymetry import BathyLoader
 from qgsw.specs import DEVICE
 
 PHYSICS_KEYS = {
@@ -505,11 +504,6 @@ class BathyConfig(_Config):
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate Bathymetry Config."""
         super().__init__(params)
-        loader = BathyLoader.from_url(
-            url=self.url,
-            savefolder=self.folder,
-        )
-        self._lon, self._lat, self._bathy = loader.retrieve_bathy()
 
     @property
     def url(self) -> str:
@@ -520,21 +514,6 @@ class BathyConfig(_Config):
     def folder(self) -> Path:
         """Data saving folder."""
         return Path(self.params[self._folder])
-
-    @property
-    def lons(self) -> np.ndarray:
-        """Bathymetry longitude array."""
-        return self._lon
-
-    @property
-    def lats(self) -> np.ndarray:
-        """Bathymetry latitude array."""
-        return self._lat
-
-    @property
-    def elevation(self) -> np.ndarray:
-        """Bahymetry."""
-        return self._bathy
 
     @property
     def htop_ocean(self) -> int:
