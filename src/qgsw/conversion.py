@@ -4,7 +4,7 @@ DEG_TO_M = 111e3
 KM_TO_M = 1e3
 
 
-def deg_to_m(value: float) -> float:
+def deg_to_m_lat(value: float) -> float:
     """Degree to Meters conversion.
 
     Args:

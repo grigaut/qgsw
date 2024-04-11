@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
+import numpy as np
 import toml
 import torch
 from typing_extensions import Self
@@ -32,6 +33,7 @@ LAYERS_KEYS = {
 
 GRID_KEYS = {
     "section": "grid",
+    "box unit": "box_unit",
     "points nb x": "nx",
     "points nb y": "ny",
     "x length": "Lx",
@@ -41,7 +43,6 @@ GRID_KEYS = {
 
 BOX_KEYS = {
     "section": "box",
-    "unit": "unit",
     "x": "x",
     "y": "y",
 }
@@ -285,6 +286,13 @@ class GridConfig(_Config):
     _ny: str = GRID_KEYS["points nb y"]
     _dt: str = GRID_KEYS["timestep"]
     _box_section: str = BOX_KEYS["section"]
+    _box_unit: str = GRID_KEYS["box unit"]
+
+    _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
+        "deg": conversion.deg_to_m_lat,
+        "km": conversion.km_to_m,
+        "m": conversion.m_to_m,
+    }
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate Grid Configuration.
@@ -296,9 +304,9 @@ class GridConfig(_Config):
         self._box = BoxConfig(params=params[self._box_section])
 
     @property
-    def box(self) -> BoxConfig:
-        """Spatial Configuration."""
-        return self._box
+    def xy_unit(self) -> str:
+        """Unit of extremums."""
+        return self.params[self._box_unit]
 
     @property
     def nx(self) -> int:
@@ -309,16 +317,6 @@ class GridConfig(_Config):
     def ny(self) -> int:
         """Number of points on the y direction."""
         return self.params[self._ny]
-
-    @property
-    def lx(self) -> int:
-        """Total distance in the x direction (in meters)."""
-        return self._box.lx
-
-    @property
-    def ly(self) -> int:
-        """Total length in the y direction (in meters)."""
-        return self._box.ly
 
     @property
     def dt(self) -> int:
@@ -334,6 +332,41 @@ class GridConfig(_Config):
     def dy(self) -> float:
         """Elementary length in the y direction."""
         return self.ly / self.ny
+
+    @property
+    def x_min(self) -> float:
+        """X min."""
+        return self._box.x_min
+
+    @property
+    def x_max(self) -> float:
+        """X max."""
+        x_max = self._box.x_max
+        if np.isnan(x_max):
+            x_max = self._infer_deg_xmax()
+        return x_max
+
+    @property
+    def y_min(self) -> float:
+        """Y min."""
+        return self._box.y_min
+
+    @property
+    def y_max(self) -> float:
+        """Y max."""
+        return self._box.y_max
+
+    @property
+    def lx(self) -> float:
+        """Total distance along x (meters)."""
+        if np.isnan(self._box.x_max):
+            return self._infer_lx()
+        return self._conversion[self.xy_unit](self.x_max - self.x_min)
+
+    @property
+    def ly(self) -> float:
+        """Total distance along y (meters)."""
+        return self._conversion[self.xy_unit](self.y_max - self.y_min)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate grid parameters.
@@ -353,19 +386,24 @@ class GridConfig(_Config):
             raise ConfigError(msg)
         return params
 
+    def _infer_deg_xmax(self) -> float:
+        if self._box_unit == "deg":
+            msg = "X max can only be infered for degree extremums."
+            raise ConfigError(msg)
+        ymin_cos = np.cos(self.y_min / 180 * np.pi)
+        ymax_cos = np.cos(self.y_max / 180 * np.pi)
+        mean_cos = 0.5 * (ymin_cos + ymax_cos)
+        return self.x_min + self.lx / (conversion.deg_to_m_lat(mean_cos))
+
+    def _infer_lx(self) -> float:
+        return self.ly * self.nx / self.ny
+
 
 class BoxConfig(_Config):
     """Space Configuration."""
 
-    _unit: str = BOX_KEYS["unit"]
     _x: str = BOX_KEYS["x"]
     _y: str = BOX_KEYS["y"]
-
-    _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
-        "deg": conversion.deg_to_m,
-        "km": conversion.km_to_m,
-        "m": conversion.m_to_m,
-    }
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate Spatial configuration.
@@ -383,11 +421,6 @@ class BoxConfig(_Config):
         Returns:
             dict[str, Any]: Configuration dictionnary.
         """
-        if params[self._unit] not in self._conversion:
-            units = self._conversion.keys()
-            msg = f"Box extremums unit must be one of {units}"
-            raise ConfigError(msg)
-
         if "min" not in params[self._x]:
             msg = "X section must contain a `min` entry"
             raise ConfigError(msg)
@@ -414,17 +447,12 @@ class BoxConfig(_Config):
         return params
 
     @property
-    def xy_unit(self) -> str:
-        """Unit of extremums."""
-        return self.params[self._unit]
-
-    @property
     def x_min(self) -> float:
         """X min."""
         return self.params[self._x]["min"]
 
     @property
-    def x_max(self) -> float:
+    def x_max(self) -> float | None:
         """X max."""
         return self.params[self._x]["max"]
 
@@ -437,13 +465,3 @@ class BoxConfig(_Config):
     def y_max(self) -> float:
         """Y max."""
         return self.params[self._y]["max"]
-
-    @property
-    def lx(self) -> float:
-        """Total distance along x (meters)."""
-        return self._conversion[self.xy_unit](self.x_max - self.x_min)
-
-    @property
-    def ly(self) -> float:
-        """Total distance along y (meters)."""
-        return self._conversion[self.xy_unit](self.y_max - self.y_min)
