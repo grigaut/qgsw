@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import scipy.io
 import xarray
-from icecream import ic
 from typing_extensions import Self
 
 if TYPE_CHECKING:
