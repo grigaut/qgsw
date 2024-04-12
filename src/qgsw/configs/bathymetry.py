@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from qgsw.configs import keys
-from qgsw.configs.base import _Config
+from qgsw.configs.base import _Config, _DataConfig
 from qgsw.configs.exceptions import ConfigError
 
 
@@ -71,7 +71,7 @@ class BathyConfig(_Config):
         return super()._validate_params(params)
 
 
-class BathyDataConfig(_Config):
+class BathyDataConfig(_DataConfig):
     """Bathymetric Data Configuration."""
 
     _url: str = keys.BATHY_DATA["url"]
@@ -79,16 +79,6 @@ class BathyDataConfig(_Config):
     _lon: str = keys.BATHY_DATA["longitude"]
     _lat: str = keys.BATHY_DATA["latitude"]
     _elev: str = keys.BATHY_DATA["elevation"]
-
-    @property
-    def url(self) -> str:
-        """Data URL."""
-        return self.params[self._url]
-
-    @property
-    def folder(self) -> Path:
-        """Data saving folder."""
-        return Path(self.params[self._folder])
 
     @property
     def longitude(self) -> str:

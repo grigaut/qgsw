@@ -7,6 +7,7 @@ PHYSICS = {
     "f0": "f0",
     "beta": "beta",
     "wind stress magnitude": "wind_stress_mag",
+    "drag coefficient": "drag_coefficient",
 }
 
 LAYERS = {
@@ -54,4 +55,21 @@ IO = {
     "output directory": "output_dir",
     "log performance": "performance_log",
     "plot frequency": "plot_frequency",
+}
+
+WINDSTRESS = {
+    "section": "windstress",
+}
+
+WINDSTRESS_DATA = {
+    "section": "data",
+    "url": "URL",
+    "folder": "folder",
+    "data": "data",
+    "longitude": "longitude",
+    "latitude": "latitude",
+    "time": "time",
+    "field 1": "field_1",
+    "field 2": "field_2",
+    "method": "method",
 }

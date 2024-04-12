@@ -17,11 +17,17 @@ class PhysicsConfig(_Config):
     _coriolis_param: str = keys.PHYSICS["f0"]
     _beta: str = keys.PHYSICS["beta"]
     _wstress_mag: str = keys.PHYSICS["wind stress magnitude"]
+    _drag_coef: str = keys.PHYSICS["drag coefficient"]
 
     @property
     def slip_coef(self) -> float:
         """Slip coefficient value."""
         return self.params[self._slip_coef]
+
+    @property
+    def drag_coefficient(self) -> float:
+        """Surface drag coefficient."""
+        return self.params[self._drag_coef]
 
     @property
     def rho(self) -> float:

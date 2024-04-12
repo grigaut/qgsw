@@ -3,16 +3,23 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
 from typing_extensions import Self
 
+from qgsw.configs import RunConfig
+from qgsw.data.loaders import Loader
+from qgsw.data.preprocessing import (
+    WindStressPreprocessorSpeed,
+    WindStressPreprocessorTaux,
+    _WindStressPreprocessor,
+)
 from qgsw.grid import Grid
 
 if TYPE_CHECKING:
-    from qgsw.configs import PhysicsConfig, RunConfig
-    from qgsw.grid import Grid
+    from qgsw.configs.physics import PhysicsConfig
 
 
 class _WindForcing(ABC):
@@ -112,3 +119,56 @@ class CosineZonalWindForcing(_WindForcing):
             float | torch.Tensor: Tau_y
         """
         return 0.0
+
+
+class WindForcingLoader(
+    Loader[
+        RunConfig, tuple[torch.Tensor, torch.Tensor], _WindStressPreprocessor
+    ]
+):
+    """Wind Forcing Data Loader."""
+
+    def set_preprocessor(self, config: RunConfig) -> _WindStressPreprocessor:
+        """Set WindStress preprocessor.
+
+        Args:
+            config (RunConfig): configuration.
+
+        Raises:
+            KeyError: If the configuration is not valid.
+
+        Returns:
+            _WindStressPreprocessor: Preprocessor.
+        """
+        ws_data = config.windstress.data
+        if ws_data.data_type == "speed":
+            return WindStressPreprocessorSpeed(
+                longitude_key=ws_data.longitude,
+                latitude_key=ws_data.latitude,
+                time_key=ws_data.time,
+                physics_config=config.physics,
+                grid=Grid.from_runconfig(config),
+                u10_key=ws_data.field_1,
+                v10_key=ws_data.field_2,
+                method=ws_data.method,
+            )
+        if ws_data.data_type == "tau":
+            return WindStressPreprocessorTaux(
+                longitude_key=ws_data.longitude,
+                latitude_key=ws_data.latitude,
+                time_key=ws_data.time,
+                physics_config=config.physics,
+                grid=Grid.from_runconfig(config),
+                u10_key=ws_data.field_1,
+                v10_key=ws_data.field_2,
+                method=ws_data.method,
+            )
+        msg = "Unrecognized data type in windstress.data section."
+        raise KeyError(msg)
+
+    def _set_filepath(self, config: RunConfig) -> Path:
+        filename = Path(config.windstress.data.url).name
+        return config.windstress.data.folder.joinpath(filename)
+
+    def _set_config(self, config: RunConfig) -> None:
+        self._config = config.windstress.data

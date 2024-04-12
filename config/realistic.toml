@@ -10,6 +10,7 @@ slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
 wind_stress_mag = 0.08   # Wind stress magnitude (Pa m-1 kg s-2)
+drag_coefficient = 1.3e-3
 
 [layers]
 h = [
@@ -47,3 +48,15 @@ URL = "https://www.di.ens.fr/louis.thiry/medsea_bathy.nc"
 longitude = "lon"
 latitude = "lat"
 elevation = "elevation"
+
+[windstress]
+[windstress.data]
+URL = "https://www.di.ens.fr/louis.thiry/wind_medsea_2010.nc"
+folder = "test"
+data = "speed"
+longitude = "longitude"
+latitude = "latitude"
+time = "time"
+field_1 = "u10"
+field_2 = "v10"
+method="linear"

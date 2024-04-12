@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any
 
 import toml
 from typing_extensions import Self
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class _Config(ABC):
@@ -54,15 +52,18 @@ class _Config(ABC):
         return cls(params=toml.load(config_path))
 
 
-class _DataConfig(_Config, ABC):
+class _DataConfig(_Config):
     """Data Configuration."""
 
-    @property
-    @abstractmethod
-    def url(self) -> str:
-        """Data URL."""
+    _url: str
+    _folder: str
 
     @property
-    @abstractmethod
+    def url(self) -> str:
+        """Data URL."""
+        return self.params[self._url]
+
+    @property
     def folder(self) -> Path:
-        """Data savong folder."""
+        """Data saving folder."""
+        return Path(self.params[self._folder])

@@ -4,36 +4,46 @@ from __future__ import annotations
 
 import urllib.request
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from qgsw.configs.base import _DataConfig
+from qgsw.configs.base import _Config
 from qgsw.data.preprocessing import Preprocessor
 from qgsw.data.readers import Reader
 
-Config = TypeVar("Config", bound=_DataConfig)
+if TYPE_CHECKING:
+    from pathlib import Path
+
 Data = TypeVar("Data")
 Preprocess = TypeVar("Preprocess", bound=Preprocessor)
+Config = TypeVar("Config", bound=_Config)
 
 
 class Loader(ABC, Generic[Config, Data, Preprocess]):
     """Data loader."""
 
     def __init__(self, config: Config) -> None:
-        """INstantiate Loader.
+        """Instantiate Loader.
 
         Args:
             config (Config): Loader data configuration.
         """
-        self._config = config
-        filepath = self._config.folder.joinpath(Path(self._config.url).name)
+        filepath = self._set_filepath(config=config)
+        self._set_config(config=config)
         self._load_from_url(filepath=filepath)
         self._reader = Reader(filepath=filepath)
-        self._preprocess = self.set_preprocessor()
+        self._preprocess = self.set_preprocessor(config=config)
 
     @abstractmethod
-    def set_preprocessor(self) -> Preprocess:
+    def set_preprocessor(self, config: Config) -> Preprocess:
         """Instantiate preprocessor."""
+
+    @abstractmethod
+    def _set_filepath(self, config: Config) -> Path:
+        """Set filepath."""
+
+    @abstractmethod
+    def _set_config(self, config: Config) -> None:
+        """Set filepath."""
 
     def retrieve(self) -> Data:
         """Retrieve Data.

@@ -57,7 +57,7 @@ class BaseReader(ABC, Generic[T]):
         """
 
     @abstractmethod
-    def get_2d(self, key: str) -> np.ndarray:
+    def get(self, key: str) -> np.ndarray:
         """Access 2D data element.
 
         Args:
@@ -101,7 +101,7 @@ class MatReader(BaseReader[dict]):
         """
         return self._get(key)[:, 0]
 
-    def get_2d(self, key: str) -> np.ndarray:
+    def get(self, key: str) -> np.ndarray:
         """Access 2D data element.
 
         Args:
@@ -146,7 +146,7 @@ class NCReader(BaseReader[xarray.Dataset]):
         """
         return self._get(key)
 
-    def get_2d(self, key: str) -> np.ndarray:
+    def get(self, key: str) -> np.ndarray:
         """Access 2D data element.
 
         Args:
@@ -186,7 +186,7 @@ class Reader:
         """
         return self._core.get_1d(key=key)
 
-    def get_2d(self, key: str) -> np.ndarray:
+    def get(self, key: str) -> np.ndarray:
         """Access 2D data element.
 
         Args:
@@ -195,4 +195,4 @@ class Reader:
         Returns:
             np.ndarray: Data value.
         """
-        return self._core.get_2d(key=key)
+        return self._core.get(key=key)

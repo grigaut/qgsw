@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -27,79 +28,24 @@ BathyData = tuple[np.ndarray, np.ndarray, np.ndarray]
 class BathyLoader(Loader[BathyDataConfig, BathyData, BathyPreprocessor]):
     """Bathymetry loader."""
 
-    def set_preprocessor(self) -> BathyPreprocessor:
+    def set_preprocessor(self, config: BathyDataConfig) -> BathyPreprocessor:
         """Set Bathymetric data preprocessor.
 
         Returns:
             BathyPreprocessor: Preprocessor.
         """
         return BathyPreprocessor(
-            longitude_key=self._config.longitude,
-            latitude_key=self._config.latitude,
-            bathymetry_key=self._config.elevation,
+            longitude_key=config.longitude,
+            latitude_key=config.latitude,
+            bathymetry_key=config.elevation,
         )
 
+    def _set_filepath(self, config: BathyDataConfig) -> Path:
+        filename = Path(config.url).name
+        return config.folder.joinpath(filename)
 
-class LandBathyFilter:
-    """Land Bathymetry filter."""
-
-    def __init__(
-        self,
-        lake_min_area: int,
-        island_min_area: int,
-    ) -> None:
-        """Instantiate LandBathyFilter.
-
-        Args:
-            lake_min_area (int): Lake minimum area.
-            island_min_area (int): Island minimum area.
-        """
-        self._lake = lake_min_area
-        self._island = island_min_area
-
-    def filter_sign(self, bathy_field: torch.Tensor) -> torch.Tensor:
-        """Filter positive or negative bathymetry.
-
-        Args:
-            bathy_field (torch.Tensor): Bathymetry field.
-
-        Returns:
-            torch.Tensor: Filtered bathymetry, 1 for positive bathymetry else 0
-        """
-        return bathy_field > 0
-
-    def filter_small_lakes(self, bathy_sign: torch.Tensor) -> torch.Tensor:
-        """Remove small lakes.
-
-        Args:
-            bathy_sign (torch.Tensor): Binary (land / Ocean) bathymetry.
-
-        Returns:
-            torch.Tensor: Filtered Bathymetry.
-        """
-        return skimage.morphology.area_closing(
-            bathy_sign, area_threshold=self._lake
-        )
-
-    def filter_small_islands(self, bathy_sign: torch.Tensor) -> torch.Tensor:
-        """Remove small islands.
-
-        Args:
-            bathy_sign (torch.Tensor): Binary (land / Ocean) bathymetry.
-
-        Returns:
-            torch.Tensor: Filtered Bathymetry.
-        """
-        return ~(
-            skimage.morphology.area_closing(
-                ~bathy_sign,
-                area_threshold=self._island,
-            )
-        )
-
-
-class OceanBathyFilter:
-    """Ocean bathymetry Filter."""
+    def _set_config(self, config: BathyDataConfig) -> None:
+        self._config = config
 
 
 class Bathymetry:

@@ -15,6 +15,7 @@ from icecream import ic
 
 sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
+from qgsw.forcing.wind import WindForcingLoader
 from qgsw.configs import RunConfig
 from qgsw.grid import Grid
 from qgsw.qg import QG
@@ -24,7 +25,9 @@ from qgsw.sw import SW
 config = RunConfig.from_file(Path("config/realistic.toml"))
 grid = Grid.from_runconfig(config)
 bathy = Bathymetry.from_runconfig(config)
-
+a = WindForcingLoader(config=config)
+ic(a.retrieve())
+exit()
 print(
     f"Grid lat: {config.grid.y_min:.1f}, {config.grid.y_max:.1f}, "
     f"lon: {config.grid.x_min:.1f}, {config.grid.x_max:.1f}, "

@@ -9,6 +9,7 @@ from qgsw.configs.exceptions import ConfigError, UngivenFieldError
 from qgsw.configs.grid import GridConfig, LayersConfig
 from qgsw.configs.io import IOConfig
 from qgsw.configs.physics import PhysicsConfig
+from qgsw.configs.windstress import WindStressConfig
 
 
 class RunConfig(_Config):
@@ -19,6 +20,7 @@ class RunConfig(_Config):
     _grid_section: str = keys.GRID["section"]
     _bathy_section: str = keys.BATHY["section"]
     _io_section: str = keys.IO["section"]
+    _windstress_section: str = keys.WINDSTRESS["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate RunConfig.
@@ -32,8 +34,12 @@ class RunConfig(_Config):
             params=self.params[self._physics_section]
         )
         self._grid = GridConfig(params=self.params[self._grid_section])
-        self._bathy = BathyConfig(params=self.params[self._bathy_section])
+        if self._bathy_section in self.params:
+            self._bathy = BathyConfig(params=self.params[self._bathy_section])
         self._io = IOConfig(params=self.params[self._io_section])
+        self._windstress = WindStressConfig(
+            params=self.params[self._windstress_section]
+        )
 
     @property
     def layers(self) -> LayersConfig:
@@ -65,6 +71,11 @@ class RunConfig(_Config):
     def io(self) -> IOConfig:
         """Input-Output  Configuration."""
         return self._io
+
+    @property
+    def windstress(self) -> WindStressConfig:
+        """WindStress Configuration."""
+        return self._windstress
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate configuration parameters.
