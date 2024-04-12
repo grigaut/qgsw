@@ -3,7 +3,8 @@
 import torch
 from typing_extensions import Self
 
-from qgsw.configs import GridConfig, RunConfig
+from qgsw.configs import RunConfig
+from qgsw.configs.grid import GridConfig
 from qgsw.specs import DEVICE
 
 
