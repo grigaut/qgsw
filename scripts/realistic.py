@@ -1,177 +1,55 @@
 # ruff : noqa
-import argparse
 import os
 import sys
-import numpy as np
-import skimage.morphology
-import torch
-import torch.nn.functional as F
 import urllib.request
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import netCDF4
+import numpy as np
 import scipy.interpolate
 import scipy.io
 import scipy.ndimage
-import getpass
+import torch
+from icecream import ic
 
 sys.path.append("../src")
-from qgsw.sw import SW
+from qgsw.bathymetry import Bathymetry
+from qgsw.configs import RunConfig
+from qgsw.grid import Grid
 from qgsw.qg import QG
+from qgsw.specs import DEVICE
+from qgsw.sw import SW
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "config",
-    help="Configuration: 'med' for Mediterranea " " and 'na' for North-Atlantic.",
-)
-parser.add_argument("--log_perf", action="store_true", help="Log performance")
-parser.add_argument("--freq_plot", type=int, default=0, help="plot frequence in days")
-args = parser.parse_args()
-config = args.config
+config = RunConfig.from_file(Path("config/realistic.toml"))
+grid = Grid.from_runconfig(config)
+bathy = Bathymetry.from_runconfig(config)
 
-# data and output directories
-os.makedirs("./data", exist_ok=True)
-# os.makedirs('./run_outputs', exist_ok=True)
-usr = getpass.getuser()
-disk = f"/srv/storage/ithaca@storage2.rennes.grid5000.fr/{usr}"
-os.makedirs(disk, exist_ok=True)
-
-## Grids
-deg_to_km = 111e3
-if config == "na":
-    # nx, ny = 512, 256
-    nx, ny = 1024, 512
-    lat_min, lat_max = 9, 48
-    Ly = (lat_max - lat_min) * deg_to_km
-    Lx = Ly * nx / ny
-    lon_min = -98
-    lon_max = lon_min + Lx / (
-        0.5
-        * (np.cos(lat_min / 180 * np.pi) + np.cos(lat_max / 180 * np.pi))
-        * deg_to_km
-    )
-    htop_ocean = -250
-if config == "med":
-    # nx, ny = 512, 256
-    nx, ny = 1024, 512
-    lat_min, lat_max = 31, 45
-    Ly = (lat_max - lat_min) * deg_to_km
-    Lx = Ly * nx / ny
-    lon_min = -5.5
-    lon_max = lon_min + Lx / (
-        0.5
-        * (np.cos(lat_min / 180 * np.pi) + np.cos(lat_max / 180 * np.pi))
-        * deg_to_km
-    )
-    htop_ocean = -100
-
-dx = Lx / nx
-dy = Ly / ny
 print(
-    f"Grid lat: {lat_min:.1f}, {lat_max:.1f}, "
-    f"lon: {lon_min:.1f}, {lon_max:.1f}, "
-    f"dx={dx/1e3:.1f}km, dy={dy/1e3:.1f}km ."
-)
-
-x_cor = np.linspace(lon_min, lon_max, nx + 1)
-y_cor = np.linspace(lat_min, lat_max, ny + 1)
-# omega grid
-lon_w, lat_w = np.meshgrid(x_cor, y_cor, indexing="ij")
-x_cen = 0.5 * (x_cor[1:] + x_cor[:-1])
-y_cen = 0.5 * (y_cor[1:] + y_cor[:-1])
-# h grid
-lon_h, lat_h = np.meshgrid(x_cen, y_cen, indexing="ij")
-# u and v grid
-lon_u, lat_u = np.meshgrid(x_cor, y_cen, indexing="ij")
-lon_v, lat_v = np.meshgrid(x_cen, y_cor, indexing="ij")
-
-
-## Topography
-if config == "na":
-    topo_file = "./data/northatlantic_topo.mat"
-    if not os.path.isfile(topo_file):
-        topo_url = "https://www.di.ens.fr/louis.thiry/AN_etopo1.mat"
-        print(f"Downloading topo file {topo_file} from {topo_url}...")
-        urllib.request.urlretrieve(topo_url, topo_file)
-        print("..done")
-    data = scipy.io.loadmat(topo_file)
-    lon_bath = data["lon_bathy"][:, 0]
-    lat_bath = data["lat_bathy"][:, 0]
-    bathy = data["bathy"].T
-    island_min_area = int(4000 * nx * ny / 1024 / 512)
-    lake_min_area = int(40000 * nx * ny / 1024 / 512)
-elif config == "med":
-    topo_file = "./data/medsea_bathy.nc"
-    if not os.path.isfile(topo_file):
-        topo_url = "https://www.di.ens.fr/louis.thiry/medsea_bathy.nc"
-        print(f"Downloading topo file {topo_file} from {topo_url}...")
-        urllib.request.urlretrieve(topo_url, topo_file)
-        print("..done")
-    ds = netCDF4.Dataset(topo_file, "r")
-    lon_bath = ds["lon"][:].data
-    lat_bath = ds["lat"][:].data
-    bathy = ds["elevation"][:].data.T
-    print(
-        f"Topo lat: {lat_bath.min():.2f} - {lat_bath.max():.2f}, "
-        f"lon: {lon_bath.min():.2f} - {lon_bath.max():.2f}"
-    )
-    island_min_area = 1000
-    lake_min_area = 40000
-
-method = "linear"
-print(f"Interpolating bathymetry on grid with {method} interpolation ...")
-bathmetry = scipy.interpolate.RegularGridInterpolator(
-    (lon_bath, lat_bath), bathy, method=method
+    f"Grid lat: {config.grid.y_min:.1f}, {config.grid.y_max:.1f}, "
+    f"lon: {config.grid.x_min:.1f}, {config.grid.x_max:.1f}, "
+    f"dx={config.grid.dx/1e3:.1f}km, dy={config.grid.dy/1e3:.1f}km ."
 )
 
 
-mask_land = bathmetry((lon_h, lat_h)) > 0
-mask_land = skimage.morphology.area_closing(mask_land, area_threshold=lake_min_area)
-mask_land = np.logical_not(
-    skimage.morphology.area_closing(
-        np.logical_not(mask_land), area_threshold=island_min_area
-    )
-)
-mask_land_w = (
-    F.avg_pool2d(
-        F.pad(
-            torch.from_numpy(mask_land).type(torch.float64).unsqueeze(0).unsqueeze(0),
-            (1, 1, 1, 1),
-            value=1.0,
-        ),
-        (2, 2),
-        stride=(1, 1),
-    )[0, 0]
-    > 0.5
-).numpy()
-
-mask_ocean = bathmetry((lon_h, lat_h)) < htop_ocean
-mask_ocean = skimage.morphology.area_closing(mask_ocean, area_threshold=island_min_area)
-mask_ocean = np.logical_not(
-    skimage.morphology.area_closing(
-        np.logical_not(mask_ocean), area_threshold=lake_min_area
-    )
-).astype("float64")
-
-bottom_topography = 4000 + np.clip(bathmetry((lon_h, lat_h)), -4000, 0)
-bottom_topography = np.clip(
-    scipy.ndimage.gaussian_filter(bottom_topography, 3.0), 0, 150
+print(
+    f"Topo lat: {bathy.lats.min():.2f} - {bathy.lats.max():.2f}, "
+    f"lon: {bathy.lons.min():.2f} - {bathy.lons.max():.2f}"
 )
 
-# remove ocean cells surrounded by 3 non-ocean cells
-for _ in range(100):
-    mask_ocean[1:-1, 1:-1] += (1 - mask_ocean[1:-1, 1:-1]) * (
-        (
-            mask_ocean[:-2, 1:-1]
-            + mask_ocean[2:, 1:-1]
-            + mask_ocean[1:-1, 2:]
-            + mask_ocean[1:-1, :-2]
-        )
-        > 2.5
-    )
-mask_ocean = (mask_ocean > 0.5).astype("float64")
-mask = mask_ocean
+print(
+    "Interpolating bathymetry on grid with"
+    f" {config.bathy.interpolation_method} interpolation ..."
+)
 
+# Land Mask Generation
+mask_land = bathy.compute_land_mask(grid.h_xy)
+mask_land_w = bathy.compute_land_mask_w(grid.h_xy)
 
-if config == "na":
+# Ocean Mask Generation
+mask_ocean = bathy.compute_land_mask(grid.h_xy)
+# exit()
+if config.io.name == "na":
     wind_file = "./data/windstress_HellermanRosenstein83.nc"
     if not os.path.isfile(wind_file):
         wind_url = "http://iridl.ldeo.columbia.edu/SOURCES/.HELLERMAN/data.nc"
@@ -179,15 +57,17 @@ if config == "na":
         urllib.request.urlretrieve(wind_url, wind_file)
 
     ds = netCDF4.Dataset(wind_file, "r")
-    X = ds.variables["X"][:].data
-    Y = ds.variables["Y"][:].data
-    T = ds.variables["T"][:].data
+    X: np.ndarray = ds.variables["X"][:].data
+    Y: np.ndarray = ds.variables["Y"][:].data
+    T: np.ndarray = ds.variables["T"][:].data
 
-    taux = np.zeros((T.shape[0] + 1, nx + 1, ny))
-    tauy = np.zeros((T.shape[0] + 1, nx, ny + 1))
+    taux = np.zeros((T.shape[0] + 1, config.grid.nx + 1, config.grid.ny))
+    tauy = np.zeros((T.shape[0] + 1, config.grid.nx, config.grid.ny + 1))
 
     method = "linear"
-    print(f"Interpolating wind forcing on grid with {method} interpolation ...")
+    print(
+        f"Interpolating wind forcing on grid with {method} interpolation ..."
+    )
     for t in range(T.shape[0]):
         ## linear interpolation with scipy
         taux_ref = ds.variables["taux"][:].data[t].T
@@ -198,8 +78,8 @@ if config == "na":
         tauy_interpolator = scipy.interpolate.RegularGridInterpolator(
             (X, Y), tauy_ref, method=method
         )
-        taux_i = taux_interpolator((lon_u + 360, lat_u))
-        tauy_i = tauy_interpolator((lon_v + 360, lat_v))
+        taux_i = taux_interpolator((grid.u_xy[0] + 360, grid.u_xy[1]))
+        tauy_i = tauy_interpolator((grid.v_xy[0] + 360, grid.v_xy[1]))
 
         ## bicubic interpolation with torch
         # taux_ref = torch.from_numpy(ds.variables['taux'][:].data[t].T).unsqueeze(0).unsqueeze(0).type(torch.float64)
@@ -221,7 +101,7 @@ if config == "na":
     tauy *= 1e-4
     taux[-1][:] = taux[0][:]
     tauy[-1][:] = tauy[0][:]
-elif config == "med":
+elif config.io.name == "med":
     wind_file = "./data/wind_medsea_2010.nc"
     if not os.path.isfile(wind_file):
         wind_url = "https://www.di.ens.fr/louis.thiry/wind_medsea_2010.nc"
@@ -229,9 +109,9 @@ elif config == "med":
         urllib.request.urlretrieve(wind_url, wind_file)
 
     ds = netCDF4.Dataset(wind_file, "r")
-    X = ds.variables["longitude"][:].data.astype("float64")
-    Y = ds.variables["latitude"][:].data.astype("float64")[::-1]
-    T = ds.variables["time"][:].data.astype("float64")
+    X: np.ndarray = ds.variables["longitude"][:].data.astype("float64")
+    Y: np.ndarray = ds.variables["latitude"][:].data.astype("float64")[::-1]
+    T: np.ndarray = ds.variables["time"][:].data.astype("float64")
 
     print(
         f"Wind lat: {Y.min():.2f} - {Y.max():.2f}, "
@@ -241,11 +121,13 @@ elif config == "med":
     drag_coefficient = 1.3e-3
     rho_ocean = 1e3
 
-    taux = np.zeros((T.shape[0] + 1, nx + 1, ny))
-    tauy = np.zeros((T.shape[0] + 1, nx, ny + 1))
+    taux = np.zeros((T.shape[0] + 1, config.grid.nx + 1, config.grid.ny))
+    tauy = np.zeros((T.shape[0] + 1, config.grid.nx, config.grid.ny + 1))
 
     method = "linear"
-    print(f"Interpolating wind forcing on grid with {method} interpolation ...")
+    print(
+        f"Interpolating wind forcing on grid with {method} interpolation ..."
+    )
     for t in range(T.shape[0]):
         u = ds.variables["u10"][:].data[t].T[:, ::-1]
         v = ds.variables["v10"][:].data[t].T[:, ::-1]
@@ -258,8 +140,8 @@ elif config == "med":
         tauy_interpolator = scipy.interpolate.RegularGridInterpolator(
             (X, Y), tauy_ref, method=method
         )
-        taux_i = taux_interpolator((lon_u, lat_u))
-        tauy_i = tauy_interpolator((lon_v, lat_v))
+        taux_i = taux_interpolator(grid.u_xy)
+        tauy_i = tauy_interpolator(grid.v_xy)
         taux[t, :, :] = taux_i
         tauy[t, :, :] = tauy_i
 
@@ -273,48 +155,32 @@ tauy = torch.from_numpy(tauy).type(dtype).to(device)
 
 torch.backends.cudnn.deterministic = True
 
-H = torch.zeros(3, 1, 1, dtype=dtype, device=device)
-H[0, 0, 0] = 400.0
-H[1, 0, 0] = 1100.0
-H[2, 0, 0] = 2600.0
-
-# density/gravity
-rho = 1000
-g_prime = torch.zeros(3, 1, 1, dtype=dtype, device=device)
-g_prime[0, 0, 0] = 9.81
-g_prime[1, 0, 0] = 0.025
-g_prime[2, 0, 0] = 0.0125
-
-
 # coriolis beta plane
-f0 = 9.375e-5  # mean coriolis (s^-1)
-beta = 1.754e-11  # coriolis gradient (m^-1 s^-1)
-y = torch.from_numpy(lat_w).type(dtype).to(device) * deg_to_km
-f = f0 + beta * (y - y.mean())
-print(f"Coriolis param min {f.min().cpu().item():.2e}, {f.max().cpu().item():.2e}")
-
-# bottom drag
-bottom_drag_coef = 0.5 * f0 * 2.0 / 2600
+f = grid.generate_coriolis_grid(f0=config.physics.f0, beta=config.physics.beta)
+print(
+    f"Coriolis param min {f.min().cpu().item():.2e},"
+    f" {f.max().cpu().item():.2e}"
+)
 
 
-dt = 2000
+# dt = 2000
 param = {
-    "nx": nx,
-    "ny": ny,
-    "nl": 3,
-    "H": H,
-    "dx": dx,
-    "dy": dy,
-    "rho": rho,
-    "g_prime": g_prime,
-    "bottom_drag_coef": bottom_drag_coef,
+    "nx": config.grid.nx,
+    "ny": config.grid.ny,
+    "nl": config.layers.nl,
+    "H": config.layers.h,
+    "dx": config.grid.dx,
+    "dy": config.grid.dy,
+    "rho": config.physics.rho,
+    "g_prime": config.layers.g_prime,
+    "bottom_drag_coef": config.physics.bottom_drag_coef,
     "f": f,
-    "device": device,
-    "dtype": dtype,
-    "slip_coef": 0.6,
-    "dt": dt,  # time-step (s)
+    "device": DEVICE,
+    "dtype": torch.float64,
+    "slip_coef": config.physics.slip_coef,
+    "dt": config.grid.dt,  # time-step (s)
     "compile": True,
-    "mask": torch.from_numpy(mask).type(dtype).to(device),
+    "mask": bathy.compute_ocean_mask(grid.h_xy),
     "taux": taux[0, 1:-1, :],
     "tauy": tauy[0, :, 1:-1],
 }
@@ -324,28 +190,28 @@ model = SW
 model = QG
 qg = model(param)
 
-name = f"qg_{config}"
+name = f"qg_"  # {config}"
 
-
+######### Probably to avoid restarting
 start_file = ""
 if start_file:
     print(f"Starting from file {start_file}...")
     zipf = np.load(start_file)
     qg.set_physical_uvh(zipf["u"], zipf["v"], zipf["h"])
-
+#########
 t = 0
 
 freq_checknan = 100
-freq_log = int(24 * 3600 / dt)
-n_steps = int(50 * 365 * 24 * 3600 / dt) + 1
-n_steps_save = int(0 * 365 * 24 * 3600 / dt)
-freq_save = int(5 * 24 * 3600 / dt)
-freq_plot = int(args.freq_plot * 24 * 3600 / dt)
+freq_log = int(24 * 3600 / config.grid.dt)
+n_steps = int(50 * 365 * 24 * 3600 / config.grid.dt) + 1
+n_steps_save = int(0 * 365 * 24 * 3600 / config.grid.dt)
+freq_save = int(5 * 24 * 3600 / config.grid.dt)
+freq_plot = int(config.io.plot_frequency * 24 * 3600 / config.grid.dt)
 
 uM, vM, hM = 0, 0, 0
 
 
-if args.log_perf:
+if config.io.log_performance:
     from time import time as cputime
 
     ngridpoints = param["nl"] * param["nx"] * param["ny"]
@@ -354,11 +220,17 @@ if args.log_perf:
 
 
 if freq_save > 0:
-    output_dir = f'{disk}/{name}_{nx}x{ny}_dt{dt}_' f'slip{param["slip_coef"]}/'
+    output_dir = (
+        f'{config.io.output_directory}/{name}_{config.grid.nx}x{config.grid.ny}_dt{config.grid.dt}_'
+        f'slip{param["slip_coef"]}/'
+    )
     os.makedirs(output_dir, exist_ok=True)
     print(f"Outputs will be saved to {output_dir}")
     np.save(os.path.join(output_dir, "mask_land_h.npz"), mask_land)
-    np.save(os.path.join(output_dir, "mask_land_w.npz"), mask_land_w)
+    np.save(
+        os.path.join(output_dir, "mask_land_w.npz"),
+        mask_land_w.numpy(),
+    )
     torch.save(param, os.path.join(output_dir, "param.pth"))
 
 
@@ -397,14 +269,14 @@ for n in range(1, n_steps + 1):
     tauy_t = (1 - m_r) * tauy[m_i, :, 1:-1] + m_r * tauy[m_i + 1, :, 1:-1]
     qg.set_wind_forcing(taux_t, tauy_t)
 
-    if args.log_perf:
+    if config.io.log_performance:
         walltime0 = cputime()
 
     ## one step
     qg.step()
-    t += dt
+    t += config.grid.dt
 
-    if args.log_perf:
+    if config.io.log_performance:
         walltime = cputime()
         perf = (walltime - walltime0) / (ngridpoints)
         mperf += perf
@@ -420,7 +292,9 @@ for n in range(1, n_steps + 1):
         raise ValueError(f"Stopping, NAN number in p at iteration {n}.")
 
     if freq_log > 0 and n % freq_log == 0:
-        print(f"n={n:05d}, t={n_years:02d}y{n_days:03d}d, {qg.get_print_info()}")
+        print(
+            f"n={n:05d}, t={n_years:02d}y{n_days:03d}d, {qg.get_print_info()}"
+        )
 
     if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
         u, v, h = qg.get_physical_uvh(numpy=True)
@@ -429,7 +303,7 @@ for n in range(1, n_steps + 1):
         if model == QG:
             wM = 0.05
             w = (qg.omega / qg.area / qg.f0).cpu().numpy()[0, nl_plot]
-            w = np.ma.masked_where(mask_land_w, w)
+            w = np.ma.masked_where(mask_land_w.numpy(), w)
             a.imshow(w.T, vmin=-wM, vmax=wM, **plot_kwargs)
         else:
             a[0].imshow(u[0, nl_plot].T, vmin=-uM, vmax=uM, **plot_kwargs)
@@ -440,7 +314,9 @@ for n in range(1, n_steps + 1):
         plt.pause(0.05)
 
     if freq_save > 0 and n > n_steps_save and n % freq_save == 0:
-        filename = os.path.join(output_dir, f"uvh_{n_years:03d}y_{n_days:03d}d.npz")
+        filename = os.path.join(
+            output_dir, f"uvh_{n_years:03d}y_{n_days:03d}d.npz"
+        )
         u, v, h = qg.get_physical_uvh(numpy=True)
         if model == QG:
             # u_a = qg.u_a.cpu().numpy()
