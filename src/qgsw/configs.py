@@ -52,6 +52,7 @@ BATHY_KEYS = {
     "h top ocean": "htop_ocean",
     "island minimum area": "island_min_area",
     "lake minimum area": "lake_min_area",
+    "interpolation": "interpolation",
 }
 
 
@@ -500,6 +501,7 @@ class BathyConfig(_Config):
     _htop: str = BATHY_KEYS["h top ocean"]
     _lake: str = BATHY_KEYS["lake minimum area"]
     _island: str = BATHY_KEYS["island minimum area"]
+    _interpolation: str = BATHY_KEYS["interpolation"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate Bathymetry Config."""
@@ -529,6 +531,14 @@ class BathyConfig(_Config):
     def island_min_area(self) -> int:
         """Lake minimum area (in meters)."""
         return self.params[self._island]
+
+    @property
+    def interpolation_method(self) -> str:
+        """Bathymetry interpolation method.
+
+        For scipy.interpolate.RegularGridInterpolator instantiation.
+        """
+        return self.params[self._interpolation]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate Bathymetry parameters.
