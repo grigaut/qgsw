@@ -55,6 +55,14 @@ BATHY_KEYS = {
     "interpolation": "interpolation",
 }
 
+IO_KEYS = {
+    "section": "io",
+    "name": "name",
+    "output directory": "output_dir",
+    "log performance": "performance_log",
+    "plot frequency": "plot_frequency",
+}
+
 
 class ConfigError(Exception):
     """Configuration-Related Error."""
@@ -112,6 +120,7 @@ class RunConfig(_Config):
     _physics_section: str = PHYSICS_KEYS["section"]
     _grid_section: str = GRID_KEYS["section"]
     _bathy_section: str = BATHY_KEYS["section"]
+    _io_section: str = IO_KEYS["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate RunConfig.
@@ -126,6 +135,7 @@ class RunConfig(_Config):
         )
         self._grid = GridConfig(params=self.params[self._grid_section])
         self._bathy = BathyConfig(params=self.params[self._bathy_section])
+        self._io = IOConfig(params=self.params[self._io_section])
 
     @property
     def layers(self) -> LayersConfig:
@@ -152,6 +162,11 @@ class RunConfig(_Config):
             )
             raise UngivenFieldError(msg)
         return self._bathy
+
+    @property
+    def io(self) -> IOConfig:
+        """Input-Output  Configuration."""
+        return self._io
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate configuration parameters.
@@ -186,7 +201,13 @@ class RunConfig(_Config):
                 f"grid section, named {self._grid_section}."
             )
             raise ConfigError(msg)
-
+        # Verify that the io section is present.
+        if self._io_section not in params:
+            msg = (
+                "The configuration must contain a "
+                f"io section, named {self._io_section}."
+            )
+            raise ConfigError(msg)
         return params
 
 
@@ -552,4 +573,66 @@ class BathyConfig(_Config):
         folder = Path(params[self._folder])
         if not folder.is_dir():
             folder.mkdir()
+        return params
+
+
+class IOConfig(_Config):
+    """Input-Output configuration."""
+
+    _name: str = IO_KEYS["name"]
+    _output: str = IO_KEYS["output directory"]
+    _freq: str = IO_KEYS["plot frequency"]
+    _log: str = IO_KEYS["log performance"]
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        """Instantiate IOConfig.
+
+        Args:
+            params (dict[str, Any]): IO configuration dictionnary.
+        """
+        super().__init__(params)
+        if not self.output_directory.is_dir():
+            self.output_directory.mkdir()
+
+    @property
+    def name(self) -> str:
+        """Run name."""
+        return self._params[self._name]
+
+    @property
+    def name_sc(self) -> str:
+        """Snake-cased name."""
+        return self.name.lower().replace(" ", "_")
+
+    @property
+    def output_directory(self) -> Path:
+        """Output directory."""
+        return Path(self._params[self._output])
+
+    @property
+    def plot_bool(self) -> bool:
+        """Whether to plot during run or not."""
+        return self._params[self._freq] is not None
+
+    @property
+    def plot_frequency(self) -> float:
+        """Plot frequency, 0 is equivalent to no plotting."""
+        if not self.plot_bool:
+            return 0
+        return self._params[self._freq]
+
+    @property
+    def log_performance(self) -> bool:
+        """Whether to log performances or not."""
+        return self._params[self._log]
+
+    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Validate IO paramaters.
+
+        Args:
+            params (dict[str, Any]): IO configuration dictionnary.
+
+        Returns:
+            dict[str, Any]: IO configuration dictionnary.
+        """
         return params
