@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
@@ -16,18 +18,12 @@ class PhysicsConfig(_Config):
     _slip_coef: str = keys.PHYSICS["slip coef"]
     _coriolis_param: str = keys.PHYSICS["f0"]
     _beta: str = keys.PHYSICS["beta"]
-    _wstress_mag: str = keys.PHYSICS["wind stress magnitude"]
-    _drag_coef: str = keys.PHYSICS["drag coefficient"]
+    _bottom_drag: str = keys.PHYSICS["bottom drag coefficient"]
 
     @property
     def slip_coef(self) -> float:
         """Slip coefficient value."""
         return self.params[self._slip_coef]
-
-    @property
-    def drag_coefficient(self) -> float:
-        """Surface drag coefficient."""
-        return self.params[self._drag_coef]
 
     @property
     def rho(self) -> float:
@@ -47,7 +43,10 @@ class PhysicsConfig(_Config):
     @property
     def bottom_drag_coef(self) -> float:
         """Drag Coefficient."""
-        return 0.5 * self.f0 * 2.0 / 2600  # Source ?
+        if np.isnan(self.params[self._bottom_drag]):
+            print("Bottom drag coefficient inferred using f0.")
+            return 0.5 * self.f0 * 2.0 / 2600  # Source ?
+        return self.params[self._bottom_drag]
 
     @property
     def wind_stress_magnitude(self) -> float:

@@ -13,34 +13,12 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 from typing_extensions import Self
 
-from qgsw.configs.bathymetry import BathyConfig, BathyDataConfig
-from qgsw.data.loaders import Loader
-from qgsw.data.preprocessing import BathyPreprocessor
+from qgsw.data.loaders import BathyLoader
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
+    from qgsw.configs.bathymetry import BathyConfig
     from qgsw.configs.core import RunConfig
-
-BathyData = tuple[np.ndarray, np.ndarray, np.ndarray]
-
-
-class BathyLoader(Loader[BathyDataConfig, BathyData, BathyPreprocessor]):
-    """Bathymetry loader."""
-
-    def set_preprocessor(self, config: BathyDataConfig) -> BathyPreprocessor:
-        """Set Bathymetric data preprocessor.
-
-        Returns:
-            BathyPreprocessor: Preprocessor.
-        """
-        return BathyPreprocessor(
-            longitude_key=config.longitude,
-            latitude_key=config.latitude,
-            bathymetry_key=config.elevation,
-        )
-
-    def _set_config(self, config: BathyDataConfig) -> BathyDataConfig:
-        return config
 
 
 class Bathymetry:

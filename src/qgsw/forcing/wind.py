@@ -10,18 +10,12 @@ import scipy.interpolate
 import torch
 from typing_extensions import Self
 
-from qgsw.configs import RunConfig
-from qgsw.data.loaders import Loader
-from qgsw.data.preprocessing import (
-    WindStressPreprocessorSpeed,
-    WindStressPreprocessorTaux,
-    _WindStressPreprocessor,
-)
+from qgsw.data.loaders import WindForcingLoader
 from qgsw.grid import Grid
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs.windstress import WindStressDataConfig
+    from qgsw.configs import RunConfig
 
 
 class _WindForcing(ABC):
@@ -280,54 +274,3 @@ class WindForcing:
 
         msg = "Unrecognized windstress type."
         raise KeyError(msg)
-
-
-class WindForcingLoader(
-    Loader[
-        RunConfig, tuple[torch.Tensor, torch.Tensor], _WindStressPreprocessor
-    ]
-):
-    """Wind Forcing Data Loader."""
-
-    def set_preprocessor(self, config: RunConfig) -> _WindStressPreprocessor:
-        """Set WindStress preprocessor.
-
-        Args:
-            config (RunConfig): configuration.
-
-        Raises:
-            KeyError: If the configuration is not valid.
-
-        Returns:
-            _WindStressPreprocessor: Preprocessor.
-        """
-        ws_data = config.windstress.data
-        if ws_data.data_type == "speed":
-            return WindStressPreprocessorSpeed(
-                longitude_key=ws_data.longitude,
-                latitude_key=ws_data.latitude,
-                time_key=ws_data.time,
-                u10_key=ws_data.field_1,
-                v10_key=ws_data.field_2,
-            )
-        if ws_data.data_type == "tau":
-            return WindStressPreprocessorTaux(
-                longitude_key=ws_data.longitude,
-                latitude_key=ws_data.latitude,
-                time_key=ws_data.time,
-                u10_key=ws_data.field_1,
-                v10_key=ws_data.field_2,
-            )
-        msg = "Unrecognized data type in windstress.data section."
-        raise KeyError(msg)
-
-    def _set_config(self, config: RunConfig) -> WindStressDataConfig:
-        """Set Data Configuration.
-
-        Args:
-            config (RunConfig): Run Configuration.
-
-        Returns:
-            WindStressDataConfig: Data configuration.
-        """
-        return config.windstress.data

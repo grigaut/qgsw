@@ -6,8 +6,7 @@ PHYSICS = {
     "slip coef": "slip_coef",
     "f0": "f0",
     "beta": "beta",
-    "wind stress magnitude": "wind_stress_mag",
-    "drag coefficient": "drag_coefficient",
+    "bottom drag coefficient": "bottom_drag_coefficient",
 }
 
 LAYERS = {
