@@ -210,7 +210,6 @@ class BoxConfig(_Config):
             ConfigError: If latitude has no max entry.
             ConfigError: If longitude has no min entry.
             ConfigError: If longitude has no max entry.
-            ConfigError: If some latitude or longitude are not given.
 
         Returns:
             dict[str, Any]: Configuration dictionnary.
@@ -226,16 +225,6 @@ class BoxConfig(_Config):
             raise ConfigError(msg)
         if "max" not in params[self._y]:
             msg = "Y section must contain a `max` entry"
-            raise ConfigError(msg)
-
-        are_none = [
-            params[self._x]["min"] is None,
-            params[self._x]["max"] is None,
-            params[self._y]["min"] is None,
-            params[self._y]["max"] is None,
-        ]
-        if sum(are_none) > 0:
-            msg = "All coordinates extremums must be renseigned."
             raise ConfigError(msg)
 
         return super()._validate_params(params)
