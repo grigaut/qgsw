@@ -1,37 +1,34 @@
 # ruff : noqa
-
-import time
-
-t0 = time.time()
 import os
 import sys
+import urllib.request
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import netCDF4
 import numpy as np
+import scipy.interpolate
+import scipy.io
+import scipy.ndimage
 import torch
 from icecream import ic
 
 sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
-from qgsw.forcing.wind import WindForcingLoader
+from qgsw.forcing.wind import WindForcing
 from qgsw.configs import RunConfig
 from qgsw.grid import Grid
 from qgsw.qg import QG
 from qgsw.specs import DEVICE
 from qgsw.sw import SW
 
+
 torch.backends.cudnn.deterministic = True
 
 config = RunConfig.from_file(Path("config/realistic.toml"))
 grid = Grid.from_runconfig(config)
-
 bathy = Bathymetry.from_runconfig(config)
-mask_land = bathy.compute_land_mask(grid.h_xy)
-mask_land_w = bathy.compute_land_mask_w(grid.h_xy)
-
-windstress = WindForcingLoader(config=config)
-taux, tauy = windstress.retrieve()
+wind = WindForcing.from_runconfig(config)
 
 print(
     f"Grid lat: {config.grid.y_min:.1f}, {config.grid.y_max:.1f}, "
@@ -50,6 +47,10 @@ print(
     f" {config.bathy.interpolation_method} interpolation ..."
 )
 
+# Land Mask Generation
+mask_land = bathy.compute_land_mask(grid.h_xy)
+mask_land_w = bathy.compute_land_mask_w(grid.h_xy)
+
 
 # coriolis beta plane
 f = grid.generate_coriolis_grid(f0=config.physics.f0, beta=config.physics.beta)
@@ -57,6 +58,8 @@ print(
     f"Coriolis param min {f.min().cpu().item():.2e},"
     f" {f.max().cpu().item():.2e}"
 )
+
+taux, tauy = wind.compute()
 
 param = {
     "nx": config.grid.nx,
@@ -84,7 +87,7 @@ model = SW
 model = QG
 qg = model(param)
 
-name = f"qg_{config.io.name}"
+name = f"qg_"  # {config}"
 
 ######### Probably to avoid restarting
 start_file = ""

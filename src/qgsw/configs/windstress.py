@@ -10,6 +10,9 @@ class WindStressConfig(_Config):
     """WindStress Configuration."""
 
     _data_section: str = keys.WINDSTRESS_DATA["section"]
+    _type: str = keys.WINDSTRESS["type"]
+    _magnitude: str = keys.WINDSTRESS["magnitude"]
+    _drag_coef: str = keys.WINDSTRESS["drag coefficient"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate Windstress Configuration.
@@ -24,8 +27,23 @@ class WindStressConfig(_Config):
 
     @property
     def data(self) -> "WindStressDataConfig":
-        """Bathymetry Data Configuration."""
+        """Windstress Data Configuration."""
         return self._data
+
+    @property
+    def type(self) -> str:
+        """Windstress type (cosine, data)."""
+        return self.params[self._type]
+
+    @property
+    def magnitude(self) -> float:
+        """Wind Stress Magnitude."""
+        return self.params[self._magnitude]
+
+    @property
+    def drag_coefficient(self) -> str:
+        """Wind drag coefficient."""
+        return self.params[self._drag_coef]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         return super()._validate_params(params)

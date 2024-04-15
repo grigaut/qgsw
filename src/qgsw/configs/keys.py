@@ -59,6 +59,9 @@ IO = {
 
 WINDSTRESS = {
     "section": "windstress",
+    "magnitude": "magnitude",
+    "type": "type",
+    "drag coefficient": "drag_coefficient",
 }
 
 WINDSTRESS_DATA = {
