@@ -1,5 +1,5 @@
 [io]
-name = "doublegyre"
+name = "vortexgyre"
 plot_frequency = nan # in days
 performance_log = false
 output_dir = "output"

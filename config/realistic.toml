@@ -54,7 +54,7 @@ magnitude = nan # (Pa m-1 kg s-2)
 drag_coefficient = 1.3e-3
 [windstress.data]
 URL = "https://www.di.ens.fr/louis.thiry/wind_medsea_2010.nc"
-folder = "test"
+folder = "data"
 data = "speed"
 longitude = "longitude"
 latitude = "latitude"

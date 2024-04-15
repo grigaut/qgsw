@@ -1,11 +1,15 @@
-configuration = "med"
+[io]
+name = "na"
+plot_frequency = nan # in days
+performance_log = false
+output_dir = "output"
 
 [physics]
 rho = 1000
 slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
-wind_stress_mag = 0.08   # Wind stress magnitude (Pa m-1 kg s-2)
+bottom_drag_coefficient = nan
 
 [layers]
 h = [
@@ -33,6 +37,28 @@ min = 9
 max = 48
 
 [bathymetry]
-URL = "https://www.di.ens.fr/louis.thiry/AN_etopo1.mat"
-folder = "data"
 htop_ocean = -250
+lake_min_area = 40_000
+island_min_area = 1_000
+interolation = "linear"
+[bathymetry.data]
+folder = "data"
+URL = "https://www.di.ens.fr/louis.thiry/AN_etopo1.mat"
+longitude = "lon_bathy"
+latitude = "lat_bathy"
+elevation = "bathy"
+
+[windstress]
+type = "data"
+magnitude = nan # (Pa m-1 kg s-2)
+drag_coefficient = nan
+[windstress.data]
+URL = "http://iridl.ldeo.columbia.edu/SOURCES/.HELLERMAN/data.nc"
+folder = "data"
+data = "tau"
+longitude = "X"
+latitude = "Y"
+time = "T"
+field_1 = "taux"
+field_2 = "tauy"
+method="linear"
