@@ -231,6 +231,18 @@ class DataWindForcing(_WindForcing):
         return taux_tensor[0, 1:-1, :], tauy_tensor[0, :, 1:-1]
 
 
+class NoWindForcing(_WindForcing):
+    """No wind forcing."""
+
+    def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
+        """Compute no wind forcing -> return 0.0s.
+
+        Returns:
+            tuple[float | torch.Tensor, float | torch.Tensor]: Tau x, Tau y.
+        """
+        return 0.0, 0.0
+
+
 class WindForcing:
     """Wind Forcing Object."""
 
@@ -271,6 +283,8 @@ class WindForcing:
         if ws_type == "data":
             grid = Grid.from_runconfig(run_config=run_config)
             return cls(forcing=DataWindForcing(config=run_config, grid=grid))
-
+        if ws_type == "none":
+            grid = Grid.from_runconfig(run_config=run_config)
+            return cls(forcing=NoWindForcing(config=run_config, grid=grid))
         msg = "Unrecognized windstress type."
         raise KeyError(msg)

@@ -15,10 +15,17 @@ sys.path.append("../src")
 from qgsw.helmholtz import compute_laplace_dstI, dstI2D
 from qgsw.qg import QG
 from qgsw.sw import SW
+from qgsw.configs import RunConfig
+from qgsw.grid import Grid
+from qgsw.forcing.wind import WindForcing
+from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
-device = "cuda" if torch.cuda.is_available() else "cpu"
-dtype = torch.float64
+
+config = RunConfig.from_file("config/vortexshear.toml")
+grid = Grid.from_runconfig(config)
+wind = WindForcing.from_runconfig(config)
+taux, tauy = wind.compute()
 
 
 def grad_perp(f, dx, dy):
@@ -28,38 +35,16 @@ def grad_perp(f, dx, dy):
     ) / dx
 
 
-# grid
-nx = 192
-ny = 192
-nl = 1
-L = 100000  # 100km
-Lx = L
-Ly = L
-dx = torch.tensor(Lx / nx, device=device, dtype=dtype)
-dy = torch.tensor(Ly / ny, device=device, dtype=dtype)
-x_, y_ = (
-    torch.linspace(-Lx / 2, Lx / 2, nx + 1, dtype=dtype, device=device),
-    torch.linspace(-Ly / 2, Ly / 2, ny + 1, dtype=dtype, device=device),
-)
-x, y = torch.meshgrid(x_, y_, indexing="ij")
-
-xc_ = 0.5 * (x_[1:] + x_[:-1])
-yc_ = 0.5 * (y_[1:] + y_[:-1])
-xc, yc = torch.meshgrid(xc_, yc_, indexing="ij")
+x, y = grid.omega_xy
+xc, yc = grid.h_xy
 rc = torch.sqrt(xc**2 + yc**2)
 # circular domain mask
 apply_mask = False
-mask = (rc < L / 2).type(torch.float64) if apply_mask else torch.ones_like(xc)
-
-H = torch.zeros(nl, 1, 1, dtype=dtype, device=device)
-if nl == 1:
-    H[0, 0, 0] = 1000  # 1km
-
-# density/gravity
-rho = 1000.0
-g_prime = torch.zeros(nl, 1, 1, dtype=dtype, device=device)
-if nl == 1:
-    g_prime[0, 0, 0] = 10.0
+mask = (
+    (rc < config.grid.lx / 2).type(torch.float64)
+    if apply_mask
+    else torch.ones_like(xc)
+)
 
 flip_sign = False
 # Burger and Rossby
@@ -70,14 +55,21 @@ for Bu, Ro in [
 ]:
     print(f"Ro={Ro} Bu={Bu}")
 
-    r0, r1, r2 = 0.1 * Lx, 0.1 * Lx, 0.14 * Lx
+    # vortex set up
+    r0, r1, r2 = (
+        0.1 * config.grid.lx,
+        0.1 * config.grid.lx,
+        0.14 * config.grid.lx,
+    )
 
     # set coriolis with burger number
-    f0 = torch.sqrt(g_prime[0, 0, 0] * H[0, 0, 0] / Bu / r0**2)
+    f0 = torch.sqrt(
+        config.layers.g_prime[0, 0, 0] * config.layers.h[0, 0, 0] / Bu / r0**2
+    )
     if flip_sign:
         f0 *= -1
-    beta = 0
-    f = f0 + beta * (y - Ly / 2)
+    beta = config.physics.beta
+    f = f0 + beta * (y - config.grid.ly / 2)
 
     z = x + 1j * y
     theta = torch.angle(z)
@@ -93,36 +85,35 @@ for Bu, Ro in [
     if flip_sign:
         vor *= -1
     laplace_dstI = compute_laplace_dstI(
-        nx, ny, dx, dy, {"device": device, "dtype": dtype}
+        config.grid.nx,
+        config.grid.ny,
+        config.grid.dx,
+        config.grid.dy,
+        {"device": DEVICE, "dtype": torch.float64},
     )
     psi_hat = dstI2D(vor[1:-1, 1:-1]) / laplace_dstI
     psi = F.pad(dstI2D(psi_hat), (1, 1, 1, 1)).unsqueeze(0).unsqueeze(0)
 
     # set psi amplitude to have correct Rossby number
-    u, v = grad_perp(psi, dx, dy)
+    u, v = grad_perp(psi, config.grid.dx, config.grid.dy)
     u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
     psi *= Ro * f0 * r0 / u_norm_max
     p_init = psi * f0
 
-    # wind forcing, bottom drag
-    taux = 0.0
-    tauy = 0.0
-    bottom_drag_coef = 0.0
-
     param_qg = {
-        "nx": nx,
-        "ny": ny,
-        "nl": nl,
-        "dx": dx,
-        "dy": dy,
-        "H": H,
-        "g_prime": g_prime,
+        "nx": config.grid.nx,
+        "ny": config.grid.ny,
+        "nl": config.layers.nl,
+        "dx": config.grid.dx,
+        "dy": config.grid.dy,
+        "H": config.layers.h,
+        "g_prime": config.layers.g_prime,
         "f": f,
         "taux": taux,
         "tauy": tauy,
-        "bottom_drag_coef": bottom_drag_coef,
-        "device": device,
-        "dtype": dtype,
+        "bottom_drag_coef": config.physics.bottom_drag_coef,
+        "device": DEVICE,
+        "dtype": torch.float64,
         "mask": mask,
         "compile": True,
         "slip_coef": 1.0,
@@ -130,21 +121,21 @@ for Bu, Ro in [
     }
 
     param_sw = {
-        "nx": nx,
-        "ny": ny,
-        "nl": nl,
-        "dx": dx,
-        "dy": dy,
-        "H": H,
-        "rho": rho,
-        "g_prime": g_prime,
+        "nx": config.grid.nx,
+        "ny": config.grid.ny,
+        "nl": config.layers.nl,
+        "dx": config.grid.dx,
+        "dy": config.grid.dy,
+        "H": config.layers.h,
+        "rho": config.physics.rho,
+        "g_prime": config.layers.g_prime,
         "f": f,
         "taux": taux,
         "tauy": tauy,
         "mask": mask,
-        "bottom_drag_coef": bottom_drag_coef,
-        "device": device,
-        "dtype": dtype,
+        "bottom_drag_coef": config.physics.bottom_drag_coef,
+        "device": DEVICE,
+        "dtype": torch.float64,
         "slip_coef": 1,
         "compile": True,
         "barotropic_filter": False,
@@ -157,14 +148,18 @@ for Bu, Ro in [
     u_init, v_init, h_init = qg_multilayer.G(p_init)
 
     u_max, v_max, c = (
-        torch.abs(u_init).max().item() / dx,
-        torch.abs(v_init).max().item() / dy,
-        torch.sqrt(g_prime[0, 0, 0] * H.sum()),
+        torch.abs(u_init).max().item() / config.grid.dx,
+        torch.abs(v_init).max().item() / config.grid.dy,
+        torch.sqrt(config.layers.g_prime[0, 0, 0] * config.layers.h.sum()),
     )
     print(f"u_max {u_max:.2e}, v_max {v_max:.2e}, c {c:.2e}")
     cfl_adv = 0.5
     cfl_gravity = 5 if param_sw["barotropic_filter"] else 0.5
-    dt = min(cfl_adv * dx / u_max, cfl_adv * dy / v_max, cfl_gravity * dx / c)
+    dt = min(
+        cfl_adv * config.grid.dx / u_max,
+        cfl_adv * config.grid.dy / v_max,
+        cfl_gravity * config.grid.dx / c,
+    )
 
     qg_multilayer.dt = dt
     qg_multilayer.u = torch.clone(u_init)
