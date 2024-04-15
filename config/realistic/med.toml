@@ -15,7 +15,7 @@ drag_coefficient = 1.3e-3
 [layers]
 h = [
     400,
-    1_100,   
+    1_100,
     2_600,
 ]
 g_prime = [
