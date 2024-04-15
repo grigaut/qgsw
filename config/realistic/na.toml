@@ -10,7 +10,7 @@ wind_stress_mag = 0.08   # Wind stress magnitude (Pa m-1 kg s-2)
 [layers]
 h = [
     400,
-    1100,   
+    1100,
     2600,
 ]
 g_prime = [

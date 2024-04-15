@@ -14,7 +14,7 @@ bottom_drag_coefficient = nan
 [layers]
 h = [
     400,
-    1_100,   
+    1_100,
     2_600,
 ]
 g_prime = [

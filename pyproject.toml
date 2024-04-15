@@ -15,8 +15,8 @@ build-backend = "setuptools.build_meta"
 line-length = 79
 target-version = "py39"
 extend-exclude = ["*.ipynb"]
-select = ["ALL"]
-ignore = [
+lint.select = ["ALL"]
+lint.ignore = [
     # missing-trailing-comma (COM812)
     "COM812",
     #no-blank-line-before-class
@@ -48,7 +48,7 @@ ignore = [
     # suppressible-exception
     "SIM105",
 ]
-unfixable = [
+lint.unfixable = [
     # Remove unused-imports
     "F401",
     # Variable assigned but never used
