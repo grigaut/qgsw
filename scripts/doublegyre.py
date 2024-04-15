@@ -11,24 +11,29 @@ from qgsw.sw import SW
 from qgsw.qg import QG
 from qgsw.configs import RunConfig
 from qgsw.grid import Grid
-from qgsw.forcing.wind import CosineZonalWindForcing
+from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
+from icecream import ic
 
 torch.backends.cudnn.deterministic = True
 
 
 config = RunConfig.from_file(Path("config/doublegyre.toml"))
 grid = Grid.from_runconfig(config)
+wind = WindForcing.from_runconfig(config)
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+# dtype = torch.float64
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-dtype = torch.float64
-
-mask = torch.ones(config.grid.nx, config.grid.ny, dtype=dtype, device=device)
+mask = torch.ones(
+    config.grid.nx,
+    config.grid.ny,
+    dtype=torch.float64,
+    device=DEVICE,
+)
 # mask[0,0] = 0
 # mask[0,-1] = 0
 
-wind_forcing = CosineZonalWindForcing.from_runconfig(run_config=config)
-taux, tauy = wind_forcing.compute_over_grid(grid=grid)
+taux, tauy = wind.compute()
 
 param = {
     "nx": config.grid.nx,
@@ -41,7 +46,7 @@ param = {
     "g_prime": config.layers.g_prime,
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
-    "dtype": dtype,
+    "dtype": torch.float64,
     "slip_coef": config.physics.slip_coef,
     "interp_fd": False,
     "dt": config.grid.dt,

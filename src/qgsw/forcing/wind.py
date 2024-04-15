@@ -69,7 +69,7 @@ class CosineZonalWindForcing(_WindForcing):
         Returns:
             tuple[float | torch.Tensor, float | torch.Tensor]: Tau x, Tau y.
         """
-        return self._compute_taux, self._compute_tauy
+        return self._compute_taux(), self._compute_tauy()
 
     def _compute_taux(self) -> float | torch.Tensor:
         """Zonal Wind.
@@ -78,8 +78,9 @@ class CosineZonalWindForcing(_WindForcing):
             float | torch.Tensor: Tau_x
         """
         y_ugrid = 0.5 * (
-            self._grid.h_xy[0][:, 1:] + self._grid.h_xy[0][:, :-1]
+            self._grid.omega_xy[1][:, 1:] + self._grid.omega_xy[1][:, :-1]
         )
+        print(y_ugrid.shape)
         wind_profile = torch.cos(
             2 * torch.pi * (y_ugrid - self._grid.ly / 2) / self._grid.ly
         )

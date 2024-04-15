@@ -1,9 +1,14 @@
+[io]
+name = "doublegyre"
+plot_frequency = nan # in days
+performance_log = false
+output_dir = "output"
+
 [physics]
 rho = 1000
 slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
-wind_stress_mag = 0.08   # Wind stress magnitude (Pa m-1 kg s-2)
 
 [layers]
 h = [
@@ -18,15 +23,20 @@ g_prime = [
 ]
 
 [grid]
-nx = 32 # 128
-ny = 64 # 256
-dt = 4000
-reference = "distance"
+nx = 32
+ny = 64
+dt = 4_000
+box_unit = "m"
 [grid.box]
-unit = "m"
 [grid.box.x]
 min = 0
 max = 2560.0e3
 [grid.box.y]
 min = 0
 max = 5120.0e3
+
+[windstress]
+type = "cosine"
+magnitude = 0.08 # (Pa m-1 kg s-2)
+drag_coefficient = 1.3e-3
+[windstress.data]
