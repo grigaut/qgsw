@@ -10,6 +10,7 @@ import scipy.interpolate
 import torch
 
 from qgsw.data.readers import Reader
+from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
@@ -145,7 +146,10 @@ class WindStressPreprocessorSpeed(_WindStressPreprocessor):
         taux[-1][:] = taux[0][:]
         tauy[-1][:] = tauy[0][:]
 
-        return taux[0, 1:-1, :], tauy[0, :, 1:-1]
+        taux_tensor = torch.from_numpy(taux).type(torch.float64).to(DEVICE)
+        tauy_tensor = torch.from_numpy(tauy).type(torch.float64).to(DEVICE)
+
+        return taux_tensor[0, 1:-1, :], tauy_tensor[0, :, 1:-1]
 
 
 class WindStressPreprocessorTaux(_WindStressPreprocessor):
@@ -193,4 +197,7 @@ class WindStressPreprocessorTaux(_WindStressPreprocessor):
         taux[-1][:] = taux[0][:]
         tauy[-1][:] = tauy[0][:]
 
-        return taux[0, 1:-1, :], tauy[0, :, 1:-1]
+        taux_tensor = torch.from_numpy(taux).type(torch.float64).to(DEVICE)
+        tauy_tensor = torch.from_numpy(tauy).type(torch.float64).to(DEVICE)
+
+        return taux_tensor[0, 1:-1, :], tauy_tensor[0, :, 1:-1]

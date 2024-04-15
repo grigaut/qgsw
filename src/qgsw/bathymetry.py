@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -40,12 +39,8 @@ class BathyLoader(Loader[BathyDataConfig, BathyData, BathyPreprocessor]):
             bathymetry_key=config.elevation,
         )
 
-    def _set_filepath(self, config: BathyDataConfig) -> Path:
-        filename = Path(config.url).name
-        return config.folder.joinpath(filename)
-
-    def _set_config(self, config: BathyDataConfig) -> None:
-        self._config = config
+    def _set_config(self, config: BathyDataConfig) -> BathyDataConfig:
+        return config
 
 
 class Bathymetry:

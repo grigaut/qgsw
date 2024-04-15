@@ -1,15 +1,14 @@
 # ruff : noqa
+
+import time
+
+t0 = time.time()
 import os
 import sys
-import urllib.request
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import netCDF4
 import numpy as np
-import scipy.interpolate
-import scipy.io
-import scipy.ndimage
 import torch
 from icecream import ic
 
@@ -22,12 +21,18 @@ from qgsw.qg import QG
 from qgsw.specs import DEVICE
 from qgsw.sw import SW
 
+torch.backends.cudnn.deterministic = True
+
 config = RunConfig.from_file(Path("config/realistic.toml"))
 grid = Grid.from_runconfig(config)
+
 bathy = Bathymetry.from_runconfig(config)
-a = WindForcingLoader(config=config)
-ic(a.retrieve())
-exit()
+mask_land = bathy.compute_land_mask(grid.h_xy)
+mask_land_w = bathy.compute_land_mask_w(grid.h_xy)
+
+windstress = WindForcingLoader(config=config)
+taux, tauy = windstress.retrieve()
+
 print(
     f"Grid lat: {config.grid.y_min:.1f}, {config.grid.y_max:.1f}, "
     f"lon: {config.grid.x_min:.1f}, {config.grid.x_max:.1f}, "
@@ -45,118 +50,6 @@ print(
     f" {config.bathy.interpolation_method} interpolation ..."
 )
 
-# Land Mask Generation
-mask_land = bathy.compute_land_mask(grid.h_xy)
-mask_land_w = bathy.compute_land_mask_w(grid.h_xy)
-
-# Ocean Mask Generation
-mask_ocean = bathy.compute_land_mask(grid.h_xy)
-# exit()
-if config.io.name == "na":
-    wind_file = "./data/windstress_HellermanRosenstein83.nc"
-    if not os.path.isfile(wind_file):
-        wind_url = "http://iridl.ldeo.columbia.edu/SOURCES/.HELLERMAN/data.nc"
-        print(f"Downloading wind file {wind_file} from {wind_url}...")
-        urllib.request.urlretrieve(wind_url, wind_file)
-
-    ds = netCDF4.Dataset(wind_file, "r")
-    X: np.ndarray = ds.variables["X"][:].data
-    Y: np.ndarray = ds.variables["Y"][:].data
-    T: np.ndarray = ds.variables["T"][:].data
-
-    taux = np.zeros((T.shape[0] + 1, config.grid.nx + 1, config.grid.ny))
-    tauy = np.zeros((T.shape[0] + 1, config.grid.nx, config.grid.ny + 1))
-
-    method = "linear"
-    print(
-        f"Interpolating wind forcing on grid with {method} interpolation ..."
-    )
-    for t in range(T.shape[0]):
-        ## linear interpolation with scipy
-        taux_ref = ds.variables["taux"][:].data[t].T
-        tauy_ref = ds.variables["tauy"][:].data[t].T
-        taux_interpolator = scipy.interpolate.RegularGridInterpolator(
-            (X, Y), taux_ref, method=method
-        )
-        tauy_interpolator = scipy.interpolate.RegularGridInterpolator(
-            (X, Y), tauy_ref, method=method
-        )
-        taux_i = taux_interpolator((grid.u_xy[0] + 360, grid.u_xy[1]))
-        tauy_i = tauy_interpolator((grid.v_xy[0] + 360, grid.v_xy[1]))
-
-        ## bicubic interpolation with torch
-        # taux_ref = torch.from_numpy(ds.variables['taux'][:].data[t].T).unsqueeze(0).unsqueeze(0).type(torch.float64)
-        # lon_u_norm = torch.from_numpy(((lon_u % 360) - 180) / 180)
-        # lat_u_norm = torch.from_numpy(lat_u / 90)
-        # grid_u_norm = torch.stack([lat_u_norm, lon_u_norm], dim=-1).unsqueeze(0).type(torch.float64)
-        # taux_i = torch.nn.functional.grid_sample(taux_ref, grid_u_norm, mode='bicubic', padding_mode='border', align_corners=False)
-
-        # tauy_ref = torch.from_numpy(ds.variables['tauy'][:].data[t].T).unsqueeze(0).unsqueeze(0).type(torch.float64)
-        # lon_v_norm = torch.from_numpy(((lon_v % 360) - 180) / 180)
-        # lat_v_norm = torch.from_numpy(lat_v / 90)
-        # grid_v_norm = torch.stack([lat_v_norm, lon_v_norm], dim=-1).unsqueeze(0).type(torch.float64)
-        # tauy_i = torch.nn.functional.grid_sample(tauy_ref, grid_v_norm, mode='bicubic', padding_mode='border', align_corners=False)
-
-        taux[t, :, :] = taux_i
-        tauy[t, :, :] = tauy_i
-
-    taux *= 1e-4
-    tauy *= 1e-4
-    taux[-1][:] = taux[0][:]
-    tauy[-1][:] = tauy[0][:]
-elif config.io.name == "med":
-    wind_file = "./data/wind_medsea_2010.nc"
-    if not os.path.isfile(wind_file):
-        wind_url = "https://www.di.ens.fr/louis.thiry/wind_medsea_2010.nc"
-        print(f"Downloading wind file {wind_file} from {wind_url}...")
-        urllib.request.urlretrieve(wind_url, wind_file)
-
-    ds = netCDF4.Dataset(wind_file, "r")
-    X: np.ndarray = ds.variables["longitude"][:].data.astype("float64")
-    Y: np.ndarray = ds.variables["latitude"][:].data.astype("float64")[::-1]
-    T: np.ndarray = ds.variables["time"][:].data.astype("float64")
-
-    print(
-        f"Wind lat: {Y.min():.2f} - {Y.max():.2f}, "
-        f"lon: {X.min():.2f} - {X.max():.2f}"
-    )
-
-    drag_coefficient = 1.3e-3
-    rho_ocean = 1e3
-
-    taux = np.zeros((T.shape[0] + 1, config.grid.nx + 1, config.grid.ny))
-    tauy = np.zeros((T.shape[0] + 1, config.grid.nx, config.grid.ny + 1))
-
-    method = "linear"
-    print(
-        f"Interpolating wind forcing on grid with {method} interpolation ..."
-    )
-    for t in range(T.shape[0]):
-        u = ds.variables["u10"][:].data[t].T[:, ::-1]
-        v = ds.variables["v10"][:].data[t].T[:, ::-1]
-        unorm = np.sqrt(u**2 + v**2)
-        taux_ref = drag_coefficient / rho_ocean * unorm * u
-        tauy_ref = drag_coefficient / rho_ocean * unorm * v
-        taux_interpolator = scipy.interpolate.RegularGridInterpolator(
-            (X, Y), taux_ref, method=method
-        )
-        tauy_interpolator = scipy.interpolate.RegularGridInterpolator(
-            (X, Y), tauy_ref, method=method
-        )
-        taux_i = taux_interpolator(grid.u_xy)
-        tauy_i = tauy_interpolator(grid.v_xy)
-        taux[t, :, :] = taux_i
-        tauy[t, :, :] = tauy_i
-
-    taux[-1][:] = taux[0][:]
-    tauy[-1][:] = tauy[0][:]
-
-
-dtype, device = torch.float64, "cuda" if torch.cuda.is_available() else "cpu"
-taux = torch.from_numpy(taux).type(dtype).to(device)
-tauy = torch.from_numpy(tauy).type(dtype).to(device)
-
-torch.backends.cudnn.deterministic = True
 
 # coriolis beta plane
 f = grid.generate_coriolis_grid(f0=config.physics.f0, beta=config.physics.beta)
@@ -165,8 +58,6 @@ print(
     f" {f.max().cpu().item():.2e}"
 )
 
-
-# dt = 2000
 param = {
     "nx": config.grid.nx,
     "ny": config.grid.ny,
@@ -184,8 +75,8 @@ param = {
     "dt": config.grid.dt,  # time-step (s)
     "compile": True,
     "mask": bathy.compute_ocean_mask(grid.h_xy),
-    "taux": taux[0, 1:-1, :],
-    "tauy": tauy[0, :, 1:-1],
+    "taux": taux,
+    "tauy": tauy,
 }
 
 
@@ -193,7 +84,7 @@ model = SW
 model = QG
 qg = model(param)
 
-name = f"qg_"  # {config}"
+name = f"qg_{config.io.name}"
 
 ######### Probably to avoid restarting
 start_file = ""

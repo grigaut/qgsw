@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
@@ -20,6 +19,7 @@ from qgsw.grid import Grid
 
 if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.windstress import WindStressDataConfig
 
 
 class _WindForcing(ABC):
@@ -166,9 +166,5 @@ class WindForcingLoader(
         msg = "Unrecognized data type in windstress.data section."
         raise KeyError(msg)
 
-    def _set_filepath(self, config: RunConfig) -> Path:
-        filename = Path(config.windstress.data.url).name
-        return config.windstress.data.folder.joinpath(filename)
-
-    def _set_config(self, config: RunConfig) -> None:
-        self._config = config.windstress.data
+    def _set_config(self, config: RunConfig) -> WindStressDataConfig:
+        return config.windstress.data
