@@ -162,7 +162,7 @@ class SW:
         self.bottom_drag_coef = param["bottom_drag_coef"]
 
         # time
-        self.dt = param["dt"]
+        self._dt = param["dt"]
         print(f"  - integration time step {self.dt:.3e}")
 
         # ensemble
@@ -213,6 +213,16 @@ class SW:
             self._set_utils_with_compilation()
         else:
             print("  - No compilation")
+
+    @property
+    def dt(self) -> float:
+        """Timestep value."""
+        return self._dt
+
+    @dt.setter
+    def dt(self, value: float) -> None:
+        print(f"dt value set to {value}.")
+        self._dt = value
 
     def _validate_H(self, param: dict[str, Any], key: str) -> torch.Tensor:
         """Validate H (unperturbed layer thickness) input value.
