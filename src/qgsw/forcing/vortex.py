@@ -1,5 +1,7 @@
 """Vortex Forcing."""
 
+from abc import ABC, abstractmethod
+
 import torch
 import torch.nn.functional as F  # noqa: N812
 
@@ -112,7 +114,7 @@ class RankineVortex2D:
         return mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
 
 
-class RankineVortex3D:
+class RankineVortex3D(ABC):
     """3D Rankine Vortex."""
 
     def __init__(
@@ -154,6 +156,7 @@ class RankineVortex3D:
         return self._2d.r2
 
     @property
+    @abstractmethod
     def psi(self) -> torch.Tensor:
         """Value of the stream function ψ.
 
@@ -161,3 +164,100 @@ class RankineVortex3D:
         """
         xy_shape = self._2d.psi.shape[-2:]
         return self._2d.psi.expand((1, self._grid.nl, *xy_shape))
+
+
+class ActiveLayersRankineVortex3D(RankineVortex3D):
+    """3D Rankine Vortex with similar vortex behavior accross all layers."""
+
+    @property
+    def psi(self) -> torch.Tensor:
+        """Value of the stream function ψ.
+
+        The Tensor has a shape of (1, nl, nx + 1, ny + 1).
+        """
+        xy_shape = self._2d.psi.shape[-2:]
+        return self._2d.psi.expand((1, self._grid.nl, *xy_shape))
+
+
+class PassiveLayersRankineVortex3D(RankineVortex3D):
+    """3D Rankine Vortex with only superior layer active."""
+
+    @property
+    def psi(self) -> torch.Tensor:
+        """Value of the stream function ψ.
+
+        The Tensor has a shape of (1, nl, nx + 1, ny + 1).
+        """
+        xy_shape = self._2d.psi.shape[-2:]
+        psi = torch.ones(
+            (1, self._grid.nl, *xy_shape),
+            device=DEVICE,
+            dtype=torch.float64,
+        )
+        psi[0, 0, ...] = self._2d.psi
+        return psi
+
+
+class VortexForcing(ABC):
+    """Vortex Forcing's abtract class."""
+
+    _vortex: RankineVortex3D
+
+    def __init__(
+        self,
+        grid_3d: Grid3D,
+        perturbation_magnitude: float = 1e-3,
+    ) -> None:
+        """Instantiate VortexForcing.
+
+        Args:
+            grid_3d (Grid3D): 3D Grid.
+            perturbation_magnitude (float, optional): Tripolar perturbation
+            magnitude. Defaults to 1e-3.
+        """
+        self._grid = grid_3d
+        self._set_vortex(perturbation_magnitude=perturbation_magnitude)
+
+    @abstractmethod
+    def _set_vortex(self, perturbation_magnitude: float) -> None:
+        """Set Vortex.
+
+        Args:
+            perturbation_magnitude (float): Vortex's tripolar
+            perturbation magnitude.
+        """
+
+    def compute(self, f0: float, Ro: float) -> torch.Tensor:  # noqa: N803
+        """Compute Initial pressure based on the vortex's vorticity.
+
+        Args:
+            f0 (float): Coriolis Parameter from β-plane approximation.
+            Ro (float): Rossby NUmber.
+
+        Returns:
+            torch.Tensor: Initial Pressure with the presence of the vortex.
+        """
+        u, v = grad_perp(self._vortex.psi, self._grid.dx, self._grid.dy)
+        u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
+        # set psi amplitude to have a correct Rossby number
+        psi_norm = self._vortex.psi * (Ro * f0 * self._vortex.r0 / u_norm_max)
+        # Return pressure value
+        return psi_norm * f0
+
+
+class ActiveLayersVortexForcing(VortexForcing):
+    """Vortex Forcing with similar vortex behavior accross all layers."""
+
+    def _set_vortex(self, perturbation_magnitude: float) -> None:
+        self._vortex = ActiveLayersRankineVortex3D(
+            grid=self._grid, perturbation_magnitude=perturbation_magnitude
+        )
+
+
+class PassiveLayersVortexForcing(VortexForcing):
+    """Vortex Forcing with only superior layer active."""
+
+    def _set_vortex(self, perturbation_magnitude: float) -> None:
+        self._vortex = PassiveLayersRankineVortex3D(
+            grid=self._grid, perturbation_magnitude=perturbation_magnitude
+        )
