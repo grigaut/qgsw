@@ -170,7 +170,7 @@ class Grid3D:
         self._layers = layers_config
 
     @property
-    def grid_2d(self) -> Grid:
+    def xy(self) -> Grid:
         """Surfacic grid."""
         return self._2D
 
