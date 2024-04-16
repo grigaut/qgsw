@@ -7,16 +7,20 @@ output_dir = "output"
 [physics]
 rho = 1000
 slip_coef = 1.0
-f0 = 9.375e-5           # mean coriolis (s^-1)
+f0 = nan           # mean coriolis (s^-1)
 beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
 [layers]
 h = [
-    1000,
+    400,
+    1_100,
+    2_600,
 ]
 g_prime = [
-    10.0,
+    9.81,
+    0.025,
+    0.0125,
 ]
 
 [grid]

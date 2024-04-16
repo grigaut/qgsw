@@ -1,42 +1,35 @@
-# ruff : noqa
-"""
+# ruff: noqa
+"""Comparison between QG and SW solutions in vortex shear instability."""
 
-Comparison between QG and SW solutions in vortex shear instability.
-
-"""
+import sys
 
 import numpy as np
-import sys
 import torch
-import torch.nn.functional as F
 
 sys.path.append("../src")
 
-from qgsw.helmholtz import compute_laplace_dstI, dstI2D
-from qgsw.qg import QG
-from qgsw.sw import SW
+import matplotlib.pyplot as plt
 from qgsw.configs import RunConfig
-from qgsw.grid import Grid
+from qgsw.forcing.vortex import (
+    PassiveLayersVortexForcing,
+)
 from qgsw.forcing.wind import WindForcing
+from qgsw.grid import Grid3D
+from qgsw.qg import QG
 from qgsw.specs import DEVICE
+from qgsw.sw import SW
 
 torch.backends.cudnn.deterministic = True
 
 config = RunConfig.from_file("config/vortexshear.toml")
-grid = Grid.from_runconfig(config)
+grid = Grid3D.from_runconfig(config)
 wind = WindForcing.from_runconfig(config)
 taux, tauy = wind.compute()
+vortex = PassiveLayersVortexForcing(grid, 1e-3)
 
 
-def grad_perp(f, dx, dy):
-    """Orthogonal gradient"""
-    return (f[..., :-1] - f[..., 1:]) / dy, (
-        f[..., 1:, :] - f[..., :-1, :]
-    ) / dx
-
-
-x, y = grid.omega_xy
-xc, yc = grid.h_xy
+x, y = grid.xy.omega_xy
+xc, yc = grid.xy.h_xy
 rc = torch.sqrt(xc**2 + yc**2)
 # circular domain mask
 apply_mask = False
@@ -70,35 +63,6 @@ for Bu, Ro in [
         f0 *= -1
     beta = config.physics.beta
     f = f0 + beta * (y - config.grid.ly / 2)
-
-    z = x + 1j * y
-    theta = torch.angle(z)
-    r = torch.sqrt(x**2 + y**2)
-
-    # create rankine vortex with tripolar perturbation
-    epsilon = 1e-3
-    r *= 1 + epsilon * torch.cos(theta * 3)
-    soft_step = lambda x: torch.sigmoid(x / 100)
-    mask_core = soft_step(r0 - r)
-    mask_ring = soft_step(r - r1) * soft_step(r2 - r)
-    vor = 1.0 * (-mask_core / mask_core.mean() + mask_ring / mask_ring.mean())
-    if flip_sign:
-        vor *= -1
-    laplace_dstI = compute_laplace_dstI(
-        config.grid.nx,
-        config.grid.ny,
-        config.grid.dx,
-        config.grid.dy,
-        {"device": DEVICE, "dtype": torch.float64},
-    )
-    psi_hat = dstI2D(vor[1:-1, 1:-1]) / laplace_dstI
-    psi = F.pad(dstI2D(psi_hat), (1, 1, 1, 1)).unsqueeze(0).unsqueeze(0)
-
-    # set psi amplitude to have correct Rossby number
-    u, v = grad_perp(psi, config.grid.dx, config.grid.dy)
-    u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
-    psi *= Ro * f0 * r0 / u_norm_max
-    p_init = psi * f0
 
     param_qg = {
         "nx": config.grid.nx,
@@ -145,7 +109,7 @@ for Bu, Ro in [
 
     qg_multilayer = QG(param_qg)
 
-    u_init, v_init, h_init = qg_multilayer.G(p_init)
+    u_init, v_init, h_init = qg_multilayer.G(vortex.compute(f0, Ro))
 
     u_max, v_max, c = (
         torch.abs(u_init).max().item() / config.grid.dx,
@@ -194,23 +158,23 @@ for Bu, Ro in [
     n_steps = int(t_end / dt) + 1
 
     if freq_plot > 0:
-        import matplotlib
+        import matplotlib as mpl
         import matplotlib.pyplot as plt
 
-        matplotlib.rcParams.update({"font.size": 18})
+        mpl.rcParams.update({"font.size": 18})
         palette = plt.cm.bwr  # .with_extremes(bad='grey')
 
         plt.ion()
 
         f, a = plt.subplots(1, 3, figsize=(18, 8))
-        a[0].set_title("$\omega_{qg}$")
-        a[1].set_title("$\omega_{sw}$")
-        a[2].set_title("$\omega_{qg} - \omega_{sw}$")
+        a[0].set_title(r"$\omega_{qg}$")
+        a[1].set_title(r"$\omega_{sw}$")
+        a[2].set_title(r"$\omega_{qg} - \omega_{sw}$")
         [(a[i].set_xticks([]), a[i].set_yticks([])) for i in range(3)]
         f.tight_layout()
         plt.pause(0.1)
 
-    for n in range(0, n_steps + 1):
+    for n in range(n_steps + 1):
         if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
             mask_w = sw_multilayer.masks.not_w[0, 0].cpu().numpy()
             w_qg = (
@@ -223,11 +187,15 @@ for Bu, Ro in [
                 .cpu()
                 .numpy()
             )
-            wM = max(np.abs(w_qg).max(), np.abs(w_sw).max())
+            w_m = max(np.abs(w_qg).max(), np.abs(w_sw).max())
 
-            kwargs = dict(
-                cmap=palette, origin="lower", vmin=-wM, vmax=wM, animated=True
-            )
+            kwargs = {
+                "cmap": palette,
+                "origin": "lower",
+                "vmin": -w_m,
+                "vmax": w_m,
+                "animated": True,
+            }
             a[0].imshow(np.ma.masked_where(mask_w, w_qg[0, 0]).T, **kwargs)
             a[1].imshow(np.ma.masked_where(mask_w, w_sw[0, 0]).T, **kwargs)
             a[2].imshow(
@@ -244,13 +212,11 @@ for Bu, Ro in [
         t += dt
         if n % freq_checknan == 0:
             if torch.isnan(qg_multilayer.h).any():
-                raise ValueError(
-                    f"Stopping, NAN number in QG h at iteration {n}."
-                )
+                msg = f"Stopping, NAN number in QG h at iteration {n}."
+                raise ValueError(msg)
             if torch.isnan(sw_multilayer.h).any():
-                raise ValueError(
-                    f"Stopping, NAN number in SW h at iteration {n}."
-                )
+                msg = f"Stopping, NAN number in SW h at iteration {n}."
+                raise ValueError(msg)
 
         if freq_log > 0 and n % freq_log == 0:
             print(f"n={n:05d}, {qg_multilayer.get_print_info()}")
