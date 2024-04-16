@@ -170,6 +170,11 @@ class Grid3D:
         self._layers = layers_config
 
     @property
+    def grid_2d(self) -> Grid:
+        """Surfacic grid."""
+        return self._2D
+
+    @property
     def nx(self) -> int:
         """Number of points on the x direction."""
         return self._2D.nx
