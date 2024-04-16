@@ -200,6 +200,11 @@ class Grid3D:
         return self._2D.ly
 
     @property
+    def lz(self) -> int:
+        """Total length in the z direction (in meters)."""
+        return self._layers.h.sum()
+
+    @property
     def dx(self) -> float:
         """dx."""
         return self._2D.dx
