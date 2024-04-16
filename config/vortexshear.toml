@@ -13,10 +13,14 @@ bottom_drag_coefficient = 0
 
 [layers]
 h = [
-    1000,
+    400,
+    1_100,
+    2_600,
 ]
 g_prime = [
-    10.0,
+    9.81,
+    0.025,
+    0.0125,
 ]
 
 [grid]
