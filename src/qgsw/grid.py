@@ -3,7 +3,7 @@
 import torch
 from typing_extensions import Self
 
-from qgsw.configs import RunConfig
+from qgsw.configs import ScriptConfig
 from qgsw.configs.grid import GridConfig, LayersConfig
 from qgsw.specs import DEVICE
 
@@ -140,11 +140,11 @@ class Grid:
         return f0 + beta * (self.omega_xy[1] - self.ly / 2)
 
     @classmethod
-    def from_runconfig(cls, run_config: RunConfig) -> Self:
-        """Construct the Grid given a RunConfig object.
+    def from_runconfig(cls, run_config: ScriptConfig) -> Self:
+        """Construct the Grid given a ScriptConfig object.
 
         Args:
-            run_config (RunConfig): Run Configuration Object.
+            run_config (ScriptConfig): Run Configuration Object.
 
         Returns:
             Self: Corresponding Grid.
@@ -270,11 +270,11 @@ class Grid3D:
         return x.expand((self.nl, *x.shape)), y.expand((self.nl, *y.shape))
 
     @classmethod
-    def from_runconfig(cls, run_config: RunConfig) -> Self:
-        """Construct the 3D Grid given a RunConfig object.
+    def from_runconfig(cls, run_config: ScriptConfig) -> Self:
+        """Construct the 3D Grid given a ScriptConfig object.
 
         Args:
-            run_config (RunConfig): Run Configuration Object.
+            run_config (ScriptConfig): Run Configuration Object.
 
         Returns:
             Self: Corresponding 3D Grid.

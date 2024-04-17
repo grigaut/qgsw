@@ -9,7 +9,7 @@ import torch
 sys.path.append("../src")
 
 import matplotlib.pyplot as plt
-from qgsw.configs import RunConfig
+from qgsw.configs import ScriptConfig
 from qgsw.forcing.vortex import (
     PassiveLayersVortexForcing,
 )
@@ -21,7 +21,7 @@ from qgsw.sw import SW
 
 torch.backends.cudnn.deterministic = True
 
-config = RunConfig.from_file("config/vortexshear.toml")
+config = ScriptConfig.from_file("config/vortexshear.toml")
 grid = Grid3D.from_runconfig(config)
 wind = WindForcing.from_runconfig(config)
 taux, tauy = wind.compute()

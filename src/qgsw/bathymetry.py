@@ -18,7 +18,7 @@ from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.bathymetry import BathyConfig
-    from qgsw.configs.core import RunConfig
+    from qgsw.configs.core import ScriptConfig
 
 
 class Bathymetry:
@@ -180,11 +180,11 @@ class Bathymetry:
         return avg_2d > 0.5  # noqa: PLR2004
 
     @classmethod
-    def from_runconfig(cls, run_config: RunConfig) -> Self:
-        """Construct the Bathymetry given a RunConfig object.
+    def from_runconfig(cls, run_config: ScriptConfig) -> Self:
+        """Construct the Bathymetry given a ScriptConfig object.
 
         Args:
-            run_config (RunConfig): Run Configuration Object.
+            run_config (ScriptConfig): Run Configuration Object.
 
         Returns:
             Self: Corresponding Bathymetry.

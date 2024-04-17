@@ -16,7 +16,7 @@ from icecream import ic
 sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
-from qgsw.configs import RunConfig
+from qgsw.configs import ScriptConfig
 from qgsw.grid import Grid
 from qgsw.qg import QG
 from qgsw.specs import DEVICE
@@ -25,7 +25,7 @@ from qgsw.sw import SW
 
 torch.backends.cudnn.deterministic = True
 
-config = RunConfig.from_file(Path("config/realistic.toml"))
+config = ScriptConfig.from_file(Path("config/realistic.toml"))
 grid = Grid.from_runconfig(config)
 bathy = Bathymetry.from_runconfig(config)
 wind = WindForcing.from_runconfig(config)

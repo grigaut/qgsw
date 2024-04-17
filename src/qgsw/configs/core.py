@@ -12,7 +12,7 @@ from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.windstress import WindStressConfig
 
 
-class RunConfig(_Config):
+class ScriptConfig(_Config):
     """Configuration for a run."""
 
     _layers_section: str = keys.LAYERS["section"]
@@ -23,7 +23,7 @@ class RunConfig(_Config):
     _windstress_section: str = keys.WINDSTRESS["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate RunConfig.
+        """Instantiate ScriptConfig.
 
         Args:
             params (dict[str, Any]): Run configuration dictionnary.

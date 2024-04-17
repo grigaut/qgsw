@@ -12,7 +12,7 @@ import torch
 
 from qgsw.configs.base import _Config, _DataConfig
 from qgsw.configs.bathymetry import BathyDataConfig
-from qgsw.configs.core import RunConfig
+from qgsw.configs.core import ScriptConfig
 from qgsw.data.preprocessing import (
     BathyPreprocessor,
     Preprocessor,
@@ -53,7 +53,7 @@ class Loader(ABC, Generic[Config, Data, Preprocess]):
         """Set filepath.
 
         Args:
-            config (RunConfig): Data Configuration.
+            config (ScriptConfig): Data Configuration.
 
         Returns:
             Path: Path to save data at.
@@ -112,16 +112,20 @@ class BathyLoader(Loader[BathyDataConfig, BathyData, BathyPreprocessor]):
 
 class WindForcingLoader(
     Loader[
-        RunConfig, tuple[torch.Tensor, torch.Tensor], _WindStressPreprocessor
+        ScriptConfig,
+        tuple[torch.Tensor, torch.Tensor],
+        _WindStressPreprocessor,
     ]
 ):
     """Wind Forcing Data Loader."""
 
-    def set_preprocessor(self, config: RunConfig) -> _WindStressPreprocessor:
+    def set_preprocessor(
+        self, config: ScriptConfig
+    ) -> _WindStressPreprocessor:
         """Set WindStress preprocessor.
 
         Args:
-            config (RunConfig): configuration.
+            config (ScriptConfig): configuration.
 
         Raises:
             KeyError: If the configuration is not valid.
@@ -149,11 +153,11 @@ class WindForcingLoader(
         msg = "Unrecognized data type in windstress.data section."
         raise KeyError(msg)
 
-    def _set_config(self, config: RunConfig) -> WindStressDataConfig:
+    def _set_config(self, config: ScriptConfig) -> WindStressDataConfig:
         """Set Data Configuration.
 
         Args:
-            config (RunConfig): Run Configuration.
+            config (ScriptConfig): Run Configuration.
 
         Returns:
             WindStressDataConfig: Data configuration.

@@ -1,5 +1,5 @@
 """Configuration Tools."""
 
-from qgsw.configs.core import RunConfig
+from qgsw.configs.core import ScriptConfig
 
-__all__ = ["RunConfig"]
+__all__ = ["ScriptConfig"]

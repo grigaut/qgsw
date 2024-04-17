@@ -15,17 +15,17 @@ from qgsw.grid import Grid
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs import RunConfig
+    from qgsw.configs import ScriptConfig
 
 
 class _WindForcing(ABC):
     """Wind Forcing Representation."""
 
-    def __init__(self, config: RunConfig, grid: Grid) -> None:
+    def __init__(self, config: ScriptConfig, grid: Grid) -> None:
         """Instantiate _WindForcing.
 
         Args:
-            config (RunConfig): Run configuration.
+            config (ScriptConfig): Run configuration.
             grid (Grid): Grid.
         """
         self._config = config
@@ -46,11 +46,11 @@ class _WindForcing(ABC):
 class CosineZonalWindForcing(_WindForcing):
     """Simple Cosine Zonal Wind."""
 
-    def __init__(self, config: RunConfig, grid: Grid) -> None:
+    def __init__(self, config: ScriptConfig, grid: Grid) -> None:
         """Instantiate CosineZonalWindForcing.
 
         Args:
-            config (RunConfig): Run configuration.
+            config (ScriptConfig): Run configuration.
             grid (Grid): Grid.
         """
         super().__init__(config, grid)
@@ -92,11 +92,11 @@ class CosineZonalWindForcing(_WindForcing):
 class DataWindForcing(_WindForcing):
     """Wind Forcing object to handle data-based wind forcing."""
 
-    def __init__(self, config: RunConfig, grid: Grid) -> None:
+    def __init__(self, config: ScriptConfig, grid: Grid) -> None:
         """Instantiate DataWindForcing.
 
         Args:
-            config (RunConfig): Run configuration.
+            config (ScriptConfig): Run configuration.
             grid (Grid): Grid.
         """
         super().__init__(config, grid)
@@ -263,13 +263,13 @@ class WindForcing:
         return self._forcing.compute()
 
     @classmethod
-    def from_runconfig(cls, run_config: RunConfig) -> Self:
-        """Construct the Wind Forcing given a RunConfig object.
+    def from_runconfig(cls, run_config: ScriptConfig) -> Self:
+        """Construct the Wind Forcing given a ScriptConfig object.
 
         The method creates the Gird based on the grid configuration.
 
         Args:
-            run_config (RunConfig): Run Configuration Object.
+            run_config (ScriptConfig): Run Configuration Object.
 
         Returns:
             Self: Corresponding Wind Forcing.
