@@ -4,8 +4,10 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 import torch.nn.functional as F  # noqa: N812
+from typing_extensions import Self
 
 from qgsw import helmholtz
+from qgsw.configs.core import ScriptConfig
 from qgsw.grid import Grid, Grid3D
 from qgsw.specs import DEVICE
 
@@ -37,6 +39,11 @@ class RankineVortex2D:
         self._grid = grid
         self._perturbation = perturbation_magnitude
         self._compute_psi()
+
+    @property
+    def grid(self) -> Grid:
+        """Underlying grid."""
+        return self._grid
 
     @property
     def perturbation_magnitude(self) -> float:
@@ -136,6 +143,11 @@ class RankineVortex3D(metaclass=ABCMeta):
         )
 
     @property
+    def grid(self) -> Grid3D:
+        """Underlying grid."""
+        return self._grid
+
+    @property
     def perturbation_magnitude(self) -> float:
         """Tripolar perturbation magnitude."""
         return self._2d.perturbation_magnitude
@@ -198,66 +210,98 @@ class PassiveLayersRankineVortex3D(RankineVortex3D):
         return psi
 
 
-class VortexForcing(metaclass=ABCMeta):
+class DecreasingLayersRankineVortex3D(RankineVortex3D):
+    """Decreasing intensity vortex."""
+
+    @property
+    def psi(self) -> torch.Tensor:
+        """Value of the stream function ψ.
+
+        Value of the stream function ψ.
+        Warning: quick implementation.
+
+        The Tensor has a shape of (1, nl, nx + 1, ny + 1).
+        """
+        xy_shape = self._2d.psi.shape[-2:]
+        psi = self._2d.psi.expand((1, self._grid.nl, *xy_shape))
+        # Reduce h size to (3,)
+        h = self._grid.h.mean(-1).mean(-1)
+        # Compute relative depth
+        relative_depth = h.cumsum(0) - h[0]
+        # Exponential decay with scaling factor
+        factor = (
+            torch.exp(-relative_depth / 10000)
+            .unsqueeze(0)
+            .unsqueeze(-1)
+            .unsqueeze(-1)
+        )
+        return psi * factor
+
+
+class RankineVortexForcing:
     """Vortex Forcing's abtract class."""
 
-    _vortex: RankineVortex3D
-
-    def __init__(
-        self,
-        grid_3d: Grid3D,
-        perturbation_magnitude: float = 1e-3,
-    ) -> None:
-        """Instantiate VortexForcing.
+    def __init__(self, vortex: RankineVortex3D) -> None:
+        """Instantiate Vortex.
 
         Args:
-            grid_3d (Grid3D): 3D Grid.
-            perturbation_magnitude (float, optional): Tripolar perturbation
-            magnitude. Defaults to 1e-3.
+            vortex (RankineVortex3D): Corresponding Vortex
         """
-        self._grid = grid_3d
-        self._set_vortex(perturbation_magnitude=perturbation_magnitude)
-
-    @abstractmethod
-    def _set_vortex(self, perturbation_magnitude: float) -> None:
-        """Set Vortex.
-
-        Args:
-            perturbation_magnitude (float): Vortex's tripolar
-            perturbation magnitude.
-        """
+        self._vortex = vortex
 
     def compute(self, f0: float, Ro: float) -> torch.Tensor:  # noqa: N803
         """Compute Initial pressure based on the vortex's vorticity.
 
         Args:
             f0 (float): Coriolis Parameter from β-plane approximation.
-            Ro (float): Rossby NUmber.
+            Ro (float): Rossby Number.
 
         Returns:
             torch.Tensor: Initial Pressure with the presence of the vortex.
         """
-        u, v = grad_perp(self._vortex.psi, self._grid.dx, self._grid.dy)
+        u, v = grad_perp(
+            self._vortex.psi,
+            self._vortex.grid.dx,
+            self._vortex.grid.dy,
+        )
         u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
         # set psi amplitude to have a correct Rossby number
         psi_norm = self._vortex.psi * (Ro * f0 * self._vortex.r0 / u_norm_max)
         # Return pressure value
         return psi_norm * f0
 
+    @classmethod
+    def from_config(cls, script_config: ScriptConfig) -> Self:
+        """Instantiate VortexForcing from ScriptConfig.
 
-class ActiveLayersVortexForcing(VortexForcing):
-    """Vortex Forcing with similar vortex behavior accross all layers."""
+        Args:
+            script_config (ScriptConfig): Script Configuration.
 
-    def _set_vortex(self, perturbation_magnitude: float) -> None:
-        self._vortex = ActiveLayersRankineVortex3D(
-            grid=self._grid, perturbation_magnitude=perturbation_magnitude
-        )
-
-
-class PassiveLayersVortexForcing(VortexForcing):
-    """Vortex Forcing with only superior layer active."""
-
-    def _set_vortex(self, perturbation_magnitude: float) -> None:
-        self._vortex = PassiveLayersRankineVortex3D(
-            grid=self._grid, perturbation_magnitude=perturbation_magnitude
-        )
+        Returns:
+            Self: VortexForcing.
+        """
+        vortex_type = script_config.vortex.type
+        perturbation = script_config.vortex.perturbation_magnitude
+        if vortex_type == "active":
+            grid = Grid3D.from_config(script_config=script_config)
+            vortex = ActiveLayersRankineVortex3D(
+                grid=grid,
+                perturbation_magnitude=perturbation,
+            )
+            return cls(vortex=vortex)
+        if vortex_type == "passive":
+            grid = Grid3D.from_config(script_config=script_config)
+            vortex = PassiveLayersRankineVortex3D(
+                grid=grid,
+                perturbation_magnitude=perturbation,
+            )
+            return cls(vortex=vortex)
+        if vortex_type == "decreasing":
+            grid = Grid3D.from_config(script_config=script_config)
+            vortex = DecreasingLayersRankineVortex3D(
+                grid=grid,
+                perturbation_magnitude=perturbation,
+            )
+            return cls(vortex=vortex)
+        msg = "Unrecognized vortex type."
+        raise KeyError(msg)

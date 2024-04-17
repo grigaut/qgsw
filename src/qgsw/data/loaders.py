@@ -157,7 +157,7 @@ class WindForcingLoader(
         """Set Data Configuration.
 
         Args:
-            config (ScriptConfig): Run Configuration.
+            config (ScriptConfig): Script Configuration.
 
         Returns:
             WindStressDataConfig: Data configuration.
