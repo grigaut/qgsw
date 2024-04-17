@@ -217,16 +217,18 @@ class DecreasingLayersRankineVortex3D(RankineVortex3D):
     def psi(self) -> torch.Tensor:
         """Value of the stream function ψ.
 
-        The Tensor has a shape of (1, nl, nx + 1, ny + 1).
-        """
-        """Value of the stream function ψ.
+        Value of the stream function ψ.
+        Warning: quick implementation.
 
         The Tensor has a shape of (1, nl, nx + 1, ny + 1).
         """
         xy_shape = self._2d.psi.shape[-2:]
         psi = self._2d.psi.expand((1, self._grid.nl, *xy_shape))
+        # Reduce h size to (3,)
         h = self._grid.h.mean(-1).mean(-1)
+        # Compute relative depth
         relative_depth = h.cumsum(0) - h[0]
+        # Exponential decay with scaling factor
         factor = (
             torch.exp(-relative_depth / 10000)
             .unsqueeze(0)
