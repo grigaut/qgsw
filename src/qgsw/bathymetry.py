@@ -184,7 +184,7 @@ class Bathymetry:
         """Construct the Bathymetry given a ScriptConfig object.
 
         Args:
-            script_config (ScriptConfig): Run Configuration Object.
+            script_config (ScriptConfig): Script Configuration Object.
 
         Returns:
             Self: Corresponding Bathymetry.

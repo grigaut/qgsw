@@ -144,7 +144,7 @@ class Grid:
         """Construct the Grid given a ScriptConfig object.
 
         Args:
-            script_config (ScriptConfig): Run Configuration Object.
+            script_config (ScriptConfig): Script Configuration Object.
 
         Returns:
             Self: Corresponding Grid.
@@ -274,7 +274,7 @@ class Grid3D:
         """Construct the 3D Grid given a ScriptConfig object.
 
         Args:
-            script_config (ScriptConfig): Run Configuration Object.
+            script_config (ScriptConfig): Script Configuration Object.
 
         Returns:
             Self: Corresponding 3D Grid.

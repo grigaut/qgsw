@@ -25,7 +25,7 @@ class _WindForcing(metaclass=ABCMeta):
         """Instantiate _WindForcing.
 
         Args:
-            config (ScriptConfig): Run configuration.
+            config (ScriptConfig): Script Configuration.
             grid (Grid): Grid.
         """
         self._config = config
@@ -50,7 +50,7 @@ class CosineZonalWindForcing(_WindForcing):
         """Instantiate CosineZonalWindForcing.
 
         Args:
-            config (ScriptConfig): Run configuration.
+            config (ScriptConfig): Script Configuration.
             grid (Grid): Grid.
         """
         super().__init__(config, grid)
@@ -96,7 +96,7 @@ class DataWindForcing(_WindForcing):
         """Instantiate DataWindForcing.
 
         Args:
-            config (ScriptConfig): Run configuration.
+            config (ScriptConfig): Script Configuration.
             grid (Grid): Grid.
         """
         super().__init__(config, grid)
@@ -269,7 +269,7 @@ class WindForcing:
         The method creates the Gird based on the grid configuration.
 
         Args:
-            script_config (ScriptConfig): Run Configuration Object.
+            script_config (ScriptConfig): Script Configuration Object.
 
         Returns:
             Self: Corresponding Wind Forcing.
