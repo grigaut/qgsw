@@ -1,5 +1,9 @@
 """Configuration Tools."""
 
-from qgsw.configs.core import ScriptConfig
+from qgsw.configs.core import (
+    DoubleGyreConfig,
+    RealisticConfig,
+    VortexShearConfig,
+)
 
-__all__ = ["ScriptConfig"]
+__all__ = ["DoubleGyreConfig", "RealisticConfig", "VortexShearConfig"]

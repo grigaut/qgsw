@@ -1,26 +1,25 @@
 """Main Configuration Tool."""
 
+from abc import ABCMeta, abstractmethod
 from typing import Any
 
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.bathymetry import BathyConfig
-from qgsw.configs.exceptions import ConfigError, UngivenFieldError
+from qgsw.configs.exceptions import ConfigError, UnexpectedFieldError
 from qgsw.configs.grid import GridConfig, LayersConfig
 from qgsw.configs.io import IOConfig
 from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.windstress import WindStressConfig
 
 
-class ScriptConfig(_Config):
+class ScriptConfig(_Config, metaclass=ABCMeta):
     """Configuration for a run."""
 
     _layers_section: str = keys.LAYERS["section"]
     _physics_section: str = keys.PHYSICS["section"]
     _grid_section: str = keys.GRID["section"]
-    _bathy_section: str = keys.BATHY["section"]
     _io_section: str = keys.IO["section"]
-    _windstress_section: str = keys.WINDSTRESS["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate ScriptConfig.
@@ -34,12 +33,7 @@ class ScriptConfig(_Config):
             params=self.params[self._physics_section]
         )
         self._grid = GridConfig(params=self.params[self._grid_section])
-        if self._bathy_section in self.params:
-            self._bathy = BathyConfig(params=self.params[self._bathy_section])
         self._io = IOConfig(params=self.params[self._io_section])
-        self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section]
-        )
 
     @property
     def layers(self) -> LayersConfig:
@@ -57,25 +51,23 @@ class ScriptConfig(_Config):
         return self._grid
 
     @property
-    def bathy(self) -> BathyConfig:
-        """Configuartion parameters frot he bathymetry."""
-        if self._bathy_section not in self.params:
-            msg = (
-                "The configuration does not contain a "
-                f"bathymetry section, named {self._bathy_section}."
-            )
-            raise UngivenFieldError(msg)
-        return self._bathy
-
-    @property
     def io(self) -> IOConfig:
         """Input-Output  Configuration."""
         return self._io
 
     @property
+    @abstractmethod
+    def bathy(self) -> BathyConfig:
+        """Configuration parameters for the bathymetry."""
+        msg = "No Bathymetry configuration for this configuration."
+        raise UnexpectedFieldError(msg)
+
+    @property
+    @abstractmethod
     def windstress(self) -> WindStressConfig:
         """WindStress Configuration."""
-        return self._windstress
+        msg = "No Wind stress configuration for this configuration."
+        raise UnexpectedFieldError(msg)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate configuration parameters.
@@ -115,6 +107,159 @@ class ScriptConfig(_Config):
             msg = (
                 "The configuration must contain a "
                 f"io section, named {self._io_section}."
+            )
+            raise ConfigError(msg)
+        return super()._validate_params(params)
+
+
+class RealisticConfig(ScriptConfig):
+    """Configuration for realistic script."""
+
+    _bathy_section: str = keys.BATHY["section"]
+    _windstress_section: str = keys.WINDSTRESS["section"]
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        """Instantiate RealisticConfig.
+
+        Args:
+            params (dict[str, Any]): Configuration Dictionnary.
+        """
+        super().__init__(params)
+        self._bathy = BathyConfig(params=self.params[self._bathy_section])
+        self._windstress = WindStressConfig(
+            params=self.params[self._windstress_section]
+        )
+
+    @property
+    def bathy(self) -> BathyConfig:
+        """Configuration parameters for the bathymetry."""
+        return self._bathy
+
+    @property
+    def windstress(self) -> WindStressConfig:
+        """WindStress Configuration."""
+        return self._windstress
+
+    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Validate configuration parameters.
+
+        Args:
+            params (dict[str, Any]): Configuration parameters.
+
+        Raises:
+            ConfigError: If the configuration doesn't have a layers section.
+
+        Returns:
+            dict[str, Any]: Configuration parameters.
+        """
+        # Verify that the bathymetry section is present.
+        if self._bathy_section not in params:
+            msg = (
+                "The configuration must contain a "
+                f"bathymetry section, named {self._bathy_section}."
+            )
+            raise ConfigError(msg)
+        # Verify that the windstress section is present.
+        if self._windstress_section not in params:
+            msg = (
+                "The configuration must contain a "
+                f"windstress section, named {self._windstress_section}."
+            )
+            raise ConfigError(msg)
+        return super()._validate_params(params)
+
+
+class VortexShearConfig(ScriptConfig):
+    """Configuration for vortex Shear Script."""
+
+    _windstress_section: str = keys.WINDSTRESS["section"]
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        """Instantiate VortexShearConfig.
+
+        Args:
+            params (dict[str, Any]): Configuration Dictionnary.
+        """
+        super().__init__(params)
+        self._windstress = WindStressConfig(
+            params=self.params[self._windstress_section]
+        )
+
+    @property
+    def bathy(self) -> BathyConfig:
+        """Configuration parameters for the bathymetry."""
+        return super().bathy
+
+    @property
+    def windstress(self) -> WindStressConfig:
+        """WindStress Configuration."""
+        return self._windstress
+
+    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Validate configuration parameters.
+
+        Args:
+            params (dict[str, Any]): Configuration parameters.
+
+        Raises:
+            ConfigError: If the configuration doesn't have a layers section.
+
+        Returns:
+            dict[str, Any]: Configuration parameters.
+        """
+        # Verify that the windstress section is present.
+        if self._windstress_section not in params:
+            msg = (
+                "The configuration must contain a "
+                f"windstress section, named {self._windstress_section}."
+            )
+            raise ConfigError(msg)
+        return super()._validate_params(params)
+
+
+class DoubleGyreConfig(ScriptConfig):
+    """Configuration for double gyre script."""
+
+    _windstress_section: str = keys.WINDSTRESS["section"]
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        """Instantiate DoubleGyreConfig.
+
+        Args:
+            params (dict[str, Any]): Configuration Dictionnary.
+        """
+        super().__init__(params)
+        self._windstress = WindStressConfig(
+            params=self.params[self._windstress_section]
+        )
+
+    @property
+    def bathy(self) -> BathyConfig:
+        """Configuration parameters for the bathymetry."""
+        return super().bathy
+
+    @property
+    def windstress(self) -> WindStressConfig:
+        """WindStress Configuration."""
+        return self._windstress
+
+    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Validate configuration parameters.
+
+        Args:
+            params (dict[str, Any]): Configuration parameters.
+
+        Raises:
+            ConfigError: If the configuration doesn't have a layers section.
+
+        Returns:
+            dict[str, Any]: Configuration parameters.
+        """
+        # Verify that the windstress section is present.
+        if self._windstress_section not in params:
+            msg = (
+                "The configuration must contain a "
+                f"windstress section, named {self._windstress_section}."
             )
             raise ConfigError(msg)
         return super()._validate_params(params)

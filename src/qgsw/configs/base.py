@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +10,7 @@ import toml
 from typing_extensions import Self
 
 
-class _Config(ABC):
+class _Config(metaclass=ABCMeta):
     """Configuration."""
 
     def __init__(self, params: dict[str, Any]) -> None:

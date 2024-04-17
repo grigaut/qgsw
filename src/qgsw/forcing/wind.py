@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,10 +15,10 @@ from qgsw.grid import Grid
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs import ScriptConfig
+    from qgsw.configs.core import ScriptConfig
 
 
-class _WindForcing(ABC):
+class _WindForcing(metaclass=ABCMeta):
     """Wind Forcing Representation."""
 
     def __init__(self, config: ScriptConfig, grid: Grid) -> None:

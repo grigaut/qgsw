@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
@@ -21,7 +21,7 @@ class LoadingError(Exception):
     """Error occuring when loading file."""
 
 
-class BaseReader(ABC, Generic[T]):
+class BaseReader(Generic[T], metaclass=ABCMeta):
     """Base class for loaders."""
 
     def __init__(

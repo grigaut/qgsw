@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import urllib.request
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, TypeVar
 
@@ -30,7 +30,7 @@ Preprocess = TypeVar("Preprocess", bound=Preprocessor)
 Config = TypeVar("Config", bound=_Config)
 
 
-class Loader(ABC, Generic[Config, Data, Preprocess]):
+class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
     """Data loader."""
 
     def __init__(self, config: Config) -> None:
