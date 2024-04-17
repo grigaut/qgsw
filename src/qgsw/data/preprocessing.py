@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
@@ -18,7 +18,7 @@ WindStressData = tuple[
 ]
 
 
-class Preprocessor(ABC, Generic[T]):
+class Preprocessor(Generic[T], metaclass=ABCMeta):
     """Base Preprocessor."""
 
     @abstractmethod
@@ -67,7 +67,8 @@ class BathyPreprocessor(
 
 
 class _WindStressPreprocessor(
-    Preprocessor[tuple[torch.Tensor, torch.Tensor]], ABC
+    Preprocessor[tuple[torch.Tensor, torch.Tensor]],
+    metaclass=ABCMeta,
 ):
     """Windtress Preprocessor."""
 

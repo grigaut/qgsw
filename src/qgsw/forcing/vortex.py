@@ -1,6 +1,6 @@
 """Vortex Forcing."""
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 import torch
 import torch.nn.functional as F  # noqa: N812
@@ -114,7 +114,7 @@ class RankineVortex2D:
         return mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
 
 
-class RankineVortex3D(ABC):
+class RankineVortex3D(metaclass=ABCMeta):
     """3D Rankine Vortex."""
 
     def __init__(
@@ -198,7 +198,7 @@ class PassiveLayersRankineVortex3D(RankineVortex3D):
         return psi
 
 
-class VortexForcing(ABC):
+class VortexForcing(metaclass=ABCMeta):
     """Vortex Forcing's abtract class."""
 
     _vortex: RankineVortex3D

@@ -9,7 +9,7 @@ sys.path.append("../src")
 
 from qgsw.sw import SW
 from qgsw.qg import QG
-from qgsw.configs import RunConfig
+from qgsw.configs import DoubleGyreConfig
 from qgsw.grid import Grid
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
@@ -18,7 +18,7 @@ from icecream import ic
 torch.backends.cudnn.deterministic = True
 
 
-config = RunConfig.from_file(Path("config/doublegyre.toml"))
+config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
 grid = Grid.from_runconfig(config)
 wind = WindForcing.from_runconfig(config)
 # device = "cuda" if torch.cuda.is_available() else "cpu"
