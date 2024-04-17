@@ -180,13 +180,13 @@ class Bathymetry:
         return avg_2d > 0.5  # noqa: PLR2004
 
     @classmethod
-    def from_runconfig(cls, run_config: ScriptConfig) -> Self:
+    def from_runconfig(cls, script_config: ScriptConfig) -> Self:
         """Construct the Bathymetry given a ScriptConfig object.
 
         Args:
-            run_config (ScriptConfig): Run Configuration Object.
+            script_config (ScriptConfig): Run Configuration Object.
 
         Returns:
             Self: Corresponding Bathymetry.
         """
-        return cls(bathy_config=run_config.bathy)
+        return cls(bathy_config=script_config.bathy)
