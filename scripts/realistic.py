@@ -26,9 +26,9 @@ from qgsw.sw import SW
 torch.backends.cudnn.deterministic = True
 
 config = RealisticConfig.from_file(Path("config/realistic.toml"))
-grid = Grid.from_runconfig(config)
-bathy = Bathymetry.from_runconfig(config)
-wind = WindForcing.from_runconfig(config)
+grid = Grid.from_config(config)
+bathy = Bathymetry.from_config(config)
+wind = WindForcing.from_config(config)
 
 print(
     f"Grid lat: {config.grid.y_min:.1f}, {config.grid.y_max:.1f}, "

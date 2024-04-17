@@ -11,7 +11,7 @@ sys.path.append("../src")
 import matplotlib.pyplot as plt
 from qgsw.configs import VortexShearConfig
 from qgsw.forcing.vortex import (
-    PassiveLayersVortexForcing,
+    RankineVortexForcing,
 )
 from qgsw.forcing.wind import WindForcing
 from qgsw.grid import Grid3D
@@ -22,11 +22,10 @@ from qgsw.sw import SW
 torch.backends.cudnn.deterministic = True
 
 config = VortexShearConfig.from_file("config/vortexshear.toml")
-grid = Grid3D.from_runconfig(config)
-wind = WindForcing.from_runconfig(config)
+grid = Grid3D.from_config(config)
+wind = WindForcing.from_config(config)
 taux, tauy = wind.compute()
-vortex = PassiveLayersVortexForcing(grid, 1e-3)
-
+vortex = RankineVortexForcing.from_config(config)
 
 x, y = grid.xy.omega_xy
 xc, yc = grid.xy.h_xy
