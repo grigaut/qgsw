@@ -75,3 +75,9 @@ WINDSTRESS_DATA = {
     "field 2": "field_2",
     "method": "method",
 }
+
+VORTEX = {
+    "section": "vortex",
+    "type": "type",
+    "perturbation magnitude": "perturbation_magnitude",
+}

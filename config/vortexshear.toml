@@ -41,3 +41,7 @@ type = "none"
 magnitude = 0.08 # (Pa m-1 kg s-2)
 drag_coefficient = 1.3e-3
 [windstress.data]
+
+[vortex]
+type = "active"
+perturbation_magnitude = 1e-3
