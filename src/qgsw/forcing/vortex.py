@@ -243,7 +243,7 @@ class RankineVortexForcing:
         return psi_norm * f0
 
     @classmethod
-    def from_runconfig(cls, script_config: ScriptConfig) -> Self:
+    def from_config(cls, script_config: ScriptConfig) -> Self:
         """Instantiate VortexForcing from ScriptConfig.
 
         Args:
@@ -255,14 +255,14 @@ class RankineVortexForcing:
         vortex_type = script_config.vortex.type
         perturbation = script_config.vortex.perturbation_magnitude
         if vortex_type == "active":
-            grid = Grid3D.from_runconfig(script_config=script_config)
+            grid = Grid3D.from_config(script_config=script_config)
             vortex = ActiveLayersRankineVortex3D(
                 grid=grid,
                 perturbation_magnitude=perturbation,
             )
             return cls(vortex=vortex)
         if vortex_type == "passive":
-            grid = Grid3D.from_runconfig(script_config=script_config)
+            grid = Grid3D.from_config(script_config=script_config)
             vortex = PassiveLayersRankineVortex3D(
                 grid=grid,
                 perturbation_magnitude=perturbation,

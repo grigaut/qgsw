@@ -140,7 +140,7 @@ class Grid:
         return f0 + beta * (self.omega_xy[1] - self.ly / 2)
 
     @classmethod
-    def from_runconfig(cls, script_config: ScriptConfig) -> Self:
+    def from_config(cls, script_config: ScriptConfig) -> Self:
         """Construct the Grid given a ScriptConfig object.
 
         Args:
@@ -270,7 +270,7 @@ class Grid3D:
         return x.expand((self.nl, *x.shape)), y.expand((self.nl, *y.shape))
 
     @classmethod
-    def from_runconfig(cls, script_config: ScriptConfig) -> Self:
+    def from_config(cls, script_config: ScriptConfig) -> Self:
         """Construct the 3D Grid given a ScriptConfig object.
 
         Args:

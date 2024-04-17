@@ -19,8 +19,8 @@ torch.backends.cudnn.deterministic = True
 
 
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
-grid = Grid.from_runconfig(config)
-wind = WindForcing.from_runconfig(config)
+grid = Grid.from_config(config)
+wind = WindForcing.from_config(config)
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 # dtype = torch.float64
 

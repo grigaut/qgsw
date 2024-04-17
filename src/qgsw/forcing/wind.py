@@ -263,7 +263,7 @@ class WindForcing:
         return self._forcing.compute()
 
     @classmethod
-    def from_runconfig(cls, script_config: ScriptConfig) -> Self:
+    def from_config(cls, script_config: ScriptConfig) -> Self:
         """Construct the Wind Forcing given a ScriptConfig object.
 
         The method creates the Gird based on the grid configuration.
@@ -276,17 +276,17 @@ class WindForcing:
         """
         ws_type = script_config.windstress.type
         if ws_type == "cosine":
-            grid = Grid.from_runconfig(script_config=script_config)
+            grid = Grid.from_config(script_config=script_config)
             return cls(
                 forcing=CosineZonalWindForcing(config=script_config, grid=grid)
             )
         if ws_type == "data":
-            grid = Grid.from_runconfig(script_config=script_config)
+            grid = Grid.from_config(script_config=script_config)
             return cls(
                 forcing=DataWindForcing(config=script_config, grid=grid)
             )
         if ws_type == "none":
-            grid = Grid.from_runconfig(script_config=script_config)
+            grid = Grid.from_config(script_config=script_config)
             return cls(forcing=NoWindForcing(config=script_config, grid=grid))
         msg = "Unrecognized windstress type."
         raise KeyError(msg)
