@@ -1,12 +1,8 @@
 # ruff: noqa
 """Comparison between QG and SW solutions in vortex shear instability."""
 
-import sys
-
 import numpy as np
 import torch
-
-sys.path.append("../src")
 
 import matplotlib.pyplot as plt
 from qgsw.configs import VortexShearConfig
