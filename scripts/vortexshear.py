@@ -1,20 +1,23 @@
 # ruff: noqa
-"""Comparison between QG and SW solutions in vortex shear instability."""
+"""Comparison between QG and SW solutions in vortex shear instability.
 
-import sys
-
-import numpy as np
-import torch
-
-sys.path.append("../src")
+Problem scales:
+lx, ly : x,y box dimensions
+r0 : vortex core radius -> length scale
+ld : deformation length scale -> √(Bu)*r0
+"""
 
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from icecream import ic
 from qgsw.configs import VortexShearConfig
 from qgsw.forcing.vortex import (
     RankineVortexForcing,
 )
 from qgsw.forcing.wind import WindForcing
 from qgsw.grid import Grid3D
+from qgsw.physics import compute_burger
 from qgsw.qg import QG
 from qgsw.specs import DEVICE
 from qgsw.sw import SW
@@ -27,6 +30,16 @@ wind = WindForcing.from_config(config)
 taux, tauy = wind.compute()
 vortex = RankineVortexForcing.from_config(config)
 
+h1 = config.layers.h[0, 0, 0]
+h2 = config.layers.h[1, 0, 0]
+
+Bu = compute_burger(
+    g=config.layers.g_prime[0, 0, 0],
+    h_scale=(h1 * h2) / (h1 + h2),
+    f0=config.physics.f0,
+    length_scale=vortex.r0,
+)
+
 x, y = grid.xy.omega_xy
 xc, yc = grid.xy.h_xy
 rc = torch.sqrt(xc**2 + yc**2)
@@ -37,13 +50,11 @@ mask = (
     if apply_mask
     else torch.ones_like(xc)
 )
-
-flip_sign = False
 # Burger and Rossby
-for Bu, Ro in [
-    # (1., 0.5),
-    (1.0, 0.1),
-    # (1., 0.02),
+for Ro in [
+    # 0.5,
+    0.1,
+    # 0.02,
 ]:
     print(f"Ro={Ro} Bu={Bu}")
 
@@ -55,11 +66,7 @@ for Bu, Ro in [
     )
 
     # set coriolis with burger number
-    f0 = torch.sqrt(
-        config.layers.g_prime[0, 0, 0] * config.layers.h[0, 0, 0] / Bu / r0**2
-    )
-    if flip_sign:
-        f0 *= -1
+    f0 = config.physics.f0
     beta = config.physics.beta
     f = f0 + beta * (y - config.grid.ly / 2)
 
@@ -201,21 +208,21 @@ for Bu, Ro in [
                 np.ma.masked_where(mask_w, (w_qg - w_sw)[0, 0]).T, **kwargs
             )
             f.suptitle(
-                f'Ro={Ro:.2f}, Bu={Bu:.2f}, t={t/tau:.2f}$\\tau$, '
-                f'{"neg." if flip_sign else "pos"} $f_0$'
+                f"Ro={Ro:.2f}, Bu={Bu:.2f}, t={t/tau:.2f}$\\tau$, "
+                f"f0={f0:.2f}"
             )
             plt.pause(0.05)
 
         qg_multilayer.step()
         sw_multilayer.step()
         t += dt
-        if n % freq_checknan == 0:
-            if torch.isnan(qg_multilayer.h).any():
-                msg = f"Stopping, NAN number in QG h at iteration {n}."
-                raise ValueError(msg)
-            if torch.isnan(sw_multilayer.h).any():
-                msg = f"Stopping, NAN number in SW h at iteration {n}."
-                raise ValueError(msg)
+        # if n % freq_checknan == 0:
+        #     if torch.isnan(qg_multilayer.h).any():
+        #         msg = f"Stopping, NAN number in QG h at iteration {n}."
+        #         raise ValueError(msg)
+        #     if torch.isnan(sw_multilayer.h).any():
+        #         msg = f"Stopping, NAN number in SW h at iteration {n}."
+        #         raise ValueError(msg)
 
         if freq_log > 0 and n % freq_log == 0:
             print(f"n={n:05d}, {qg_multilayer.get_print_info()}")

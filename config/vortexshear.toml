@@ -7,20 +7,18 @@ output_dir = "output"
 [physics]
 rho = 1000
 slip_coef = 1.0
-f0 = nan           # mean coriolis (s^-1)
+f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
 [layers]
 h = [
-    400,
-    1_100,
-    2_600,
+    200,
+    1_000
 ]
 g_prime = [
-    9.81,
-    0.025,
-    0.0125,
+    10.0,
+    2e-2
 ]
 
 [grid]
@@ -30,11 +28,11 @@ dt = 4_000
 box_unit = "m"
 [grid.box]
 [grid.box.x]
-min = -50_000
-max = 50_000
+min = -2_200_000
+max = 2_200_000
 [grid.box.y]
-min = -50_000
-max = 50_000
+min = -2_200_000
+max = 2_200_000
 
 [windstress]
 type = "none"
@@ -43,5 +41,5 @@ drag_coefficient = 1.3e-3
 [windstress.data]
 
 [vortex]
-type = "active"
+type = "passive"
 perturbation_magnitude = 1e-3
