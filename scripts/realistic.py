@@ -78,8 +78,8 @@ param = {
     "dt": config.grid.dt,  # time-step (s)
     "compile": True,
     "mask": bathy.compute_ocean_mask(grid.h.xy),
-    "taux": taux,
-    "tauy": tauy,
+    "taux": taux[0, 1:-1, :],
+    "tauy": tauy[0, :, 1:-1],
 }
 
 

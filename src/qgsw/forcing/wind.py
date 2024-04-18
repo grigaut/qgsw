@@ -172,7 +172,7 @@ class DataWindForcing(_WindForcing):
         taux_tensor = torch.from_numpy(taux).type(torch.float64).to(DEVICE)
         tauy_tensor = torch.from_numpy(tauy).type(torch.float64).to(DEVICE)
 
-        return taux_tensor[0, 1:-1, :], tauy_tensor[0, :, 1:-1]
+        return taux_tensor, tauy_tensor
 
     def _transform_tau_data(
         self,
