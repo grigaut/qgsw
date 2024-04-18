@@ -82,12 +82,8 @@ class Grid:
         """
         return self._v_x, self._v_y
 
-    def _generate_grids(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """Generate X,Y grids.
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: X,Y
-        """
+    def _generate_grids(self) -> None:
+        """Generate X,Y grids."""
         xs = torch.linspace(
             self._config.x_min,
             self._config.x_max,
