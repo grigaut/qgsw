@@ -35,7 +35,7 @@ def compute_burger(
     Returns:
         float: Burger number: (g * H) / (f0² * Ld²)
     """
-    return (g * h_scale) / (f0 * length_scale)
+    return (g * h_scale) / (f0**2 * length_scale**2)
 
 
 def compute_deformation_radius(g: float, h_scale: float, f0: float) -> float:
