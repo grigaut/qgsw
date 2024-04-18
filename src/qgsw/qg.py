@@ -51,7 +51,7 @@ class QG(SW):
             msg = (
                 "H must me constant in space for "
                 "qg approximation, i.e. have shape (...,1,1)"
-                f"got shape shape {self.H.shape}"
+                f"got shape shape {value.shape}"
             )
             raise ValueError(msg)
         return value

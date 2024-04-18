@@ -8,7 +8,7 @@ from typing_extensions import Self
 
 from qgsw import helmholtz
 from qgsw.configs.core import ScriptConfig
-from qgsw.grid import Grid, Grid3D
+from qgsw.grid import Meshes2D, Meshes3D
 from qgsw.specs import DEVICE
 
 
@@ -26,13 +26,13 @@ class RankineVortex2D:
 
     def __init__(
         self,
-        grid: Grid,
+        grid: Meshes2D,
         perturbation_magnitude: float = 1e-3,
     ) -> None:
         """Instantiate Vortex.
 
         Args:
-            grid (Grid): Spatial Grid.
+            grid (Meshes2D): Spatial Meshes2D.
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """
@@ -41,7 +41,7 @@ class RankineVortex2D:
         self._compute_psi()
 
     @property
-    def grid(self) -> Grid:
+    def grid(self) -> Meshes2D:
         """Underlying grid."""
         return self._grid
 
@@ -80,7 +80,7 @@ class RankineVortex2D:
             torch.Tensor: Streamfunction values over the
         (nx + 1, ny + 1) domain.
         """
-        vor = self._compute_vorticity(self._grid.omega_xy)
+        vor = self._compute_vorticity(self._grid.omega.xy)
         # Compute Laplacian operator in Fourier Space
         laplacian = helmholtz.compute_laplace_dstI(
             self._grid.nx,
@@ -126,24 +126,24 @@ class RankineVortex3D(metaclass=ABCMeta):
 
     def __init__(
         self,
-        grid: Grid3D,
+        grid: Meshes3D,
         perturbation_magnitude: float = 1e-3,
     ) -> None:
         """Instantiate 3D Rankine Vortex.
 
         Args:
-            grid (Grid3D): 3D Grid.
+            grid (Meshes3D): 3D Grid.
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """
         self._grid = grid
         self._2d = RankineVortex2D(
-            grid=grid.xy,
+            grid=grid.remove_z(),
             perturbation_magnitude=perturbation_magnitude,
         )
 
     @property
-    def grid(self) -> Grid3D:
+    def grid(self) -> Meshes3D:
         """Underlying grid."""
         return self._grid
 
@@ -202,7 +202,7 @@ class PassiveLayersRankineVortex3D(RankineVortex3D):
         """
         xy_shape = self._2d.psi.shape[-2:]
         psi = torch.ones(
-            (1, self._grid.nl, *xy_shape),
+            (1, self._grid.nh, *xy_shape),
             device=DEVICE,
             dtype=torch.float64,
         )
@@ -303,21 +303,21 @@ class RankineVortexForcing:
         vortex_type = script_config.vortex.type
         perturbation = script_config.vortex.perturbation_magnitude
         if vortex_type == "active":
-            grid = Grid3D.from_config(script_config=script_config)
+            grid = Meshes3D.from_config(script_config=script_config)
             vortex = ActiveLayersRankineVortex3D(
                 grid=grid,
                 perturbation_magnitude=perturbation,
             )
             return cls(vortex=vortex)
         if vortex_type == "passive":
-            grid = Grid3D.from_config(script_config=script_config)
+            grid = Meshes3D.from_config(script_config=script_config)
             vortex = PassiveLayersRankineVortex3D(
                 grid=grid,
                 perturbation_magnitude=perturbation,
             )
             return cls(vortex=vortex)
         if vortex_type == "decreasing":
-            grid = Grid3D.from_config(script_config=script_config)
+            grid = Meshes3D.from_config(script_config=script_config)
             vortex = DecreasingLayersRankineVortex3D(
                 grid=grid,
                 perturbation_magnitude=perturbation,

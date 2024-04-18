@@ -10,7 +10,7 @@ sys.path.append("../src")
 from qgsw.sw import SW
 from qgsw.qg import QG
 from qgsw.configs import DoubleGyreConfig
-from qgsw.grid import Grid
+from qgsw.grid import Meshes2D
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
 from icecream import ic
@@ -19,7 +19,7 @@ torch.backends.cudnn.deterministic = True
 
 
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
-grid = Grid.from_config(config)
+grid = Meshes2D.from_config(config)
 wind = WindForcing.from_config(config)
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 # dtype = torch.float64
@@ -41,9 +41,9 @@ param = {
     "nl": config.layers.nl,
     "dx": config.grid.dx,
     "dy": config.grid.dy,
-    "H": config.layers.h,
+    "H": config.layers.h.unsqueeze(1).unsqueeze(1),
     "rho": config.physics.rho,
-    "g_prime": config.layers.g_prime,
+    "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
@@ -54,7 +54,7 @@ param = {
     "barotropic_filter": True,
     "barotropic_filter_spectral": True,
     "mask": mask,
-    "f": grid.generate_coriolis_grid(
+    "f": grid.generate_coriolis_mesh(
         f0=config.physics.f0, beta=config.physics.beta
     ),
     "taux": taux,
@@ -70,7 +70,7 @@ for model, name, dt, start_file in [
     # set time step given barotropic mode for SW
     if model == SW:
         c = (
-            torch.sqrt(config.layers.h.sum() * config.layers.g_prime[0, 0, 0])
+            torch.sqrt(config.layers.h.sum() * config.layers.g_prime[0])
             .cpu()
             .item()
         )

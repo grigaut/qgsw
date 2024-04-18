@@ -29,18 +29,16 @@ class LayersConfig(_Config):
             device=DEVICE,
         )
         h[:, 0, 0] = torch.Tensor(self.params[self._h])
-        return h
+        return torch.Tensor(self.params[self._h], device=DEVICE).to(
+            dtype=torch.float64
+        )
 
     @property
     def g_prime(self) -> torch.Tensor:
         """Values of reduced gravity (g')."""
-        g_prime = torch.zeros(
-            size=(self.nl, 1, 1),
-            dtype=torch.float64,
-            device=DEVICE,
+        return torch.Tensor(self.params[self._g_prime], device=DEVICE).to(
+            dtype=torch.float64
         )
-        g_prime[:, 0, 0] = torch.Tensor(self.params[self._g_prime])
-        return g_prime
 
     @property
     def nl(self) -> int:

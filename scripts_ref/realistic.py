@@ -53,8 +53,8 @@ if config == "na":
     )
     htop_ocean = -250
 if config == "med":
-    # nx, ny = 512, 256
-    nx, ny = 1024, 512
+    nx, ny = 512, 256
+    # nx, ny = 1024, 512
     lat_min, lat_max = 31, 45
     Ly = (lat_max - lat_min) * deg_to_km
     Lx = Ly * nx / ny
@@ -362,7 +362,7 @@ freq_log = int(24 * 3600 / dt)
 n_steps = int(50 * 365 * 24 * 3600 / dt) + 1
 n_steps_save = int(0 * 365 * 24 * 3600 / dt)
 freq_save = int(5 * 24 * 3600 / dt)
-freq_plot = int(args.freq_plot * 24 * 3600 / dt)
+freq_plot = int(5 * 24 * 3600 / dt)
 
 uM, vM, hM = 0, 0, 0
 
@@ -417,6 +417,10 @@ for n in range(1, n_steps + 1):
     ## update wind forcing
     month = 12 * (t % (365 * 24 * 3600)) / (365 * 24 * 3600)
     m_i, m_r = int(month), month - int(month)
+    from icecream import ic
+
+    ic(taux.shape, taux)
+    ic(tauy.shape, tauy)
     taux_t = (1 - m_r) * taux[m_i, 1:-1, :] + m_r * taux[m_i + 1, 1:-1, :]
     tauy_t = (1 - m_r) * tauy[m_i, :, 1:-1] + m_r * tauy[m_i + 1, :, 1:-1]
     qg.set_wind_forcing(taux_t, tauy_t)

@@ -16,7 +16,7 @@ from qgsw.forcing.vortex import (
     RankineVortexForcing,
 )
 from qgsw.forcing.wind import WindForcing
-from qgsw.grid import Grid3D
+from qgsw.grid import Meshes3D
 from qgsw.physics import compute_burger
 from qgsw.qg import QG
 from qgsw.specs import DEVICE
@@ -25,23 +25,24 @@ from qgsw.sw import SW
 torch.backends.cudnn.deterministic = True
 
 config = VortexShearConfig.from_file("config/vortexshear.toml")
-grid = Grid3D.from_config(config)
+grid = Meshes3D.from_config(config)
 wind = WindForcing.from_config(config)
 taux, tauy = wind.compute()
 vortex = RankineVortexForcing.from_config(config)
 
-h1 = config.layers.h[0, 0, 0]
-h2 = config.layers.h[1, 0, 0]
+h1 = config.layers.h[0]
+h2 = config.layers.h[1]
 
 Bu = compute_burger(
-    g=config.layers.g_prime[0, 0, 0],
+    g=config.layers.g_prime[0],
     h_scale=(h1 * h2) / (h1 + h2),
     f0=config.physics.f0,
     length_scale=vortex.r0,
 )
 
-x, y = grid.xy.omega_xy
-xc, yc = grid.xy.h_xy
+grid_2d = grid.remove_z()
+x, y = grid_2d.omega.xy
+xc, yc = grid_2d.h.xy
 rc = torch.sqrt(xc**2 + yc**2)
 # circular domain mask
 apply_mask = False
@@ -76,8 +77,8 @@ for Ro in [
         "nl": config.layers.nl,
         "dx": config.grid.dx,
         "dy": config.grid.dy,
-        "H": config.layers.h,
-        "g_prime": config.layers.g_prime,
+        "H": grid.h.xyh[2],
+        "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
         "taux": taux,
         "tauy": tauy,
@@ -96,9 +97,9 @@ for Ro in [
         "nl": config.layers.nl,
         "dx": config.grid.dx,
         "dy": config.grid.dy,
-        "H": config.layers.h,
+        "H": grid.h.xyh[2],
         "rho": config.physics.rho,
-        "g_prime": config.layers.g_prime,
+        "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
         "taux": taux,
         "tauy": tauy,
@@ -120,7 +121,7 @@ for Ro in [
     u_max, v_max, c = (
         torch.abs(u_init).max().item() / config.grid.dx,
         torch.abs(v_init).max().item() / config.grid.dy,
-        torch.sqrt(config.layers.g_prime[0, 0, 0] * config.layers.h.sum()),
+        torch.sqrt(config.layers.g_prime[0] * config.layers.h.sum()),
     )
     print(f"u_max {u_max:.2e}, v_max {v_max:.2e}, c {c:.2e}")
     cfl_adv = 0.5

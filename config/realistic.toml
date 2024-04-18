@@ -1,6 +1,6 @@
 [io]
 name = "med"
-plot_frequency = nan # in days
+plot_frequency = 5 # in days
 performance_log = false
 output_dir = "output"
 
@@ -24,8 +24,8 @@ g_prime = [
 ]
 
 [grid]
-nx = 1024
-ny = 512
+nx = 512
+ny = 256
 dt = 2_000
 box_unit = "deg"
 [grid.box]

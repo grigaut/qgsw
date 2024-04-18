@@ -17,7 +17,7 @@ sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
 from qgsw.configs import RealisticConfig
-from qgsw.grid import Grid
+from qgsw.grid import Meshes2D
 from qgsw.qg import QG
 from qgsw.specs import DEVICE
 from qgsw.sw import SW
@@ -26,7 +26,7 @@ from qgsw.sw import SW
 torch.backends.cudnn.deterministic = True
 
 config = RealisticConfig.from_file(Path("config/realistic.toml"))
-grid = Grid.from_config(config)
+grid = Meshes2D.from_config(config)
 bathy = Bathymetry.from_config(config)
 wind = WindForcing.from_config(config)
 
@@ -48,12 +48,12 @@ print(
 )
 
 # Land Mask Generation
-mask_land = bathy.compute_land_mask(grid.h_xy)
-mask_land_w = bathy.compute_land_mask_w(grid.h_xy)
+mask_land = bathy.compute_land_mask(grid.h.xy)
+mask_land_w = bathy.compute_land_mask_w(grid.h.xy)
 
 
 # coriolis beta plane
-f = grid.generate_coriolis_grid(f0=config.physics.f0, beta=config.physics.beta)
+f = grid.generate_coriolis_mesh(f0=config.physics.f0, beta=config.physics.beta)
 print(
     f"Coriolis param min {f.min().cpu().item():.2e},"
     f" {f.max().cpu().item():.2e}"
@@ -65,11 +65,11 @@ param = {
     "nx": config.grid.nx,
     "ny": config.grid.ny,
     "nl": config.layers.nl,
-    "H": config.layers.h,
+    "H": config.layers.h.unsqueeze(1).unsqueeze(1),
     "dx": config.grid.dx,
     "dy": config.grid.dy,
     "rho": config.physics.rho,
-    "g_prime": config.layers.g_prime,
+    "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "f": f,
     "device": DEVICE,
@@ -77,7 +77,7 @@ param = {
     "slip_coef": config.physics.slip_coef,
     "dt": config.grid.dt,  # time-step (s)
     "compile": True,
-    "mask": bathy.compute_ocean_mask(grid.h_xy),
+    "mask": bathy.compute_ocean_mask(grid.h.xy),
     "taux": taux,
     "tauy": tauy,
 }
@@ -162,6 +162,8 @@ for n in range(1, n_steps + 1):
     ## update wind forcing
     month = 12 * (t % (365 * 24 * 3600)) / (365 * 24 * 3600)
     m_i, m_r = int(month), month - int(month)
+    ic(taux)
+    ic(tauy)
     taux_t = (1 - m_r) * taux[m_i, 1:-1, :] + m_r * taux[m_i + 1, 1:-1, :]
     tauy_t = (1 - m_r) * tauy[m_i, :, 1:-1] + m_r * tauy[m_i + 1, :, 1:-1]
     qg.set_wind_forcing(taux_t, tauy_t)

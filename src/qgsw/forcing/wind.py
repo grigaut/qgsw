@@ -11,7 +11,7 @@ import torch
 from typing_extensions import Self
 
 from qgsw.data.loaders import WindForcingLoader
-from qgsw.grid import Grid
+from qgsw.grid import Meshes2D
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
@@ -21,12 +21,12 @@ if TYPE_CHECKING:
 class _WindForcing(metaclass=ABCMeta):
     """Wind Forcing Representation."""
 
-    def __init__(self, config: ScriptConfig, grid: Grid) -> None:
+    def __init__(self, config: ScriptConfig, grid: Meshes2D) -> None:
         """Instantiate _WindForcing.
 
         Args:
             config (ScriptConfig): Script Configuration.
-            grid (Grid): Grid.
+            grid (Meshes2D): Grid.
         """
         self._config = config
         self._grid = grid
@@ -36,7 +36,7 @@ class _WindForcing(metaclass=ABCMeta):
         """Generate Wind Stress constraints over the given grid.
 
         Args:
-            grid (Grid): Grid to generate wind stress over.
+            grid (Meshes2D): Grid to generate wind stress over.
 
         Returns:
             tuple[float | torch.Tensor, float | torch.Tensor]: tau_x, tau_y
@@ -46,12 +46,12 @@ class _WindForcing(metaclass=ABCMeta):
 class CosineZonalWindForcing(_WindForcing):
     """Simple Cosine Zonal Wind."""
 
-    def __init__(self, config: ScriptConfig, grid: Grid) -> None:
+    def __init__(self, config: ScriptConfig, grid: Meshes2D) -> None:
         """Instantiate CosineZonalWindForcing.
 
         Args:
             config (ScriptConfig): Script Configuration.
-            grid (Grid): Grid.
+            grid (Meshes2D): Grid.
         """
         super().__init__(config, grid)
         magnitude = self._config.windstress.magnitude
@@ -72,7 +72,7 @@ class CosineZonalWindForcing(_WindForcing):
             float | torch.Tensor: Tau_x
         """
         y_ugrid = 0.5 * (
-            self._grid.omega_xy[1][:, 1:] + self._grid.omega_xy[1][:, :-1]
+            self._grid.omega.xy[1][:, 1:] + self._grid.omega.xy[1][:, :-1]
         )
         print(y_ugrid.shape)
         wind_profile = torch.cos(
@@ -92,12 +92,12 @@ class CosineZonalWindForcing(_WindForcing):
 class DataWindForcing(_WindForcing):
     """Wind Forcing object to handle data-based wind forcing."""
 
-    def __init__(self, config: ScriptConfig, grid: Grid) -> None:
+    def __init__(self, config: ScriptConfig, grid: Meshes2D) -> None:
         """Instantiate DataWindForcing.
 
         Args:
             config (ScriptConfig): Script Configuration.
-            grid (Grid): Grid.
+            grid (Meshes2D): Grid.
         """
         super().__init__(config, grid)
         self._loader = WindForcingLoader(config=config)
@@ -161,8 +161,8 @@ class DataWindForcing(_WindForcing):
                 tauy_ref,
                 method=self._config.windstress.data.method,
             )
-            taux_i = taux_interpolator(self._grid.u_xy)
-            tauy_i = tauy_interpolator(self._grid.v_xy)
+            taux_i = taux_interpolator(self._grid.u.xy)
+            tauy_i = tauy_interpolator(self._grid.v.xy)
             taux[t, :, :] = taux_i
             tauy[t, :, :] = tauy_i
 
@@ -211,10 +211,10 @@ class DataWindForcing(_WindForcing):
                 method=self._config.windstress.data.method,
             )
             taux_i = taux_interpolator(
-                (self._grid.u_xy[0] + 360, self._grid.u_xy[1])
+                (self._grid.u.xy[0] + 360, self._grid.u.xy[1])
             )
             tauy_i = tauy_interpolator(
-                (self._grid.v_xy[0] + 360, self._grid.v_xy[1])
+                (self._grid.v.xy[0] + 360, self._grid.v.xy[1])
             )
 
             taux[t, :, :] = taux_i
@@ -276,17 +276,17 @@ class WindForcing:
         """
         ws_type = script_config.windstress.type
         if ws_type == "cosine":
-            grid = Grid.from_config(script_config=script_config)
+            grid = Meshes2D.from_config(script_config=script_config)
             return cls(
                 forcing=CosineZonalWindForcing(config=script_config, grid=grid)
             )
         if ws_type == "data":
-            grid = Grid.from_config(script_config=script_config)
+            grid = Meshes2D.from_config(script_config=script_config)
             return cls(
                 forcing=DataWindForcing(config=script_config, grid=grid)
             )
         if ws_type == "none":
-            grid = Grid.from_config(script_config=script_config)
+            grid = Meshes2D.from_config(script_config=script_config)
             return cls(forcing=NoWindForcing(config=script_config, grid=grid))
         msg = "Unrecognized windstress type."
         raise KeyError(msg)
