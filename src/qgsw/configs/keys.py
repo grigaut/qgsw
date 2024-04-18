@@ -15,8 +15,8 @@ LAYERS = {
     "reduced gravity": "g_prime",
 }
 
-GRID = {
-    "section": "grid",
+MESH = {
+    "section": "mesh",
     "box unit": "box_unit",
     "points nb x": "nx",
     "points nb y": "ny",

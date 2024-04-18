@@ -52,31 +52,31 @@ class Bathymetry:
 
     def interpolate(
         self,
-        grid_xy: tuple[torch.Tensor, torch.Tensor],
+        mesh_xy: tuple[torch.Tensor, torch.Tensor],
     ) -> np.ndarray:
-        """Interpolate bathymetry on a given grid.
+        """Interpolate bathymetry on a given mesh.
 
         Args:
-            grid_xy (tuple[torch.Tensor, torch.Tensor]): xy grid.
+            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
 
         Returns:
-            torch.Tensor: Interpolation of bathymetry on the given grid.
+            torch.Tensor: Interpolation of bathymetry on the given mesh.
         """
-        return self._interpolation(grid_xy)
+        return self._interpolation(mesh_xy)
 
     def compute_land_mask(
         self,
-        grid_xy: tuple[torch.Tensor, torch.Tensor],
+        mesh_xy: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        """Compute land mask over a given grid.
+        """Compute land mask over a given mesh.
 
         Args:
-            grid_xy (tuple[torch.Tensor, torch.Tensor]): xy grid.
+            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
 
         Returns:
             torch.Tensor: Boolean mask with 1 over land cells and 0 elsewhere.
         """
-        land = self.interpolate(grid_xy=grid_xy) > 0
+        land = self.interpolate(mesh_xy=mesh_xy) > 0
         # remove small ocean inclusions in land
         land_without_lakes: np.ndarray = skimage.morphology.area_closing(
             land,
@@ -93,17 +93,17 @@ class Bathymetry:
 
     def compute_ocean_mask(
         self,
-        grid_xy: tuple[torch.Tensor, torch.Tensor],
+        mesh_xy: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        """Compute ocean mask over a given grid.
+        """Compute ocean mask over a given mesh.
 
         Args:
-            grid_xy (tuple[torch.Tensor, torch.Tensor]): xy grid.
+            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
 
         Returns:
             torch.Tensor: Boolean mask with 1 over ocean cells and 0 elsewhere.
         """
-        interp_bathy = self.interpolate(grid_xy=grid_xy)
+        interp_bathy = self.interpolate(mesh_xy=mesh_xy)
         ocean = interp_bathy < self._config.htop_ocean
         # Remove small land inclusions in ocean
         ocean_without_islands: np.ndarray = skimage.morphology.area_closing(
@@ -147,33 +147,33 @@ class Bathymetry:
 
     def compute_bottom_topography(
         self,
-        grid_xy: tuple[torch.Tensor, torch.Tensor],
+        mesh_xy: tuple[torch.Tensor, torch.Tensor],
     ) -> np.ndarray:
         """Compute botoom topography.
 
         Args:
-            grid_xy (tuple[torch.Tensor, torch.Tensor]): xy grid.
+            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
 
         Returns:
             np.ndarray: Bottom Topography.
         """
-        bottom_topography = 4000 + np.clip(self.interpolate(grid_xy), -4000, 0)
+        bottom_topography = 4000 + np.clip(self.interpolate(mesh_xy), -4000, 0)
         return np.clip(
             scipy.ndimage.gaussian_filter(bottom_topography, 3.0), 0, 150
         )
 
     def compute_land_mask_w(
-        self, grid_xy: tuple[torch.Tensor, torch.Tensor]
+        self, mesh_xy: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
         """Pad land mask with land border and perform 2D average.
 
         Args:
-            grid_xy (tuple[torch.Tensor, torch.Tensor]): xy grid.
+            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
 
         Returns:
             torch.Tensor: Land mask W.
         """
-        land = self.compute_land_mask(grid_xy=grid_xy)
+        land = self.compute_land_mask(mesh_xy=mesh_xy)
         unsqueezed = land.unsqueeze(0).unsqueeze(0)
         padded = F.pad(unsqueezed, (1, 1, 1, 1), value=1.0)
         avg_2d = F.avg_pool2d(padded, (2, 2), stride=(1, 1))[0, 0]

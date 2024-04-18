@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 class Masks:
     """
-    Masks for staggered grid used in Shallow-water discretization.
+    Masks for staggered mesh used in Shallow-water discretization.
     The variables are:
      - w: vorticity
      - h: layer thickness
@@ -26,9 +26,9 @@ class Masks:
 
     """
 
-    def __init__(self, mask_hgrid: torch.Tensor):
+    def __init__(self, mask_hmesh: torch.Tensor):
         """
-        Computes automatically several masks given the binary mask on the h grid.
+        Computes automatically several masks given the binary mask on the h mesh.
         as well as the irregulare boundary points
         Example of mask:
             Given the following 4_x3 domain:
@@ -56,12 +56,12 @@ class Masks:
 
 
         Parameters
-            - mask_hgrid: float/double Tensor, shape (nx, ny), binary values
+            - mask_hmesh: float/double Tensor, shape (nx, ny), binary values
         """
-        mtype = mask_hgrid.dtype
-        mshape = mask_hgrid.shape
+        mtype = mask_hmesh.dtype
+        mshape = mask_hmesh.shape
 
-        self.h = mask_hgrid.reshape((1,) * (4 - len(mshape)) + mshape)
+        self.h = mask_hmesh.reshape((1,) * (4 - len(mshape)) + mshape)
         self.u = (
             F.avg_pool2d(self.h, (2, 1), stride=(1, 1), padding=(1, 0)) > 3 / 4
         )
@@ -128,7 +128,7 @@ class Masks:
             )
         )
 
-        # h-stencil in direction x on u-grid
+        # h-stencil in direction x on u-mesh
         self.u_sten_hx_eq2 = torch.logical_and(
             torch.logical_and(
                 F.avg_pool2d(
@@ -156,7 +156,7 @@ class Masks:
             torch.logical_not(self.u_sten_hx_eq4), self.u_sten_hx_gt4
         )
 
-        # w-stencil in direction y on u-grid
+        # w-stencil in direction y on u-mesh
         self.u_sten_wy_eq2 = torch.logical_and(
             torch.logical_and(
                 F.avg_pool2d(
@@ -184,7 +184,7 @@ class Masks:
             torch.logical_not(self.u_sten_wy_eq4), self.u_sten_wy_gt4
         )
 
-        # h-stencil in direction y on v-grid
+        # h-stencil in direction y on v-mesh
         self.v_sten_hy_eq2 = torch.logical_and(
             torch.logical_and(
                 F.avg_pool2d(
@@ -212,7 +212,7 @@ class Masks:
             torch.logical_not(self.v_sten_hy_eq4), self.v_sten_hy_gt4
         )
 
-        # w-stencil in direction x on v-grid
+        # w-stencil in direction x on v-mesh
         self.v_sten_wx_eq2 = torch.logical_and(
             torch.logical_and(
                 F.avg_pool2d(
@@ -316,7 +316,7 @@ if __name__ == "__main__":
                 a.set_xticks(np.arange(-0.5, n + 0.5)),
                 a.set_yticks(np.arange(-0.5, n + 0.5)),
             )
-            a.grid()
+            a.mesh()
 
             # h mask
             size = 90

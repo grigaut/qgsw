@@ -96,8 +96,8 @@ class SW:
         Parameters
 
         param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
+            'nx':       int, number of mesh points in dimension x
+            'ny':       int, number mesh points in dimension y
             'nl':       nl, number of stacked layer
             'dx':       float or Tensor (nx, ny), dx metric term
             'dy':       float or Tensor (nx, ny), dy metric term
@@ -124,7 +124,7 @@ class SW:
 
         # verifications
 
-        # grid
+        # mesh
         self.nx: int = param["nx"]  # number of points in the x direction
         self.ny: int = param["ny"]  # number of point in the y direction
         self.nl: int = param["nl"]  # number of layers
@@ -144,13 +144,13 @@ class SW:
         self.f = self._validate_coriolis_param(param=param, key="f")
 
         self.f0 = self.f.mean()
-        self.f_ugrid = 0.5 * (self.f[:, :, 1:] + self.f[:, :, :-1])
-        self.f_vgrid = 0.5 * (self.f[:, 1:, :] + self.f[:, :-1, :])
-        self.f_hgrid = interp_TP(self.f)
-        self.fstar_ugrid = self.f_ugrid * self.area
-        self.fstar_vgrid = self.f_vgrid * self.area
-        self.fstar_vgrid = self.f_vgrid * self.area
-        self.fstar_hgrid = self.f_hgrid * self.area
+        self.f_umesh = 0.5 * (self.f[:, :, 1:] + self.f[:, :, :-1])
+        self.f_vmesh = 0.5 * (self.f[:, 1:, :] + self.f[:, :-1, :])
+        self.f_hmesh = interp_TP(self.f)
+        self.fstar_umesh = self.f_umesh * self.area
+        self.fstar_vmesh = self.f_vmesh * self.area
+        self.fstar_vmesh = self.f_vmesh * self.area
+        self.fstar_hmesh = self.f_hmesh * self.area
 
         # gravity
         self.g_prime: torch.Tensor = param["g_prime"]
@@ -328,8 +328,8 @@ class SW:
         - self.h_ref
         - self.eta_ref
         - self.p_ref
-        - self.h_ref_ugrid
-        - self.h_ref_vgrid
+        - self.h_ref_umesh
+        - self.h_ref_vmesh
         - self.dx_p_ref
         - self.dy_p_ref
         """
@@ -337,19 +337,19 @@ class SW:
         self.eta_ref = -self.H.sum(dim=-3) + reverse_cumsum(self.H, dim=-3)
         self.p_ref = torch.cumsum(self.g_prime * self.eta_ref, dim=-3)
         if self.h_ref.shape[-2] != 1 and self.h_ref.shape[-1] != 1:
-            h_ref_ugrid = F.pad(self.h_ref, (0, 0, 1, 1), mode="replicate")
-            self.h_ref_ugrid = 0.5 * (
-                h_ref_ugrid[..., 1:, :] + h_ref_ugrid[..., :-1, :]
+            h_ref_umesh = F.pad(self.h_ref, (0, 0, 1, 1), mode="replicate")
+            self.h_ref_umesh = 0.5 * (
+                h_ref_umesh[..., 1:, :] + h_ref_umesh[..., :-1, :]
             )
-            h_ref_vgrid = F.pad(self.h_ref, (1, 1), mode="replicate")
-            self.h_ref_vgrid = 0.5 * (
-                h_ref_vgrid[..., 1:] + h_ref_vgrid[..., :-1]
+            h_ref_vmesh = F.pad(self.h_ref, (1, 1), mode="replicate")
+            self.h_ref_vmesh = 0.5 * (
+                h_ref_vmesh[..., 1:] + h_ref_vmesh[..., :-1]
             )
             self.dx_p_ref = torch.diff(self.p_ref, dim=-2)
             self.dy_p_ref = torch.diff(self.p_ref, dim=-1)
         else:
-            self.h_ref_ugrid = self.h_ref
-            self.h_ref_vgrid = self.h_ref
+            self.h_ref_umesh = self.h_ref
+            self.h_ref_vmesh = self.h_ref
             self.dx_p_ref = 0.0
             self.dy_p_ref = 0.0
 
@@ -412,9 +412,9 @@ class SW:
             mask_6=self.masks.u_sten_hx_gt6[..., 1:-1, :],
         )
 
-        self.w_flux_y = lambda w, v_ugrid: flux(
+        self.w_flux_y = lambda w, v_umesh: flux(
             w,
-            v_ugrid,
+            v_umesh,
             dim=-1,
             n_points=6,
             rec_func_2=linear2_centered,
@@ -424,9 +424,9 @@ class SW:
             mask_4=self.masks.u_sten_wy_eq4[..., 1:-1, :],
             mask_6=self.masks.u_sten_wy_gt4[..., 1:-1, :],
         )
-        self.w_flux_x = lambda w, u_vgrid: flux(
+        self.w_flux_x = lambda w, u_vmesh: flux(
             w,
-            u_vgrid,
+            u_vmesh,
             dim=-2,
             n_points=6,
             rec_func_2=linear2_centered,
@@ -456,16 +456,16 @@ class SW:
     def _set_barotropic_filter_exact(self) -> None:
         """Set Helmoltz Solver for barotropic and exact form."""
         print("in exact form")
-        coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]
-        coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
+        coef_umesh = (self.h_tot_umesh * self.masks.u)[0, 0]
+        coef_vmesh = (self.h_tot_vmesh * self.masks.v)[0, 0]
         lambd = 1.0 / (self.g * self.dt * self.tau)
         self.helm_solver = MG_Helmholtz(
             self.dx,
             self.dy,
             self.nx,
             self.ny,
-            coef_ugrid=coef_ugrid,
-            coef_vgrid=coef_vgrid,
+            coef_umesh=coef_umesh,
+            coef_vmesh=coef_vmesh,
             lambd=lambd,
             device=self.device,
             dtype=self.dtype,
@@ -601,8 +601,8 @@ class SW:
         omega_Vm = self.w_flux_y(self.omega[..., 1:-1, :], self.V_m)
         omega_Um = self.w_flux_x(self.omega[..., 1:-1], self.U_m)
 
-        dt_u = omega_Vm + self.fstar_ugrid[..., 1:-1, :] * self.V_m
-        dt_v = -(omega_Um + self.fstar_vgrid[..., 1:-1] * self.U_m)
+        dt_u = omega_Vm + self.fstar_umesh[..., 1:-1, :] * self.V_m
+        dt_v = -(omega_Um + self.fstar_vmesh[..., 1:-1] * self.U_m)
 
         # grad pressure + k_energy
         ke_pressure = self.k_energy + self.p
@@ -621,10 +621,10 @@ class SW:
         """
         Add wind forcing to the derivatives du, dv.
         """
-        H_ugrid = (self.h_tot_ugrid) / self.area
-        H_vgrid = (self.h_tot_vgrid) / self.area
-        du[..., 0, :, :] += self.taux / H_ugrid[..., 0, 1:-1, :] * self.dx
-        dv[..., 0, :, :] += self.tauy / H_vgrid[..., 0, :, 1:-1] * self.dy
+        H_umesh = (self.h_tot_umesh) / self.area
+        H_vmesh = (self.h_tot_vmesh) / self.area
+        du[..., 0, :, :] += self.taux / H_umesh[..., 0, 1:-1, :] * self.dx
+        dv[..., 0, :, :] += self.tauy / H_vmesh[..., 0, :, 1:-1] * self.dy
         return du, dv
 
     def add_bottom_drag(self, du, dv):
@@ -669,14 +669,14 @@ class SW:
         self.k_energy = (
             self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
         )
-        # self.pv = (self.interp_TP(self.omega) + self.fstar_hgrid) \
+        # self.pv = (self.interp_TP(self.omega) + self.fstar_hmesh) \
         # / (self.h_ref + self.h)
 
         h_ = replicate_pad(self.h, self.masks.h)
-        self.h_ugrid = 0.5 * (h_[..., 1:, 1:-1] + h_[..., :-1, 1:-1])
-        self.h_vgrid = 0.5 * (h_[..., 1:-1, 1:] + h_[..., 1:-1, :-1])
-        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
-        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
+        self.h_umesh = 0.5 * (h_[..., 1:, 1:-1] + h_[..., :-1, 1:-1])
+        self.h_vmesh = 0.5 * (h_[..., 1:-1, 1:] + h_[..., 1:-1, :-1])
+        self.h_tot_umesh = self.h_ref_umesh + self.h_umesh
+        self.h_tot_vmesh = self.h_ref_vmesh + self.h_vmesh
 
     def filter_barotropic_waves(self, dt_u, dt_v, dt_h):
         """
@@ -685,12 +685,12 @@ class SW:
         # compute RHS
         u_star = (self.u + self.dt * dt_u) / self.dx
         v_star = (self.v + self.dt * dt_v) / self.dy
-        u_bar_star = (u_star * self.h_tot_ugrid).sum(
+        u_bar_star = (u_star * self.h_tot_umesh).sum(
             dim=-3, keepdim=True
-        ) / self.h_tot_ugrid.sum(dim=-3, keepdim=True)
-        v_bar_star = (v_star * self.h_tot_vgrid).sum(
+        ) / self.h_tot_umesh.sum(dim=-3, keepdim=True)
+        v_bar_star = (v_star * self.h_tot_vmesh).sum(
             dim=-3, keepdim=True
-        ) / self.h_tot_vgrid.sum(dim=-3, keepdim=True)
+        ) / self.h_tot_vmesh.sum(dim=-3, keepdim=True)
         if self.barotropic_filter_spectral:
             rhs = (
                 1.0
@@ -706,14 +706,14 @@ class SW:
                 1.0
                 / (self.g * self.dt * self.tau)
                 * (
-                    torch.diff(self.h_tot_ugrid * u_bar_star, dim=-2) / self.dx
-                    + torch.diff(self.h_tot_vgrid * v_bar_star, dim=-1)
+                    torch.diff(self.h_tot_umesh * u_bar_star, dim=-2) / self.dx
+                    + torch.diff(self.h_tot_vmesh * v_bar_star, dim=-1)
                     / self.dy
                 )
             )
-            coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]
-            coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
-            w_surf_imp = self.helm_solver.solve(rhs, coef_ugrid, coef_vgrid)
+            coef_umesh = (self.h_tot_umesh * self.masks.u)[0, 0]
+            coef_vmesh = (self.h_tot_vmesh * self.masks.v)[0, 0]
+            w_surf_imp = self.helm_solver.solve(rhs, coef_umesh, coef_vmesh)
             # WIP
 
         filt_u = (

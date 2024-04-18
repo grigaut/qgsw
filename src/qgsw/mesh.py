@@ -281,9 +281,6 @@ class Mesh3D:
             self._coords.y.points,
             indexing="ij",
         )
-        from icecream import ic
-
-        ic(self._coords.h.points)
         _, self._hx, self._hy = torch.meshgrid(
             self._coords.h.points,
             self._coords.x.points,
@@ -452,16 +449,16 @@ class Meshes2D:
             Self: Corresponding Meshes2D.
         """
         x = torch.linspace(
-            script_config.grid.x_min,
-            script_config.grid.x_max,
-            script_config.grid.nx + 1,
+            script_config.mesh.x_min,
+            script_config.mesh.x_max,
+            script_config.mesh.nx + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
         y = torch.linspace(
-            script_config.grid.y_min,
-            script_config.grid.y_max,
-            script_config.grid.ny + 1,
+            script_config.mesh.y_min,
+            script_config.mesh.y_max,
+            script_config.mesh.ny + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
@@ -560,7 +557,7 @@ class Meshes3D:
 
     @property
     def omega(self) -> Mesh3D:
-        """X,Y cordinates of the Omega grid ('classical' grid corners).
+        """X,Y cordinates of the Omega mesh ('classical' mesh corners).
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -569,7 +566,7 @@ class Meshes3D:
 
     @property
     def h(self) -> Mesh3D:
-        """X,Y coordinates of the H grid (center of 'classical' grid cells).
+        """X,Y coordinates of the H mesh (center of 'classical' mesh cells).
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -578,7 +575,7 @@ class Meshes3D:
 
     @property
     def u(self) -> Mesh3D:
-        """X,Y coordinates of the u grid .
+        """X,Y coordinates of the u mesh .
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -587,7 +584,7 @@ class Meshes3D:
 
     @property
     def v(self) -> Mesh3D:
-        """X,Y coordinates of the H grid (center of 'classical' grid cells).
+        """X,Y coordinates of the H mesh (center of 'classical' mesh cells).
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -618,16 +615,16 @@ class Meshes3D:
             Self: Corresponding 3D Grid.
         """
         x = torch.linspace(
-            script_config.grid.x_min,
-            script_config.grid.x_max,
-            script_config.grid.nx + 1,
+            script_config.mesh.x_min,
+            script_config.mesh.x_max,
+            script_config.mesh.nx + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
         y = torch.linspace(
-            script_config.grid.y_min,
-            script_config.grid.y_max,
-            script_config.grid.ny + 1,
+            script_config.mesh.y_min,
+            script_config.mesh.y_max,
+            script_config.mesh.ny + 1,
             dtype=torch.float64,
             device=DEVICE,
         )

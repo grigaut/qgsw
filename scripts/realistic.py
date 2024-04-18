@@ -17,7 +17,7 @@ sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
 from qgsw.configs import RealisticConfig
-from qgsw.grid import Meshes2D
+from qgsw.mesh import Meshes2D
 from qgsw.qg import QG
 from qgsw.specs import DEVICE
 from qgsw.sw import SW
@@ -26,14 +26,14 @@ from qgsw.sw import SW
 torch.backends.cudnn.deterministic = True
 
 config = RealisticConfig.from_file(Path("config/realistic.toml"))
-grid = Meshes2D.from_config(config)
+mesh = Meshes2D.from_config(config)
 bathy = Bathymetry.from_config(config)
 wind = WindForcing.from_config(config)
 
 print(
-    f"Grid lat: {config.grid.y_min:.1f}, {config.grid.y_max:.1f}, "
-    f"lon: {config.grid.x_min:.1f}, {config.grid.x_max:.1f}, "
-    f"dx={config.grid.dx/1e3:.1f}km, dy={config.grid.dy/1e3:.1f}km ."
+    f"Grid lat: {config.mesh.y_min:.1f}, {config.mesh.y_max:.1f}, "
+    f"lon: {config.mesh.x_min:.1f}, {config.mesh.x_max:.1f}, "
+    f"dx={config.mesh.dx/1e3:.1f}km, dy={config.mesh.dy/1e3:.1f}km ."
 )
 
 
@@ -43,17 +43,17 @@ print(
 )
 
 print(
-    "Interpolating bathymetry on grid with"
+    "Interpolating bathymetry on mesh with"
     f" {config.bathy.interpolation_method} interpolation ..."
 )
 
 # Land Mask Generation
-mask_land = bathy.compute_land_mask(grid.h.xy)
-mask_land_w = bathy.compute_land_mask_w(grid.h.xy)
+mask_land = bathy.compute_land_mask(mesh.h.xy)
+mask_land_w = bathy.compute_land_mask_w(mesh.h.xy)
 
 
 # coriolis beta plane
-f = grid.generate_coriolis_mesh(f0=config.physics.f0, beta=config.physics.beta)
+f = mesh.generate_coriolis_mesh(f0=config.physics.f0, beta=config.physics.beta)
 print(
     f"Coriolis param min {f.min().cpu().item():.2e},"
     f" {f.max().cpu().item():.2e}"
@@ -62,12 +62,12 @@ print(
 taux, tauy = wind.compute()
 
 param = {
-    "nx": config.grid.nx,
-    "ny": config.grid.ny,
+    "nx": config.mesh.nx,
+    "ny": config.mesh.ny,
     "nl": config.layers.nl,
     "H": config.layers.h.unsqueeze(1).unsqueeze(1),
-    "dx": config.grid.dx,
-    "dy": config.grid.dy,
+    "dx": config.mesh.dx,
+    "dy": config.mesh.dy,
     "rho": config.physics.rho,
     "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
@@ -75,9 +75,9 @@ param = {
     "device": DEVICE,
     "dtype": torch.float64,
     "slip_coef": config.physics.slip_coef,
-    "dt": config.grid.dt,  # time-step (s)
+    "dt": config.mesh.dt,  # time-step (s)
     "compile": True,
-    "mask": bathy.compute_ocean_mask(grid.h.xy),
+    "mask": bathy.compute_ocean_mask(mesh.h.xy),
     "taux": taux[0, 1:-1, :],
     "tauy": tauy[0, :, 1:-1],
 }
@@ -99,11 +99,11 @@ if start_file:
 t = 0
 
 freq_checknan = 100
-freq_log = int(24 * 3600 / config.grid.dt)
-n_steps = int(50 * 365 * 24 * 3600 / config.grid.dt) + 1
-n_steps_save = int(0 * 365 * 24 * 3600 / config.grid.dt)
-freq_save = int(5 * 24 * 3600 / config.grid.dt)
-freq_plot = int(config.io.plot_frequency * 24 * 3600 / config.grid.dt)
+freq_log = int(24 * 3600 / config.mesh.dt)
+n_steps = int(50 * 365 * 24 * 3600 / config.mesh.dt) + 1
+n_steps_save = int(0 * 365 * 24 * 3600 / config.mesh.dt)
+freq_save = int(5 * 24 * 3600 / config.mesh.dt)
+freq_plot = int(config.io.plot_frequency * 24 * 3600 / config.mesh.dt)
 
 uM, vM, hM = 0, 0, 0
 
@@ -111,14 +111,14 @@ uM, vM, hM = 0, 0, 0
 if config.io.log_performance:
     from time import time as cputime
 
-    ngridpoints = param["nl"] * param["nx"] * param["ny"]
+    nmeshpoints = param["nl"] * param["nx"] * param["ny"]
     mperf = 0
     [qg.step() for _ in range(5)]  # warm up
 
 
 if freq_save > 0:
     output_dir = (
-        f'{config.io.output_directory}/{name}_{config.grid.nx}x{config.grid.ny}_dt{config.grid.dt}_'
+        f'{config.io.output_directory}/{name}_{config.mesh.nx}x{config.mesh.ny}_dt{config.mesh.dt}_'
         f'slip{param["slip_coef"]}/'
     )
     os.makedirs(output_dir, exist_ok=True)
@@ -162,8 +162,6 @@ for n in range(1, n_steps + 1):
     ## update wind forcing
     month = 12 * (t % (365 * 24 * 3600)) / (365 * 24 * 3600)
     m_i, m_r = int(month), month - int(month)
-    ic(taux)
-    ic(tauy)
     taux_t = (1 - m_r) * taux[m_i, 1:-1, :] + m_r * taux[m_i + 1, 1:-1, :]
     tauy_t = (1 - m_r) * tauy[m_i, :, 1:-1] + m_r * tauy[m_i + 1, :, 1:-1]
     qg.set_wind_forcing(taux_t, tauy_t)
@@ -173,11 +171,11 @@ for n in range(1, n_steps + 1):
 
     ## one step
     qg.step()
-    t += config.grid.dt
+    t += config.mesh.dt
 
     if config.io.log_performance:
         walltime = cputime()
-        perf = (walltime - walltime0) / (ngridpoints)
+        perf = (walltime - walltime0) / (nmeshpoints)
         mperf += perf
         print(
             f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf/n:.2e}) s",
