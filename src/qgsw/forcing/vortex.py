@@ -249,6 +249,26 @@ class RankineVortexForcing:
         """
         self._vortex = vortex
 
+    @property
+    def perturbation_magnitude(self) -> float:
+        """Tripolar perturbation magnitude."""
+        return self._vortex.perturbation_magnitude
+
+    @property
+    def r0(self) -> float:
+        """Core cylinder radius: 0.1*lx."""
+        return self._vortex.r0
+
+    @property
+    def r1(self) -> float:
+        """Inner radius of the surrounding ring: r0."""
+        return self._vortex.r1
+
+    @property
+    def r2(self) -> float:
+        """Outer radius of the surrounding ring: 0.14*lx."""
+        return self._vortex.r2
+
     def compute(self, f0: float, Ro: float) -> torch.Tensor:  # noqa: N803
         """Compute Initial pressure based on the vortex's vorticity.
 
