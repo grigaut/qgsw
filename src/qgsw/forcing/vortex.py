@@ -8,7 +8,7 @@ from typing_extensions import Self
 
 from qgsw import helmholtz
 from qgsw.configs.core import ScriptConfig
-from qgsw.mesh import Meshes2D, Meshes3D
+from qgsw.mesh.meshes import Meshes2D, Meshes3D
 from qgsw.specs import DEVICE
 
 
