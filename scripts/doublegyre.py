@@ -7,8 +7,7 @@ from pathlib import Path
 
 sys.path.append("../src")
 
-from qgsw.sw import SW
-from qgsw.qg import QG
+from qgsw.models import SW, QG
 from qgsw.configs import DoubleGyreConfig
 from qgsw.physics import coriolis
 from qgsw.mesh import Meshes3D

@@ -18,9 +18,8 @@ from qgsw.forcing.vortex import (
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.physics import compute_burger
-from qgsw.qg import QG
+from qgsw.models import SW, QG
 from qgsw.specs import DEVICE
-from qgsw.sw import SW
 
 torch.backends.cudnn.deterministic = True
 

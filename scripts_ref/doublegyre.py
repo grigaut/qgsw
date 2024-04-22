@@ -6,8 +6,8 @@ import torch
 
 sys.path.append("../src")
 
-from qgsw.sw import SW
-from qgsw.qg import QG
+
+from qgsw.models import SW, QG
 
 torch.backends.cudnn.deterministic = True
 

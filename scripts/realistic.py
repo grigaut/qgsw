@@ -14,10 +14,9 @@ from qgsw.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
 from qgsw.configs import RealisticConfig
 from qgsw.mesh import Meshes3D
-from qgsw.qg import QG
+from qgsw.models import SW, QG
 from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
-from qgsw.sw import SW
 
 
 torch.backends.cudnn.deterministic = True

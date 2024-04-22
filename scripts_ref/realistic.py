@@ -21,8 +21,8 @@ import getpass
 import matplotlib.pyplot as plt
 
 sys.path.append("../src")
-from qgsw.sw import SW
-from qgsw.qg import QG
+
+from qgsw.models import SW, QG
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

@@ -17,7 +17,7 @@ from qgsw.helmholtz import (
     compute_capacitance_matrices,
 )
 from qgsw.finite_diff import grad_perp
-from qgsw.sw import SW
+from qgsw.models.sw import SW
 from typing import Any, Union
 
 
