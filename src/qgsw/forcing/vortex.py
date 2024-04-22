@@ -6,9 +6,9 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 from typing_extensions import Self
 
-from qgsw import helmholtz
 from qgsw.configs.core import ScriptConfig
 from qgsw.mesh.meshes import Meshes2D, Meshes3D
+from qgsw.models.core import helmholtz
 from qgsw.specs import DEVICE
 
 
@@ -138,7 +138,7 @@ class RankineVortex3D(metaclass=ABCMeta):
         """
         self._mesh = mesh
         self._2d = RankineVortex2D(
-            mesh=mesh.remove_z(),
+            mesh=mesh.remove_z_h(),
             perturbation_magnitude=perturbation_magnitude,
         )
 

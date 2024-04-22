@@ -39,7 +39,7 @@ Bu = compute_burger(
     length_scale=vortex.r0,
 )
 
-mesh_2d = mesh.remove_z()
+mesh_2d = mesh.remove_z_h()
 x, y = mesh_2d.omega.xy
 xc, yc = mesh_2d.h.xy
 rc = torch.sqrt(xc**2 + yc**2)
