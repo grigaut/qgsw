@@ -3,7 +3,7 @@
 Pytorch implementation of multigrid solver for 2D generalized Helmoltz equation
     ∇.(c∇u) - λu = rhs
 with homegenous Neumann BC, where the coefficent c possibly varies in space.
-Assuming staggered mesh:
+Assuming staggered grid:
     o---v---o---v---o
     |       |       |
     u   x   u   x   u
@@ -35,36 +35,36 @@ def compute_nlevels(n):
     return 1 + highest_powerof2_divisor
 
 
-def compute_mask_uvmeshs(mask):
-    """Computes the mask on the u and v meshs given the mask on the
-    center mesh."""
+def compute_mask_uvgrids(mask):
+    """Computes the mask on the u and v grids given the mask on the
+    center grid."""
     mask_ = mask.unsqueeze(0) if len(mask.shape) == 2 else mask
-    mask_umesh = (
+    mask_ugrid = (
         F.avg_pool2d(mask_, (2, 1), stride=(1, 1), padding=(1, 0)) > 3 / 4
     ).type(mask.dtype)
-    mask_vmesh = (
+    mask_vgrid = (
         F.avg_pool2d(mask_, (1, 2), stride=(1, 1), padding=(0, 1)) > 3 / 4
     ).type(mask.dtype)
     return (
-        (mask_umesh[0], mask_vmesh[0])
+        (mask_ugrid[0], mask_vgrid[0])
         if len(mask.shape) == 2
-        else (mask_umesh[0], mask_vmesh[0])
+        else (mask_ugrid[0], mask_vgrid[0])
     )
 
 
 def compute_helmholtz_matrix(
-    dx, dy, lambd, mask, coef_umesh, coef_vmesh, dtype, device
+    dx, dy, lambd, mask, coef_ugrid, coef_vgrid, dtype, device
 ):
     """Computes the equivalent matrix of a Helmholtz operator
     on a masked domain."""
 
-    def helmholtz(f, dx, dy, lambd, mask, coef_umesh, coef_vmesh):
+    def helmholtz(f, dx, dy, lambd, mask, coef_ugrid, coef_vgrid):
         f_ = F.pad(f, (1, 1, 1, 1))
         dx_f = torch.diff(f_[..., 1:-1], dim=-2)
         dy_f = torch.diff(f_[..., 1:-1, :], dim=-1)
         Hf = (
-            torch.diff(coef_umesh * dx_f, dim=-2) / dx**2
-            + torch.diff(coef_vmesh * dy_f, dim=-1) / dy**2
+            torch.diff(coef_ugrid * dx_f, dim=-2) / dx**2
+            + torch.diff(coef_vgrid * dy_f, dim=-1) / dy**2
             - lambd * f
         )
         return Hf * mask
@@ -77,22 +77,22 @@ def compute_helmholtz_matrix(
             (lambd.shape[0],) + mask.shape, dtype=dtype, device=device
         )
         x[:, i_s[n], j_s[n]] = 1
-        H_x = helmholtz(x, dx, dy, lambd, mask, coef_umesh, coef_vmesh)
+        H_x = helmholtz(x, dx, dy, lambd, mask, coef_ugrid, coef_vgrid)
         h_matrix[:, n] = H_x[:, i_s, j_s]
     return i_s, j_s, h_matrix
 
 
 def jacobi_smoothing(
-    f, rhs, dx, dy, mask, coef_umesh, coef_vmesh, omega, lambd
+    f, rhs, dx, dy, mask, coef_ugrid, coef_vgrid, omega, lambd
 ):
-    """Jacobi smoothing operator on masked mesh."""
+    """Jacobi smoothing operator on masked grid."""
 
     dxm2 = 1.0 / dx**2
     dym2 = 1.0 / dy**2
-    cu_ip1_j = coef_umesh[..., 1:, :]
-    cu_i_j = coef_umesh[..., :-1, :]
-    cv_i_jp1 = coef_vmesh[..., 1:]
-    cv_i_j = coef_vmesh[..., :-1]
+    cu_ip1_j = coef_ugrid[..., 1:, :]
+    cu_i_j = coef_ugrid[..., :-1, :]
+    cv_i_jp1 = coef_vgrid[..., 1:]
+    cv_i_j = coef_vgrid[..., :-1]
     factor = mask / (
         lambd + dxm2 * (cu_ip1_j + cu_i_j) + dym2 * (cv_i_jp1 + cv_i_j)
     )
@@ -116,7 +116,7 @@ def jacobi_smoothing(
     return f
 
 
-def residual(f, rhs, dx, dy, mask, coef_umesh, coef_vmesh, lambd):
+def residual(f, rhs, dx, dy, mask, coef_ugrid, coef_vgrid, lambd):
     """Compute 2D Helmholtz equation with Neumann BC residual:
         res = rhs - Hf
     where Hf is a generalized Helmholtz operator
@@ -128,8 +128,8 @@ def residual(f, rhs, dx, dy, mask, coef_umesh, coef_vmesh, lambd):
     dx_f = torch.diff(f_[..., 1:-1], dim=-2)
     dy_f = torch.diff(f_[..., 1:-1, :], dim=-1)
     Hf = mask * (
-        torch.diff(coef_umesh * dx_f, dim=-2) / dx**2
-        + torch.diff(coef_vmesh * dy_f, dim=-1) / dy**2
+        torch.diff(coef_ugrid * dx_f, dim=-2) / dx**2
+        + torch.diff(coef_vgrid * dy_f, dim=-1) / dy**2
         - lambd * f
     )
 
@@ -171,7 +171,7 @@ def prolong(v, divisor=16):
 
 
 def restrict(v, divisor=4):
-    """Cell-centered coarse-mesh restriction of the 2D field v."""
+    """Cell-centered coarse-grid restriction of the 2D field v."""
     return (
         v[..., :-1:2, :-1:2]
         + v[..., 1::2, :-1:2]
@@ -182,7 +182,7 @@ def restrict(v, divisor=4):
 
 class MG_Helmholtz:
     """
-    Multrimesh solver for generalized Helmoltz equations
+    Multrigrid solver for generalized Helmoltz equations
         ∇.(c∇u) - λu = rhs
     c being a possibly non-constant coefficient for
     masked domains embedded in a rectangle.
@@ -194,8 +194,8 @@ class MG_Helmholtz:
         dy,
         nx,
         ny,
-        coef_umesh,
-        coef_vmesh,
+        coef_ugrid,
+        coef_vgrid,
         n_levels=None,
         lambd=None,
         tol=1e-8,
@@ -245,7 +245,7 @@ class MG_Helmholtz:
             0.95, dtype=self.dtype, device=self.device
         )
 
-        # Multimesh algo parameters
+        # Multigrid algo parameters
         self.n_levels = n_levels
         self.max_ite = max_ite
         self.tol = tol
@@ -261,8 +261,8 @@ class MG_Helmholtz:
         # Restriction and prolongation divisors
         self.compute_divisor_hierarchy()
 
-        # Divergence coefficient on u- and v-mesh
-        self.compute_coefficient_hierarchy(coef_umesh, coef_vmesh)
+        # Divergence coefficient on u- and v-grid
+        self.compute_coefficient_hierarchy(coef_ugrid, coef_vgrid)
 
         # Bottom solving with matrix inversion
         if self.niter_bottom <= 0:
@@ -271,15 +271,15 @@ class MG_Helmholtz:
                 dy * 2 ** (n_levels - 1),
             )
             mask_bottom = self.masks[-1][0]
-            coef_umesh_bottom = self.coefs_umesh[-1][0]
-            coef_vmesh_bottom = self.coefs_vmesh[-1][0]
+            coef_ugrid_bottom = self.coefs_ugrid[-1][0]
+            coef_vgrid_bottom = self.coefs_vgrid[-1][0]
             i_s, j_s, h_mat = compute_helmholtz_matrix(
                 dx_bottom,
                 dy_bottom,
                 lambd,
                 mask_bottom,
-                coef_umesh_bottom,
-                coef_vmesh_bottom,
+                coef_ugrid_bottom,
+                coef_vgrid_bottom,
                 dtype,
                 device,
             )
@@ -294,16 +294,16 @@ class MG_Helmholtz:
             f = torch.zeros(self.shape, dtype=self.dtype, device=self.device)
             rhs = torch.zeros_like(f)
             mask = self.masks[0]
-            coef_umesh = self.coefs_umesh[0]
-            coef_vmesh = self.coefs_vmesh[0]
+            coef_ugrid = self.coefs_ugrid[0]
+            coef_vgrid = self.coefs_vgrid[0]
             smooth_args = (
                 f,
                 rhs,
                 self.dx,
                 self.dy,
                 mask,
-                coef_umesh,
-                coef_vmesh,
+                coef_ugrid,
+                coef_vgrid,
                 self.omega_pre,
                 self.lambd,
             )
@@ -314,8 +314,8 @@ class MG_Helmholtz:
                 self.dx,
                 self.dy,
                 mask,
-                coef_umesh,
-                coef_vmesh,
+                coef_ugrid,
+                coef_vgrid,
                 self.lambd,
             )
             self.residual = torch.jit.trace(residual, residual_args)
@@ -342,16 +342,16 @@ class MG_Helmholtz:
             mask.shape[-2] == self.nx and mask.shape[-1] == self.ny
         ), f"Invalid mask shape {mask.shape}!=({self.nx},{self.ny})"
         mask = mask.unsqueeze(0)
-        mask_umesh, mask_vmesh = compute_mask_uvmeshs(mask)
+        mask_ugrid, mask_vgrid = compute_mask_uvgrids(mask)
         self.masks = [mask]
-        self.masks_umesh = [mask_umesh]
-        self.masks_vmesh = [mask_vmesh]
+        self.masks_ugrid = [mask_ugrid]
+        self.masks_vgrid = [mask_vgrid]
         for i in range(1, self.n_levels):
             mask = (self.restrict(self.masks[-1]) > 0.5).type(self.dtype)
-            mask_umesh, mask_vmesh = compute_mask_uvmeshs(mask)
+            mask_ugrid, mask_vgrid = compute_mask_uvgrids(mask)
             self.masks.append(mask)
-            self.masks_umesh.append(mask_umesh)
-            self.masks_vmesh.append(mask_vmesh)
+            self.masks_ugrid.append(mask_ugrid)
+            self.masks_vgrid.append(mask_vgrid)
 
     def compute_divisor_hierarchy(self):
         self.divisors_restrict = [None]
@@ -368,42 +368,42 @@ class MG_Helmholtz:
             )
         self.divisors_prolong.append(None)
 
-    def compute_coefficient_hierarchy(self, coef_umesh, coef_vmesh):
+    def compute_coefficient_hierarchy(self, coef_ugrid, coef_vgrid):
         nx, ny = self.nx, self.ny
         assert (
-            coef_umesh.shape[-2] == nx + 1 and coef_umesh.shape[-1] == ny
-        ), f"Invalid coef shape {coef_umesh.shape[-2:]}!=({nx+1}, {ny})"
+            coef_ugrid.shape[-2] == nx + 1 and coef_ugrid.shape[-1] == ny
+        ), f"Invalid coef shape {coef_ugrid.shape[-2:]}!=({nx+1}, {ny})"
         assert (
-            coef_vmesh.shape[-2] == nx and coef_vmesh.shape[-1] == ny + 1
-        ), f"Invalid coef shape {coef_vmesh.shape[-2:]}!=({nx}, {ny+1})"
+            coef_vgrid.shape[-2] == nx and coef_vgrid.shape[-1] == ny + 1
+        ), f"Invalid coef shape {coef_vgrid.shape[-2:]}!=({nx}, {ny+1})"
         coef = 0.25 * (
-            coef_umesh[..., 1:, :]
-            + coef_umesh[..., :-1, :]
-            + coef_vmesh[..., 1:]
-            + coef_vmesh[..., :-1]
+            coef_ugrid[..., 1:, :]
+            + coef_ugrid[..., :-1, :]
+            + coef_vgrid[..., 1:]
+            + coef_vgrid[..., :-1]
         ).unsqueeze(0)
-        self.coefs_umesh = [coef_umesh.unsqueeze(0) * self.masks_umesh[0]]
-        self.coefs_vmesh = [coef_vmesh.unsqueeze(0) * self.masks_vmesh[0]]
+        self.coefs_ugrid = [coef_ugrid.unsqueeze(0) * self.masks_ugrid[0]]
+        self.coefs_vgrid = [coef_vgrid.unsqueeze(0) * self.masks_vgrid[0]]
         for i in range(1, self.n_levels):
             coef = restrict(coef, self.divisors_restrict[i]) * self.masks[i]
-            self.coefs_umesh.append(
+            self.coefs_ugrid.append(
                 F.avg_pool2d(coef, (2, 1), stride=(1, 1), padding=(1, 0))
-                * self.masks_umesh[i]
+                * self.masks_ugrid[i]
             )
-            self.coefs_vmesh.append(
+            self.coefs_vgrid.append(
                 F.avg_pool2d(coef, (1, 2), stride=(1, 1), padding=(0, 1))
-                * self.masks_vmesh[i]
+                * self.masks_vgrid[i]
             )
 
-    def solve(self, rhs, coef_umesh=None, coef_vmesh=None):
-        if coef_umesh is not None and coef_vmesh is not None:
-            self.compute_coefficient_hierarchy(coef_umesh, coef_vmesh)
+    def solve(self, rhs, coef_ugrid=None, coef_vgrid=None):
+        if coef_ugrid is not None and coef_vgrid is not None:
+            self.compute_coefficient_hierarchy(coef_ugrid, coef_vgrid)
         return self.FMG_Helmholtz(rhs, self.dx, self.dy)
 
-    def solve_smooth(self, rhs, coef_umesh=None, coef_vmesh=None):
-        if coef_umesh is None or coef_vmesh is None:
-            coef_umesh = self.coefs_umesh[0]
-            coef_vmesh = self.coefs_vmesh[0]
+    def solve_smooth(self, rhs, coef_ugrid=None, coef_vgrid=None):
+        if coef_ugrid is None or coef_vgrid is None:
+            coef_ugrid = self.coefs_ugrid[0]
+            coef_vgrid = self.coefs_vgrid[0]
 
         f = torch.zeros_like(rhs)
         for _ in range(1000):
@@ -413,8 +413,8 @@ class MG_Helmholtz:
                 self.dx,
                 self.dy,
                 self.masks[0],
-                coef_umesh,
-                coef_vmesh,
+                coef_ugrid,
+                coef_vgrid,
                 self.omega_pre,
                 self.lambd,
             )
@@ -431,8 +431,8 @@ class MG_Helmholtz:
             dx,
             dy,
             self.masks[0],
-            self.coefs_umesh[0],
-            self.coefs_vmesh[0],
+            self.coefs_ugrid[0],
+            self.coefs_vgrid[0],
             self.lambd,
         )
         # print(f'init resnorm: {(res.norm()/f.norm()).cpu().item():.3e}')
@@ -445,8 +445,8 @@ class MG_Helmholtz:
                 dx,
                 dy,
                 self.masks[0],
-                self.coefs_umesh[0],
-                self.coefs_vmesh[0],
+                self.coefs_ugrid[0],
+                self.coefs_vgrid[0],
                 self.lambd,
             )
             nite += 1
@@ -457,8 +457,8 @@ class MG_Helmholtz:
 
     def V_cycle(self, f, rhs, n_levels, dx, dy, level=0):
         mask = self.masks[level]
-        coef_umesh = self.coefs_umesh[level]
-        coef_vmesh = self.coefs_vmesh[level]
+        coef_ugrid = self.coefs_ugrid[level]
+        coef_vgrid = self.coefs_vgrid[level]
 
         # bottom solve
         if level == n_levels - 1:
@@ -477,54 +477,54 @@ class MG_Helmholtz:
                         dx,
                         dy,
                         mask,
-                        coef_umesh,
-                        coef_vmesh,
+                        coef_ugrid,
+                        coef_vgrid,
                         self.omega_pre,
                         self.lambd,
                     )
             return f
 
-        # Step 1: Relax Au=f on this mesh
+        # Step 1: Relax Au=f on this grid
         f = self.smooth(
             f,
             rhs,
             dx,
             dy,
             mask,
-            coef_umesh,
-            coef_vmesh,
+            coef_ugrid,
+            coef_vgrid,
             self.omega_pre,
             self.lambd,
         )
         res = self.residual(
-            f, rhs, dx, dy, mask, coef_umesh, coef_vmesh, self.lambd
+            f, rhs, dx, dy, mask, coef_ugrid, coef_vgrid, self.lambd
         )
 
-        # Step 2: Restrict residual to coarse mesh
+        # Step 2: Restrict residual to coarse grid
         res_coarse = (
             self.restrict(res, self.divisors_restrict[level + 1])
             * self.masks[level + 1]
         )
 
-        # Step 3: Solve residual equation on the coarse mesh. (Recursively)
+        # Step 3: Solve residual equation on the coarse grid. (Recursively)
         eps_coarse = torch.zeros_like(res_coarse)
         eps_coarse = self.V_cycle(
             eps_coarse, res_coarse, n_levels, dx * 2, dy * 2, level=level + 1
         )
 
-        # Step 4: Prolongate eps_coarse to current mesh and add to f
+        # Step 4: Prolongate eps_coarse to current grid and add to f
         eps = self.prolong(eps_coarse, self.divisors_prolong[level]) * mask
         f += eps
 
-        # Step 5: Relax Au=f on this mesh
+        # Step 5: Relax Au=f on this grid
         f = self.smooth(
             f,
             rhs,
             dx,
             dy,
             mask,
-            coef_umesh,
-            coef_vmesh,
+            coef_ugrid,
+            coef_vgrid,
             self.omega_post,
             self.lambd,
         )
@@ -532,7 +532,7 @@ class MG_Helmholtz:
         return f
 
     def FMG_Helmholtz(self, rhs, dx, dy):
-        """Full Multimesh cycle"""
+        """Full Multigrid cycle"""
         rhs_list = [rhs]
         for i in range(1, self.n_levels):
             rhs_list.append(
@@ -551,8 +551,8 @@ class MG_Helmholtz:
             )
         else:  # smoothing
             k = 2 ** (self.n_levels - 1)
-            coef_umesh_bottom = self.coefs_umesh[-1]
-            coef_vmesh_bottom = self.coefs_vmesh[-1]
+            coef_ugrid_bottom = self.coefs_ugrid[-1]
+            coef_vgrid_bottom = self.coefs_vgrid[-1]
             for _ in range(self.niter_bottom):
                 f = self.smooth(
                     f,
@@ -560,8 +560,8 @@ class MG_Helmholtz:
                     k * dx,
                     k * dy,
                     self.masks[-1],
-                    coef_umesh_bottom,
-                    coef_vmesh_bottom,
+                    coef_ugrid_bottom,
+                    coef_vgrid_bottom,
                     self.omega_pre,
                     self.lambd,
                 )
@@ -587,8 +587,8 @@ class MG_Helmholtz:
             dx,
             dy,
             self.masks[0],
-            self.coefs_umesh[0],
-            self.coefs_vmesh[0],
+            self.coefs_ugrid[0],
+            self.coefs_vgrid[0],
             self.lambd,
         )
         while nite < self.max_ite and res.norm() / f.norm() > self.tol:
@@ -599,8 +599,8 @@ class MG_Helmholtz:
                 dx,
                 dy,
                 self.masks[0],
-                self.coefs_umesh[0],
-                self.coefs_vmesh[0],
+                self.coefs_ugrid[0],
+                self.coefs_vgrid[0],
                 self.lambd,
             )
             nite += 1
@@ -616,13 +616,13 @@ if __name__ == "__main__":
     matplotlib.rcParams.update({"font.size": 16})
     plt.ion()
 
-    def helmholtz(f, dx, dy, coef_umesh, coef_vmesh, lambd):
+    def helmholtz(f, dx, dy, coef_ugrid, coef_vgrid, lambd):
         f_ = F.pad(f, (1, 1, 1, 1))
         dx_f = torch.diff(f_[..., 1:-1], dim=-2) / dx
         dy_f = torch.diff(f_[..., 1:-1, :], dim=-1) / dy
         return (
-            torch.diff(coef_umesh * dx_f, dim=-2) / dx
-            + torch.diff(coef_vmesh * dy_f, dim=-1) / dy
+            torch.diff(coef_ugrid * dx_f, dim=-2) / dx
+            + torch.diff(coef_vgrid * dy_f, dim=-1) / dy
             - lambd * f
         )
 
@@ -633,12 +633,12 @@ if __name__ == "__main__":
     # # Seed
     torch.manual_seed(0)
 
-    # mesh
+    # grid
     nx, ny = 64, 64
     dx = torch.tensor(0.1, device=device, dtype=dtype)
     dy = torch.tensor(0.1, device=device, dtype=dtype)
 
-    # Multimesh levels
+    # Multigrid levels
     n_levels = None
 
     # masks
@@ -664,48 +664,48 @@ if __name__ == "__main__":
     )[0, 0]
     coef_cst = torch.ones_like(coef_var)
 
-    coef_cst_umesh = (
+    coef_cst_ugrid = (
         0.5 * (coef_cst[..., 1:, :] + coef_cst[..., :-1, :])[..., 1:-1]
     )
-    coef_cst_vmesh = (
+    coef_cst_vgrid = (
         0.5 * (coef_cst[..., 1:] + coef_cst[..., :-1])[..., 1:-1, :]
     )
-    coef_var_umesh = (
+    coef_var_ugrid = (
         0.5 * (coef_var[..., 1:, :] + coef_var[..., :-1, :])[..., 1:-1]
     )
-    coef_var_vmesh = (
+    coef_var_vgrid = (
         0.5 * (coef_var[..., 1:] + coef_var[..., :-1])[..., 1:-1, :]
     )
 
-    for mask, coef_umesh_, coef_vmesh_, title in [
-        (sq_mask, coef_cst_umesh, coef_cst_vmesh, "square domain, cst coeff"),
-        (sq_mask, coef_var_umesh, coef_var_vmesh, "square domain, var coeff"),
+    for mask, coef_ugrid_, coef_vgrid_, title in [
+        (sq_mask, coef_cst_ugrid, coef_cst_vgrid, "square domain, cst coeff"),
+        (sq_mask, coef_var_ugrid, coef_var_vgrid, "square domain, var coeff"),
         (
             circ_mask,
-            coef_cst_umesh,
-            coef_cst_vmesh,
+            coef_cst_ugrid,
+            coef_cst_vgrid,
             "masked circular domain, cst coeff",
         ),
         (
             circ_mask,
-            coef_var_umesh,
-            coef_var_vmesh,
+            coef_var_ugrid,
+            coef_var_vgrid,
             "masked circular domain, var coeff",
         ),
     ]:
-        mask_umesh, mask_vmesh = compute_mask_uvmeshs(mask)
-        coef_umesh = coef_umesh_ * mask_umesh
-        coef_vmesh = coef_vmesh_ * mask_vmesh
+        mask_ugrid, mask_vgrid = compute_mask_uvgrids(mask)
+        coef_ugrid = coef_ugrid_ * mask_ugrid
+        coef_vgrid = coef_vgrid_ * mask_vgrid
         f = torch.DoubleTensor(1, nx, ny).normal_().to(device) * mask
-        helm_f = helmholtz(f, dx, dy, coef_umesh, coef_vmesh, lambd)
+        helm_f = helmholtz(f, dx, dy, coef_ugrid, coef_vgrid, lambd)
 
         mg = MG_Helmholtz(
             dx,
             dy,
             nx,
             ny,
-            coef_umesh,
-            coef_vmesh,
+            coef_ugrid,
+            coef_vgrid,
             n_levels=n_levels,
             lambd=lambd,
             device=device,
@@ -722,13 +722,13 @@ if __name__ == "__main__":
         fig.suptitle(f"Solving ∇.(c∇u) - λu = rhs, {title}")
 
         fig.colorbar(
-            ax[0].imshow(coef_umesh.cpu().T, origin="lower"), ax=ax[0]
+            ax[0].imshow(coef_ugrid.cpu().T, origin="lower"), ax=ax[0]
         )
-        ax[0].set_title("coefficient u mesh")
+        ax[0].set_title("coefficient u grid")
         fig.colorbar(
-            ax[1].imshow(coef_vmesh.cpu().T, origin="lower"), ax=ax[1]
+            ax[1].imshow(coef_vgrid.cpu().T, origin="lower"), ax=ax[1]
         )
-        ax[1].set_title("coefficient v mesh")
+        ax[1].set_title("coefficient v grid")
         fig.colorbar(ax[2].imshow(f.cpu()[0].T, origin="lower"), ax=ax[2])
         ax[2].set_title("true f")
         fig.colorbar(

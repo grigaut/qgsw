@@ -19,7 +19,7 @@ def compute_laplace_dctII(
     dy: float,
     arr_kwargs,
 ) -> torch.Tensor:
-    """DCT-II of standard 5-points laplacian on uniform mesh"""
+    """DCT-II of standard 5-points laplacian on uniform grid"""
     x, y = torch.meshgrid(
         torch.arange(nx, **arr_kwargs),
         torch.arange(ny, **arr_kwargs),
@@ -127,7 +127,7 @@ def compute_laplace_dstI(
     nx: int, ny: int, dx: float, dy: float, arr_kwargs
 ) -> torch.Tensor:
     """Type-I discrete sine transform of the usual 5-points
-    discrete laplacian operator on uniformly spaced mesh."""
+    discrete laplacian operator on uniformly spaced grid."""
     x, y = torch.meshgrid(
         torch.arange(1, nx, **arr_kwargs),
         torch.arange(1, ny, **arr_kwargs),
@@ -242,7 +242,7 @@ class HelmholtzNeumannSolver:
             )
         self.not_mask = 1 - self.mask
 
-        # mask on u- and v-mesh
+        # mask on u- and v-grid
         self.mask_u = (
             F.avg_pool2d(
                 self.mask,
@@ -366,7 +366,7 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.float64
 
-    # mesh
+    # grid
     N = 4
     nx, ny = 2 * 2 ** (N - 1), 2 * 2 ** (N - 1)
     shape = (nx, ny)

@@ -129,7 +129,7 @@ class QG(SW):
         )
         self.helmholtz_dstI = laplace_dstI - self.f0**2 * self.lambd
 
-        cst_wmesh = torch.ones((1, nl, nx + 1, ny + 1), **self.arr_kwargs)
+        cst_wgrid = torch.ones((1, nl, nx + 1, ny + 1), **self.arr_kwargs)
         if len(self.masks.psi_irrbound_xids) > 0:
             # Handle Non rectangular geometry
             self.cap_matrices = compute_capacitance_matrices(
@@ -137,8 +137,8 @@ class QG(SW):
                 self.masks.psi_irrbound_xids,
                 self.masks.psi_irrbound_yids,
             )
-            sol_wmesh = solve_helmholtz_dstI_cmm(
-                (cst_wmesh * self.masks.psi)[..., 1:-1, 1:-1],
+            sol_wgrid = solve_helmholtz_dstI_cmm(
+                (cst_wgrid * self.masks.psi)[..., 1:-1, 1:-1],
                 self.helmholtz_dstI,
                 self.cap_matrices,
                 self.masks.psi_irrbound_xids,
@@ -147,14 +147,14 @@ class QG(SW):
             )
         else:
             self.cap_matrices = None
-            sol_wmesh = solve_helmholtz_dstI(
-                cst_wmesh[..., 1:-1, 1:-1], self.helmholtz_dstI
+            sol_wgrid = solve_helmholtz_dstI(
+                cst_wgrid[..., 1:-1, 1:-1], self.helmholtz_dstI
             )
 
-        self.homsol_wmesh = cst_wmesh + sol_wmesh * self.f0**2 * self.lambd
-        self.homsol_wmesh_mean = self.homsol_wmesh.mean((-1, -2), keepdim=True)
-        self.homsol_hmesh = self.interp_TP(self.homsol_wmesh)
-        self.homsol_hmesh_mean = self.homsol_hmesh.mean((-1, -2), keepdim=True)
+        self.homsol_wgrid = cst_wgrid + sol_wgrid * self.f0**2 * self.lambd
+        self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
+        self.homsol_hgrid = self.interp_TP(self.homsol_wgrid)
+        self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
 
     def add_wind_forcing(self, du, dv):
         du[..., 0, :, :] += self.taux / self.H[0] * self.dx
@@ -174,7 +174,7 @@ class QG(SW):
         Args:
             p (torch.Tensor): Pressure.
             p_i (Union[None, torch.Tensor], optional): Interpolated pressure
-             ("middle of mesh cell"). Defaults to None.
+             ("middle of grid cell"). Defaults to None.
 
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
@@ -202,7 +202,7 @@ class QG(SW):
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: Quasi-geostrophique pressure,
-            interpolated quasi-geostroophic pressure ("middle of mesh cell").
+            interpolated quasi-geostroophic pressure ("middle of grid cell").
         """
         # transform to modes
         helmholtz_rhs: torch.Tensor = torch.einsum(
@@ -221,8 +221,8 @@ class QG(SW):
             p_modes = solve_helmholtz_dstI(helmholtz_rhs, self.helmholtz_dstI)
 
         # Add homogeneous solutions to ensure mass conservation
-        alpha = -p_modes.mean((-1, -2), keepdim=True) / self.homsol_wmesh_mean
-        p_modes += alpha * self.homsol_wmesh
+        alpha = -p_modes.mean((-1, -2), keepdim=True) / self.homsol_wgrid_mean
+        p_modes += alpha * self.homsol_wgrid
         # transform back to layers
         p_qg: torch.Tensor = torch.einsum(
             "lm,...mxy->...lxy", self.Cm2l, p_modes

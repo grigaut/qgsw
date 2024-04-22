@@ -71,12 +71,12 @@ class CosineZonalWindForcing(_WindForcing):
         Returns:
             float | torch.Tensor: Tau_x
         """
-        y_umesh = 0.5 * (
+        y_ugrid = 0.5 * (
             self._mesh.omega.xy[1][:, 1:] + self._mesh.omega.xy[1][:, :-1]
         )
-        print(y_umesh.shape)
+        print(y_ugrid.shape)
         wind_profile = torch.cos(
-            2 * torch.pi * (y_umesh - self._mesh.ly / 2) / self._mesh.ly
+            2 * torch.pi * (y_ugrid - self._mesh.ly / 2) / self._mesh.ly
         )
         return self._tau0 * wind_profile[1:-1, :]
 
