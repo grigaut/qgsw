@@ -8,7 +8,7 @@ from typing_extensions import Self
 
 from qgsw import helmholtz
 from qgsw.configs.core import ScriptConfig
-from qgsw.grid import Grid, Grid3D
+from qgsw.mesh.meshes import Meshes2D, Meshes3D
 from qgsw.specs import DEVICE
 
 
@@ -26,24 +26,24 @@ class RankineVortex2D:
 
     def __init__(
         self,
-        grid: Grid,
+        mesh: Meshes2D,
         perturbation_magnitude: float = 1e-3,
     ) -> None:
         """Instantiate Vortex.
 
         Args:
-            grid (Grid): Spatial Grid.
+            mesh (Meshes2D): Spatial Meshes2D.
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """
-        self._grid = grid
+        self._mesh = mesh
         self._perturbation = perturbation_magnitude
         self._compute_psi()
 
     @property
-    def grid(self) -> Grid:
-        """Underlying grid."""
-        return self._grid
+    def mesh(self) -> Meshes2D:
+        """Underlying mesh."""
+        return self._mesh
 
     @property
     def perturbation_magnitude(self) -> float:
@@ -53,7 +53,7 @@ class RankineVortex2D:
     @property
     def r0(self) -> float:
         """Core cylinder radius: 0.1*lx."""
-        return 0.1 * self._grid.lx
+        return 0.1 * self._mesh.lx
 
     @property
     def r1(self) -> float:
@@ -63,7 +63,7 @@ class RankineVortex2D:
     @property
     def r2(self) -> float:
         """Outer radius of the surrounding ring: 0.14*lx."""
-        return 0.14 * self._grid.lx
+        return 0.14 * self._mesh.lx
 
     @property
     def psi(self) -> torch.Tensor:
@@ -80,13 +80,13 @@ class RankineVortex2D:
             torch.Tensor: Streamfunction values over the
         (nx + 1, ny + 1) domain.
         """
-        vor = self._compute_vorticity(self._grid.omega_xy)
+        vor = self._compute_vorticity(self._mesh.omega.xy)
         # Compute Laplacian operator in Fourier Space
         laplacian = helmholtz.compute_laplace_dstI(
-            self._grid.nx,
-            self._grid.ny,
-            self._grid.dx,
-            self._grid.dy,
+            self._mesh.nx,
+            self._mesh.ny,
+            self._mesh.dx,
+            self._mesh.dy,
             {"device": DEVICE, "dtype": torch.float64},
         )
         # Solve problem in Fourier space : "ψ = ω/∆"
@@ -96,17 +96,17 @@ class RankineVortex2D:
         self._psi = psi.unsqueeze(0).unsqueeze(0)
 
     def _compute_vorticity(
-        self, grid_xy: tuple[torch.Tensor, torch.Tensor]
+        self, mesh_xy: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
         """Compute the vorticity ω of the vortex.
 
         Args:
-            grid_xy (tuple[torch.Tensor, torch.Tensor]): Grid.
+            mesh_xy (tuple[torch.Tensor, torch.Tensor]): Grid.
 
         Returns:
             torch.Tensor: Vorticity Value.
         """
-        x, y = grid_xy
+        x, y = mesh_xy
         # Compute cylindrical components
         theta = torch.angle(x + 1j * y)
         r = torch.sqrt(x**2 + y**2)
@@ -126,26 +126,26 @@ class RankineVortex3D(metaclass=ABCMeta):
 
     def __init__(
         self,
-        grid: Grid3D,
+        mesh: Meshes3D,
         perturbation_magnitude: float = 1e-3,
     ) -> None:
         """Instantiate 3D Rankine Vortex.
 
         Args:
-            grid (Grid3D): 3D Grid.
+            mesh (Meshes3D): 3D Grid.
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """
-        self._grid = grid
+        self._mesh = mesh
         self._2d = RankineVortex2D(
-            grid=grid.xy,
+            mesh=mesh.remove_z(),
             perturbation_magnitude=perturbation_magnitude,
         )
 
     @property
-    def grid(self) -> Grid3D:
-        """Underlying grid."""
-        return self._grid
+    def mesh(self) -> Meshes3D:
+        """Underlying mesh."""
+        return self._mesh
 
     @property
     def perturbation_magnitude(self) -> float:
@@ -175,7 +175,7 @@ class RankineVortex3D(metaclass=ABCMeta):
         The Tensor has a shape of (1, nl, nx + 1, ny + 1).
         """
         xy_shape = self._2d.psi.shape[-2:]
-        return self._2d.psi.expand((1, self._grid.nl, *xy_shape))
+        return self._2d.psi.expand((1, self._mesh.nl, *xy_shape))
 
 
 class ActiveLayersRankineVortex3D(RankineVortex3D):
@@ -188,7 +188,7 @@ class ActiveLayersRankineVortex3D(RankineVortex3D):
         The Tensor has a shape of (1, nl, nx + 1, ny + 1).
         """
         xy_shape = self._2d.psi.shape[-2:]
-        return self._2d.psi.expand((1, self._grid.nl, *xy_shape))
+        return self._2d.psi.expand((1, self._mesh.nl, *xy_shape))
 
 
 class PassiveLayersRankineVortex3D(RankineVortex3D):
@@ -202,7 +202,7 @@ class PassiveLayersRankineVortex3D(RankineVortex3D):
         """
         xy_shape = self._2d.psi.shape[-2:]
         psi = torch.ones(
-            (1, self._grid.nl, *xy_shape),
+            (1, self._mesh.nl, *xy_shape),
             device=DEVICE,
             dtype=torch.float64,
         )
@@ -223,9 +223,9 @@ class DecreasingLayersRankineVortex3D(RankineVortex3D):
         The Tensor has a shape of (1, nl, nx + 1, ny + 1).
         """
         xy_shape = self._2d.psi.shape[-2:]
-        psi = self._2d.psi.expand((1, self._grid.nl, *xy_shape))
+        psi = self._2d.psi.expand((1, self._mesh.nl, *xy_shape))
         # Reduce h size to (3,)
-        h = self._grid.h.mean(-1).mean(-1)
+        h = self._mesh.h.mean(-1).mean(-1)
         # Compute relative depth
         relative_depth = h.cumsum(0) - h[0]
         # Exponential decay with scaling factor
@@ -281,8 +281,8 @@ class RankineVortexForcing:
         """
         u, v = grad_perp(
             self._vortex.psi,
-            self._vortex.grid.dx,
-            self._vortex.grid.dy,
+            self._vortex.mesh.dx,
+            self._vortex.mesh.dy,
         )
         u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
         # set psi amplitude to have a correct Rossby number
@@ -303,23 +303,23 @@ class RankineVortexForcing:
         vortex_type = script_config.vortex.type
         perturbation = script_config.vortex.perturbation_magnitude
         if vortex_type == "active":
-            grid = Grid3D.from_config(script_config=script_config)
+            mesh = Meshes3D.from_config(script_config=script_config)
             vortex = ActiveLayersRankineVortex3D(
-                grid=grid,
+                mesh=mesh,
                 perturbation_magnitude=perturbation,
             )
             return cls(vortex=vortex)
         if vortex_type == "passive":
-            grid = Grid3D.from_config(script_config=script_config)
+            mesh = Meshes3D.from_config(script_config=script_config)
             vortex = PassiveLayersRankineVortex3D(
-                grid=grid,
+                mesh=mesh,
                 perturbation_magnitude=perturbation,
             )
             return cls(vortex=vortex)
         if vortex_type == "decreasing":
-            grid = Grid3D.from_config(script_config=script_config)
+            mesh = Meshes3D.from_config(script_config=script_config)
             vortex = DecreasingLayersRankineVortex3D(
-                grid=grid,
+                mesh=mesh,
                 perturbation_magnitude=perturbation,
             )
             return cls(vortex=vortex)

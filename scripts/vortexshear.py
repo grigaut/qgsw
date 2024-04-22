@@ -16,7 +16,7 @@ from qgsw.forcing.vortex import (
     RankineVortexForcing,
 )
 from qgsw.forcing.wind import WindForcing
-from qgsw.grid import Grid3D
+from qgsw.mesh import Meshes3D
 from qgsw.physics import compute_burger
 from qgsw.qg import QG
 from qgsw.specs import DEVICE
@@ -25,28 +25,29 @@ from qgsw.sw import SW
 torch.backends.cudnn.deterministic = True
 
 config = VortexShearConfig.from_file("config/vortexshear.toml")
-grid = Grid3D.from_config(config)
+mesh = Meshes3D.from_config(config)
 wind = WindForcing.from_config(config)
 taux, tauy = wind.compute()
 vortex = RankineVortexForcing.from_config(config)
 
-h1 = config.layers.h[0, 0, 0]
-h2 = config.layers.h[1, 0, 0]
+h1 = config.layers.h[0]
+h2 = config.layers.h[1]
 
 Bu = compute_burger(
-    g=config.layers.g_prime[0, 0, 0],
+    g=config.layers.g_prime[0],
     h_scale=(h1 * h2) / (h1 + h2),
     f0=config.physics.f0,
     length_scale=vortex.r0,
 )
 
-x, y = grid.xy.omega_xy
-xc, yc = grid.xy.h_xy
+mesh_2d = mesh.remove_z()
+x, y = mesh_2d.omega.xy
+xc, yc = mesh_2d.h.xy
 rc = torch.sqrt(xc**2 + yc**2)
 # circular domain mask
 apply_mask = False
 mask = (
-    (rc < config.grid.lx / 2).type(torch.float64)
+    (rc < config.mesh.lx / 2).type(torch.float64)
     if apply_mask
     else torch.ones_like(xc)
 )
@@ -60,24 +61,24 @@ for Ro in [
 
     # vortex set up
     r0, r1, r2 = (
-        0.1 * config.grid.lx,
-        0.1 * config.grid.lx,
-        0.14 * config.grid.lx,
+        0.1 * config.mesh.lx,
+        0.1 * config.mesh.lx,
+        0.14 * config.mesh.lx,
     )
 
     # set coriolis with burger number
     f0 = config.physics.f0
     beta = config.physics.beta
-    f = f0 + beta * (y - config.grid.ly / 2)
+    f = f0 + beta * (y - config.mesh.ly / 2)
 
     param_qg = {
-        "nx": config.grid.nx,
-        "ny": config.grid.ny,
+        "nx": config.mesh.nx,
+        "ny": config.mesh.ny,
         "nl": config.layers.nl,
-        "dx": config.grid.dx,
-        "dy": config.grid.dy,
-        "H": config.layers.h,
-        "g_prime": config.layers.g_prime,
+        "dx": config.mesh.dx,
+        "dy": config.mesh.dy,
+        "H": mesh.h.xyh[2],
+        "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
         "taux": taux,
         "tauy": tauy,
@@ -91,14 +92,14 @@ for Ro in [
     }
 
     param_sw = {
-        "nx": config.grid.nx,
-        "ny": config.grid.ny,
+        "nx": config.mesh.nx,
+        "ny": config.mesh.ny,
         "nl": config.layers.nl,
-        "dx": config.grid.dx,
-        "dy": config.grid.dy,
-        "H": config.layers.h,
+        "dx": config.mesh.dx,
+        "dy": config.mesh.dy,
+        "H": mesh.h.xyh[2],
         "rho": config.physics.rho,
-        "g_prime": config.layers.g_prime,
+        "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
         "taux": taux,
         "tauy": tauy,
@@ -118,17 +119,17 @@ for Ro in [
     u_init, v_init, h_init = qg_multilayer.G(vortex.compute(f0, Ro))
 
     u_max, v_max, c = (
-        torch.abs(u_init).max().item() / config.grid.dx,
-        torch.abs(v_init).max().item() / config.grid.dy,
-        torch.sqrt(config.layers.g_prime[0, 0, 0] * config.layers.h.sum()),
+        torch.abs(u_init).max().item() / config.mesh.dx,
+        torch.abs(v_init).max().item() / config.mesh.dy,
+        torch.sqrt(config.layers.g_prime[0] * config.layers.h.sum()),
     )
     print(f"u_max {u_max:.2e}, v_max {v_max:.2e}, c {c:.2e}")
     cfl_adv = 0.5
     cfl_gravity = 5 if param_sw["barotropic_filter"] else 0.5
     dt = min(
-        cfl_adv * config.grid.dx / u_max,
-        cfl_adv * config.grid.dy / v_max,
-        cfl_gravity * config.grid.dx / c,
+        cfl_adv * config.mesh.dx / u_max,
+        cfl_adv * config.mesh.dy / v_max,
+        cfl_gravity * config.mesh.dx / c,
     )
 
     qg_multilayer.dt = dt

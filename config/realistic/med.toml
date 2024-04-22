@@ -23,16 +23,16 @@ g_prime = [
     0.0125,
 ]
 
-[grid]
+[mesh]
 nx = 1024
 ny = 512
 dt = 2_000
 box_unit = "deg"
-[grid.box]
-[grid.box.x]
+[mesh.box]
+[mesh.box.x]
 min = -5.5
 max = nan
-[grid.box.y]
+[mesh.box.y]
 min = 31
 max = 45
 

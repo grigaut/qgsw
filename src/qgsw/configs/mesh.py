@@ -29,18 +29,16 @@ class LayersConfig(_Config):
             device=DEVICE,
         )
         h[:, 0, 0] = torch.Tensor(self.params[self._h])
-        return h
+        return torch.Tensor(self.params[self._h], device=DEVICE).to(
+            dtype=torch.float64
+        )
 
     @property
     def g_prime(self) -> torch.Tensor:
         """Values of reduced gravity (g')."""
-        g_prime = torch.zeros(
-            size=(self.nl, 1, 1),
-            dtype=torch.float64,
-            device=DEVICE,
+        return torch.Tensor(self.params[self._g_prime], device=DEVICE).to(
+            dtype=torch.float64
         )
-        g_prime[:, 0, 0] = torch.Tensor(self.params[self._g_prime])
-        return g_prime
 
     @property
     def nl(self) -> int:
@@ -73,14 +71,14 @@ class LayersConfig(_Config):
         return super()._validate_params(params)
 
 
-class GridConfig(_Config):
+class MeshConfig(_Config):
     """Grid Configuration."""
 
-    _nx: str = keys.GRID["points nb x"]
-    _ny: str = keys.GRID["points nb y"]
-    _dt: str = keys.GRID["timestep"]
+    _nx: str = keys.MESH["points nb x"]
+    _ny: str = keys.MESH["points nb y"]
+    _dt: str = keys.MESH["timestep"]
     _box_section: str = keys.BOX["section"]
-    _box_unit: str = keys.GRID["box unit"]
+    _box_unit: str = keys.MESH["box unit"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
         "deg": conversion.deg_to_m_lat,
@@ -163,7 +161,7 @@ class GridConfig(_Config):
         return self._conversion[self.xy_unit](self.y_max - self.y_min)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate grid parameters.
+        """Validate mesh parameters.
 
         Args:
             params (dict[str, Any]): Grid parameters.
@@ -174,7 +172,7 @@ class GridConfig(_Config):
         # Verify that the layers section is present.
         if self._box_section not in params:
             msg = (
-                "The grid configuration must contain a "
+                "The mesh configuration must contain a "
                 f"box section, named {self._box_section}."
             )
             raise ConfigError(msg)

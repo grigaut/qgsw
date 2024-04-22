@@ -6,8 +6,8 @@ from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.bathymetry import BathyConfig
 from qgsw.configs.exceptions import ConfigError, UnexpectedFieldError
-from qgsw.configs.grid import GridConfig, LayersConfig
 from qgsw.configs.io import IOConfig
+from qgsw.configs.mesh import LayersConfig, MeshConfig
 from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.vortex import VortexConfig
 from qgsw.configs.windstress import WindStressConfig
@@ -18,7 +18,7 @@ class ScriptConfig(_Config):
 
     _layers_section: str = keys.LAYERS["section"]
     _physics_section: str = keys.PHYSICS["section"]
-    _grid_section: str = keys.GRID["section"]
+    _mesh_section: str = keys.MESH["section"]
     _io_section: str = keys.IO["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
@@ -32,7 +32,7 @@ class ScriptConfig(_Config):
         self._physics = PhysicsConfig(
             params=self.params[self._physics_section]
         )
-        self._grid = GridConfig(params=self.params[self._grid_section])
+        self._mesh = MeshConfig(params=self.params[self._mesh_section])
         self._io = IOConfig(params=self.params[self._io_section])
 
     @property
@@ -46,9 +46,9 @@ class ScriptConfig(_Config):
         return self._physics
 
     @property
-    def grid(self) -> GridConfig:
-        """Configuration parameters dictionnary for the grid."""
-        return self._grid
+    def mesh(self) -> MeshConfig:
+        """Configuration parameters dictionnary for the mesh."""
+        return self._mesh
 
     @property
     def io(self) -> IOConfig:
@@ -99,11 +99,11 @@ class ScriptConfig(_Config):
                 f"physics section, named {self._physics_section}."
             )
             raise ConfigError(msg)
-        # Verify that the grid section is present.
-        if self._grid_section not in params:
+        # Verify that the mesh section is present.
+        if self._mesh_section not in params:
             msg = (
                 "The configuration must contain a "
-                f"grid section, named {self._grid_section}."
+                f"mesh section, named {self._mesh_section}."
             )
             raise ConfigError(msg)
         # Verify that the io section is present.

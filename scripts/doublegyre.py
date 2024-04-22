@@ -10,7 +10,8 @@ sys.path.append("../src")
 from qgsw.sw import SW
 from qgsw.qg import QG
 from qgsw.configs import DoubleGyreConfig
-from qgsw.grid import Grid
+from qgsw.physics import coriolis
+from qgsw.mesh import Meshes3D
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
 from icecream import ic
@@ -19,14 +20,14 @@ torch.backends.cudnn.deterministic = True
 
 
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
-grid = Grid.from_config(config)
+mesh = Meshes3D.from_config(config)
 wind = WindForcing.from_config(config)
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 # dtype = torch.float64
 
 mask = torch.ones(
-    config.grid.nx,
-    config.grid.ny,
+    config.mesh.nx,
+    config.mesh.ny,
     dtype=torch.float64,
     device=DEVICE,
 )
@@ -36,26 +37,29 @@ mask = torch.ones(
 taux, tauy = wind.compute()
 
 param = {
-    "nx": config.grid.nx,
-    "ny": config.grid.ny,
+    "nx": config.mesh.nx,
+    "ny": config.mesh.ny,
     "nl": config.layers.nl,
-    "dx": config.grid.dx,
-    "dy": config.grid.dy,
-    "H": config.layers.h,
+    "dx": config.mesh.dx,
+    "dy": config.mesh.dy,
+    "H": config.layers.h.unsqueeze(1).unsqueeze(1),
     "rho": config.physics.rho,
-    "g_prime": config.layers.g_prime,
+    "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
     "slip_coef": config.physics.slip_coef,
     "interp_fd": False,
-    "dt": config.grid.dt,
+    "dt": config.mesh.dt,
     "compile": True,
     "barotropic_filter": True,
     "barotropic_filter_spectral": True,
     "mask": mask,
-    "f": grid.generate_coriolis_grid(
-        f0=config.physics.f0, beta=config.physics.beta
+    "f": coriolis.compute_beta_plane(
+        latitudes=mesh.omega.remove_z_h().xy[1],
+        f0=config.physics.f0,
+        beta=config.physics.beta,
+        ly=mesh.ly,
     ),
     "taux": taux,
     "tauy": tauy,
@@ -70,19 +74,19 @@ for model, name, dt, start_file in [
     # set time step given barotropic mode for SW
     if model == SW:
         c = (
-            torch.sqrt(config.layers.h.sum() * config.layers.g_prime[0, 0, 0])
+            torch.sqrt(config.layers.h.sum() * config.layers.g_prime[0])
             .cpu()
             .item()
         )
         print(c)
         cfl = 20 if param["barotropic_filter"] else 0.5
         print(cfl)
-        dt = float(int(cfl * min(config.grid.dx, config.grid.dy) / c))
+        dt = float(int(cfl * min(config.mesh.dx, config.mesh.dy) / c))
         print(f"dt = {dt:.1f} s.")
         param["dt"] = dt
     # exit()
     print(
-        f"Double gyre config, {name} model, {config.grid.nx}x{config.grid.ny} grid, dt {dt:.1f}s."
+        f"Double gyre config, {name} model, {config.mesh.nx}x{config.mesh.ny} mesh, dt {dt:.1f}s."
     )
 
     qgsw_multilayer = model(param)
@@ -106,7 +110,7 @@ for model, name, dt, start_file in [
 
     if freq_save > 0:
         output_dir = (
-            f'run_outputs/{name}_{config.grid.nx}x{config.grid.ny}_dt{dt}_'
+            f'run_outputs/{name}_{config.mesh.nx}x{config.mesh.ny}_dt{dt}_'
             f'slip{param["slip_coef"]}/'
         )
         os.makedirs(output_dir, exist_ok=True)
