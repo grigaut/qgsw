@@ -9,15 +9,15 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from qgsw.helmholtz import (
+from qgsw.models.core.helmholtz import (
     compute_laplace_dstI,
     solve_helmholtz_dstI,
     dstI2D,
     solve_helmholtz_dstI_cmm,
     compute_capacitance_matrices,
 )
-from qgsw.finite_diff import grad_perp
-from qgsw.sw import SW
+from qgsw.models.core.finite_diff import grad_perp
+from qgsw.models.sw import SW
 from typing import Any, Union
 
 

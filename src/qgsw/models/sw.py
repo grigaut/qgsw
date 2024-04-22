@@ -8,10 +8,10 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from typing import Any
-from qgsw.finite_diff import interp_TP, comp_ke, div_nofluxbc
-from qgsw.flux import flux
-from qgsw.helmholtz import HelmholtzNeumannSolver
-from qgsw.helmholtz_multigrid import MG_Helmholtz
+from qgsw.models.core.finite_diff import interp_TP, comp_ke, div_nofluxbc
+from qgsw.models.core.flux import flux
+from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
+from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.masks import Masks
 from qgsw.reconstruction import linear2_centered, wenoz4_left, wenoz6_left
 from typing import Union

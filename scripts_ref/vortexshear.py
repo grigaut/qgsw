@@ -12,9 +12,8 @@ import torch.nn.functional as F
 
 sys.path.append("../src")
 
-from qgsw.helmholtz import compute_laplace_dstI, dstI2D
-from qgsw.qg import QG
-from qgsw.sw import SW
+from qgsw.models.core.helmholtz import compute_laplace_dstI, dstI2D
+from qgsw.models import SW, QG
 
 torch.backends.cudnn.deterministic = True
 device = "cuda" if torch.cuda.is_available() else "cpu"
