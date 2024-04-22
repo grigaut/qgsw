@@ -13,6 +13,17 @@ PIP:=${BIN}/pip
 REQUIREMENTS:=${PWD}/requirements.txt
 DEV_REQUIREMENTS:=${PWD}/requirements-dev.txt
 
+# G5K runs
+# Zip file
+ZIP_FOLDER := ${PWD}/g5k
+ZIP_FILE := ${ZIP_FOLDER}/code.zip
+# Folders
+CONFIG := ${PWD}/config
+SRC := ${PWD}/src
+SCRIPTS := ${PWD}/scripts
+# Files
+PYPROJECT := ${PWD}/pyproject.toml
+MAKEFILE := ${PWD}/Makefile
 all:
 	@${MAKE} install-dev
 
@@ -33,3 +44,11 @@ install-dev: ${VENV}
 	@${PIP} install -r ${DEV_REQUIREMENTS}
 	@${PIP} install -e .
 
+${ZIP_FOLDER}:
+	mkdir -p ${ZIP_FOLDER}
+
+compress: ${ZIP_FOLDER}
+	find ${SRC} -iname \*.py | zip ${ZIP_FILE} -@
+	find ${SCRIPTS} -iname \*.py | zip ${ZIP_FILE} -@
+	find ${CONFIG} -iname \*.toml | zip ${ZIP_FILE} -@
+	zip ${ZIP_FILE} ${PYPROJECT} ${MAKEFILE}
