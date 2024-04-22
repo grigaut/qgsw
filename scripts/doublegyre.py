@@ -10,6 +10,7 @@ sys.path.append("../src")
 from qgsw.sw import SW
 from qgsw.qg import QG
 from qgsw.configs import DoubleGyreConfig
+from qgsw.physics import coriolis
 from qgsw.mesh import Meshes2D
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
@@ -54,8 +55,11 @@ param = {
     "barotropic_filter": True,
     "barotropic_filter_spectral": True,
     "mask": mask,
-    "f": mesh.generate_coriolis_grid(
-        f0=config.physics.f0, beta=config.physics.beta
+    "f": coriolis.compute_beta_plane(
+        latitudes=mesh.omega.xy[1],
+        f0=config.physics.f0,
+        beta=config.physics.beta,
+        ly=mesh.ly,
     ),
     "taux": taux,
     "tauy": tauy,

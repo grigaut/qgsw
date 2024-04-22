@@ -1,14 +1,10 @@
 # ruff : noqa
 import os
 import sys
-import urllib.request
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import netCDF4
 import numpy as np
-import scipy.interpolate
-import scipy.io
 import scipy.ndimage
 import torch
 from icecream import ic
@@ -19,6 +15,7 @@ from qgsw.forcing.wind import WindForcing
 from qgsw.configs import RealisticConfig
 from qgsw.mesh import Meshes2D
 from qgsw.qg import QG
+from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
 from qgsw.sw import SW
 
@@ -53,7 +50,12 @@ mask_land_w = bathy.compute_land_mask_w(mesh.h.xy)
 
 
 # coriolis beta plane
-f = mesh.generate_coriolis_grid(f0=config.physics.f0, beta=config.physics.beta)
+f = coriolis.compute_beta_plane(
+    latitudes=mesh.omega.xy[1],
+    f0=config.physics.f0,
+    beta=config.physics.beta,
+    ly=mesh.ly,
+)
 print(
     f"Coriolis param min {f.min().cpu().item():.2e},"
     f" {f.max().cpu().item():.2e}"

@@ -426,18 +426,6 @@ class Meshes2D:
         """
         return self._v
 
-    def generate_coriolis_grid(self, f0: float, beta: float) -> torch.Tensor:
-        """Generate Coriolis Parameter Mesh.
-
-        Args:
-            f0 (float): f0 (from beta-plane approximation).
-            beta (float): Beta (from beta plane approximation)
-
-        Returns:
-            torch.Tensor: Coriolis Mesh.
-        """
-        return f0 + beta * (self.omega.xy[1] - self.ly / 2)
-
     def add_h(self, h: torch.Tensor) -> Meshes3D:
         """Switch to 3D Meshes adding layers thickness.
 
@@ -630,18 +618,6 @@ class Meshes3D:
         for more details.
         """
         return self._v
-
-    def generate_coriolis_grid(self, f0: float, beta: float) -> torch.Tensor:
-        """Generate Coriolis Parameter Mesh.
-
-        Args:
-            f0 (float): f0 (from beta-plane approximation).
-            beta (float): Beta (from beta plane approximation)
-
-        Returns:
-            torch.Tensor: Coriolis Mesh.
-        """
-        return f0 + beta * (self.omega.xyz[1] - self.ly / 2)
 
     def remove_z_h(self) -> Meshes2D:
         """Remove z coordinates.
