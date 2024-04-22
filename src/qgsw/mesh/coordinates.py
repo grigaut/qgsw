@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 
-class CoordinateInstanciationError(Exception):
+class CoordinatesInstanciationError(Exception):
     """Exception raised when instantiating coordinates."""
 
 
@@ -19,6 +19,7 @@ class Coordinates1D:
         Args:
             points (torch.Tensor): Coordinates values.
         """
+        self._raise_if_multidim(points=points)
         self._points = points
 
     @property
@@ -35,6 +36,16 @@ class Coordinates1D:
     def l(self) -> int:  # noqa: E743
         """Total length."""
         return self._points[-1] - self._points[0]
+
+    def _raise_if_multidim(self, points: torch.Tensor) -> None:
+        """Raise an error is the points is not an unidimensional tensor.
+
+        Args:
+            points (torch.Tensor): Coordinates points.
+        """
+        if len(points.shape) != 1:
+            msg = "Only unidimensional tensors are accepted as coordinates."
+            raise CoordinatesInstanciationError(msg)
 
 
 class Coordinates2D:
@@ -112,16 +123,16 @@ class Coordinates3D:
             None is z is given. Defaults to None.
 
         Raises:
-            CoordinateInstanciationError: If both z and h are None.
-            CoordinateInstanciationError: If both z and h are not None.
+            CoordinatesInstanciationError: If both z and h are None.
+            CoordinatesInstanciationError: If both z and h are not None.
         """
         self._2d = Coordinates2D(x=x, y=y)
         if (z is None) and (h is None):
             msg = "Exactly one of z and h must be given, none were given."
-            raise CoordinateInstanciationError(msg)
+            raise CoordinatesInstanciationError(msg)
         if (z is not None) and (h is not None):
             msg = "Exactly one of z and h must be given, both were given."
-            raise CoordinateInstanciationError(msg)
+            raise CoordinatesInstanciationError(msg)
         if z is None:
             self._h = Coordinates1D(points=h)
             z_from_h = self._convert_h_to_z(h)
