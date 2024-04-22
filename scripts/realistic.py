@@ -13,7 +13,7 @@ sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
 from qgsw.configs import RealisticConfig
-from qgsw.mesh import Meshes2D
+from qgsw.mesh import Meshes3D
 from qgsw.qg import QG
 from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
@@ -23,7 +23,7 @@ from qgsw.sw import SW
 torch.backends.cudnn.deterministic = True
 
 config = RealisticConfig.from_file(Path("config/realistic.toml"))
-mesh = Meshes2D.from_config(config)
+mesh = Meshes3D.from_config(config)
 bathy = Bathymetry.from_config(config)
 wind = WindForcing.from_config(config)
 
@@ -45,13 +45,13 @@ print(
 )
 
 # Land Mask Generation
-mask_land = bathy.compute_land_mask(mesh.h.xy)
-mask_land_w = bathy.compute_land_mask_w(mesh.h.xy)
+mask_land = bathy.compute_land_mask(mesh.h.remove_z_h().xy)
+mask_land_w = bathy.compute_land_mask_w(mesh.h.remove_z_h().xy)
 
 
 # coriolis beta plane
 f = coriolis.compute_beta_plane(
-    latitudes=mesh.omega.xy[1],
+    latitudes=mesh.omega.remove_z_h().xy[1],
     f0=config.physics.f0,
     beta=config.physics.beta,
     ly=mesh.ly,
@@ -79,7 +79,7 @@ param = {
     "slip_coef": config.physics.slip_coef,
     "dt": config.mesh.dt,  # time-step (s)
     "compile": True,
-    "mask": bathy.compute_ocean_mask(mesh.h.xy),
+    "mask": bathy.compute_ocean_mask(mesh.h.remove_z_h().xy),
     "taux": taux[0, 1:-1, :],
     "tauy": tauy[0, :, 1:-1],
 }

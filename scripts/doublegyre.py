@@ -11,7 +11,7 @@ from qgsw.sw import SW
 from qgsw.qg import QG
 from qgsw.configs import DoubleGyreConfig
 from qgsw.physics import coriolis
-from qgsw.mesh import Meshes2D
+from qgsw.mesh import Meshes3D
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
 from icecream import ic
@@ -20,7 +20,7 @@ torch.backends.cudnn.deterministic = True
 
 
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
-mesh = Meshes2D.from_config(config)
+mesh = Meshes3D.from_config(config)
 wind = WindForcing.from_config(config)
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 # dtype = torch.float64
@@ -56,7 +56,7 @@ param = {
     "barotropic_filter_spectral": True,
     "mask": mask,
     "f": coriolis.compute_beta_plane(
-        latitudes=mesh.omega.xy[1],
+        latitudes=mesh.omega.remove_z_h().xy[1],
         f0=config.physics.f0,
         beta=config.physics.beta,
         ly=mesh.ly,

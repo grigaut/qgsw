@@ -74,7 +74,6 @@ class CosineZonalWindForcing(_WindForcing):
         y_ugrid = 0.5 * (
             self._mesh.omega.xy[1][:, 1:] + self._mesh.omega.xy[1][:, :-1]
         )
-        print(y_ugrid.shape)
         wind_profile = torch.cos(
             2 * torch.pi * (y_ugrid - self._mesh.ly / 2) / self._mesh.ly
         )
