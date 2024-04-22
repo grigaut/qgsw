@@ -191,7 +191,7 @@ class Coordinates3D:
         """
         return F.pad(h.cumsum(0), (1, 0))
 
-    def remove_z(self) -> Coordinates2D:
+    def remove_z_h(self) -> Coordinates2D:
         """Remove Vertical coordinates.
 
         Returns:
@@ -310,13 +310,13 @@ class Mesh3D:
         """
         return self._hx, self._hy, self._h
 
-    def remove_z(self) -> Mesh2D:
+    def remove_z_h(self) -> Mesh2D:
         """Remove z coordinates.
 
         Returns:
             Mesh2D: 2D Mesh for only X and Y.
         """
-        return Mesh2D(coordinates=self._coords.remove_z())
+        return Mesh2D(coordinates=self._coords.remove_z_h())
 
     @classmethod
     def from_tensors(
@@ -437,6 +437,46 @@ class Meshes2D:
             torch.Tensor: Coriolis Mesh.
         """
         return f0 + beta * (self.omega.xy[1] - self.ly / 2)
+
+    def add_h(self, h: torch.Tensor) -> Meshes3D:
+        """Switch to 3D Meshes adding layers thickness.
+
+        Args:
+            h (torch.Tensor): Layers thickness.
+
+        Returns:
+            Meshes3D: 3D Meshes.
+        """
+        omega_3d = self.omega.add_h(h=h)
+        h_3d = self._h.add_h(h=h)
+        u_3d = self._u.add_h(h=h)
+        v_3d = self._v.add_h(h=h)
+        return Meshes3D(
+            omega_mesh=omega_3d,
+            h_mesh=h_3d,
+            u_mesh=u_3d,
+            v_mesh=v_3d,
+        )
+
+    def add_z(self, z: torch.Tensor) -> Meshes3D:
+        """Switch to 3D Mesh adding z coordinates.
+
+        Args:
+            z (torch.Tensor): Z coordinates.
+
+        Returns:
+            Meshes3D: 3D Mesh.
+        """
+        omega_3d = self.omega.add_z(z=z)
+        h_3d = self._h.add_z(z=z)
+        u_3d = self._u.add_z(z=z)
+        v_3d = self._v.add_z(z=z)
+        return Meshes3D(
+            omega_mesh=omega_3d,
+            h_mesh=h_3d,
+            u_mesh=u_3d,
+            v_mesh=v_3d,
+        )
 
     @classmethod
     def from_config(cls, script_config: ScriptConfig) -> Self:
@@ -591,17 +631,17 @@ class Meshes3D:
         """
         return self._v
 
-    def remove_z(self) -> Meshes2D:
+    def remove_z_h(self) -> Meshes2D:
         """Remove z coordinates.
 
         Returns:
             Meshes2D: 2D Mesh for only X and Y.
         """
         return Meshes2D(
-            omega_mesh=self._omega.remove_z(),
-            h_mesh=self._h.remove_z(),
-            u_mesh=self._u.remove_z(),
-            v_mesh=self._v.remove_z(),
+            omega_mesh=self._omega.remove_z_h(),
+            h_mesh=self._h.remove_z_h(),
+            u_mesh=self._u.remove_z_h(),
+            v_mesh=self._v.remove_z_h(),
         )
 
     @classmethod
