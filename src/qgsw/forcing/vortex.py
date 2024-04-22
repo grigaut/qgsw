@@ -202,7 +202,7 @@ class PassiveLayersRankineVortex3D(RankineVortex3D):
         """
         xy_shape = self._2d.psi.shape[-2:]
         psi = torch.ones(
-            (1, self._mesh.nh, *xy_shape),
+            (1, self._mesh.nl, *xy_shape),
             device=DEVICE,
             dtype=torch.float64,
         )

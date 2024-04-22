@@ -74,7 +74,12 @@ class Mesh2D:
 
 
 class Mesh3D:
-    """3D Mesh."""
+    """3D Mesh.
+
+    Warning: the h (layer thickness) coordinates has smaller
+    dimension (nl, 1, 1) than z (nl, nx, ny) to account for constant thickness
+    layers and speed up calculations.
+    """
 
     def __init__(self, coordinates: Coordinates3D) -> None:
         """Instantiate 3D Mesh.
@@ -114,7 +119,8 @@ class Mesh3D:
     def xyh(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """X,Y,H meshes.
 
-        X,Y and H tensors all have (nh, nx, ny) shapes.
+        X and Y have (nl, nx, ny) shapes and H has (nl,1,1) shape
+        (constant thickness layers).
         """
         return self._hx, self._hy, self._h
 

@@ -65,7 +65,7 @@ class Meshes2D:
     def omega(self) -> Mesh2D:
         """Omega Mesh.
 
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        See https://agupubs.oFinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
         return self._omega
@@ -225,7 +225,7 @@ class Meshes3D:
         return self.h.coordinates.y.n
 
     @property
-    def nh(self) -> int:
+    def nl(self) -> int:
         """Number of layers."""
         return self.h.coordinates.h.n
 
