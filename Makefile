@@ -1,3 +1,7 @@
+ifneq (,$(wildcard ./.env))
+	include .env
+    export
+endif
 # Virtual Environment Management
 ENVIRONMENT_FILEPATH := environment.yml
 VENV := ${PWD}/.venv
@@ -15,15 +19,15 @@ DEV_REQUIREMENTS:=${PWD}/requirements-dev.txt
 
 # G5K runs
 # Zip file
-ZIP_FOLDER := ${PWD}/g5k
-ZIP_FILE := ${ZIP_FOLDER}/code.zip
+ZIP_FILE := qgsw.zip
 # Folders
-CONFIG := ${PWD}/config
-SRC := ${PWD}/src
-SCRIPTS := ${PWD}/scripts
+CONFIG := ./config
+SRC := src
+SCRIPTS := scripts
 # Files
-PYPROJECT := ${PWD}/pyproject.toml
-MAKEFILE := ${PWD}/Makefile
+PYPROJECT := pyproject.toml
+MAKEFILE := Makefile
+
 all:
 	@${MAKE} install-dev
 
@@ -44,11 +48,21 @@ install-dev: ${VENV}
 	@${PIP} install -r ${DEV_REQUIREMENTS}
 	@${PIP} install -e .
 
-${ZIP_FOLDER}:
-	mkdir -p ${ZIP_FOLDER}
+# GRID 5000 -----------------------------------------
 
-compress: ${ZIP_FOLDER}
-	find ${SRC} -iname \*.py | zip ${ZIP_FILE} -@
-	find ${SCRIPTS} -iname \*.py | zip ${ZIP_FILE} -@
-	find ${CONFIG} -iname \*.toml | zip ${ZIP_FILE} -@
-	zip ${ZIP_FILE} ${PYPROJECT} ${MAKEFILE}
+export-to-g5k:
+	# Create temp directory
+	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
+	# Zip files
+	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
+	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
+	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
+	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT}
+	# Export to g5k
+	scp ${tmp}/${ZIP_FILE} ${LOGIN}@rennes.g5k:~/
+	# Remove temp files
+	rm -rf ${tmp}
+
+install-g5k:
+	pip install .
+# ---------------------------------------------------
