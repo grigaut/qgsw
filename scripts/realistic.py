@@ -53,7 +53,7 @@ mask_land_w = bathy.compute_land_mask_w(mesh.h.xy)
 
 
 # coriolis beta plane
-f = mesh.generate_coriolis_mesh(f0=config.physics.f0, beta=config.physics.beta)
+f = mesh.generate_coriolis_grid(f0=config.physics.f0, beta=config.physics.beta)
 print(
     f"Coriolis param min {f.min().cpu().item():.2e},"
     f" {f.max().cpu().item():.2e}"

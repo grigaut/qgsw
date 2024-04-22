@@ -54,7 +54,7 @@ param = {
     "barotropic_filter": True,
     "barotropic_filter_spectral": True,
     "mask": mask,
-    "f": mesh.generate_coriolis_mesh(
+    "f": mesh.generate_coriolis_grid(
         f0=config.physics.f0, beta=config.physics.beta
     ),
     "taux": taux,
