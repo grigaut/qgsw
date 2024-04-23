@@ -1,0 +1,43 @@
+[io]
+name = "single_layer_vortex"
+plot_frequency = nan # in days
+performance_log = false
+output_dir = "output"
+
+[physics]
+rho = 1000
+slip_coef = 1.0
+f0 = 9.375e-5           # mean coriolis (s^-1)
+beta = 0                # coriolis gradient (m^-1 s^-1)
+bottom_drag_coefficient = 0
+
+[layers]
+h = [
+    200
+]
+g_prime = [
+    10.0
+]
+
+[mesh]
+nx = 96
+ny = 96
+dt = 4_000
+box_unit = "m"
+[mesh.box]
+[mesh.box.x]
+min = -2_200_000
+max = 2_200_000
+[mesh.box.y]
+min = -2_200_000
+max = 2_200_000
+
+[windstress]
+type = "none"
+magnitude = 0.08 # (Pa m-1 kg s-2)
+drag_coefficient = 1.3e-3
+[windstress.data]
+
+[vortex]
+type = "passive"
+perturbation_magnitude = 1e-3
