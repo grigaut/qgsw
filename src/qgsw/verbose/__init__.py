@@ -1,0 +1,21 @@
+"""Verbose.
+
+Recommended ways to import this module is:
+>>> from qgsw import verbose
+
+Therefore, one can access verbose level with:
+>>> from qgsw import verbose
+>>> print(verbose.get_level())
+
+And one can set verbose levl with:
+>>> from qgsw import verbose
+>>> verbose.set_level(2)
+"""
+
+from qgsw.verbose._core import get_level, set_level, set_prefix
+
+__all__ = [
+    "get_level",
+    "set_level",
+    "set_prefix",
+]
