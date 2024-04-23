@@ -48,11 +48,6 @@ class PhysicsConfig(_Config):
             return 0.5 * self.f0 * 2.0 / 2600  # Source ?
         return self.params[self._bottom_drag]
 
-    @property
-    def wind_stress_magnitude(self) -> float:
-        """Wind Stress Magnitude (in Pa m-1 kg s-2)."""
-        return self.params[self._wstress_mag]
-
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate Physics Configuration.
 
