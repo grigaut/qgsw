@@ -22,6 +22,14 @@ class Unit:
             return False
         return self.name == value.name
 
+    def __repr__(self) -> str:
+        """Unit string representation.
+
+        Returns:
+            str: Unit name.
+        """
+        return self.name
+
 
 DEGREE = Unit("degree")
 METERS = Unit("meters")
