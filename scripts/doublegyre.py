@@ -17,7 +17,7 @@ from qgsw import verbose
 from icecream import ic
 
 torch.backends.cudnn.deterministic = True
-
+verbose.set_level(2)
 
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
 mesh = Meshes3D.from_config(config)
