@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from icecream import ic
+from qgsw import verbose
 from qgsw.configs import VortexShearConfig
 from qgsw.forcing.vortex import (
     RankineVortexForcing,
@@ -22,6 +23,7 @@ from qgsw.models import SW, QG
 from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
+verbose.set_level(2)
 
 config = VortexShearConfig.from_file("config/vortexshear.toml")
 mesh = Meshes3D.from_config(config)
@@ -56,7 +58,7 @@ for Ro in [
     0.1,
     # 0.02,
 ]:
-    print(f"Ro={Ro} Bu={Bu}")
+    verbose.display(msg=f"Ro={Ro} Bu={Bu}", trigger_level=1)
 
     # vortex set up
     r0, r1, r2 = (
@@ -122,7 +124,10 @@ for Ro in [
         torch.abs(v_init).max().item() / config.mesh.dy,
         torch.sqrt(config.layers.g_prime[0] * config.layers.h.sum()),
     )
-    print(f"u_max {u_max:.2e}, v_max {v_max:.2e}, c {c:.2e}")
+    verbose.display(
+        msg=f"u_max {u_max:.2e}, v_max {v_max:.2e}, c {c:.2e}",
+        trigger_level=1,
+    )
     cfl_adv = 0.5
     cfl_gravity = 5 if param_sw["barotropic_filter"] else 0.5
     dt = min(
@@ -155,7 +160,10 @@ for Ro in [
 
     w_0 = qg_multilayer.omega.squeeze() / qg_multilayer.dx / qg_multilayer.dy
     tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).cpu().item()
-    print(f"tau = {tau *f0:.2f} f0-1")
+    verbose.display(
+        msg=f"tau = {tau *f0:.2f} f0-1",
+        trigger_level=1,
+    )
 
     t_end = 8 * tau
     freq_plot = int(t_end / 100 / dt) + 1
@@ -225,4 +233,7 @@ for Ro in [
         #         raise ValueError(msg)
 
         if freq_log > 0 and n % freq_log == 0:
-            print(f"n={n:05d}, {qg_multilayer.get_print_info()}")
+            verbose.display(
+                msg=f"n={n:05d}, {qg_multilayer.get_print_info()}",
+                trigger_level=1,
+            )
