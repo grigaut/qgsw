@@ -1,6 +1,5 @@
 """Verbose Decorators."""
 
-from functools import wraps
 from typing import Any, Callable, TypeVar
 
 from typing_extensions import ParamSpec
@@ -115,47 +114,16 @@ class VerboseDisplayer:
         indent = "".join([self._prefix] * (level))
         return f"{indent}{msg}"
 
-    def _display(self, msg: str, trigger: int) -> None:
-        if self.level >= trigger:
-            print(self._indent(msg=msg, level=(trigger - 1)))
-
-    def add(self, msg: str, trigger_level: int) -> Callable[[F], F]:
-        """Add verbose to a given function.
-
-        The trigger level must be stricly positive to be taken into account.
+    def display(self, msg: str, trigger_level: int) -> None:
+        """Display verbose message.
 
         Args:
             msg (str): Message to display.
             trigger_level (int): Trigger level.
-
-        Returns:
-            Callable[[F], F]: Decorator.
         """
         trigger = self._check_trigger_level(trigger_level=trigger_level)
-
-        def display_msg(func: F) -> F:
-            """Display message before function execution.
-
-            Args:
-                func (F): Function to decorate.
-
-            Returns:
-                F: Wrapper.
-            """
-
-            @wraps(func)
-            def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-                """Wrap function.
-
-                Returns:
-                    T: Function output.
-                """
-                self._display(msg=msg, trigger=trigger)
-                return func(*args, **kwargs)
-
-            return wrapper
-
-        return display_msg
+        if self.level >= trigger:
+            print(self._indent(msg=msg, level=(trigger - 1)))
 
 
 VERBOSE = VerboseDisplayer(0)
@@ -196,3 +164,13 @@ def get_level() -> int:
         - 3 or higher: exhaustive informations displayed
     """
     return VERBOSE.level
+
+
+def display(msg: str, trigger_level: int) -> None:
+    """Display verbose message.
+
+    Args:
+        msg (str): Message to display.
+        trigger_level (int): Trigger level.
+    """
+    return VERBOSE.display(msg=msg, trigger_level=trigger_level)
