@@ -8,10 +8,16 @@ import torch
 from typing_extensions import Self
 
 from qgsw.mesh.mesh import Mesh2D, Mesh3D
+from qgsw.spatial.units._units import METERS
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.core import ScriptConfig
+    from qgsw.spatial.units._units import Unit
+
+
+class MeshesInstanciationError(Exception):
+    """Error raised when instantiating meshes."""
 
 
 class Meshes2D:
@@ -26,6 +32,12 @@ class Meshes2D:
         v_mesh: Mesh2D,
     ) -> None:
         """Instantiate the Meshes2D."""
+        self._verify_xy_units(
+            omega_xy_unit=omega_mesh.xy_unit,
+            h_xy_unit=h_mesh.xy_unit,
+            u_xy_unit=u_mesh.xy_unit,
+            v_xy_unit=v_mesh.xy_unit,
+        )
         self._omega = omega_mesh
         self._h = h_mesh
         self._u = u_mesh
@@ -53,13 +65,18 @@ class Meshes2D:
 
     @property
     def dx(self) -> float:
-        """dx."""
+        """Dx."""
         return self.lx / self.nx
 
     @property
     def dy(self) -> float:
-        """dy."""
+        """Dy."""
         return self.ly / self.ny
+
+    @property
+    def xy_unit(self) -> Unit:
+        """X and Y unit."""
+        return self._omega.xy_unit
 
     @property
     def omega(self) -> Mesh2D:
@@ -96,6 +113,33 @@ class Meshes2D:
         for more details.
         """
         return self._v
+
+    def _verify_xy_units(
+        self,
+        omega_xy_unit: Mesh2D,
+        h_xy_unit: Mesh2D,
+        u_xy_unit: Mesh2D,
+        v_xy_unit: Mesh2D,
+    ) -> None:
+        """Verify meshes xy units equality.
+
+        Args:
+            omega_xy_unit (Mesh2D): Omega xy unit.
+            h_xy_unit (Mesh2D): h xy unit.
+            u_xy_unit (Mesh2D): u xy unit.
+            v_xy_unit (Mesh2D): v xy unit.
+
+        Raises:
+            MeshesInstanciationError: If the unit don't match.
+        """
+        omega_h = omega_xy_unit == h_xy_unit
+        h_u = h_xy_unit == u_xy_unit
+        u_v = u_xy_unit == v_xy_unit
+
+        if omega_h and h_u and u_v:
+            return
+        msg = "All meshes xy units must correspond."
+        raise MeshesInstanciationError(msg)
 
     def add_h(self, h: torch.Tensor) -> Meshes3D:
         """Switch to 3D Meshes adding layers thickness.
@@ -147,29 +191,35 @@ class Meshes2D:
         Returns:
             Self: Corresponding Meshes2D.
         """
+        box = script_config.mesh.box
+        mesh = script_config.mesh
         x = torch.linspace(
-            script_config.mesh.x_min,
-            script_config.mesh.x_max,
-            script_config.mesh.nx + 1,
+            box.x_min,
+            box.x_max,
+            mesh.nx + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
         y = torch.linspace(
-            script_config.mesh.y_min,
-            script_config.mesh.y_max,
-            script_config.mesh.ny + 1,
+            box.y_min,
+            box.y_max,
+            mesh.ny + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
-        return cls.from_tensors(x=x, y=y)
+        return cls.from_tensors(x=x, y=y, x_unit=box.unit, y_unit=box.unit)
 
     @classmethod
-    def from_tensors(cls, *, x: torch.Tensor, y: torch.Tensor) -> Self:
+    def from_tensors(
+        cls, *, x: torch.Tensor, y: torch.Tensor, x_unit: Unit, y_unit: Unit
+    ) -> Self:
         """Generate ω, h, u, v meshes from coordinates tensors.
 
         Args:
             x (torch.Tensor): X Coordinates.
             y (torch.Tensor): Y Coordinates.
+            x_unit (Unit): X unit.
+            y_unit (Unit): Y unit.
 
         Returns:
             Self: 2D Meshes.
@@ -177,10 +227,30 @@ class Meshes2D:
         x_centers = 0.5 * (x[1:] + x[:-1])
         y_centers = 0.5 * (y[1:] + y[:-1])
 
-        omega_mesh = Mesh2D.from_tensors(x=x, y=y)
-        h_mesh = Mesh2D.from_tensors(x=x_centers, y=y_centers)
-        u_mesh = Mesh2D.from_tensors(x=x, y=y_centers)
-        v_mesh = Mesh2D.from_tensors(x=x_centers, y=y)
+        omega_mesh = Mesh2D.from_tensors(
+            x=x,
+            y=y,
+            x_unit=x_unit,
+            y_unit=y_unit,
+        )
+        h_mesh = Mesh2D.from_tensors(
+            x=x_centers,
+            y=y_centers,
+            x_unit=x_unit,
+            y_unit=y_unit,
+        )
+        u_mesh = Mesh2D.from_tensors(
+            x=x,
+            y=y_centers,
+            x_unit=x_unit,
+            y_unit=y_unit,
+        )
+        v_mesh = Mesh2D.from_tensors(
+            x=x_centers,
+            y=y,
+            x_unit=x_unit,
+            y_unit=y_unit,
+        )
 
         return cls(
             omega_mesh=omega_mesh,
@@ -209,6 +279,18 @@ class Meshes3D:
             u_mesh (Mesh3D): u mesh.
             v_mesh (Mesh3D): v mesh.
         """
+        self._verify_xy_units(
+            omega_xy_unit=omega_mesh.xy_unit,
+            h_xy_unit=h_mesh.xy_unit,
+            u_xy_unit=u_mesh.xy_unit,
+            v_xy_unit=v_mesh.xy_unit,
+        )
+        self._verify_zh_units(
+            omega_zh_unit=omega_mesh.zh_unit,
+            h_zh_unit=h_mesh.zh_unit,
+            u_zh_unit=u_mesh.zh_unit,
+            v_zh_unit=v_mesh.zh_unit,
+        )
         self._omega = omega_mesh
         self._h = h_mesh
         self._u = u_mesh
@@ -246,12 +328,12 @@ class Meshes3D:
 
     @property
     def dx(self) -> float:
-        """dx."""
+        """dx."""  # noqa: D403
         return self.lx / self.nx
 
     @property
     def dy(self) -> float:
-        """dy."""
+        """dy."""  # noqa: D403
         return self.ly / self.ny
 
     @property
@@ -290,6 +372,60 @@ class Meshes3D:
         """
         return self._v
 
+    def _verify_xy_units(
+        self,
+        omega_xy_unit: Mesh2D,
+        h_xy_unit: Mesh2D,
+        u_xy_unit: Mesh2D,
+        v_xy_unit: Mesh2D,
+    ) -> None:
+        """Verify meshes xy units equality.
+
+        Args:
+            omega_xy_unit (Mesh2D): Omega xy unit.
+            h_xy_unit (Mesh2D): h xy unit.
+            u_xy_unit (Mesh2D): u xy unit.
+            v_xy_unit (Mesh2D): v xy unit.
+
+        Raises:
+            MeshesInstanciationError: If the unit don't match.
+        """
+        omega_h = omega_xy_unit == h_xy_unit
+        h_u = h_xy_unit == u_xy_unit
+        u_v = u_xy_unit == v_xy_unit
+
+        if omega_h and h_u and u_v:
+            return
+        msg = "All meshes xy units must correspond."
+        raise MeshesInstanciationError(msg)
+
+    def _verify_zh_units(
+        self,
+        omega_zh_unit: Mesh2D,
+        h_zh_unit: Mesh2D,
+        u_zh_unit: Mesh2D,
+        v_zh_unit: Mesh2D,
+    ) -> None:
+        """Verify meshes zh units equality.
+
+        Args:
+            omega_zh_unit (Mesh2D): Omega zh unit.
+            h_zh_unit (Mesh2D): h zh unit.
+            u_zh_unit (Mesh2D): u zh unit.
+            v_zh_unit (Mesh2D): v zh unit.
+
+        Raises:
+            MeshesInstanciationError: If the unit don't match.
+        """
+        omega_h = omega_zh_unit == h_zh_unit
+        h_u = h_zh_unit == u_zh_unit
+        u_v = u_zh_unit == v_zh_unit
+
+        if omega_h and h_u and u_v:
+            return
+        msg = "All meshes zh units must correspond."
+        raise MeshesInstanciationError(msg)
+
     def remove_z_h(self) -> Meshes2D:
         """Remove z coordinates.
 
@@ -313,26 +449,38 @@ class Meshes3D:
         Returns:
             Self: Corresponding 3D Grid.
         """
+        box = script_config.mesh.box
+        mesh = script_config.mesh
         x = torch.linspace(
-            script_config.mesh.x_min,
-            script_config.mesh.x_max,
-            script_config.mesh.nx + 1,
+            box.x_min,
+            box.x_max,
+            mesh.nx + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
         y = torch.linspace(
-            script_config.mesh.y_min,
-            script_config.mesh.y_max,
-            script_config.mesh.ny + 1,
+            box.y_min,
+            box.y_max,
+            mesh.ny + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
-        return cls.from_tensors(x=x, y=y, h=script_config.layers.h)
+        return cls.from_tensors(
+            x=x,
+            y=y,
+            h=script_config.layers.h,
+            x_unit=box.unit,
+            y_unit=box.unit,
+            zh_unit=METERS,
+        )
 
     @classmethod
     def from_tensors(
         cls,
         *,
+        x_unit: Unit,
+        y_unit: Unit,
+        zh_unit: Unit,
         x: torch.Tensor,
         y: torch.Tensor,
         z: torch.Tensor | None = None,
@@ -341,12 +489,15 @@ class Meshes3D:
         """Generate ω, h, u, v meshes from coordinates tensors.
 
         Args:
-            x (torch.Tensor): X Coordinates.
-            y (torch.Tensor): Y Coordinates.
-            z (torch.Tensor | None, optional): Z Coordinates, must be set to
-            None is h is given. Defaults to None.
-            h (torch.Tensor | None, optional): H thickness, must be set to
-            None is z is given. Defaults to None.
+            x_unit (Unit): X unit.
+            y_unit (Unit): Y unit.
+            zh_unit (Unit): Z and H unit.
+            x (torch.Tensor): X points.
+            y (torch.Tensor): Y points.
+            z (torch.Tensor | None, optional): Z points, set to None if h
+            is given. Defaults to None.
+            h (torch.Tensor | None, optional): H points, set to None if z
+            is given. Defaults to None.
 
         Returns:
             Self: 3D Meshes.
@@ -354,10 +505,42 @@ class Meshes3D:
         x_centers = 0.5 * (x[1:] + x[:-1])
         y_centers = 0.5 * (y[1:] + y[:-1])
 
-        omega_mesh = Mesh3D.from_tensors(x=x, y=y, z=z, h=h)
-        h_mesh = Mesh3D.from_tensors(x=x_centers, y=y_centers, z=z, h=h)
-        u_mesh = Mesh3D.from_tensors(x=x, y=y_centers, z=z, h=h)
-        v_mesh = Mesh3D.from_tensors(x=x_centers, y=y, z=z, h=h)
+        omega_mesh = Mesh3D.from_tensors(
+            x=x,
+            y=y,
+            z=z,
+            h=h,
+            x_unit=x_unit,
+            y_unit=y_unit,
+            zh_unit=zh_unit,
+        )
+        h_mesh = Mesh3D.from_tensors(
+            x=x_centers,
+            y=y_centers,
+            z=z,
+            h=h,
+            x_unit=x_unit,
+            y_unit=y_unit,
+            zh_unit=zh_unit,
+        )
+        u_mesh = Mesh3D.from_tensors(
+            x=x,
+            y=y_centers,
+            z=z,
+            h=h,
+            x_unit=x_unit,
+            y_unit=y_unit,
+            zh_unit=zh_unit,
+        )
+        v_mesh = Mesh3D.from_tensors(
+            x=x_centers,
+            y=y,
+            z=z,
+            h=h,
+            x_unit=x_unit,
+            y_unit=y_unit,
+            zh_unit=zh_unit,
+        )
 
         return cls(
             omega_mesh=omega_mesh,
