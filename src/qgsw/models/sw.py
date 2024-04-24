@@ -14,6 +14,7 @@ from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.masks import Masks
 from qgsw.reconstruction import linear2_centered, wenoz4_left, wenoz6_left
+from qgsw import verbose
 from typing import Union
 
 
@@ -115,12 +116,21 @@ class SW:
             'bottom_drag_coef': float, linear bottom drag coefficient
             'barotropic_filter': boolean, i true applies implicit FS calculation
         """
-
-        print(f"Creating {self.__class__.__name__} model...")
+        verbose.display(
+            msg=f"Creating {self.__class__.__name__} model...",
+            trigger_level=1,
+        )
         self.device = param["device"]
         self.dtype = param.get("dtype", torch.float64)
         self.arr_kwargs = {"dtype": self.dtype, "device": self.device}
-        print(f"  - dtype {self.dtype}, device {self.device}.")
+        verbose.display(
+            msg=f"dtype: {self.dtype}.",
+            trigger_level=2,
+        )
+        verbose.display(
+            msg=f"device: {self.device}",
+            trigger_level=2,
+        )
 
         # verifications
 
@@ -130,7 +140,10 @@ class SW:
         self.nl: int = param["nl"]  # number of layers
         self.dx: float = param["dx"]  # x-step
         self.dy: float = param["dy"]  # y-step
-        print(f"  - nx, ny, nl =  {self.nx, self.ny, self.nl}")
+        verbose.display(
+            msg=f"nx, ny, nl =  {self.nx, self.ny, self.nl}",
+            trigger_level=2,
+        )
         self.area = self.dx * self.dy
 
         # Input Validation
@@ -163,7 +176,11 @@ class SW:
 
         # time
         self._dt = param["dt"]
-        print(f"  - integration time step {self.dt:.3e}")
+
+        verbose.display(
+            msg=f"Integration time step {self.dt:.3e}",
+            trigger_level=2,
+        )
 
         # ensemble
         self.n_ens = param.get("n_ens", 1)
@@ -191,19 +208,27 @@ class SW:
         if self.barotropic_filter:
             class_name = self.__class__.__name__
             if class_name == "SW":
-                print("  - Using barotropic filter ", end="")
                 self.tau = 2 * self.dt
                 self.barotropic_filter_spectral = param.get(
                     "barotropic_filter_spectral", False
                 )
                 if self.barotropic_filter_spectral:
+                    verbose.display(
+                        msg="Using barotropic filter in spectral approximation.",
+                        trigger_level=2,
+                    )
                     self._set_barotropic_filter_spectral()
                 else:
+                    verbose.display(
+                        msg="Using barotropic filter in exact form.",
+                        trigger_level=2,
+                    )
                     self._set_barotropic_filter_exact()
             else:
                 self.barotropic_filter = False
-                print(
-                    f"  - class {class_name}!=SW, ignoring barotropic filter "
+                verbose.display(
+                    msg=f"class {class_name}!=SW, ignoring barotropic filter",
+                    trigger_level=2,
                 )
 
         # utils and flux computation functions
@@ -212,7 +237,7 @@ class SW:
         if param.get("compile", True):
             self._set_utils_with_compilation()
         else:
-            print("  - No compilation")
+            verbose.display(msg="No compilation", trigger_level=2)
 
     @property
     def dt(self) -> float:
@@ -221,7 +246,7 @@ class SW:
 
     @dt.setter
     def dt(self, value: float) -> None:
-        print(f"dt value set to {value}.")
+        verbose.display(msg=f"dt value set to {value}.", trigger_level=1)
         self._dt = value
 
     def _validate_H(self, param: dict[str, Any], key: str) -> torch.Tensor:
@@ -256,7 +281,10 @@ class SW:
         """
         # If 'mask' key does not exist
         if key not in param.keys():
-            print("  - no mask provided, domain assumed to be rectangular")
+            verbose.display(
+                msg="No mask provided, domain assumed to be rectangular",
+                trigger_level=2,
+            )
             mask = torch.ones(
                 self.nx,
                 self.ny,
@@ -276,7 +304,10 @@ class SW:
         if not all([v in [0, 1] for v in vals]) or vals == [0]:
             msg = f"Invalid mask with non-binary values : {vals}"
             raise KeyError(msg)
-        print(f'  - {"non-" if len(vals)==2 else ""}trivial mask provided')
+        verbose.display(
+            msg=f"{'Non-trivial' if len(vals)==2 else 'Trivial'} mask provided",
+            trigger_level=2,
+        )
         return Masks(mask)
 
     def _validate_slip_coef(self, param: dict[str, Any], key: str) -> float:
@@ -295,11 +326,14 @@ class SW:
             msg = f"slip coefficient must be in [0, 1], got {value}"
             raise KeyError(msg)
         cl_type = (
-            "free-"
+            "Free-"
             if value == 1
-            else ("no-" if value == 0 else "partial free-")
+            else ("No-" if value == 0 else "Partial free-")
         )
-        print(f"  - {cl_type}slip boundary condition")
+        verbose.display(
+            msg=f"{cl_type}slip boundary condition",
+            trigger_level=2,
+        )
         return value
 
     def _validate_coriolis_param(
@@ -355,9 +389,14 @@ class SW:
 
     def _set_utils_with_compilation(self) -> None:
         """Set utils and flux function for compilation."""
-        print(f"  - torch version {torch.__version__} ", end="")
         if torch.__version__[0] == "2":
-            print(">= 2.0, using torch.compile for compilation.")
+            verbose.display(
+                msg=(
+                    f"torch version {torch.__version__} >= 2.0, "
+                    "using torch.compile for compilation."
+                ),
+                trigger_level=2,
+            )
             self.comp_ke = torch.compile(self.comp_ke)
             self.interp_TP = torch.compile(self.interp_TP)
             self.h_flux_y = torch.compile(self.h_flux_y)
@@ -365,7 +404,13 @@ class SW:
             self.w_flux_y = torch.compile(self.w_flux_y)
             self.w_flux_x = torch.compile(self.w_flux_x)
         else:
-            print("< 2.0, using torch.jit.trace for compilation.")
+            verbose.display(
+                msg=(
+                    f"torch version {torch.__version__} < 2.0, "
+                    "using torch.jit.trace for compilation."
+                ),
+                trigger_level=2,
+            )
             self.comp_ke = torch.jit.trace(
                 self.comp_ke, (self.u, self.U, self.v, self.V)
             )
@@ -439,7 +484,6 @@ class SW:
 
     def _set_barotropic_filter_spectral(self) -> None:
         """Set Helmoltz Solver for barotropic and spectral."""
-        print("spectral approximation")
         self.H_tot = self.H.sum(dim=-3, keepdim=True)
         self.lambd = 1.0 / (self.g * self.dt * self.tau * self.H_tot)
         self.helm_solver = HelmholtzNeumannSolver(
@@ -455,7 +499,6 @@ class SW:
 
     def _set_barotropic_filter_exact(self) -> None:
         """Set Helmoltz Solver for barotropic and exact form."""
-        print("in exact form")
         coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]
         coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
         lambd = 1.0 / (self.g * self.dt * self.tau)

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import numpy as np
 import torch
 
+from qgsw import verbose
 from qgsw.configs.base import _Config, _DataConfig
 from qgsw.configs.bathymetry import BathyDataConfig
 from qgsw.configs.core import ScriptConfig
@@ -83,9 +84,12 @@ class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
             Self: Instantiated BathyLoader.
         """
         if not filepath.is_file():
-            print(f"Downloading file {filepath} from {self._config.url}...")
+            verbose.display(
+                msg=f"Downloading file {filepath} from {self._config.url}...",
+                trigger_level=1,
+            )
             urllib.request.urlretrieve(self._config.url, filepath)
-            print("..done")
+            verbose.display(msg="..done", trigger_level=1)
 
 
 BathyData = tuple[np.ndarray, np.ndarray, np.ndarray]
