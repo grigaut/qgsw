@@ -27,8 +27,8 @@ g_prime = [
 nx = 32
 ny = 64
 dt = 4_000
-box_unit = "m"
 [mesh.box]
+unit = "m"
 [mesh.box.x]
 min = 0
 max = 2560.0e3

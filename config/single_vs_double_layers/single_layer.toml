@@ -23,8 +23,8 @@ g_prime = [
 nx = 96
 ny = 96
 dt = 4_000
-box_unit = "m"
 [mesh.box]
+unit = "m"
 [mesh.box.x]
 min = -2_200_000
 max = 2_200_000

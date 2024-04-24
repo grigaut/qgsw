@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import torch
 from typing_extensions import Self
 
-from qgsw.mesh.coordinates import Coordinates2D, Coordinates3D
+from qgsw.mesh.coordinates import Coordinates1D, Coordinates2D, Coordinates3D
+
+if TYPE_CHECKING:
+    from qgsw.spatial.units._units import Unit
 
 
 class Mesh2D:
@@ -25,6 +30,11 @@ class Mesh2D:
         )
 
     @property
+    def xy_unit(self) -> Unit:
+        """Mesh unit."""
+        return self._coords.xy_unit
+
+    @property
     def coordinates(self) -> Coordinates2D:
         """Mesh X,Y coordinates."""
         return self._coords
@@ -37,22 +47,22 @@ class Mesh2D:
         """
         return self._x, self._y
 
-    def add_z(self, z: torch.Tensor) -> Mesh3D:
+    def add_z(self, z: Coordinates1D) -> Mesh3D:
         """Switch to 3D Mesh adding z coordinates.
 
         Args:
-            z (torch.Tensor): Z coordinates.
+            z (Coordinates1D): Z coordinates.
 
         Returns:
             Mesh3D: 3D Mesh.
         """
         return Mesh3D(self.coordinates.add_z(z=z))
 
-    def add_h(self, h: torch.Tensor) -> Mesh3D:
+    def add_h(self, h: Coordinates1D) -> Mesh3D:
         """Switch to 3D Mesh adding layers thickness.
 
         Args:
-            h (torch.Tensor): Layers thickness.
+            h (Coordinates1D): Layers thickness.
 
         Returns:
             Mesh3D: 3D Mesh.
@@ -60,17 +70,31 @@ class Mesh2D:
         return Mesh3D(self.coordinates.add_h(h=h))
 
     @classmethod
-    def from_tensors(cls, x: torch.Tensor, y: torch.Tensor) -> Self:
+    def from_tensors(
+        cls,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        x_unit: Unit,
+        y_unit: Unit,
+    ) -> Self:
         """Create 2D Mesh from X and Y tensors.
 
         Args:
             x (torch.Tensor): X coordinates Vector.
             y (torch.Tensor): Y coordinates Vector.
+            x_unit (Unit): X unit.
+            y_unit (Unit): Y unit.
 
         Returns:
             Self: 2D Mesh.
         """
-        return cls(Coordinates2D(x=x, y=y))
+        coords = Coordinates2D.from_tensors(
+            x=x,
+            y=y,
+            x_unit=x_unit,
+            y_unit=y_unit,
+        )
+        return cls(coords)
 
 
 class Mesh3D:
@@ -124,6 +148,16 @@ class Mesh3D:
         """
         return self._hx, self._hy, self._h
 
+    @property
+    def xy_unit(self) -> Unit:
+        """X and Y unit."""
+        return self._coords.xy_unit
+
+    @property
+    def zh_unit(self) -> Unit:
+        """Z and H unit."""
+        return self._coords.zh_unit
+
     def remove_z_h(self) -> Mesh2D:
         """Remove z coordinates.
 
@@ -136,6 +170,9 @@ class Mesh3D:
     def from_tensors(
         cls,
         *,
+        x_unit: Unit,
+        y_unit: Unit,
+        zh_unit: Unit,
         x: torch.Tensor,
         y: torch.Tensor,
         z: torch.Tensor | None = None,
@@ -144,14 +181,26 @@ class Mesh3D:
         """Create 3D Mesh from coordinates Vectors.
 
         Args:
-            x (torch.Tensor): X Coordinates.
-            y (torch.Tensor): Y Coordinates.
-            z (torch.Tensor | None, optional): Z Coordinates, must be set to
-            None is h is given. Defaults to None.
-            h (torch.Tensor | None, optional): H thickness, must be set to
-            None is z is given. Defaults to None.
+            x_unit (Unit): X unit.
+            y_unit (Unit): Y unit.
+            zh_unit (Unit): Z and H unit.
+            x (torch.Tensor): X points.
+            y (torch.Tensor): Y points.
+            z (torch.Tensor | None, optional): Z points, set to None if h
+            is given. Defaults to None.
+            h (torch.Tensor | None, optional): H points, set to None if z
+            is given. Defaults to None.
 
         Returns:
-            Self: 3D Mesh.
+            Self: Mesh3D.
         """
-        return cls(Coordinates3D(x=x, y=y, z=z, h=h))
+        coords = Coordinates3D.from_tensors(
+            x=x,
+            y=y,
+            z=z,
+            h=h,
+            x_unit=x_unit,
+            y_unit=y_unit,
+            zh_unit=zh_unit,
+        )
+        return cls(coords)

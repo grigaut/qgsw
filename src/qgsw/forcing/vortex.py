@@ -9,6 +9,8 @@ from typing_extensions import Self
 from qgsw.configs.core import ScriptConfig
 from qgsw.mesh.meshes import Meshes2D, Meshes3D
 from qgsw.models.core import helmholtz
+from qgsw.spatial.units._units import METERS, Unit
+from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
 
@@ -23,6 +25,7 @@ class RankineVortex2D:
     """2D Rankine Vortex."""
 
     _norm_factor: int = 100
+    _required_xy_unit: Unit = METERS
 
     def __init__(
         self,
@@ -36,6 +39,9 @@ class RankineVortex2D:
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """
+        if mesh.xy_unit != self._required_xy_unit:
+            msg = f"XY units should be {self._required_xy_unit}."
+            raise UnitError(msg)
         self._mesh = mesh
         self._perturbation = perturbation_magnitude
         self._compute_psi()
@@ -210,34 +216,6 @@ class PassiveLayersRankineVortex3D(RankineVortex3D):
         return psi
 
 
-class DecreasingLayersRankineVortex3D(RankineVortex3D):
-    """Decreasing intensity vortex."""
-
-    @property
-    def psi(self) -> torch.Tensor:
-        """Value of the stream function ψ.
-
-        Value of the stream function ψ.
-        Warning: quick implementation.
-
-        The Tensor has a shape of (1, nl, nx + 1, ny + 1).
-        """
-        xy_shape = self._2d.psi.shape[-2:]
-        psi = self._2d.psi.expand((1, self._mesh.nl, *xy_shape))
-        # Reduce h size to (3,)
-        h = self._mesh.h.mean(-1).mean(-1)
-        # Compute relative depth
-        relative_depth = h.cumsum(0) - h[0]
-        # Exponential decay with scaling factor
-        factor = (
-            torch.exp(-relative_depth / 10000)
-            .unsqueeze(0)
-            .unsqueeze(-1)
-            .unsqueeze(-1)
-        )
-        return psi * factor
-
-
 class RankineVortexForcing:
     """Vortex Forcing's abtract class."""
 
@@ -312,13 +290,6 @@ class RankineVortexForcing:
         if vortex_type == "passive":
             mesh = Meshes3D.from_config(script_config=script_config)
             vortex = PassiveLayersRankineVortex3D(
-                mesh=mesh,
-                perturbation_magnitude=perturbation,
-            )
-            return cls(vortex=vortex)
-        if vortex_type == "decreasing":
-            mesh = Meshes3D.from_config(script_config=script_config)
-            vortex = DecreasingLayersRankineVortex3D(
                 mesh=mesh,
                 perturbation_magnitude=perturbation,
             )

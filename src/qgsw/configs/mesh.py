@@ -7,10 +7,11 @@ from typing import Any, Callable, ClassVar
 import numpy as np
 import torch
 
-from qgsw import conversion
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
+from qgsw.spatial import conversion
+from qgsw.spatial.units._units import DEGREE, KILOMETERS, METERS, Unit
 from qgsw.specs import DEVICE
 
 
@@ -78,12 +79,11 @@ class MeshConfig(_Config):
     _ny: str = keys.MESH["points nb y"]
     _dt: str = keys.MESH["timestep"]
     _box_section: str = keys.BOX["section"]
-    _box_unit: str = keys.MESH["box unit"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
-        "deg": conversion.deg_to_m_lat,
-        "km": conversion.km_to_m,
-        "m": conversion.m_to_m,
+        DEGREE.name: conversion.deg_to_m_lat,
+        KILOMETERS.name: conversion.km_to_m,
+        METERS.name: conversion.m_to_m,
     }
 
     def __init__(self, params: dict[str, Any]) -> None:
@@ -96,9 +96,9 @@ class MeshConfig(_Config):
         self._box = BoxConfig(params=params[self._box_section])
 
     @property
-    def xy_unit(self) -> str:
-        """Unit of extremums."""
-        return self.params[self._box_unit]
+    def box(self) -> BoxConfig:
+        """Box Configuration."""
+        return self._box
 
     @property
     def nx(self) -> int:
@@ -126,39 +126,18 @@ class MeshConfig(_Config):
         return self.ly / self.ny
 
     @property
-    def x_min(self) -> float:
-        """X min."""
-        return self._box.x_min
-
-    @property
-    def x_max(self) -> float:
-        """X max."""
-        x_max = self._box.x_max
-        if np.isnan(x_max):
-            x_max = self._infer_deg_xmax()
-        return x_max
-
-    @property
-    def y_min(self) -> float:
-        """Y min."""
-        return self._box.y_min
-
-    @property
-    def y_max(self) -> float:
-        """Y max."""
-        return self._box.y_max
-
-    @property
     def lx(self) -> float:
         """Total distance along x (meters)."""
         if np.isnan(self._box.x_max):
             return self._infer_lx()
-        return self._conversion[self.xy_unit](self.x_max - self.x_min)
+        conversion = self._conversion[self._box.unit.name]
+        return conversion(self._box.x_max - self._box.x_min)
 
     @property
     def ly(self) -> float:
         """Total distance along y (meters)."""
-        return self._conversion[self.xy_unit](self.y_max - self.y_min)
+        conversion = self._conversion[self._box.unit.name]
+        return conversion(self._box.y_max - self._box.y_min)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate mesh parameters.
@@ -178,16 +157,12 @@ class MeshConfig(_Config):
             raise ConfigError(msg)
         return super()._validate_params(params)
 
-    def _infer_deg_xmax(self) -> float:
-        if self._box_unit == "deg":
-            msg = "X max can only be infered for degree extremums."
-            raise ConfigError(msg)
-        ymin_cos = np.cos(self.y_min / 180 * np.pi)
-        ymax_cos = np.cos(self.y_max / 180 * np.pi)
-        mean_cos = 0.5 * (ymin_cos + ymax_cos)
-        return self.x_min + self.lx / (conversion.deg_to_m_lat(mean_cos))
-
     def _infer_lx(self) -> float:
+        """Infer lx value from ly, nx and ny.
+
+        Returns:
+            float: lx value (in meters)
+        """
         return self.ly * self.nx / self.ny
 
 
@@ -196,6 +171,12 @@ class BoxConfig(_Config):
 
     _x: str = keys.BOX["x"]
     _y: str = keys.BOX["y"]
+    _unit: str = keys.BOX["unit"]
+    _units_mapping: ClassVar[dict[str, Unit]] = {
+        "deg": DEGREE,
+        "m": METERS,
+        "km": KILOMETERS,
+    }
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate Spatial configuration.
@@ -226,6 +207,11 @@ class BoxConfig(_Config):
             raise ConfigError(msg)
 
         return super()._validate_params(params)
+
+    @property
+    def unit(self) -> Unit:
+        """Units."""
+        return self._units_mapping[self.params[self._unit]]
 
     @property
     def x_min(self) -> float:

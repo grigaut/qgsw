@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import torch
 import torch.nn.functional as F  # noqa: N812
+from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from qgsw.spatial.units._units import Unit
 
 
 class CoordinatesInstanciationError(Exception):
@@ -13,14 +19,21 @@ class CoordinatesInstanciationError(Exception):
 class Coordinates1D:
     """1D Coordinates."""
 
-    def __init__(self, *, points: torch.Tensor) -> None:
+    def __init__(self, *, points: torch.Tensor, unit: Unit) -> None:
         """Instantiate Coordinates.
 
         Args:
             points (torch.Tensor): Coordinates values.
+            unit (Unit): Coordinates unit.
         """
         self._raise_if_multidim(points=points)
         self._points = points
+        self._unit = unit
+
+    @property
+    def unit(self) -> Unit:
+        """Coordinates unit."""
+        return self._unit
 
     @property
     def points(self) -> torch.Tensor:
@@ -51,10 +64,26 @@ class Coordinates1D:
 class Coordinates2D:
     """2D Coordinates."""
 
-    def __init__(self, *, x: torch.Tensor, y: torch.Tensor) -> None:
-        """Instantiate the Coordinates2D."""
-        self._x = Coordinates1D(points=x)
-        self._y = Coordinates1D(points=y)
+    def __init__(
+        self,
+        *,
+        x: Coordinates1D,
+        y: Coordinates1D,
+    ) -> None:
+        """Instantiate Coordinates 2D.
+
+        Args:
+            x (Coordinates1D): x coordinates.
+            y (Coordinates1D): y coordinates.
+
+        Raises:
+            CoordinatesInstanciationError: If coordinates units don't match.
+        """
+        if x.unit != y.unit:
+            msg = "Both coordinates must have the same unit."
+            raise CoordinatesInstanciationError(msg)
+        self._x = x
+        self._y = y
 
     @property
     def x(self) -> Coordinates1D:
@@ -74,27 +103,56 @@ class Coordinates2D:
         """
         return self.x.points, self.y.points
 
-    def add_z(self, z: torch.Tensor) -> Coordinates3D:
+    @property
+    def xy_unit(self) -> Unit:
+        """X and Y unit."""
+        return self._x.unit
+
+    def add_z(self, z: Coordinates1D) -> Coordinates3D:
         """Switch to 3D coordinates adding z coordinates.
 
         Args:
-            z (torch.Tensor): Z coordinates.
+            z (Coordinates1D): Z coordinates.
 
         Returns:
             Coordinates3D: 3D Coordinates.
         """
         return Coordinates3D(x=self.x, y=self.y, z=z)
 
-    def add_h(self, h: torch.Tensor) -> Coordinates3D:
+    def add_h(self, h: Coordinates1D) -> Coordinates3D:
         """Switch to 3D coordinates adding layers thickness.
 
         Args:
-            h (torch.Tensor): Layers thickness.
+            h (Coordinates1D): Layers thickness.
 
         Returns:
             Coordinates3D: 3D Coordinates.
         """
         return Coordinates3D(x=self.x, y=self.y, h=h)
+
+    @classmethod
+    def from_tensors(
+        cls,
+        *,
+        x: torch.Tensor,
+        x_unit: Unit,
+        y: torch.Tensor,
+        y_unit: Unit,
+    ) -> Self:
+        """Creates 2d Coordinates form tensors.
+
+        Args:
+            x (torch.Tensor): X points.
+            x_unit (Unit): X units.
+            y (torch.Tensor): Y points.
+            y_unit (Unit): Y units.
+
+        Returns:
+            Self: 2D coordinates.
+        """
+        x = Coordinates1D(points=x, unit=x_unit)
+        y = Coordinates1D(points=y, unit=y_unit)
+        return cls(x=x, y=y)
 
 
 class Coordinates3D:
@@ -107,19 +165,19 @@ class Coordinates3D:
     def __init__(
         self,
         *,
-        x: torch.Tensor,
-        y: torch.Tensor,
-        z: torch.Tensor | None = None,
-        h: torch.Tensor | None = None,
+        x: Coordinates1D,
+        y: Coordinates1D,
+        z: Coordinates1D | None = None,
+        h: Coordinates1D | None = None,
     ) -> None:
         """Instantiate the 3D Coordinates.
 
         Args:
-            x (torch.Tensor): X Coordinates.
-            y (torch.Tensor): Y Coordinates.
-            z (torch.Tensor | None, optional): Z Coordinates, must be set to
+            x (Coordinates1D): X Coordinates.
+            y (Coordinates1D): Y Coordinates.
+            z (Coordinates1D | None, optional): Z Coordinates, must be set to
             None is h is given. Defaults to None.
-            h (torch.Tensor | None, optional): H thickness, must be set to
+            h (Coordinates1D | None, optional): H thickness, must be set to
             None is z is given. Defaults to None.
 
         Raises:
@@ -134,13 +192,13 @@ class Coordinates3D:
             msg = "Exactly one of z and h must be given, both were given."
             raise CoordinatesInstanciationError(msg)
         if z is None:
-            self._h = Coordinates1D(points=h)
             z_from_h = self._convert_h_to_z(h)
-            self._z = Coordinates1D(points=z_from_h)
+            self._h = h
+            self._z = z_from_h
         if h is None:
             h_from_z = self._convert_z_to_h(z)
-            self._ = Coordinates1D(points=h_from_z)
-            self._z = Coordinates1D(points=z)
+            self._h = h_from_z
+            self._z = z
 
     @property
     def x(self) -> Coordinates1D:
@@ -172,27 +230,43 @@ class Coordinates3D:
         """X,Y coordinates and layer thickness (H)."""
         return self.x.points, self.y.points, self.h.points
 
-    def _convert_z_to_h(self, z: torch.Tensor) -> torch.Tensor:
+    @property
+    def xy_unit(self) -> Unit:
+        """X and Y unit."""
+        return self._2d.xy_unit
+
+    @property
+    def zh_unit(self) -> Unit:
+        """Z and H unit."""
+        return self._z.unit
+
+    def _convert_z_to_h(self, z: Coordinates1D) -> Coordinates1D:
         """Convert Z coordinates to layers thickness.
 
         Args:
-            z (torch.Tensor): Z coordinates.
+            z (Coordinates1D): Z coordinates.
 
         Returns:
-            torch.Tensor: Layers thickness.
+            Coordinates1D: Layers thickness.
         """
-        return z[1:] - z[:-1]
+        return Coordinates1D(
+            points=(z.points[1:] - z.points[:-1]),
+            unit=z.unit,
+        )
 
-    def _convert_h_to_z(self, h: torch.Tensor) -> torch.Tensor:
+    def _convert_h_to_z(self, h: Coordinates1D) -> Coordinates1D:
         """Convert layers thickness to Z coordinates.
 
         Args:
-            h (torch.Tensor): Layers thickness.
+            h (Coordinates1D): Layers thickness.
 
         Returns:
-            torch.Tensor: Z coordinates.
+            Coordinates1D: Z coordinates.
         """
-        return F.pad(h.cumsum(0), (1, 0))
+        return Coordinates1D(
+            points=F.pad(h.points.cumsum(0), (1, 0)),
+            unit=h.unit,
+        )
 
     def remove_z_h(self) -> Coordinates2D:
         """Remove Vertical coordinates.
@@ -201,3 +275,50 @@ class Coordinates3D:
             Coordinates2D: X,Y Coordinates.
         """
         return self._2d
+
+    @classmethod
+    def from_tensors(
+        cls,
+        *,
+        x_unit: Unit,
+        y_unit: Unit,
+        zh_unit: Unit,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        z: torch.Tensor | None = None,
+        h: torch.Tensor | None = None,
+    ) -> Self:
+        """Create 3D coordinates form tensors.
+
+        Args:
+            x_unit (Unit): X unit.
+            y_unit (Unit): Y unit.
+            zh_unit (Unit): Z or H unit.
+            x (torch.Tensor): X points.
+            y (torch.Tensor): Y points.
+            z (torch.Tensor | None, optional): Z points, set to None if h is
+            given. Defaults to None.
+            h (torch.Tensor | None, optional): H points, set to None if z is
+            given. Defaults to None.
+
+        Raises:
+            CoordinatesInstanciationError: If both z and h are None.
+            CoordinatesInstanciationError: If both z and h are given.
+
+        Returns:
+            Self: 3D Coordinates.
+        """
+        coords_2d = Coordinates2D.from_tensors(
+            x=x, x_unit=x_unit, y=y, y_unit=y_unit
+        )
+        if (z is None) and (h is None):
+            msg = "Exactly one of z and h must be given, none were given."
+            raise CoordinatesInstanciationError(msg)
+        if (z is not None) and (h is not None):
+            msg = "Exactly one of z and h must be given, both were given."
+            raise CoordinatesInstanciationError(msg)
+        if z is None:
+            h_coords = Coordinates1D(points=h, unit=zh_unit)
+            return coords_2d.add_h(h_coords)
+        z_coords = Coordinates1D(points=z, unit=zh_unit)
+        return coords_2d.add_z(z_coords)

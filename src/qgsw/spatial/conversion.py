@@ -16,6 +16,18 @@ def deg_to_m_lat(value: float) -> float:
     return value * DEG_TO_M
 
 
+def m_to_deg_lat(value: float) -> float:
+    """Meters to degree conversion for latitudes.
+
+    Args:
+        value (float): Value in meters.
+
+    Returns:
+        float: Value in degree.
+    """
+    return value / DEG_TO_M
+
+
 def km_to_m(value: float) -> float:
     """Kilometers to Meters conversion.
 

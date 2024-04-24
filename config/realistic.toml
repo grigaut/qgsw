@@ -24,14 +24,15 @@ g_prime = [
 ]
 
 [mesh]
-nx = 512
-ny = 256
+nx = 1024
+ny = 512
 dt = 2_000
-box_unit = "deg"
+# box_unit = "deg"
 [mesh.box]
+unit = "deg"
 [mesh.box.x]
 min = -5.5
-max = nan
+max = 37
 [mesh.box.y]
 min = 31
 max = 45

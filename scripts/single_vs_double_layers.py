@@ -40,10 +40,9 @@ vortex_1l = RankineVortexForcing.from_config(config_1l)
 mesh_1l = Meshes3D.from_config(config_1l)
 # "" Coriolis
 f = coriolis.compute_beta_plane(
-    latitudes=mesh_1l.omega.remove_z_h().xy[1],
+    mesh=mesh_1l.omega.remove_z_h(),
     f0=config_1l.physics.f0,
     beta=config_1l.physics.beta,
-    ly=mesh_1l.ly,
 )
 ## Compute Burger Number
 Bu_1l = compute_burger(
@@ -99,10 +98,9 @@ vortex_2l = RankineVortexForcing.from_config(config_2l)
 mesh_2l = Meshes3D.from_config(config_2l)
 ## Coriolis
 f = coriolis.compute_beta_plane(
-    latitudes=mesh_2l.omega.remove_z_h().xy[1],
+    mesh=mesh_2l.omega.remove_z_h(),
     f0=config_1l.physics.f0,
     beta=config_1l.physics.beta,
-    ly=mesh_2l.ly,
 )
 ## Compute Burger Number
 h1 = config_2l.layers.h[0]
