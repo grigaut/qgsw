@@ -20,13 +20,13 @@ from qgsw.specs import DEVICE
 from qgsw import verbose
 
 torch.backends.cudnn.deterministic = True
+verbose.set_level(2)
 
 config = RealisticConfig.from_file(Path("config/realistic.toml"))
 mesh = Meshes3D.from_config(config)
 bathy = Bathymetry.from_config(config)
 wind = WindForcing.from_config(config)
 
-verbose.set_level(2)
 verbose.display(
     msg=f"Grid lat: {config.mesh.y_min:.1f}, {config.mesh.y_max:.1f}, ",
     trigger_level=1,
