@@ -159,7 +159,6 @@ class VerboseDisplayer:
 
 
 VERBOSE = VerboseDisplayer(0)
-print(VERBOSE.level)
 
 
 def set_level(level: int) -> None:
