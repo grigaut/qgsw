@@ -39,7 +39,7 @@ class RankineVortex2D:
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """
-        if self._mesh.xy_unit != self._required_xy_unit:
+        if mesh.xy_unit != self._required_xy_unit:
             msg = f"XY units should be {self._required_xy_unit}."
             raise UnitError(msg)
         self._mesh = mesh

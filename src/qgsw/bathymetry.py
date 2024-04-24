@@ -14,15 +14,20 @@ import torch.nn.functional as F  # noqa: N812
 from typing_extensions import Self
 
 from qgsw.data.loaders import BathyLoader
+from qgsw.spatial.units._units import DEGREE, Unit
+from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.bathymetry import BathyConfig
     from qgsw.configs.core import ScriptConfig
+    from qgsw.mesh.mesh import Mesh2D
 
 
 class Bathymetry:
     """Bathymetry."""
+
+    _required_xy_unit: Unit = DEGREE
 
     def __init__(self, bathy_config: BathyConfig) -> None:
         """Instantiate Bathymetry."""
@@ -52,31 +57,34 @@ class Bathymetry:
 
     def interpolate(
         self,
-        mesh_xy: tuple[torch.Tensor, torch.Tensor],
+        mesh_2d: Mesh2D,
     ) -> np.ndarray:
         """Interpolate bathymetry on a given mesh.
 
         Args:
-            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
+            mesh_2d (Mesh2D): 2D mesh.
 
         Returns:
             torch.Tensor: Interpolation of bathymetry on the given mesh.
         """
-        return self._interpolation(mesh_xy)
+        if mesh_2d.xy_unit != self._required_xy_unit:
+            msg = f"Mesh2D xy unit must be {self._required_xy_unit}."
+            raise UnitError(msg)
+        return self._interpolation(mesh_2d.xy)
 
     def compute_land_mask(
         self,
-        mesh_xy: tuple[torch.Tensor, torch.Tensor],
+        mesh_2d: Mesh2D,
     ) -> torch.Tensor:
         """Compute land mask over a given mesh.
 
         Args:
-            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
+            mesh_2d (Mesh2D): 2D mesh.
 
         Returns:
             torch.Tensor: Boolean mask with 1 over land cells and 0 elsewhere.
         """
-        land = self.interpolate(mesh_xy=mesh_xy) > 0
+        land = self.interpolate(mesh_2d=mesh_2d) > 0
         # remove small ocean inclusions in land
         land_without_lakes: np.ndarray = skimage.morphology.area_closing(
             land,
@@ -93,17 +101,17 @@ class Bathymetry:
 
     def compute_ocean_mask(
         self,
-        mesh_xy: tuple[torch.Tensor, torch.Tensor],
+        mesh_2d: Mesh2D,
     ) -> torch.Tensor:
         """Compute ocean mask over a given mesh.
 
         Args:
-            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
+            mesh_2d (Mesh2D): 2D mesh.
 
         Returns:
             torch.Tensor: Boolean mask with 1 over ocean cells and 0 elsewhere.
         """
-        interp_bathy = self.interpolate(mesh_xy=mesh_xy)
+        interp_bathy = self.interpolate(mesh_2d=mesh_2d)
         ocean = interp_bathy < self._config.htop_ocean
         # Remove small land inclusions in ocean
         ocean_without_islands: np.ndarray = skimage.morphology.area_closing(
@@ -162,18 +170,16 @@ class Bathymetry:
             scipy.ndimage.gaussian_filter(bottom_topography, 3.0), 0, 150
         )
 
-    def compute_land_mask_w(
-        self, mesh_xy: tuple[torch.Tensor, torch.Tensor]
-    ) -> torch.Tensor:
+    def compute_land_mask_w(self, mesh_2d: Mesh2D) -> torch.Tensor:
         """Pad land mask with land border and perform 2D average.
 
         Args:
-            mesh_xy (tuple[torch.Tensor, torch.Tensor]): xy mesh.
+            mesh_2d (Mesh2D): 2D mesh.
 
         Returns:
             torch.Tensor: Land mask W.
         """
-        land = self.compute_land_mask(mesh_xy=mesh_xy)
+        land = self.compute_land_mask(mesh_2d=mesh_2d)
         unsqueezed = land.unsqueeze(0).unsqueeze(0)
         padded = F.pad(unsqueezed, (1, 1, 1, 1), value=1.0)
         avg_2d = F.avg_pool2d(padded, (2, 2), stride=(1, 1))[0, 0]

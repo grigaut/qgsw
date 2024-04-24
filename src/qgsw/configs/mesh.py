@@ -81,9 +81,9 @@ class MeshConfig(_Config):
     _box_section: str = keys.BOX["section"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
-        "deg": conversion.deg_to_m_lat,
-        "km": conversion.km_to_m,
-        "m": conversion.m_to_m,
+        DEGREE.name: conversion.deg_to_m_lat,
+        KILOMETERS.name: conversion.km_to_m,
+        METERS.name: conversion.m_to_m,
     }
 
     def __init__(self, params: dict[str, Any]) -> None:
@@ -130,13 +130,13 @@ class MeshConfig(_Config):
         """Total distance along x (meters)."""
         if np.isnan(self._box.x_max):
             return self._infer_lx()
-        conversion = self._conversion[self._box.unit]
+        conversion = self._conversion[self._box.unit.name]
         return conversion(self._box.x_max - self._box.x_min)
 
     @property
     def ly(self) -> float:
         """Total distance along y (meters)."""
-        conversion = self._conversion[self._box.unit]
+        conversion = self._conversion[self._box.unit.name]
         return conversion(self._box.y_max - self._box.y_min)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
