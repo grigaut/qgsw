@@ -17,32 +17,45 @@ from qgsw.mesh import Meshes3D
 from qgsw.models import SW, QG
 from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
-
+from qgsw import verbose
 
 torch.backends.cudnn.deterministic = True
+verbose.set_level(2)
 
 config = RealisticConfig.from_file(Path("config/realistic.toml"))
 mesh = Meshes3D.from_config(config)
 bathy = Bathymetry.from_config(config)
 wind = WindForcing.from_config(config)
 
-print(
-    f"Grid lat: {config.mesh.y_min:.1f}, {config.mesh.y_max:.1f}, "
-    f"lon: {config.mesh.x_min:.1f}, {config.mesh.x_max:.1f}, "
-    f"dx={config.mesh.dx/1e3:.1f}km, dy={config.mesh.dy/1e3:.1f}km ."
+verbose.display(
+    msg=f"Grid lat: {config.mesh.y_min:.1f}, {config.mesh.y_max:.1f}, ",
+    trigger_level=1,
+)
+verbose.display(
+    msg=f"lon: {config.mesh.x_min:.1f}, {config.mesh.x_max:.1f}, ",
+    trigger_level=1,
+)
+verbose.display(
+    msg=f"dx={config.mesh.dx/1e3:.1f}km, dy={config.mesh.dy/1e3:.1f}km .",
+    trigger_level=1,
+)
+verbose.display(
+    msg=f"Topo lat: {bathy.lats.min():.2f} - {bathy.lats.max():.2f}, ",
+    trigger_level=1,
 )
 
-
-print(
-    f"Topo lat: {bathy.lats.min():.2f} - {bathy.lats.max():.2f}, "
-    f"lon: {bathy.lons.min():.2f} - {bathy.lons.max():.2f}"
+verbose.display(
+    msg=f"lon: {bathy.lons.min():.2f} - {bathy.lons.max():.2f}",
+    trigger_level=1,
 )
 
-print(
-    "Interpolating bathymetry on mesh with"
-    f" {config.bathy.interpolation_method} interpolation ..."
+verbose.display(
+    msg=(
+        "Interpolating bathymetry on mesh with"
+        f" {config.bathy.interpolation_method} interpolation ..."
+    ),
+    trigger_level=1,
 )
-
 # Land Mask Generation
 mask_land = bathy.compute_land_mask(mesh.h.remove_z_h().xy)
 mask_land_w = bathy.compute_land_mask_w(mesh.h.remove_z_h().xy)
@@ -55,9 +68,12 @@ f = coriolis.compute_beta_plane(
     beta=config.physics.beta,
     ly=mesh.ly,
 )
-print(
-    f"Coriolis param min {f.min().cpu().item():.2e},"
-    f" {f.max().cpu().item():.2e}"
+verbose.display(
+    msg=(
+        f"Coriolis param min {f.min().cpu().item():.2e},"
+        f" {f.max().cpu().item():.2e}"
+    ),
+    trigger_level=1,
 )
 
 taux, tauy = wind.compute()
@@ -93,7 +109,7 @@ name = f"qg_"  # {config}"
 ######### Probably to avoid restarting
 start_file = ""
 if start_file:
-    print(f"Starting from file {start_file}...")
+    verbose.display(msg=f"Starting from file {start_file}...", trigger_level=1)
     zipf = np.load(start_file)
     qg.set_physical_uvh(zipf["u"], zipf["v"], zipf["h"])
 #########
@@ -123,7 +139,10 @@ if freq_save > 0:
         f'slip{param["slip_coef"]}/'
     )
     os.makedirs(output_dir, exist_ok=True)
-    print(f"Outputs will be saved to {output_dir}")
+    verbose.display(
+        msg=f"Outputs will be saved to {output_dir}",
+        trigger_level=1,
+    )
     np.save(os.path.join(output_dir, "mask_land_h.npz"), mask_land)
     np.save(
         os.path.join(output_dir, "mask_land_w.npz"),
@@ -178,9 +197,9 @@ for n in range(1, n_steps + 1):
         walltime = cputime()
         perf = (walltime - walltime0) / (nmeshpoints)
         mperf += perf
-        print(
-            f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf/n:.2e}) s",
-            end="",
+        verbose.display(
+            msg=f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf/n:.2e}) s",
+            trigger_level=1,
         )
 
     n_years = int(t // (365 * 24 * 3600))
@@ -190,8 +209,9 @@ for n in range(1, n_steps + 1):
         raise ValueError(f"Stopping, NAN number in p at iteration {n}.")
 
     if freq_log > 0 and n % freq_log == 0:
-        print(
-            f"n={n:05d}, t={n_years:02d}y{n_days:03d}d, {qg.get_print_info()}"
+        verbose.display(
+            msg=f"n={n:05d}, t={n_years:02d}y{n_days:03d}d, {qg.get_print_info()}",
+            trigger_level=1,
         )
 
     if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
@@ -227,7 +247,7 @@ for n in range(1, n_steps + 1):
                 h=h.astype("float32"),
             )
             # print(f'saved u,v,h,u_a,v_a to {filename}')
-            print(f"saved u,v,h to {filename}")
+            verbose.display(msg=f"saved u,v,h to {filename}", trigger_level=1)
         else:
             np.savez(
                 filename,
@@ -235,4 +255,4 @@ for n in range(1, n_steps + 1):
                 v=v.astype("float32"),
                 h=h.astype("float32"),
             )
-            print(f"saved u,v,h to {filename}")
+            verbose.display(msg=f"saved u,v,h to {filename}", trigger_level=1)

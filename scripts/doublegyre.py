@@ -13,10 +13,11 @@ from qgsw.physics import coriolis
 from qgsw.mesh import Meshes3D
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
+from qgsw import verbose
 from icecream import ic
 
 torch.backends.cudnn.deterministic = True
-
+verbose.set_level(2)
 
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
 mesh = Meshes3D.from_config(config)
@@ -77,21 +78,25 @@ for model, name, dt, start_file in [
             .cpu()
             .item()
         )
-        print(c)
         cfl = 20 if param["barotropic_filter"] else 0.5
-        print(cfl)
         dt = float(int(cfl * min(config.mesh.dx, config.mesh.dy) / c))
-        print(f"dt = {dt:.1f} s.")
         param["dt"] = dt
     # exit()
-    print(
-        f"Double gyre config, {name} model, {config.mesh.nx}x{config.mesh.ny} mesh, dt {dt:.1f}s."
+    verbose.display(
+        msg=(
+            f"Double gyre config, {name} model, "
+            f"{config.mesh.nx}x{config.mesh.ny} mesh, dt {dt:.1f}s."
+        ),
+        trigger_level=1,
     )
 
     qgsw_multilayer = model(param)
 
     if start_file:
-        print(f"Starting from file {start_file}...")
+        verbose.display(
+            msg=f"Starting from file {start_file}...",
+            trigger_level=1,
+        )
         zipf = np.load(start_file)
         qgsw_multilayer.set_physical_uvh(zipf["u"], zipf["v"], zipf["h"])
 
@@ -113,7 +118,9 @@ for model, name, dt, start_file in [
             f'slip{param["slip_coef"]}/'
         )
         os.makedirs(output_dir, exist_ok=True)
-        print(f"Outputs will be saved to {output_dir}")
+        verbose.display(
+            msg=f"Outputs will be saved to {output_dir}", trigger_level=1
+        )
 
     if freq_plot > 0:
         import matplotlib.pyplot as plt
@@ -149,8 +156,12 @@ for model, name, dt, start_file in [
             raise ValueError(f"Stopping, NAN number in p at iteration {n}.")
 
         if freq_log > 0 and n % freq_log == 0:
-            print(
-                f"n={n:05d}, t={n_years:02d}y{n_days:03d}d, {qgsw_multilayer.get_print_info()}"
+            verbose.display(
+                msg=(
+                    f"n={n:05d}, t={n_years:02d}y{n_days:03d}d, "
+                    f"{qgsw_multilayer.get_print_info()}"
+                ),
+                trigger_level=1,
             )
 
         if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
@@ -208,7 +219,10 @@ for model, name, dt, start_file in [
                     v_a=v_a.astype("float32"),
                     h=h.astype("float32"),
                 )
-                print(f"saved u,v,h,u_a,v_a to {filename}")
+                verbose.display(
+                    msg=f"saved u,v,h,u_a,v_a to {filename}",
+                    trigger_level=1,
+                )
             else:
                 np.savez(
                     filename,
@@ -216,5 +230,7 @@ for model, name, dt, start_file in [
                     v=v.astype("float32"),
                     h=h.astype("float32"),
                 )
-                print(f"saved u,v,h to {filename}")
-    break
+                verbose.display(
+                    msg=f"saved u,v,h to {filename}",
+                    trigger_level=1,
+                )

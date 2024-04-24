@@ -18,6 +18,7 @@ from qgsw.models.core.helmholtz import (
 )
 from qgsw.models.core.finite_diff import grad_perp
 from qgsw.models.sw import SW
+from qgsw import verbose
 from typing import Any, Union
 
 
@@ -109,10 +110,13 @@ class QG(SW):
         lambd_l, L = torch.linalg.eig(self.A.T)
         self.lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
         with np.printoptions(precision=1):
-            print(
-                "  - Rossby deformation Radii (km): ",
+            radius = (
                 1e-3
-                / torch.sqrt(self.f0**2 * self.lambd.squeeze()).cpu().numpy(),
+                / torch.sqrt(self.f0**2 * self.lambd.squeeze()).cpu().numpy()
+            )
+            verbose.display(
+                msg=f"Rossby deformation Radii (km): {radius}",
+                trigger_level=2,
             )
         R, L = R.real, L.real
         # layer to mode

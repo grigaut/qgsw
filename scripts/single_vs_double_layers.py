@@ -4,6 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from qgsw import verbose
 from qgsw.configs import VortexShearConfig
 from qgsw.forcing.vortex import RankineVortexForcing
 from qgsw.forcing.wind import WindForcing
@@ -13,6 +14,7 @@ from qgsw.physics import compute_burger, coriolis
 from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
+verbose.set_level(2)
 
 config_1l = VortexShearConfig.from_file(
     "config/single_vs_double_layers/single_layer.toml"
@@ -50,7 +52,10 @@ Bu_1l = compute_burger(
     f0=config_1l.physics.f0,
     length_scale=vortex_1l.r0,
 )
-print(f"Single-Layer Burger Number: {Bu_1l:.2f}")
+verbose.display(
+    msg=f"Single-Layer Burger Number: {Bu_1l:.2f}",
+    trigger_level=1,
+)
 ## Set model parameters
 params_1l = {
     "nx": config_1l.mesh.nx,
@@ -110,7 +115,10 @@ Bu_2l = compute_burger(
     f0=config_2l.physics.f0,
     length_scale=vortex_2l.r0,
 )
-print(f"Two-Layer Burger Number: {Bu_2l:.2f}")
+verbose.display(
+    msg=f"Multi-Layers Burger Number: {Bu_2l:.2f}",
+    trigger_level=1,
+)
 ## Set model parameters
 params_2l = {
     "nx": config_2l.mesh.nx,
@@ -168,7 +176,10 @@ w_0_1l = qg_1l.omega.squeeze() / qg_1l.dx / qg_1l.dy
 
 
 tau_1l = 1.0 / torch.sqrt(w_0_1l.pow(2).mean()).cpu().item()
-print(f"tau (single layer) = {tau_1l *config_1l.physics.f0:.2f} f0-1")
+verbose.display(
+    msg=f"tau (single layer) = {tau_1l *config_1l.physics.f0:.2f} f0-1",
+    trigger_level=1,
+)
 
 qg_2l.compute_diagnostic_variables()
 qg_2l.compute_time_derivatives()
@@ -177,10 +188,15 @@ w_0_2l = qg_2l.omega.squeeze() / qg_2l.dx / qg_2l.dy
 
 
 tau_2l = 1.0 / torch.sqrt(w_0_2l.pow(2).mean()).cpu().item()
-print(f"tau (multi layer) = {tau_2l *config_2l.physics.f0:.2f} f0-1")
+verbose.display(
+    msg=f"tau (multi layer) = {tau_2l *config_2l.physics.f0:.2f} f0-1",
+    trigger_level=1,
+)
 
 tau = max(tau_1l, tau_2l)
-print(f"tau = {tau *config_2l.physics.f0:.2f} f0-1")
+verbose.display(
+    msg=f"tau = {tau *config_2l.physics.f0:.2f} f0-1", trigger_level=1
+)
 
 t_end = 8 * tau
 freq_plot = int(t_end / 100 / dt) + 1
@@ -188,7 +204,7 @@ freq_checknan = 100
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
 
-print(f"Total Duration: {t_end:.2f}")
+verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
 # Instantiate Plots
@@ -233,5 +249,11 @@ for n in range(n_steps + 1):
     t += dt
 
     if freq_log > 0 and n % freq_log == 0:
-        print(f"n={n:05d}, {qg_1l.get_print_info()}")
-        print(f"n={n:05d}, {qg_2l.get_print_info()}")
+        verbose.display(
+            msg=f"n={n:05d}, {qg_1l.get_print_info()}",
+            trigger_level=1,
+        )
+        verbose.display(
+            msg=f"n={n:05d}, {qg_2l.get_print_info()}",
+            trigger_level=1,
+        )

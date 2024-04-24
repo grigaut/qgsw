@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 
+from qgsw import verbose
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
@@ -44,14 +45,12 @@ class PhysicsConfig(_Config):
     def bottom_drag_coef(self) -> float:
         """Drag Coefficient."""
         if np.isnan(self.params[self._bottom_drag]):
-            print("Bottom drag coefficient inferred using f0.")
+            verbose.display(
+                msg="Bottom drag coefficient inferred using f0.",
+                trigger_level=1,
+            )
             return 0.5 * self.f0 * 2.0 / 2600  # Source ?
         return self.params[self._bottom_drag]
-
-    @property
-    def wind_stress_magnitude(self) -> float:
-        """Wind Stress Magnitude (in Pa m-1 kg s-2)."""
-        return self.params[self._wstress_mag]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate Physics Configuration.
