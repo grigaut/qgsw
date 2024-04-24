@@ -17,7 +17,6 @@ LAYERS = {
 
 MESH = {
     "section": "mesh",
-    "box unit": "box_unit",
     "points nb x": "nx",
     "points nb y": "ny",
     "x length": "Lx",
@@ -27,6 +26,7 @@ MESH = {
 
 BOX = {
     "section": "box",
+    "unit": "unit",
     "x": "x",
     "y": "y",
 }
