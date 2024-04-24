@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.ndimage
 import torch
-from icecream import ic
 
 sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
@@ -18,6 +17,7 @@ from qgsw.models import SW, QG
 from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
 from qgsw import verbose
+from icecream import ic
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
@@ -28,11 +28,11 @@ bathy = Bathymetry.from_config(config)
 wind = WindForcing.from_config(config)
 
 verbose.display(
-    msg=f"Grid lat: {config.mesh.y_min:.1f}, {config.mesh.y_max:.1f}, ",
+    msg=f"Grid lat: {config.mesh.box.y_min:.1f}, {config.mesh.box.y_max:.1f}, ",
     trigger_level=1,
 )
 verbose.display(
-    msg=f"lon: {config.mesh.x_min:.1f}, {config.mesh.x_max:.1f}, ",
+    msg=f"lon: {config.mesh.box.x_min:.1f}, {config.mesh.box.x_max:.1f}, ",
     trigger_level=1,
 )
 verbose.display(
@@ -57,16 +57,15 @@ verbose.display(
     trigger_level=1,
 )
 # Land Mask Generation
-mask_land = bathy.compute_land_mask(mesh.h.remove_z_h().xy)
-mask_land_w = bathy.compute_land_mask_w(mesh.h.remove_z_h().xy)
 
+mask_land = bathy.compute_land_mask(mesh.h.remove_z_h())
+mask_land_w = bathy.compute_land_mask_w(mesh.h.remove_z_h())
 
 # coriolis beta plane
 f = coriolis.compute_beta_plane(
-    latitudes=mesh.omega.remove_z_h().xy[1],
+    mesh=mesh.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
-    ly=mesh.ly,
 )
 verbose.display(
     msg=(
@@ -75,7 +74,7 @@ verbose.display(
     ),
     trigger_level=1,
 )
-
+exit()
 taux, tauy = wind.compute()
 
 param = {
