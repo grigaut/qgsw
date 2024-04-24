@@ -204,7 +204,7 @@ freq_checknan = 100
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
 
-print(f"Total Duration: {t_end:.2f}")
+verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
 # Instantiate Plots
@@ -249,5 +249,11 @@ for n in range(n_steps + 1):
     t += dt
 
     if freq_log > 0 and n % freq_log == 0:
-        print(f"n={n:05d}, {qg_1l.get_print_info()}")
-        print(f"n={n:05d}, {qg_2l.get_print_info()}")
+        verbose.display(
+            msg=f"n={n:05d}, {qg_1l.get_print_info()}",
+            trigger_level=1,
+        )
+        verbose.display(
+            msg=f"n={n:05d}, {qg_2l.get_print_info()}",
+            trigger_level=1,
+        )
