@@ -437,9 +437,14 @@ class ComparisonPlot(Generic[AxesManager], metaclass=ABCMeta):
         """
         self._axes_nb = len(axes_managers)
         self._axes_ms = axes_managers
-        self._fig, axes = self._create_figure_axes()
+        self._figure, axes = self._create_figure_axes()
         self._axes = axes.flatten()
         self._set_axes()
+
+    @property
+    def figure(self) -> Figure:
+        """Figure."""
+        return self._figure
 
     def _raise_if_inconsistent_datas(self, elements_nb: int) -> None:
         """Raise an error if the number of plot to update is invalid.
