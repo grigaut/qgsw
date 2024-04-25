@@ -208,17 +208,12 @@ verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
 # Instantiate Figures
-qg_1l_axes = SurfaceVorticityAxes.from_mask(
-    mask=qg_1l.masks.not_w[0, 0].cpu().numpy(),
-)
+mask = qg_1l.masks.not_w[0, 0].cpu().numpy()
+qg_1l_axes = SurfaceVorticityAxes.from_mask(mask=mask)
 qg_1l_axes.set_title(r"$\omega_{QG-1L}$")
-qg_2l_axes = SurfaceVorticityAxes.from_mask(
-    mask=qg_1l.masks.not_w[0, 0].cpu().numpy(),
-)
+qg_2l_axes = SurfaceVorticityAxes.from_mask(mask=mask)
 qg_2l_axes.set_title(r"$\omega_{QG-ML}$")
-diff_axes = SurfaceVorticityAxes.from_mask(
-    mask=qg_1l.masks.not_w[0, 0].cpu().numpy(),
-)
+diff_axes = SurfaceVorticityAxes.from_mask(mask=mask)
 diff_axes.set_title(r"$\omega_{QG-1L} - \omega_{QG-ML}$")
 plot = SurfaceVorticityComparisonFigure(qg_1l_axes, qg_2l_axes, diff_axes)
 plot.figure.suptitle(

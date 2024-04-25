@@ -176,23 +176,17 @@ for Ro in [
     n_steps = int(t_end / dt) + 1
 
     if freq_plot > 0:
-        sw_axes = SurfaceVorticityAxes.from_mask(
-            mask=sw_multilayer.masks.not_w[0, 0].cpu().numpy(),
-        )
+        mask = sw_multilayer.masks.not_w[0, 0].cpu().numpy()
+        sw_axes = SurfaceVorticityAxes.from_mask(mask=mask)
         sw_axes.set_title(r"$\omega_{SW}$")
-        qg_axes = SurfaceVorticityAxes.from_mask(
-            mask=sw_multilayer.masks.not_w[0, 0].cpu().numpy(),
-        )
+        qg_axes = SurfaceVorticityAxes.from_mask(mask=mask)
         qg_axes.set_title(r"$\omega_{QG}$")
-        diff_axes = SurfaceVorticityAxes.from_mask(
-            mask=sw_multilayer.masks.not_w[0, 0].cpu().numpy(),
-        )
+        diff_axes = SurfaceVorticityAxes.from_mask(mask=mask)
         diff_axes.set_title(r"$\omega_{SW} - \omega_{QG}$")
         plot = SurfaceVorticityComparisonFigure(sw_axes, qg_axes, diff_axes)
 
     for n in range(n_steps + 1):
         if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
-            mask_w = sw_multilayer.masks.not_w[0, 0].cpu().numpy()
             w_qg = (
                 (qg_multilayer.omega / qg_multilayer.area / qg_multilayer.f0)
                 .cpu()
