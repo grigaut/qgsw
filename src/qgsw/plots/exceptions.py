@@ -11,3 +11,7 @@ class MismatchingMaskError(Exception):
 
 class AxesInstantiationError(Exception):
     """Error for incorrectly set-up axes."""
+
+
+class ImpossibleAxesUpdateError(Exception):
+    """Error for impossible axis update."""
