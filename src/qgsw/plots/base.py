@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, Self
 
-from qgsw.plots.exceptions import InvalidMaskError, MismatchingMaskError
+from qgsw.plots.exceptions import (
+    AxesInstantiationError,
+    InvalidMaskError,
+    MismatchingMaskError,
+)
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -20,65 +24,244 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 
 
-class BaseAxes(metaclass=ABCMeta):
-    """Base class for for plots contents."""
+class BaseAxesContext(metaclass=ABCMeta):
+    """Base class for Axes context management."""
+
+    _default_title: str = ""
 
     def __init__(
         self,
-        data: np.ndarray,
+    ) -> None:
+        """Instantiate the AxesContext.
+
+        Args:
+            title (str): Axes title.
+            xticks (list, optional): X ticks. Defaults to [].
+            yticks (list, optional): Y ticks. Defaults to [].
+        """
+        self.title = self._default_title
+
+    @abstractmethod
+    def _create_axes(self, figure: Figure) -> Axes:
+        """Create a new Axes from a given Figure.
+
+        Args:
+            figure (Figure): Figure to add axes to.
+
+        Returns:
+            Axes: Created Axes.
+        """
+        return figure.add_subplot()
+
+    @abstractmethod
+    def _style_axes(self, ax: Axes) -> Axes:
+        """Style Axes.
+
+        Args:
+            ax (Axes): Axes to style.
+
+        Returns:
+            Axes: Styled Axes.
+        """
+        ax.set_title(self.title)
+        return ax
+
+    def add_new_axes(self, figure: Figure) -> Axes:
+        """Add and style a new Axes to ag iven figure.
+
+        Args:
+            figure (Figure): Figure to add Axes to.
+
+        Returns:
+            Axes: Final Axes.
+        """
+        ax = self._create_axes(figure=figure)
+        return self._style_axes(ax=ax)
+
+    def reload_axes(self, ax: Axes) -> None:
+        """Reaload given Axes.
+
+        Args:
+            ax (Axes): Axes to reload.
+        """
+        ax.clear()
+        return self._style_axes(ax=ax)
+
+
+class BaseAxesContent(metaclass=ABCMeta):
+    """Base for Axes Content Management."""
+
+    def __init__(
+        self,
         mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> None:
-        """Instantiate the Axes plot.
+        """Instantiate the AxesContent.
 
         Args:
-            data (np.ndarray): Data to plot.
             mask (np.ndarray | None, optional): Mask to apply on data.
             Mask will be set to ones if None. Defaults to None.
-            **kwargs:  additional arguments to pass to plotting method.
+            **kwargs: Additional arguments to pass to plotting method.
         """
-        self._data = self._format_data(data=data)
-        self._mask = self._validate_mask(mask=mask)
+        self._raise_if_invalid_mask(mask=mask)
+        self._mask = mask
         self._kwargs = kwargs
 
-    @abstractmethod
-    def _format_data(self, data: np.ndarray) -> np.ndarray:
-        """Format data for plotting sake.
+    def _raise_if_invalid_mask(self, mask: np.ndarray | None) -> None:
+        """Raise error if the Mask is not valid.
 
         Args:
-            data (np.ndarray): Original data.
-
-        Returns:
-            np.ndarray: Valid data.
-        """
-        return data
-
-    def _validate_mask(self, mask: np.ndarray | None) -> np.ndarray:
-        """Assert that the mask is valid.
-
-        Args:
-            mask (np.ndarray | None): Mask input.
+            mask (np.ndarray | None): Mask to inspect.
 
         Raises:
-            MismatchingMaskError: If the mask's shape doesn't match data's.
             InvalidMaskError: If the mask does not only contain 0s and 1s.
-
-        Returns:
-            np.ndarray: Valid mask.
         """
         if mask is None:
-            return np.ones(self._data.shape)
-        if mask.shape != self._data.shape:
-            msg = "Mask's shape must match data's shape."
-            raise MismatchingMaskError(msg)
+            return
         if not np.all([(e in {0, 1}) for e in np.unique(mask)]):
             msg = "The mask must contain only 0s and 1s."
             raise InvalidMaskError(msg)
-        return mask
 
-    @staticmethod
     @abstractmethod
-    def create_axes(figure: Figure) -> Axes:
+    def _format_data(self, data: np.ndarray) -> np.ndarray:
+        """Format input data.
+
+        Args:
+            data (np.ndarray): Data tot format.
+
+        Returns:
+            np.ndarray: Formatted data.
+        """
+        return data
+
+    @abstractmethod
+    def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
+        """Update ax content using data from a np.ndarray.
+
+        Args:
+            ax (Axes): Axes to update the content of.
+            data (np.ndarray): Data to use for content update.
+            mask (np.ndarray): Mask to use to show data.
+
+        Returns:
+            Axes: Updated axes.
+        """
+
+    def update(self, ax: Axes, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
+        """Update ax content using data from a np.ndarray.
+
+        Args:
+            ax (Axes): Axes to update the content of.
+            data (np.ndarray): Data to use for content update.
+            **kwargs: Additional arguments to give to the plotting function.
+
+        Returns:
+            Axes: Updated axes.
+        """
+        self._kwargs = self._kwargs | kwargs
+        formatted_data = self._format_data(data=data)
+        mask = self._validate_mask(data=formatted_data)
+        return self._update(ax=ax, data=formatted_data, mask=mask)
+
+    @abstractmethod
+    def _retrieve_data_from_model(self, model: SW) -> np.ndarray:
+        """Retrieve relevant from a given SW model.
+
+        Args:
+            model (SW): Model to retrieve data from.
+
+        Returns:
+            np.ndarray: Relevant data.
+        """
+
+    def update_with_model(
+        self, ax: Axes, model: SW, **kwargs: P.kwargs
+    ) -> Axes:
+        """Update Axes content using data from a SW model.
+
+        Args:
+            ax (Axes): Axes to update the content of.
+            model (SW): MOdel to use for the content update.
+            **kwargs: Additional arguments to give to the plotting function.
+
+        Returns:
+            Axes: Updated Axes.
+        """
+        return self.update(
+            ax=ax,
+            data=self._retrieve_data_from_model(model=model),
+            **kwargs,
+        )
+
+    def _validate_mask(self, data: np.ndarray) -> np.ndarray:
+        """Validate Mask.
+
+        Args:
+            data (np.ndarray): Data to use as content.
+
+        Raises:
+            MismatchingMaskError: If the mask's shape doesn't match
+            the data's shape.
+            InvalidMaskError: If the mask do
+
+        Returns:
+            np.ndarray: Valid Mask.
+        """
+        if self._mask is None:
+            return np.ones(data.shape)
+        if self._mask.shape != data.shape:
+            msg = "Mask's shape must match data's shape."
+            raise MismatchingMaskError(msg)
+        return self._mask
+
+
+AxesContext = TypeVar("AxesContext", bound=BaseAxesContext)
+AxesContent = TypeVar("AxesContent", bound=BaseAxesContent)
+
+
+class BaseAxes(Generic[AxesContext, AxesContent]):
+    """Base class for for plots contents."""
+
+    def __init__(self, context: AxesContext, content: AxesContent) -> None:
+        """Instantiate the Axes.
+
+        Args:
+            context (AxesContext): Axes Context Manager.
+            content (AxesContent): Axes Content Manager.
+        """
+        self._content = content
+        self._context = context
+        self._ax: Axes | None = None
+        self._figure: Figure | None = None
+
+    @property
+    def context(self) -> AxesContext:
+        """Axes Context."""
+        return self._context
+
+    @property
+    def ax(self) -> Axes:
+        """Axes to plot to."""
+        if self._ax is None:
+            msg = (
+                f"Instantiate ax before calling {self.__class__.__name__}.ax"
+                f" using {self.__class__.__name__}.set_ax()."
+            )
+            raise AxesInstantiationError(msg)
+        return self._ax
+
+    @ax.setter
+    def ax(self, ax: Axes) -> None:
+        """Set the ax of the object.
+
+        Recommended Axes to use is the one generated by .create_axes.
+
+        Args:
+            ax (Axes): Axes to use for self._ax.
+        """
+        self.set_ax(ax=ax)
+
+    def create_axes(self, figure: Figure) -> Axes:
         """Create a new axes from a given figure.
 
         Args:
@@ -87,72 +270,78 @@ class BaseAxes(metaclass=ABCMeta):
         Returns:
             Axes: Created axes.
         """
-        return figure.add_subplot()
+        return self._context.add_new_axes(figure=figure)
 
-    @abstractmethod
-    def _style_axes(self, ax: Axes) -> Axes:
-        """Style a given axes.
+    def set_ax(self, ax: Axes) -> None:
+        """Set the ax of the object.
 
-        Args:
-            ax (Axes): Axes to style.
-
-        Returns:
-            Axes: Styled axes.
-        """
-
-    @abstractmethod
-    def _set_content(self, ax: Axes) -> Axes:
-        """Set the axes content.
+        Recommended Axes to use is the one generated by .create_axes.
 
         Args:
-            ax (Axes): Axes to set the content of.
-
-        Returns:
-            Axes: Axes with content.
+            ax (Axes): Axes to use for self._ax.
         """
+        self._ax = ax
+        self._figure = ax.figure
 
-    def add_to_axes(self, ax: Axes) -> Axes:
-        """Add the content to a given Axes.
+    def set_title(self, title: str) -> None:
+        """Set the Axes' title.
 
         Args:
-            ax (Axes): Axes to add content to.
-
-        Returns:
-            Axes: Final Axes.
+            title (str): New title.
         """
-        ax.clear()
-        ax = self._style_axes(ax=ax)
-        return self._set_content(ax=ax)
+        self._context.title = title
+        if self._ax is not None:
+            self.ax = self._context.reload_axes(self._ax)
 
-    def add_to_figure(self, figure: Figure) -> Axes:
-        """Add the content to a given Figure.
+    def update(self, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
+        """Update the Axes content.
 
         Args:
-            figure (Figure): Figure to add content to.
+            data (np.ndarray): Data to use for update.
+            **kwargs: Additional arguments to give to the plotting function.
 
         Returns:
-            Axes: Axes added to the figure.
+            Axes: Updated Axes.
         """
-        ax = self.create_axes(figure=figure)
-        return self.add_to_axes(ax=ax)
+        return self._content.update(ax=self._ax, data=data, **kwargs)
+
+    def update_with_model(self, model: SW, **kwargs: P.kwargs) -> Axes:
+        """Update the Axes content using a SW model.
+
+        Args:
+            model (SW): Model to use to update Axes.
+            **kwargs: Additional arguments to give to the plotting function.
+
+        Returns:
+            Axes: Updated Axes.
+        """
+        return self._content.update_with_model(
+            ax=self._ax, model=model, **kwargs
+        )
 
 
-class BaseSinglePlot(metaclass=ABCMeta):
+AxesManager = TypeVar("AxesManager", bound=BaseAxes)
+
+
+class BaseSinglePlot(Generic[AxesManager], metaclass=ABCMeta):
     """Base class for a plot rendering a single Axes."""
 
     def __init__(
         self,
+        axes_manager: AxesManager,
         figure: Figure | None = None,
     ) -> None:
         """Instantiate the plot.
 
         Args:
+            axes_manager (AxesManager): Axes Manager.
             figure (Figure | None, optional): Figure to render plot to.
             The figure will be created if None. Defaults to None.
         """
         plt.ion()
         self._figure = figure
-        self._ax = None
+        self._ax = axes_manager
+        self._ax.set_ax(self._ax.create_axes(figure=self.figure))
 
     @property
     def figure(self) -> Figure:
@@ -162,12 +351,11 @@ class BaseSinglePlot(metaclass=ABCMeta):
         return self._figure
 
     @property
-    def ax(self) -> Axes:
-        """Figure's axes."""
-        if self._ax is None:
-            self._ax = self._create_axes(figure=self.figure)
+    def ax(self) -> AxesManager:
+        """Figure's axes manager."""
         return self._ax
 
+    @abstractmethod
     def _create_figure(self) -> Figure:
         """Create an empty figure.
 
@@ -178,71 +366,42 @@ class BaseSinglePlot(metaclass=ABCMeta):
         figure.tight_layout()
         return figure
 
-    @abstractmethod
-    def _create_axes(self, figure: Figure) -> Axes:
-        """Create Axes within the Figure.
-
-        Args:
-            figure (Figure): Figure to add axes to.
-
-        Returns:
-            Axes: Created axes.
-        """
-
-    @abstractmethod
-    def _retrieve_data_from_model(self, model: SW) -> np.ndarray:
-        """Retrieve relevant data from a SW model.
-
-        Args:
-            model (SW): Model to retrieve data from.
-
-        Returns:
-            np.ndarray: Retrieved data.
-        """
-
-    @abstractmethod
-    def _update(
-        self, data: np.ndarray, mask: np.ndarray, **kwargs: P.kwargs
-    ) -> Axes:
-        """Update the plot content.
-
-        Args:
-            data (np.ndarray): Data to use.
-            mask (np.ndarray): Mask to use.
-            **kwargs: additional parameters to give to plotting method.
-
-        Returns:
-            Axes: Updated Axes.
-        """
-
-    def update_with(
-        self, data: np.ndarray, mask: np.ndarray, **kwargs: P.kwargs
-    ) -> None:
+    def update_with(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update and render the plot content.
 
         Args:
             data (np.ndarray): Data to use.
-            mask (np.ndarray): Mask to use.
-            **kwargs: additional parameters to give to plotting method.
+            **kwargs: Additional arguments to give to the plotting function.
         """
-        self._update(data=data, mask=mask, **kwargs)
+        self._ax.update(data=data, **kwargs)
         plt.pause(0.05)
 
     def update_with_model(
         self,
         model: SW,
-        mask: np.ndarray,
         **kwargs: P.kwargs,
     ) -> None:
         """Update the plot content with a SW model.
 
         Args:
             model (SW): Model to use for plot update.
-            mask (np.ndarray): Mask to apply on data.
-            **kwargs: additional parameters to give to plotting method.
+            **kwargs: Additional arguments to give to the plotting function.
         """
-        return self.update_with(
-            data=self._retrieve_data_from_model(model=model),
-            mask=mask,
-            **kwargs,
-        )
+        self._ax.update_with_model(model=model, **kwargs)
+        plt.pause(0.05)
+
+    @classmethod
+    @abstractmethod
+    def from_mask(
+        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
+    ) -> Self:
+        """Instantiate Plot only from the mask.
+
+        Args:
+            mask (np.ndarray | None, optional): Mask to apply on data.
+            Mask will be set to ones if None. Defaults to None.
+            **kwargs: Additional arguments to pass to plotting method.
+
+        Returns:
+            Self: Instantiated plot.
+        """

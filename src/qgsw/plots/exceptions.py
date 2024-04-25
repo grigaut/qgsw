@@ -6,4 +6,8 @@ class InvalidMaskError(Exception):
 
 
 class MismatchingMaskError(Exception):
-    """Eroor for when a mask mismatches the dara's shape."""
+    """Error for when a mask mismatches the dara's shape."""
+
+
+class AxesInstantiationError(Exception):
+    """Error for incorrectly set-up axes."""
