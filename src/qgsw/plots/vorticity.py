@@ -11,13 +11,13 @@ from matplotlib.figure import Figure
 from typing_extensions import ParamSpec, Self
 
 from qgsw.models.sw import SW
-from qgsw.plots.base import (
+from qgsw.plots.base.axes import (
     BaseAxes,
     BaseAxesContent,
     BaseAxesContext,
-    BaseSinglePlot,
-    ComparisonPlot,
 )
+from qgsw.plots.base.comparison import ComparisonFigure
+from qgsw.plots.base.figures import BaseSingleFigure
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -152,7 +152,7 @@ class SurfaceVorticityAxes(
     def from_mask(
         cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
     ) -> Self:
-        """Instantiate Plot only from the mask.
+        """Instantiate Figure only from the mask.
 
         Args:
             mask (np.ndarray | None, optional): Mask to apply on data.
@@ -168,8 +168,8 @@ class SurfaceVorticityAxes(
         )
 
 
-class SurfaceVorticityPlot(BaseSinglePlot[SurfaceVorticityAxes]):
-    """Surface Vorticity Plot."""
+class SurfaceVorticityFigure(BaseSingleFigure[SurfaceVorticityAxes]):
+    """Surface Vorticity Figure."""
 
     def _create_figure(self) -> Figure:
         return super()._create_figure()
@@ -187,7 +187,7 @@ class SurfaceVorticityPlot(BaseSinglePlot[SurfaceVorticityAxes]):
     def from_mask(
         cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
     ) -> Self:
-        """Instantiate Plot only from the mask.
+        """Instantiate Figure only from the mask.
 
         Args:
             mask (np.ndarray | None, optional): Mask to apply on data.
@@ -202,5 +202,5 @@ class SurfaceVorticityPlot(BaseSinglePlot[SurfaceVorticityAxes]):
         )
 
 
-class SurfaceVorticityComparisonPlot(ComparisonPlot[SurfaceVorticityAxes]):
+class SurfaceVorticityComparisonFigure(ComparisonFigure[SurfaceVorticityAxes]):
     """Comparison between Surface Vorticity Axes."""

@@ -1,0 +1,104 @@
+"""Base plots."""
+
+from __future__ import annotations
+
+from abc import ABCMeta, abstractmethod
+from typing import TYPE_CHECKING, Generic
+
+import matplotlib.pyplot as plt
+from typing_extensions import ParamSpec, Self
+
+from qgsw.plots.base.axes import AxesManager
+
+if TYPE_CHECKING:
+    import numpy as np
+    from matplotlib.figure import Figure
+
+    from qgsw.models.sw import SW
+
+P = ParamSpec("P")
+
+
+class BaseSingleFigure(Generic[AxesManager], metaclass=ABCMeta):
+    """Base class for a plot rendering a single Axes."""
+
+    def __init__(
+        self,
+        axes_manager: AxesManager,
+        figure: Figure | None = None,
+    ) -> None:
+        """Instantiate the plot.
+
+        Args:
+            axes_manager (AxesManager): Axes Manager.
+            figure (Figure | None, optional): Figure to render plot to.
+            The figure will be created if None. Defaults to None.
+        """
+        plt.ion()
+        self._figure = figure
+        self._ax = axes_manager
+        self._ax.set_ax(self._ax.create_axes(figure=self.figure))
+
+    @property
+    def figure(self) -> Figure:
+        """Figure containing the plot."""
+        if self._figure is None:
+            self._figure = self._create_figure()
+        return self._figure
+
+    @property
+    def ax(self) -> AxesManager:
+        """Figure's axes manager."""
+        return self._ax
+
+    @abstractmethod
+    def _create_figure(self) -> Figure:
+        """Create an empty figure.
+
+        Returns:
+            Figure: Created figure.
+        """
+        figure = plt.figure()
+        figure.tight_layout()
+        return figure
+
+    def update_with(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
+        """Update and render the plot content.
+
+        Args:
+            data (np.ndarray): Data to use.
+            **kwargs: Additional arguments to give to the plotting function.
+        """
+        self._ax.update(data=data, **kwargs)
+        plt.pause(0.05)
+
+    def update_with_model(
+        self,
+        model: SW,
+        **kwargs: P.kwargs,
+    ) -> None:
+        """Update the plot content with a SW model.
+
+        Args:
+            model (SW): Model to use for plot update.
+            **kwargs: Additional arguments to give to the plotting function.
+        """
+        self._ax.update_with_model(model=model, **kwargs)
+        plt.pause(0.05)
+
+    @classmethod
+    @abstractmethod
+    def from_mask(
+        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
+    ) -> Self:
+        """Instantiate Figure only from the mask.
+
+        Args:
+            mask (np.ndarray | None, optional): Mask to apply on data.
+            Mask will be set to ones if None. Defaults to None.
+            **kwargs: Additional arguments to pass to plotting method.
+
+        Returns:
+            Self: Instantiated plot.
+        """
+        return cls()

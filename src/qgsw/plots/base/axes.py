@@ -1,17 +1,15 @@
-"""Base plot."""
+"""Axes Managers."""
 
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
-import matplotlib.pyplot as plt
 import numpy as np
 from typing_extensions import ParamSpec, Self
 
 from qgsw.plots.exceptions import (
     AxesInstantiationError,
-    ImpossibleAxesUpdateError,
     InvalidMaskError,
     MismatchingMaskError,
 )
@@ -324,7 +322,7 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
     def from_mask(
         cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
     ) -> Self:
-        """Instantiate Plot only from the mask.
+        """Instantiate Figure only from the mask.
 
         Args:
             mask (np.ndarray | None, optional): Mask to apply on data.
@@ -337,155 +335,3 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
 
 
 AxesManager = TypeVar("AxesManager", bound=BaseAxes)
-
-
-class BaseSinglePlot(Generic[AxesManager], metaclass=ABCMeta):
-    """Base class for a plot rendering a single Axes."""
-
-    def __init__(
-        self,
-        axes_manager: AxesManager,
-        figure: Figure | None = None,
-    ) -> None:
-        """Instantiate the plot.
-
-        Args:
-            axes_manager (AxesManager): Axes Manager.
-            figure (Figure | None, optional): Figure to render plot to.
-            The figure will be created if None. Defaults to None.
-        """
-        plt.ion()
-        self._figure = figure
-        self._ax = axes_manager
-        self._ax.set_ax(self._ax.create_axes(figure=self.figure))
-
-    @property
-    def figure(self) -> Figure:
-        """Figure containing the plot."""
-        if self._figure is None:
-            self._figure = self._create_figure()
-        return self._figure
-
-    @property
-    def ax(self) -> AxesManager:
-        """Figure's axes manager."""
-        return self._ax
-
-    @abstractmethod
-    def _create_figure(self) -> Figure:
-        """Create an empty figure.
-
-        Returns:
-            Figure: Created figure.
-        """
-        figure = plt.figure()
-        figure.tight_layout()
-        return figure
-
-    def update_with(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
-        """Update and render the plot content.
-
-        Args:
-            data (np.ndarray): Data to use.
-            **kwargs: Additional arguments to give to the plotting function.
-        """
-        self._ax.update(data=data, **kwargs)
-        plt.pause(0.05)
-
-    def update_with_model(
-        self,
-        model: SW,
-        **kwargs: P.kwargs,
-    ) -> None:
-        """Update the plot content with a SW model.
-
-        Args:
-            model (SW): Model to use for plot update.
-            **kwargs: Additional arguments to give to the plotting function.
-        """
-        self._ax.update_with_model(model=model, **kwargs)
-        plt.pause(0.05)
-
-    @classmethod
-    @abstractmethod
-    def from_mask(
-        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
-    ) -> Self:
-        """Instantiate Plot only from the mask.
-
-        Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
-            **kwargs: Additional arguments to pass to plotting method.
-
-        Returns:
-            Self: Instantiated plot.
-        """
-        return cls()
-
-
-class ComparisonPlot(Generic[AxesManager], metaclass=ABCMeta):
-    """Comparison plot."""
-
-    _n_cols = 3
-
-    def __init__(self, *axes_managers: AxesManager) -> None:
-        """Instantiate the compariosn plot.
-
-        Args:
-            *axes_managers (AxesManager): Axes Managers for the plot.
-        """
-        self._axes_nb = len(axes_managers)
-        self._axes_ms = axes_managers
-        self._figure, axes = self._create_figure_axes()
-        self._axes = axes.flatten()
-        self._set_axes()
-
-    @property
-    def figure(self) -> Figure:
-        """Figure."""
-        return self._figure
-
-    def _raise_if_inconsistent_datas(self, elements_nb: int) -> None:
-        """Raise an error if the number of plot to update is invalid.
-
-        Args:
-            elements_nb (int): Number of plots ot update.
-
-        Raises:
-            ImpossibleAxesUpdateError: If the number doesn't match
-            the number of plots.
-        """
-        if elements_nb != self._axes_nb:
-            msg = (
-                "There must be as many elements to update as axes."
-                f"{self._axes_nb} were expected, {elements_nb} were given."
-            )
-            raise ImpossibleAxesUpdateError(msg)
-
-    def _create_figure_axes(self) -> tuple[Figure, list[Axes]]:
-        """Create the Figure and the Axes list.
-
-        Returns:
-            tuple[Figure, list[Axes]]: Figure, Axes list.
-        """
-        ncols = min(self._axes_nb, self._n_cols)
-        nrows = (self._axes_nb - 1) // self._n_cols + 1
-        return plt.subplots(
-            nrows=nrows, ncols=ncols, figsize=(6 * ncols, 6 * nrows)
-        )
-
-    def _set_axes(self) -> None:
-        """Set the Axes within the Axes Managers."""
-        for i, axes_m in enumerate(self._axes_ms):
-            axes_m.set_ax(self._axes[i])
-            axes_m.context.reload_axes(axes_m.ax)
-
-    def update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
-        """Update the Figure."""
-        self._raise_if_inconsistent_datas(elements_nb=len(datas))
-        for i, data in enumerate(datas):
-            if data is None:
-                continue
-            self._axes_ms[i].update(data, **kwargs)
-            plt.pause(0.05)
