@@ -21,6 +21,10 @@ from qgsw.mesh import Meshes3D
 from qgsw.physics import compute_burger
 from qgsw.models import SW, QG
 from qgsw.specs import DEVICE
+from qgsw.plots.vorticity import (
+    SurfaceVorticityAxes,
+    SurfaceVorticityComparisonFigure,
+)
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
@@ -172,25 +176,17 @@ for Ro in [
     n_steps = int(t_end / dt) + 1
 
     if freq_plot > 0:
-        import matplotlib as mpl
-        import matplotlib.pyplot as plt
-
-        mpl.rcParams.update({"font.size": 18})
-        palette = plt.cm.bwr  # .with_extremes(bad='grey')
-
-        plt.ion()
-
-        f, a = plt.subplots(1, 3, figsize=(18, 8))
-        a[0].set_title(r"$\omega_{qg}$")
-        a[1].set_title(r"$\omega_{sw}$")
-        a[2].set_title(r"$\omega_{qg} - \omega_{sw}$")
-        [(a[i].set_xticks([]), a[i].set_yticks([])) for i in range(3)]
-        f.tight_layout()
-        plt.pause(0.1)
+        mask = sw_multilayer.masks.not_w[0, 0].cpu().numpy()
+        sw_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+        sw_axes.set_title(r"$\omega_{SW}$")
+        qg_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+        qg_axes.set_title(r"$\omega_{QG}$")
+        diff_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+        diff_axes.set_title(r"$\omega_{SW} - \omega_{QG}$")
+        plot = SurfaceVorticityComparisonFigure(sw_axes, qg_axes, diff_axes)
 
     for n in range(n_steps + 1):
         if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
-            mask_w = sw_multilayer.masks.not_w[0, 0].cpu().numpy()
             w_qg = (
                 (qg_multilayer.omega / qg_multilayer.area / qg_multilayer.f0)
                 .cpu()
@@ -204,33 +200,21 @@ for Ro in [
             w_m = max(np.abs(w_qg).max(), np.abs(w_sw).max())
 
             kwargs = {
-                "cmap": palette,
-                "origin": "lower",
                 "vmin": -w_m,
                 "vmax": w_m,
-                "animated": True,
             }
-            a[0].imshow(np.ma.masked_where(mask_w, w_qg[0, 0]).T, **kwargs)
-            a[1].imshow(np.ma.masked_where(mask_w, w_sw[0, 0]).T, **kwargs)
-            a[2].imshow(
-                np.ma.masked_where(mask_w, (w_qg - w_sw)[0, 0]).T, **kwargs
-            )
-            f.suptitle(
-                f"Ro={Ro:.2f}, Bu={Bu:.2f}, t={t/tau:.2f}$\\tau$, "
-                f"f0={f0:.2f}"
-            )
-            plt.pause(0.05)
+            plot.update(w_sw, w_qg, w_sw - w_qg, **kwargs)
 
         qg_multilayer.step()
         sw_multilayer.step()
         t += dt
-        # if n % freq_checknan == 0:
-        #     if torch.isnan(qg_multilayer.h).any():
-        #         msg = f"Stopping, NAN number in QG h at iteration {n}."
-        #         raise ValueError(msg)
-        #     if torch.isnan(sw_multilayer.h).any():
-        #         msg = f"Stopping, NAN number in SW h at iteration {n}."
-        #         raise ValueError(msg)
+        if n % freq_checknan == 0:
+            if torch.isnan(qg_multilayer.h).any():
+                msg = f"Stopping, NAN number in QG h at iteration {n}."
+                raise ValueError(msg)
+            if torch.isnan(sw_multilayer.h).any():
+                msg = f"Stopping, NAN number in SW h at iteration {n}."
+                raise ValueError(msg)
 
         if freq_log > 0 and n % freq_log == 0:
             verbose.display(

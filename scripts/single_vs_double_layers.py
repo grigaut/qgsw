@@ -1,7 +1,5 @@
 """Comparison of a single-layer vs a double-layer model under vortex shear."""
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from qgsw import verbose
@@ -11,6 +9,10 @@ from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.models import QG
 from qgsw.physics import compute_burger, coriolis
+from qgsw.plots.vorticity import (
+    SurfaceVorticityAxes,
+    SurfaceVorticityComparisonFigure,
+)
 from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
@@ -205,20 +207,19 @@ n_steps = int(t_end / dt) + 1
 verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
-# Instantiate Plots
-mpl.rcParams.update({"font.size": 18})
-palette = plt.cm.bwr  # .with_extremes(bad='grey')
-
-plt.ion()
-
-f, a = plt.subplots(1, 3, figsize=(18, 8))
-a[0].set_title(r"$\omega_{QG Single Layer}$")
-a[1].set_title(r"$\omega_{QG MultiLayers}$")
-a[2].set_title(r"$\omega_{QG Single Layer} - \omega_{QG MultiLayers}$")
-[(a[i].set_xticks([]), a[i].set_yticks([])) for i in range(3)]
-f.tight_layout()
-plt.pause(0.1)
-
+# Instantiate Figures
+mask = qg_1l.masks.not_w[0, 0].cpu().numpy()
+qg_1l_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+qg_1l_axes.set_title(r"$\omega_{QG-1L}$")
+qg_2l_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+qg_2l_axes.set_title(r"$\omega_{QG-ML}$")
+diff_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+diff_axes.set_title(r"$\omega_{QG-1L} - \omega_{QG-ML}$")
+plot = SurfaceVorticityComparisonFigure(qg_1l_axes, qg_2l_axes, diff_axes)
+plot.figure.suptitle(
+    f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
+    f" t={t/tau:.2f}$\\tau$, f0={config_1l.physics.f0:.2f}"
+)
 # Start runs
 for n in range(n_steps + 1):
     if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
@@ -227,20 +228,10 @@ for n in range(n_steps + 1):
         w_m = max(np.abs(w_1l).max(), np.abs(w_2l).max())
 
         kwargs = {
-            "cmap": palette,
-            "origin": "lower",
             "vmin": -w_m,
             "vmax": w_m,
-            "animated": True,
         }
-        a[0].imshow(w_1l[0, 0].T, **kwargs)
-        a[1].imshow(w_2l[0, 0].T, **kwargs)
-        a[2].imshow((w_1l - w_2l)[0, 0].T, **kwargs)
-        f.suptitle(
-            f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
-            f" t={t/tau:.2f}$\\tau$, f0={config_1l.physics.f0:.2f}"
-        )
-        plt.pause(0.05)
+        plot.update(w_1l, w_2l, w_1l - w_2l, **kwargs)
 
     qg_1l.step()
     qg_2l.step()
@@ -248,10 +239,10 @@ for n in range(n_steps + 1):
 
     if freq_log > 0 and n % freq_log == 0:
         verbose.display(
-            msg=f"n={n:05d}, {qg_1l.get_print_info()}",
+            msg=f"QG-1l: n={n:05d}, {qg_1l.get_print_info()}",
             trigger_level=1,
         )
         verbose.display(
-            msg=f"n={n:05d}, {qg_2l.get_print_info()}",
+            msg=f"QG_ML: n={n:05d}, {qg_2l.get_print_info()}",
             trigger_level=1,
         )
