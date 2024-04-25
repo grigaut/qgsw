@@ -62,7 +62,7 @@ class BaseSingleFigure(Generic[AxesManager], metaclass=ABCMeta):
         figure.tight_layout()
         return figure
 
-    def update_with(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
+    def _update(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update and render the plot content.
 
         Args:
@@ -70,6 +70,15 @@ class BaseSingleFigure(Generic[AxesManager], metaclass=ABCMeta):
             **kwargs: Additional arguments to give to the plotting function.
         """
         self._ax.update(data=data, **kwargs)
+
+    def update(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
+        """Update and render the plot content.
+
+        Args:
+            data (np.ndarray): Data to use.
+            **kwargs: Additional arguments to give to the plotting function.
+        """
+        self._update(data=data, **kwargs)
         plt.pause(0.05)
 
     def update_with_model(

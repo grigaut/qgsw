@@ -239,6 +239,11 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         return self._context
 
     @property
+    def content(self) -> AxesContent:
+        """Axes Content."""
+        return self._content
+
+    @property
     def ax(self) -> Axes:
         """Axes to plot to."""
         if self._ax is None:

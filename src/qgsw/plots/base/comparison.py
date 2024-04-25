@@ -78,11 +78,15 @@ class ComparisonFigure(Generic[AxesManager], metaclass=ABCMeta):
             axes_m.set_ax(self._axes[i])
             axes_m.context.reload_axes(axes_m.ax)
 
-    def update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+    def _update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
         """Update the Figure."""
         self._raise_if_inconsistent_datas(elements_nb=len(datas))
         for i, data in enumerate(datas):
             if data is None:
                 continue
             self._axes_ms[i].update(data, **kwargs)
-            plt.pause(0.05)
+
+    def update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+        """Update the Figure."""
+        self._update(*datas, **kwargs)
+        plt.pause(0.05)

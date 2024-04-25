@@ -22,8 +22,10 @@ from qgsw.plots.base.figures import BaseSingleFigure
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from matplotlib.image import AxesImage
 
     from qgsw.models.sw import SW
+
 
 P = ParamSpec("P")
 
@@ -76,6 +78,12 @@ class SurfaceVorticityAxesContent(BaseAxesContent):
         kwargs["origin"] = kwargs.get("origin", "lower")
         kwargs["animated"] = kwargs.get("animated", True)
         super().__init__(mask, **kwargs)
+        self._axesim = None
+
+    @property
+    def axes_image(self) -> AxesImage:
+        """Axes Image."""
+        return self._axesim
 
     def _format_data(self, data: np.ndarray) -> np.ndarray:
         """Format input data.
@@ -100,7 +108,8 @@ class SurfaceVorticityAxesContent(BaseAxesContent):
             Axes: Updated Axes.
         """
         masked_data = np.ma.masked_where(mask, data).T
-        ax.imshow(masked_data, **self._kwargs)
+        axesim = ax.imshow(masked_data, **self._kwargs)
+        self._axesim = axesim
         return ax
 
     def _retrieve_data_from_model(self, model: SW) -> np.ndarray:
@@ -171,17 +180,53 @@ class SurfaceVorticityAxes(
 class SurfaceVorticityFigure(BaseSingleFigure[SurfaceVorticityAxes]):
     """Surface Vorticity Figure."""
 
-    def _create_figure(self) -> Figure:
-        return super()._create_figure()
+    def __init__(
+        self, axes_manager: SurfaceVorticityAxes, figure: Figure | None = None
+    ) -> None:
+        """Instantiate the Surface Vorticity Figure.
 
-    def update_with(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
+        Args:
+            axes_manager (SurfaceVorticityAxes): Axes Manager.
+            figure (Figure | None, optional): Figure, is None, one will be
+            created. Defaults to None.
+        """
+        super().__init__(axes_manager, figure)
+        self._cbar_axes = None
+
+    def _show_colorbar(self) -> None:
+        """Show the colorbar."""
+        if self._cbar_axes is None:
+            # Create the colorbar Axes.
+            self.figure.subplots_adjust(right=0.85)
+            self._cbar_axes: Axes = self.figure.add_axes(
+                [0.88, 0.15, 0.04, 0.7]
+            )
+        if self._ax.content.axes_image is not None:
+            # Update the colorbar.
+            self.figure.colorbar(
+                self._ax.content.axes_image,
+                cax=self._cbar_axes,
+                label=r"$\omega / f_0$",
+            )
+
+    def _update(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
+        """Update the Figure.
+
+        Args:
+            data (np.ndarray): Data tuse for update (1,nl,nx,ny).
+            **kwargs: Additional arguments to give to the plotting function.
+        """
+        super()._update(data, **kwargs)
+        self._show_colorbar()
+
+    def update(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update Axes content.
 
         Args:
             data (np.ndarray): Data to use (1,nl,nx,ny).
             **kwargs: Additional arguments to give to the plotting function.
         """
-        return super().update_with(data, **kwargs)
+        super().update(data, **kwargs)
 
     @classmethod
     def from_mask(
@@ -204,3 +249,29 @@ class SurfaceVorticityFigure(BaseSingleFigure[SurfaceVorticityAxes]):
 
 class SurfaceVorticityComparisonFigure(ComparisonFigure[SurfaceVorticityAxes]):
     """Comparison between Surface Vorticity Axes."""
+
+    def __init__(self, *axes_managers: SurfaceVorticityAxes) -> None:
+        """Instantiate the surface vorticity comparison."""
+        super().__init__(*axes_managers)
+        self._cbar_axes = None
+
+    def _show_colorbar(self) -> None:
+        """Show the colorbar."""
+        if self._cbar_axes is None:
+            # create colorbar Axes.
+            self.figure.subplots_adjust(right=0.85)
+            self._cbar_axes: Axes = self.figure.add_axes(
+                [0.88, 0.15, 0.04, 0.7]
+            )
+        if self._axes_ms[0].content.axes_image is not None:
+            # Add colorbar to the Axes.
+            self.figure.colorbar(
+                self._axes_ms[0].content.axes_image,
+                cax=self._cbar_axes,
+                label=r"$\omega / f_0$",
+            )
+
+    def _update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+        """Update the Axes."""
+        super()._update(*datas, **kwargs)
+        self._show_colorbar()
