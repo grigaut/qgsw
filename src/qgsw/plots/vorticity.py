@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -15,6 +16,7 @@ from qgsw.plots.base import (
     BaseAxesContent,
     BaseAxesContext,
     BaseSinglePlot,
+    ComparisonPlot,
 )
 
 if TYPE_CHECKING:
@@ -58,6 +60,22 @@ class SurfaceVortictyAxesContext(BaseAxesContext):
 
 class SurfaceVorticityAxesContent(BaseAxesContent):
     """Axes Content Manager for surface vorticity plot."""
+
+    def __init__(
+        self, mask: np.ndarray | None = None, **kwargs: P.kwargs
+    ) -> None:
+        """Instantiate the AxesContent.
+
+        Args:
+            mask (np.ndarray | None, optional): Mask to apply on data.
+            Mask will be set to ones if None. Defaults to None.
+            **kwargs: Additional arguments to pass to plotting method.
+        """
+        palette = plt.cm.bwr
+        kwargs["cmap"] = kwargs.get("cmap", palette)
+        kwargs["origin"] = kwargs.get("origin", "lower")
+        kwargs["animated"] = kwargs.get("animated", True)
+        super().__init__(mask, **kwargs)
 
     def _format_data(self, data: np.ndarray) -> np.ndarray:
         """Format input data.
@@ -130,6 +148,25 @@ class SurfaceVorticityAxes(
         """
         return super().update(data, **kwargs)
 
+    @classmethod
+    def from_mask(
+        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
+    ) -> Self:
+        """Instantiate Plot only from the mask.
+
+        Args:
+            mask (np.ndarray | None, optional): Mask to apply on data.
+            Mask will be set to ones if None. Defaults to None.
+            **kwargs: Additional arguments to pass to plotting method.
+
+        Returns:
+            Self: Instantiated plot.
+        """
+        return cls(
+            context=SurfaceVortictyAxesContext(),
+            content=SurfaceVorticityAxesContent(mask=mask, **kwargs),
+        )
+
 
 class SurfaceVorticityPlot(BaseSinglePlot[SurfaceVorticityAxes]):
     """Surface Vorticity Plot."""
@@ -161,8 +198,9 @@ class SurfaceVorticityPlot(BaseSinglePlot[SurfaceVorticityAxes]):
             Self: Instantiated plot.
         """
         return cls(
-            axes_manager=SurfaceVorticityAxes(
-                context=SurfaceVortictyAxesContext(),
-                content=SurfaceVorticityAxesContent(mask=mask, **kwargs),
-            )
+            axes_manager=SurfaceVorticityAxes.from_mask(mask=mask, **kwargs),
         )
+
+
+class SurfaceVorticityComparisonPlot(ComparisonPlot[SurfaceVorticityAxes]):
+    """Comparison between Surface Vorticity Axes."""
