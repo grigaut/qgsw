@@ -113,8 +113,8 @@ for model, name, dt, start_file in [
 
     if freq_save > 0:
         output_dir = (
-            f'run_outputs/{name}_{config.mesh.nx}x{config.mesh.ny}_dt{dt}_'
-            f'slip{param["slip_coef"]}/'
+            f"{config.io.output_directory}/{name}_{config.mesh.nx}x"
+            f"{config.mesh.ny}_dt{dt}_slip{param["slip_coef"]}/"
         )
         os.makedirs(output_dir, exist_ok=True)
         verbose.display(
