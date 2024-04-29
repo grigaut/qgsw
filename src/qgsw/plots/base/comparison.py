@@ -36,7 +36,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         self._axes_nb = len(axes_managers)
         self._axes_ms = axes_managers
         self._figure, axes = self._create_figure_axes()
-        self._figure.canvas.manager.set_window_title("Comparison")
+        self._figure.canvas.manager.set_window_title("comparison")
         self._axes: np.ndarray = axes.flatten()
         self._set_axes()
 
