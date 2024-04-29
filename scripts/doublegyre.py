@@ -114,7 +114,7 @@ for model, name, dt, start_file in [
     if freq_save > 0:
         output_dir = (
             f"{config.io.output_directory}/{name}_{config.mesh.nx}x"
-            f"{config.mesh.ny}_dt{dt}_slip{param["slip_coef"]}/"
+            f"{config.mesh.ny}_dt{dt}_slip{param['slip_coef']}/"
         )
         os.makedirs(output_dir, exist_ok=True)
         verbose.display(
@@ -208,28 +208,10 @@ for model, name, dt, start_file in [
             )
             u, v, h = qgsw_multilayer.get_physical_uvh(numpy=True)
             if model == QG:
-                u_a = qgsw_multilayer.u_a.cpu().numpy()
-                v_a = qgsw_multilayer.v_a.cpu().numpy()
-                np.savez(
-                    filename,
-                    u=u.astype("float32"),
-                    v=v.astype("float32"),
-                    u_a=u_a.astype("float32"),
-                    v_a=v_a.astype("float32"),
-                    h=h.astype("float32"),
+                qgsw_multilayer.save_uvh(Path(filename))
+                filename_a = os.path.join(
+                    output_dir, f"uv_a_{n_years:03d}y_{n_days:03d}d.npz"
                 )
-                verbose.display(
-                    msg=f"saved u,v,h,u_a,v_a to {filename}",
-                    trigger_level=1,
-                )
+                qgsw_multilayer.save_uv_ageostrophic(Path(filename_a))
             else:
-                np.savez(
-                    filename,
-                    u=u.astype("float32"),
-                    v=v.astype("float32"),
-                    h=h.astype("float32"),
-                )
-                verbose.display(
-                    msg=f"saved u,v,h to {filename}",
-                    trigger_level=1,
-                )
+                qgsw_multilayer.save_uvh(Path(filename))
