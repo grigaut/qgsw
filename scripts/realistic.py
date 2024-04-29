@@ -92,7 +92,7 @@ param = {
     "slip_coef": config.physics.slip_coef,
     "dt": config.mesh.dt,  # time-step (s)
     "compile": True,
-    "mask": bathy.compute_ocean_mask(mesh.h.remove_z_h().xy),
+    "mask": bathy.compute_ocean_mask(mesh.h.remove_z_h()),
     "taux": taux[0, 1:-1, :],
     "tauy": tauy[0, :, 1:-1],
 }
@@ -235,22 +235,10 @@ for n in range(1, n_steps + 1):
         )
         u, v, h = qg.get_physical_uvh(numpy=True)
         if model == QG:
-            # u_a = qg.u_a.cpu().numpy()
-            # v_a = qg.v_a.cpu().numpy()
-            np.savez(
-                filename,
-                u=u.astype("float32"),
-                v=v.astype("float32"),
-                # u_a=u_a.astype('float32'), v_a=v_a.astype('float32'),
-                h=h.astype("float32"),
+            qg.save_uvh(Path(filename))
+            filename_a = os.path.join(
+                output_dir, f"uv_a_{n_years:03d}y_{n_days:03d}d.npz"
             )
-            # print(f'saved u,v,h,u_a,v_a to {filename}')
-            verbose.display(msg=f"saved u,v,h to {filename}", trigger_level=1)
+            qg.save_uv_ageostrophic(Path(filename_a))
         else:
-            np.savez(
-                filename,
-                u=u.astype("float32"),
-                v=v.astype("float32"),
-                h=h.astype("float32"),
-            )
-            verbose.display(msg=f"saved u,v,h to {filename}", trigger_level=1)
+            qg.save_uvh(Path(filename))
