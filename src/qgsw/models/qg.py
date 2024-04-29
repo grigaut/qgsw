@@ -5,9 +5,9 @@ Pytorch multilayer QG as projected SW, Louis Thiry, 9. oct. 2023.
   - DST spectral solver for QG elliptic equation
 """
 
+from pathlib import Path
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from qgsw.models.core.helmholtz import (
     compute_laplace_dstI,
@@ -297,3 +297,19 @@ class QG(SW):
         self.compute_ageostrophic_velocity(dt_uvh_qg, dt_uvh_sw)
 
         return dt_uvh_qg
+
+    def save_uv_ageostrophic(self, output_file: Path) -> None:
+        """Save U ageostrophic and V ageostrophic to a given file.
+
+        Args:
+            output_file (Path): File to save value in (.npz).
+        """
+        self._raise_if_invalid_savefile(output_file=output_file)
+
+        np.savez(
+            output_file,
+            u=self.u_a.numpy().astype("float32"),
+            v=self.v_a.numpy().astype("float32"),
+        )
+
+        verbose.display(msg=f"saved u_a,v_a to {output_file}", trigger_level=1)

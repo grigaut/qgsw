@@ -4,18 +4,23 @@ Shallow-water implementation.
 Louis Thiry, Nov 2023 for IFREMER.
 """
 
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Literal, Union, overload
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-from typing import Any
-from qgsw.models.core.finite_diff import interp_TP, comp_ke, div_nofluxbc
+
+from qgsw import verbose
+from qgsw.masks import Masks
+from qgsw.models.core.finite_diff import comp_ke, div_nofluxbc, interp_TP
 from qgsw.models.core.flux import flux
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
-from qgsw.masks import Masks
+from qgsw.models.exceptions import InvalidSavingFileError
 from qgsw.reconstruction import linear2_centered, wenoz4_left, wenoz6_left
-from qgsw import verbose
-from typing import Union
 
 
 def replicate_pad(f, mask):
@@ -49,7 +54,6 @@ def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     reverse_cumsum(torch.arange(1,4), dim=-1)
     >>> tensor([6, 5, 3])
     """
-
     return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
 
 
@@ -59,8 +63,7 @@ def inv_reverse_cumsum(x, dim):
 
 
 class SW:
-    """
-    # Implementation of multilayer rotating shallow-water model
+    """# Implementation of multilayer rotating shallow-water model
 
     Following https://doi.org/10.1029/2021MS002663 .
 
@@ -93,8 +96,7 @@ class SW:
     """
 
     def __init__(self, param: dict[str, Any]):
-        """
-        Parameters
+        """Parameters
 
         param: python dict. with following keys
             'nx':       int, number of grid points in dimension x
@@ -537,7 +539,6 @@ class SW:
             ValueError: If tauy is not a float nor a Tensor.
             ValueError: If tauy if a wrongly-shaped Tensor.
         """
-
         is_tensorx = isinstance(taux, torch.Tensor)
 
         if (not isinstance(taux, float)) and (not is_tensorx):
@@ -559,7 +560,22 @@ class SW:
         self.taux = taux
         self.tauy = tauy
 
-    def get_physical_uvh(self, numpy=False):
+    @overload
+    def get_physical_uvh(
+        self, numpy: Literal[True]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
+
+    @overload
+    def get_physical_uvh(
+        self, numpy: Literal[False]
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]: ...
+
+    def get_physical_uvh(
+        self, numpy: bool = False
+    ) -> (
+        tuple[np.ndarray, np.ndarray, np.ndarray]
+        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ):
         """Get physical variables u_phys, v_phys, h_phys from state variables."""
         u_phys = (self.u / self.dx).cpu()
         v_phys = (self.v / self.dy).cpu()
@@ -572,9 +588,7 @@ class SW:
         )
 
     def set_physical_uvh(self, u_phys, v_phys, h_phys):
-        """
-        Set state variables with physical variables u_phys, v_phys, h_phys.
-        """
+        """Set state variables with physical variables u_phys, v_phys, h_phys."""
         u_ = (
             torch.from_numpy(u_phys)
             if isinstance(u_phys, np.ndarray)
@@ -607,9 +621,7 @@ class SW:
         self.compute_diagnostic_variables()
 
     def get_print_info(self):
-        """
-        Returns a string with summary of current variables.
-        """
+        """Returns a string with summary of current variables."""
         hl_mean = (self.h / self.area).mean((-1, -2)).squeeze().cpu().numpy()
         eta = self.eta
         u, v, h = self.u / self.dx, self.v / self.dy, self.h / self.area
@@ -627,8 +639,7 @@ class SW:
             )
 
     def advection_h(self) -> torch.Tensor:
-        """
-        Advection RHS for thickness perturbation h
+        """Advection RHS for thickness perturbation h
         dt_h = - div(h_tot [u v]),  h_tot = h_ref + h
         """
         h_tot = self.h_ref + self.h
@@ -637,9 +648,7 @@ class SW:
         return -div_nofluxbc(h_tot_flux_x, h_tot_flux_y) * self.masks.h
 
     def advection_momentum(self):
-        """
-        Advection RHS for momentum (u, v)
-        """
+        """Advection RHS for momentum (u, v)"""
         # Vortex-force + Coriolis
         omega_Vm = self.w_flux_y(self.omega[..., 1:-1, :], self.V_m)
         omega_Um = self.w_flux_x(self.omega[..., 1:-1], self.U_m)
@@ -661,9 +670,7 @@ class SW:
         ) * self.masks.v
 
     def add_wind_forcing(self, du, dv):
-        """
-        Add wind forcing to the derivatives du, dv.
-        """
+        """Add wind forcing to the derivatives du, dv."""
         H_ugrid = (self.h_tot_ugrid) / self.area
         H_vgrid = (self.h_tot_vgrid) / self.area
         du[..., 0, :, :] += self.taux / H_ugrid[..., 0, 1:-1, :] * self.dx
@@ -671,16 +678,13 @@ class SW:
         return du, dv
 
     def add_bottom_drag(self, du, dv):
-        """
-        Add bottom drag to the derivatives du, dv.
-        """
+        """Add bottom drag to the derivatives du, dv."""
         du[..., -1, :, :] += -self.bottom_drag_coef * self.u[..., -1, 1:-1, :]
         dv[..., -1, :, :] += -self.bottom_drag_coef * self.v[..., -1, :, 1:-1]
         return du, dv
 
     def compute_omega(self, u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
-        """
-        Pad u and v using boundary conditions (free-slip, partial free-slip,
+        """Pad u and v using boundary conditions (free-slip, partial free-slip,
         no-slip).
         """
         u_ = F.pad(u, (1, 1, 0, 0))
@@ -698,8 +702,7 @@ class SW:
         return omega
 
     def compute_diagnostic_variables(self):
-        """
-        Compute the model's diagnostic variables given the prognostic
+        """Compute the model's diagnostic variables given the prognostic
         variables self.u, self.v, self.h .
         """
         self.omega = self.compute_omega(self.u, self.v)
@@ -722,9 +725,7 @@ class SW:
         self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
     def filter_barotropic_waves(self, dt_u, dt_v, dt_h):
-        """
-        Inspired from https://doi.org/10.1029/2000JC900089.
-        """
+        """Inspired from https://doi.org/10.1029/2000JC900089."""
         # compute RHS
         u_star = (self.u + self.dt * dt_u) / self.dx
         v_star = (self.v + self.dt * dt_v) / self.dy
@@ -774,9 +775,7 @@ class SW:
         return dt_u + filt_u, dt_v + filt_v, dt_h
 
     def compute_time_derivatives(self):
-        """
-        Computes the state variables derivatives dt_u, dt_v, dt_h
-        """
+        """Computes the state variables derivatives dt_u, dt_v, dt_h"""
         self.compute_diagnostic_variables()
         dt_h = self.advection_h()
         dt_u, dt_v = self.advection_momentum()
@@ -786,9 +785,7 @@ class SW:
         return dt_u, dt_v, dt_h
 
     def step(self):
-        """
-        Performs one step time-integration with RK3-SSP scheme.
-        """
+        """Performs one step time-integration with RK3-SSP scheme."""
         dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
         self.u += self.dt * dt0_u
         self.v += self.dt * dt0_v
@@ -803,3 +800,35 @@ class SW:
         self.u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
         self.v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
         self.h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
+
+    def _raise_if_invalid_savefile(self, output_file: Path) -> None:
+        """Raise and error if the saving file is invalid.
+
+        Args:
+            output_file (Path): Output file.
+
+        Raises:
+            InvalidSavingFileError: if the saving file extension is not .npz.
+        """
+        if output_file.suffix != ".npz":
+            msg = "Variables are expected to be saved in an .npz file."
+            raise InvalidSavingFileError(msg)
+
+    def save_uvh(self, output_file: Path) -> None:
+        """Save U, V and H values.
+
+        Args:
+            output_file (Path): File to save value in (.npz).
+        """
+        self._raise_if_invalid_savefile(output_file=output_file)
+
+        u, v, h = self.get_physical_uvh(numpy=True)
+
+        np.savez(
+            output_file,
+            u=u.astype("float32"),
+            v=v.astype("float32"),
+            h=h.astype("float32"),
+        )
+
+        verbose.display(msg=f"saved u,v,h to {output_file}", trigger_level=1)
