@@ -12,21 +12,28 @@ import torch
 from qgsw.models.core.helmholtz import (
     compute_laplace_dstI,
     solve_helmholtz_dstI,
-    dstI2D,
     solve_helmholtz_dstI_cmm,
     compute_capacitance_matrices,
 )
 from qgsw.models.core.finite_diff import grad_perp
-from qgsw.models.sw import SW
+from qgsw.models.base import Model
 from qgsw import verbose
 from typing import Any, Union
 
 
-class QG(SW):
+class QG(Model):
     """Multilayer quasi-geostrophic model as projected SW."""
+
+    barotropic_filter: bool = False
+    barotropic_filter_spectral: bool = False
 
     def __init__(self, param):
         super().__init__(param)
+
+        verbose.display(
+            msg=f"class QG, ignoring barotropic filter",
+            trigger_level=2,
+        )
 
         # init matrices for elliptic equation
         self.compute_auxillary_matrices()
@@ -34,7 +41,9 @@ class QG(SW):
         # precompile functions
         self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
 
-    def _validate_H(self, param: dict[str, Any], key: str) -> torch.Tensor:
+    def _validate_layers(
+        self, param: dict[str, Any], key: str
+    ) -> torch.Tensor:
         """Perform additional validation over H.
 
         Args:
@@ -47,7 +56,7 @@ class QG(SW):
         Returns:
             torch.Tensor: H
         """
-        value = super()._validate_H(param, key)
+        value = super()._validate_layers(param, key)
         if value.shape[-2:] != (1, 1):
             msg = (
                 "H must me constant in space for "
@@ -160,7 +169,7 @@ class QG(SW):
         self.homsol_hgrid = self.interp_TP(self.homsol_wgrid)
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
 
-    def add_wind_forcing(self, du, dv):
+    def _add_wind_forcing(self, du, dv):
         du[..., 0, :, :] += self.taux / self.H[0] * self.dx
         dv[..., 0, :, :] += self.tauy / self.H[0] * self.dy
         return du, dv
@@ -313,3 +322,7 @@ class QG(SW):
         )
 
         verbose.display(msg=f"saved u_a,v_a to {output_file}", trigger_level=1)
+
+    def step(self):
+        """Performs one step time-integration with RK3-SSP scheme."""
+        super().step()
