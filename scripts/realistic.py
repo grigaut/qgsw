@@ -74,7 +74,6 @@ verbose.display(
     ),
     trigger_level=1,
 )
-exit()
 taux, tauy = wind.compute()
 
 param = {
