@@ -180,17 +180,13 @@ class SurfaceVorticityAxes(
 class SurfaceVorticityFigure(BaseSingleFigure[SurfaceVorticityAxes]):
     """Surface Vorticity Figure."""
 
-    def __init__(
-        self, axes_manager: SurfaceVorticityAxes, figure: Figure | None = None
-    ) -> None:
+    def __init__(self, axes_manager: SurfaceVorticityAxes) -> None:
         """Instantiate the Surface Vorticity Figure.
 
         Args:
             axes_manager (SurfaceVorticityAxes): Axes Manager.
-            figure (Figure | None, optional): Figure, is None, one will be
-            created. Defaults to None.
         """
-        super().__init__(axes_manager, figure)
+        super().__init__(axes_manager)
         self._cbar_axes = None
 
     def _show_colorbar(self) -> None:

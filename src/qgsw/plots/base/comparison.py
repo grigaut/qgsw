@@ -3,27 +3,26 @@
 from __future__ import annotations
 
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Any, Generic
 
 import matplotlib.pyplot as plt
+import numpy as np
 from typing_extensions import ParamSpec
 
 from qgsw.plots.base.axes import AxesManager
+from qgsw.plots.base.figures import BaseFigure
 from qgsw.plots.exceptions import (
     ImpossibleAxesUpdateError,
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
-    import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
 P = ParamSpec("P")
 
 
-class ComparisonFigure(Generic[AxesManager], metaclass=ABCMeta):
+class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
     """Comparison figure."""
 
     _n_cols = 3
@@ -39,11 +38,6 @@ class ComparisonFigure(Generic[AxesManager], metaclass=ABCMeta):
         self._figure, axes = self._create_figure_axes()
         self._axes = axes.flatten()
         self._set_axes()
-
-    @property
-    def figure(self) -> Figure:
-        """Figure."""
-        return self._figure
 
     def _raise_if_inconsistent_datas(self, elements_nb: int) -> None:
         """Raise an error if the number of plot to update is invalid.
@@ -88,15 +82,24 @@ class ComparisonFigure(Generic[AxesManager], metaclass=ABCMeta):
                 continue
             self._axes_ms[i].update(data, **kwargs)
 
+    def _set_cbar_extrems(
+        self, *datas: np.ndarray | None, **kwargs: P.kwargs
+    ) -> dict[str, Any]:
+        """Set the colorbar extrem values if needed.
+
+        Returns:
+            dict[str, Any]: Updated kwargs.
+        """
+        if ("vmin" not in kwargs) and ("vmax" in kwargs):
+            return kwargs
+        max_value = max(np.abs(data).max() for data in datas)
+        if "vmin" not in kwargs:
+            kwargs["vmin"] = -max_value
+        if "vmax" not in kwargs:
+            kwargs["vmax"] = max_value
+        return kwargs
+
     def update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
         """Update the Figure."""
-        self._update(*datas, **kwargs)
+        self._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
         plt.pause(0.05)
-
-    def savefig(self, output_file: Path) -> None:
-        """Save figure in the given output file.
-
-        Args:
-            output_file (Path): File to save figure at.
-        """
-        self.figure.savefig(fname=output_file)
