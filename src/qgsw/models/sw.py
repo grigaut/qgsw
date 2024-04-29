@@ -801,15 +801,26 @@ class SW:
         self.v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
         self.h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
 
+    def _raise_if_invalid_savefile(self, output_file: Path) -> None:
+        """Raise and error if the saving file is invalid.
+
+        Args:
+            output_file (Path): Output file.
+
+        Raises:
+            InvalidSavingFileError: if the saving file extension is not .npz.
+        """
+        if output_file.suffix != ".npz":
+            msg = "Variables are expected to be saved in an .npz file."
+            raise InvalidSavingFileError(msg)
+
     def save_uvh(self, output_file: Path) -> None:
         """Save U, V and H values.
 
         Args:
             output_file (Path): File to save value in (.npz).
         """
-        if output_file.suffix != ".npz":
-            msg = "Variables are expected to be saved in an .npz file."
-            raise InvalidSavingFileError(msg)
+        self._raise_if_invalid_savefile(output_file=output_file)
 
         u, v, h = self.get_physical_uvh(numpy=True)
 
