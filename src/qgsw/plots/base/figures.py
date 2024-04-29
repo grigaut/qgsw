@@ -39,6 +39,10 @@ class BaseFigure:
         """
         self.figure.savefig(fname=output_file)
 
+    def show(self) -> None:
+        """Show the figure."""
+        plt.pause(0.05)
+
 
 class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
     """Base class for a plot rendering a single Axes."""
@@ -92,7 +96,6 @@ class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             **kwargs: Additional arguments to give to the plotting function.
         """
         self._update(data=data, **kwargs)
-        plt.pause(0.05)
 
     def update_with_model(
         self,
@@ -106,7 +109,6 @@ class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             **kwargs: Additional arguments to give to the plotting function.
         """
         self._ax.update_with_model(model=model, **kwargs)
-        plt.pause(0.05)
 
     @classmethod
     @abstractmethod
