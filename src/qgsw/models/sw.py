@@ -7,7 +7,7 @@ Louis Thiry, Nov 2023 for IFREMER.
 import numpy as np
 import torch
 import torch.nn.functional as F
-from typing import Any
+from typing import Any, overload, Literal
 from qgsw.models.core.finite_diff import interp_TP, comp_ke, div_nofluxbc
 from qgsw.models.core.flux import flux
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
@@ -559,7 +559,22 @@ class SW:
         self.taux = taux
         self.tauy = tauy
 
-    def get_physical_uvh(self, numpy=False):
+    @overload
+    def get_physical_uvh(
+        self, numpy: Literal[True]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
+
+    @overload
+    def get_physical_uvh(
+        self, numpy: Literal[False]
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]: ...
+
+    def get_physical_uvh(
+        self, numpy: bool = False
+    ) -> (
+        tuple[np.ndarray, np.ndarray, np.ndarray]
+        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ):
         """Get physical variables u_phys, v_phys, h_phys from state variables."""
         u_phys = (self.u / self.dx).cpu()
         v_phys = (self.v / self.dy).cpu()
