@@ -36,7 +36,8 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         self._axes_nb = len(axes_managers)
         self._axes_ms = axes_managers
         self._figure, axes = self._create_figure_axes()
-        self._axes = axes.flatten()
+        self._figure.canvas.manager.set_window_title("Comparison")
+        self._axes: np.ndarray = axes.flatten()
         self._set_axes()
 
     def _raise_if_inconsistent_datas(self, elements_nb: int) -> None:
