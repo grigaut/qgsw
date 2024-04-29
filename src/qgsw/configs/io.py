@@ -26,6 +26,9 @@ class IOConfig(_Config):
         super().__init__(params)
         if not self.output_directory.is_dir():
             self.output_directory.mkdir()
+            gitignore = self.output_directory.joinpath(".gitignore")
+            with gitignore.open("w") as file:
+                file.write("*")
 
     @property
     def name(self) -> str:

@@ -11,6 +11,8 @@ from typing_extensions import ParamSpec, Self
 from qgsw.plots.base.axes import AxesManager
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import numpy as np
     from matplotlib.figure import Figure
 
@@ -19,13 +21,31 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 
 
-class BaseSingleFigure(Generic[AxesManager], metaclass=ABCMeta):
+class BaseFigure:
+    """Base class for figures."""
+
+    @property
+    def figure(self) -> Figure:
+        """Figure containing the plot."""
+        if self._figure is None:
+            self._figure = self._create_figure()
+        return self._figure
+
+    def savefig(self, output_file: Path) -> None:
+        """Save figure in the given output file.
+
+        Args:
+            output_file (Path): File to save figure at.
+        """
+        self.figure.savefig(fname=output_file)
+
+
+class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
     """Base class for a plot rendering a single Axes."""
 
     def __init__(
         self,
         axes_manager: AxesManager,
-        figure: Figure | None = None,
     ) -> None:
         """Instantiate the plot.
 
@@ -35,16 +55,9 @@ class BaseSingleFigure(Generic[AxesManager], metaclass=ABCMeta):
             The figure will be created if None. Defaults to None.
         """
         plt.ion()
-        self._figure = figure
+        self._figure = self._create_figure()
         self._ax = axes_manager
         self._ax.set_ax(self._ax.create_axes(figure=self.figure))
-
-    @property
-    def figure(self) -> Figure:
-        """Figure containing the plot."""
-        if self._figure is None:
-            self._figure = self._create_figure()
-        return self._figure
 
     @property
     def ax(self) -> AxesManager:

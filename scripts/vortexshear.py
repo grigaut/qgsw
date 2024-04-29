@@ -16,6 +16,7 @@ from qgsw.configs import VortexShearConfig
 from qgsw.forcing.vortex import (
     RankineVortexForcing,
 )
+from pathlib import Path
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.physics import compute_burger
@@ -119,9 +120,9 @@ for Ro in [
         "dt": 0.0,  # time-step (s)
     }
 
-    qg_multilayer = QG(param_qg)
+    qg_ml = QG(param_qg)
 
-    u_init, v_init, h_init = qg_multilayer.G(vortex.compute(f0, Ro))
+    u_init, v_init, h_init = qg_ml.G(vortex.compute(f0, Ro))
 
     u_max, v_max, c = (
         torch.abs(u_init).max().item() / config.mesh.dx,
@@ -140,29 +141,29 @@ for Ro in [
         cfl_gravity * config.mesh.dx / c,
     )
 
-    qg_multilayer.dt = dt
-    qg_multilayer.u = torch.clone(u_init)
-    qg_multilayer.v = torch.clone(v_init)
-    qg_multilayer.h = torch.clone(h_init)
-    qg_multilayer.compute_diagnostic_variables()
+    qg_ml.dt = dt
+    qg_ml.u = torch.clone(u_init)
+    qg_ml.v = torch.clone(v_init)
+    qg_ml.h = torch.clone(h_init)
+    qg_ml.compute_diagnostic_variables()
 
-    w_qg = (qg_multilayer.omega.squeeze() / qg_multilayer.area).cpu().numpy()
+    w_qg = (qg_ml.omega.squeeze() / qg_ml.area).cpu().numpy()
 
     # update time step
     param_sw["dt"] = dt
-    sw_multilayer = SW(param_sw)
-    sw_multilayer.u = torch.clone(u_init)
-    sw_multilayer.v = torch.clone(v_init)
-    sw_multilayer.h = torch.clone(h_init)
-    sw_multilayer.compute_diagnostic_variables()
+    sw_ml = SW(param_sw)
+    sw_ml.u = torch.clone(u_init)
+    sw_ml.v = torch.clone(v_init)
+    sw_ml.h = torch.clone(h_init)
+    sw_ml.compute_diagnostic_variables()
 
     # time params
     t = 0
 
-    qg_multilayer.compute_time_derivatives()
-    wa_0 = qg_multilayer.omega_a.squeeze().cpu().numpy()
+    qg_ml.compute_time_derivatives()
+    wa_0 = qg_ml.omega_a.squeeze().cpu().numpy()
 
-    w_0 = qg_multilayer.omega.squeeze() / qg_multilayer.dx / qg_multilayer.dy
+    w_0 = qg_ml.omega.squeeze() / qg_ml.dx / qg_ml.dy
     tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).cpu().item()
     verbose.display(
         msg=f"tau = {tau *f0:.2f} f0-1",
@@ -176,7 +177,7 @@ for Ro in [
     n_steps = int(t_end / dt) + 1
 
     if freq_plot > 0:
-        mask = sw_multilayer.masks.not_w[0, 0].cpu().numpy()
+        mask = sw_ml.masks.not_w[0, 0].cpu().numpy()
         sw_axes = SurfaceVorticityAxes.from_mask(mask=mask)
         sw_axes.set_title(r"$\omega_{SW}$")
         qg_axes = SurfaceVorticityAxes.from_mask(mask=mask)
@@ -187,37 +188,26 @@ for Ro in [
 
     for n in range(n_steps + 1):
         if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
-            w_qg = (
-                (qg_multilayer.omega / qg_multilayer.area / qg_multilayer.f0)
-                .cpu()
-                .numpy()
-            )
-            w_sw = (
-                (sw_multilayer.omega / sw_multilayer.area / sw_multilayer.f0)
-                .cpu()
-                .numpy()
-            )
-            w_m = max(np.abs(w_qg).max(), np.abs(w_sw).max())
+            w_qg = (qg_ml.omega / qg_ml.area / qg_ml.f0).cpu().numpy()
+            w_sw = (sw_ml.omega / sw_ml.area / sw_ml.f0).cpu().numpy()
+            plot.update(w_sw, w_qg, w_sw - w_qg)
+            output_dir = config.io.output_directory
+            output_name = Path(f"{config.io.name}_{n}.png")
+            plot.savefig(output_dir.joinpath(output_name))
 
-            kwargs = {
-                "vmin": -w_m,
-                "vmax": w_m,
-            }
-            plot.update(w_sw, w_qg, w_sw - w_qg, **kwargs)
-
-        qg_multilayer.step()
-        sw_multilayer.step()
+        qg_ml.step()
+        sw_ml.step()
         t += dt
         if n % freq_checknan == 0:
-            if torch.isnan(qg_multilayer.h).any():
+            if torch.isnan(qg_ml.h).any():
                 msg = f"Stopping, NAN number in QG h at iteration {n}."
                 raise ValueError(msg)
-            if torch.isnan(sw_multilayer.h).any():
+            if torch.isnan(sw_ml.h).any():
                 msg = f"Stopping, NAN number in SW h at iteration {n}."
                 raise ValueError(msg)
 
         if freq_log > 0 and n % freq_log == 0:
             verbose.display(
-                msg=f"n={n:05d}, {qg_multilayer.get_print_info()}",
+                msg=f"n={n:05d}, {qg_ml.get_print_info()}",
                 trigger_level=1,
             )
