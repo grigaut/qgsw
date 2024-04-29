@@ -1,5 +1,5 @@
 [io]
-name = "single_layer_vortex"
+name = "1_layer_200"
 plot_frequency = nan # in days
 performance_log = false
 output_dir = "output"

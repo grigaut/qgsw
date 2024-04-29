@@ -1,6 +1,7 @@
 """Comparison of a single-layer vs a double-layer model under vortex shear."""
 
-import numpy as np
+from pathlib import Path
+
 import torch
 from qgsw import verbose
 from qgsw.configs import VortexShearConfig
@@ -199,7 +200,7 @@ verbose.display(
 )
 
 t_end = 8 * tau
-freq_plot = int(t_end / 100 / dt) + 1
+freq_plot = int(t_end / 10 / dt) + 1
 freq_checknan = 100
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
@@ -216,22 +217,22 @@ qg_2l_axes.set_title(r"$\omega_{QG-ML}$")
 diff_axes = SurfaceVorticityAxes.from_mask(mask=mask)
 diff_axes.set_title(r"$\omega_{QG-1L} - \omega_{QG-ML}$")
 plot = SurfaceVorticityComparisonFigure(qg_1l_axes, qg_2l_axes, diff_axes)
-plot.figure.suptitle(
-    f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
-    f" t={t/tau:.2f}$\\tau$, f0={config_1l.physics.f0:.2f}"
-)
+
 # Start runs
 for n in range(n_steps + 1):
     if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
         w_1l = (qg_1l.omega / qg_1l.area / qg_1l.f0).cpu().numpy()
         w_2l = (qg_2l.omega / qg_2l.area / qg_2l.f0).cpu().numpy()
-        w_m = max(np.abs(w_1l).max(), np.abs(w_2l).max())
-
-        kwargs = {
-            "vmin": -w_m,
-            "vmax": w_m,
-        }
-        plot.update(w_1l, w_2l, w_1l - w_2l, **kwargs)
+        plot.figure.suptitle(
+            f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
+            f" t={t/tau:.2f}$\\tau$"
+        )
+        plot.update(w_1l, w_2l, w_1l - w_2l)
+        output_dir = config_1l.io.output_directory
+        name_1l = config_1l.io.name
+        name_2l = config_2l.io.name
+        output_name = Path(f"comparison_{name_1l}_{name_2l}_{n}.png")
+        plot.savefig(output_dir.joinpath(output_name))
 
     qg_1l.step()
     qg_2l.step()
