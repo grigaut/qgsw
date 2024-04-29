@@ -228,6 +228,7 @@ for n in range(n_steps + 1):
             f" t={t/tau:.2f}$\\tau$"
         )
         plot.update(w_1l, w_2l, w_1l - w_2l)
+        plot.show()
         output_dir = config_1l.io.output_directory
         name_1l = config_1l.io.name
         name_2l = config_2l.io.name

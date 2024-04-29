@@ -103,4 +103,3 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
     def update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
         """Update the Figure."""
         self._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
-        plt.pause(0.05)

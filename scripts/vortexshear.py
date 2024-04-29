@@ -191,6 +191,7 @@ for Ro in [
             w_qg = (qg_ml.omega / qg_ml.area / qg_ml.f0).cpu().numpy()
             w_sw = (sw_ml.omega / sw_ml.area / sw_ml.f0).cpu().numpy()
             plot.update(w_sw, w_qg, w_sw - w_qg)
+            plot.show()
             output_dir = config.io.output_directory
             output_name = Path(f"{config.io.name}_{n}.png")
             plot.savefig(output_dir.joinpath(output_name))
