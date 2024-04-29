@@ -11,6 +11,8 @@ from typing_extensions import ParamSpec, Self
 from qgsw.plots.base.axes import AxesManager
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import numpy as np
     from matplotlib.figure import Figure
 
@@ -94,6 +96,14 @@ class BaseSingleFigure(Generic[AxesManager], metaclass=ABCMeta):
         """
         self._ax.update_with_model(model=model, **kwargs)
         plt.pause(0.05)
+
+    def savefig(self, output_file: Path) -> None:
+        """Save figure in the given output file.
+
+        Args:
+            output_file (Path): File to save figure at.
+        """
+        self.figure.savefig(fname=output_file)
 
     @classmethod
     @abstractmethod

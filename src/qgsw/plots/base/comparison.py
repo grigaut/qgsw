@@ -14,6 +14,8 @@ from qgsw.plots.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
@@ -90,3 +92,11 @@ class ComparisonFigure(Generic[AxesManager], metaclass=ABCMeta):
         """Update the Figure."""
         self._update(*datas, **kwargs)
         plt.pause(0.05)
+
+    def savefig(self, output_file: Path) -> None:
+        """Save figure in the given output file.
+
+        Args:
+            output_file (Path): File to save figure at.
+        """
+        self.figure.savefig(fname=output_file)
