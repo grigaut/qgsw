@@ -31,6 +31,6 @@ class Unit:
         return self.name
 
 
-DEGREE = Unit("degree")
+DEGREES = Unit("degree")
 METERS = Unit("meters")
 KILOMETERS = Unit("kilometers")

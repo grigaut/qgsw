@@ -4,7 +4,7 @@ import torch
 
 from qgsw.mesh.mesh import Mesh2D
 from qgsw.spatial.conversion import deg_to_m_lat, km_to_m
-from qgsw.spatial.units._units import DEGREE, KILOMETERS, METERS
+from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS
 from qgsw.spatial.units.exceptions import UnitError
 
 
@@ -27,7 +27,7 @@ def compute_beta_plane(
         return _beta_plane_from_meters(y=mesh.xy[1], f0=f0, beta=beta)
     if mesh.xy_unit == KILOMETERS:
         return _beta_plane_from_meters(y=km_to_m(mesh.xy[1]), f0=f0, beta=beta)
-    if mesh.xy_unit == DEGREE:
+    if mesh.xy_unit == DEGREES:
         return _beta_plane_from_degree(latitude=mesh.xy[1], f0=f0, beta=beta)
     msg = f"Unable to compute beta plane from unit {mesh.xy_unit}."
     raise UnitError(msg)

@@ -14,7 +14,7 @@ import torch.nn.functional as F  # noqa: N812
 from typing_extensions import Self
 
 from qgsw.data.loaders import BathyLoader
-from qgsw.spatial.units._units import DEGREE, Unit
+from qgsw.spatial.units._units import DEGREES, Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 class Bathymetry:
     """Bathymetry."""
 
-    _required_xy_unit: Unit = DEGREE
+    _required_xy_unit: Unit = DEGREES
 
     def __init__(self, bathy_config: BathyConfig) -> None:
         """Instantiate Bathymetry."""

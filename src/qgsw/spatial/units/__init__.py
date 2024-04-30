@@ -1,5 +1,5 @@
 """Spatial units."""
 
-from qgsw.spatial.units._units import DEGREE, KILOMETERS, METERS
+from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS
 
-__all__ = ["DEGREE", "KILOMETERS", "METERS"]
+__all__ = ["DEGREES", "KILOMETERS", "METERS"]

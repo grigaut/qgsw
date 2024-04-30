@@ -11,7 +11,7 @@ from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
 from qgsw.spatial import conversion
-from qgsw.spatial.units._units import DEGREE, KILOMETERS, METERS, Unit
+from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, Unit
 from qgsw.specs import DEVICE
 
 
@@ -81,7 +81,7 @@ class MeshConfig(_Config):
     _box_section: str = keys.BOX["section"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
-        DEGREE.name: conversion.deg_to_m_lat,
+        DEGREES.name: conversion.deg_to_m_lat,
         KILOMETERS.name: conversion.km_to_m,
         METERS.name: conversion.m_to_m,
     }
@@ -173,7 +173,7 @@ class BoxConfig(_Config):
     _y: str = keys.BOX["y"]
     _unit: str = keys.BOX["unit"]
     _units_mapping: ClassVar[dict[str, Unit]] = {
-        "deg": DEGREE,
+        "deg": DEGREES,
         "m": METERS,
         "km": KILOMETERS,
     }
