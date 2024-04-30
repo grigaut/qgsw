@@ -3,8 +3,9 @@
 import torch
 
 from qgsw.mesh.mesh import Mesh2D
+from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.spatial.conversion import deg_to_m_lat, km_to_m
-from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS
+from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
 from qgsw.spatial.units.exceptions import UnitError
 
 
@@ -29,6 +30,8 @@ def compute_beta_plane(
         return _beta_plane_from_meters(y=km_to_m(mesh.xy[1]), f0=f0, beta=beta)
     if mesh.xy_unit == DEGREES:
         return _beta_plane_from_degree(latitude=mesh.xy[1], f0=f0, beta=beta)
+    if mesh.xy_unit == RADIANS:
+        return _beta_plane_from_radians(latitude=mesh.xy[1], f0=f0, beta=beta)
     msg = f"Unable to compute beta plane from unit {mesh.xy_unit}."
     raise UnitError(msg)
 
@@ -63,3 +66,41 @@ def _beta_plane_from_degree(
         torch.Tensor: Coriolis  values.
     """
     return f0 + beta * deg_to_m_lat(latitude - latitude.mean())
+
+
+def _beta_plane_from_radians(
+    latitude: torch.Tensor, f0: float, beta: float
+) -> torch.Tensor:
+    """Compute beat-plane from latitudes in radians.
+
+    Args:
+        latitude (torch.Tensor): latitude values.
+        f0 (float): f0 (from beta-plane approximation).
+        beta (float): Beta (from beta plane approximation).
+
+    Returns:
+        torch.Tensor: Coriolis  values.
+    """
+    return f0 + beta * (latitude - latitude.mean()) * EARTH_RADIUS
+
+
+def compute_coriolis_parameter(
+    mesh: Mesh2D,
+) -> torch.Tensor:
+    """Compute the coriolis parameter given a 2D Mesh.
+
+    Args:
+        mesh (Mesh2D): 2D Mesh.
+
+    Raises:
+        UnitError: If the mesh if not in radians.
+
+    Returns:
+        torch.Tensor: (nx, ny) Coriolis parameter value tensor.
+    """
+    if mesh.xy_unit != RADIANS:
+        msg = f"Unable to compute beta plane from {mesh.xy_unit} mesh."
+        raise UnitError(msg)
+
+    latitude = mesh.xy[1]  # in radians
+    return 2 * EARTH_ANGULAR_ROTATION * torch.sin(latitude)
