@@ -76,3 +76,15 @@ def deg_to_rad(value: float) -> float:
         float: Value in radians.
     """
     return value * np.pi / 180
+
+
+def rad_to_m(value: float) -> float:
+    """Radians to meters conversion.
+
+    Args:
+        value (float): Value in radians.
+
+    Returns:
+        float: Value in meters.
+    """
+    return deg_to_m_lat(rad_to_deg(value))
