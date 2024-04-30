@@ -3,8 +3,8 @@
 import torch
 
 from qgsw.mesh.mesh import Mesh2D
-from qgsw.physics.constants import EARTH_RADIUS
-from qgsw.spatial.conversion import deg_to_m_lat, km_to_m
+from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
+from qgsw.spatial.conversion import deg_to_m_lat, deg_to_rad, km_to_m
 from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
 from qgsw.spatial.units.exceptions import UnitError
 
@@ -82,3 +82,76 @@ def _beta_plane_from_radians(
         torch.Tensor: Coriolis  values.
     """
     return f0 + beta * (latitude - latitude.mean()) * EARTH_RADIUS
+
+
+def compute_f0(mesh: Mesh2D) -> float:
+    """Compute f0 value given 2D Mesh.
+
+    Args:
+        mesh (Mesh2D): Mesh to compute f0 from.
+
+    Raises:
+        UnitError: If the mesh unit is invalid.
+
+    Returns:
+        float: f0 value (value at the mean latitude).
+    """
+    if mesh.xy_unit == RADIANS:
+        return _compute_f0_from_radians(mesh=mesh.xy[1].mean())
+    if mesh.xy_unit == DEGREES:
+        return _compute_f0_from_radians(mesh=deg_to_rad(mesh.xy[1].mean()))
+    msg = f"Unable to compute f0 using a {mesh.xy_unit} mesh."
+    raise UnitError(msg)
+
+
+def _compute_f0_from_radians(
+    latitude_ref: float,
+) -> float:
+    """Compute f0 parameter given a reference latitude.
+
+    Args:
+        latitude_ref (float): Reference latitude (radians).
+
+    Returns:
+        float: f0 value.
+    """
+    return 2 * EARTH_ANGULAR_ROTATION * torch.sin(latitude_ref)
+
+
+def compute_beta(mesh: Mesh2D) -> float:
+    """Compute beta value given 2D Mesh.
+
+    Args:
+        mesh (Mesh2D): Mesh to compute beta from.
+
+    Raises:
+        UnitError: If the mesh unit is invalid.
+
+    Returns:
+        float: beta value (value at the mean latitude).
+    """
+    if mesh.xy_unit == RADIANS:
+        return _compute_beta_from_radians(mesh=mesh.xy[1].mean())
+    if mesh.xy_unit == DEGREES:
+        return _compute_beta_from_radians(mesh=deg_to_rad(mesh.xy[1].mean()))
+    msg = f"Unable to compute beta using a {mesh.xy_unit} mesh."
+    raise UnitError(msg)
+
+
+def _compute_beta_from_radians(
+    latitude_ref: float,
+) -> float:
+    """Compute f0 parameter given a reference latitude.
+
+    Args:
+        latitude_ref (float): Reference latitude (radians).
+
+    Returns:
+        float: beta value.
+    """
+    return (
+        2
+        * EARTH_ANGULAR_ROTATION
+        * torch.cos(torch.mean(latitude_ref))
+        / EARTH_RADIUS
+    )
