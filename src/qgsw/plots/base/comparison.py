@@ -12,7 +12,7 @@ from typing_extensions import ParamSpec
 from qgsw.plots.base.axes import AxesManager
 from qgsw.plots.base.figures import BaseFigure
 from qgsw.plots.exceptions import (
-    ImpossibleAxesUpdateError,
+    AxesUpdateError,
 )
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             elements_nb (int): Number of plots ot update.
 
         Raises:
-            ImpossibleAxesUpdateError: If the number doesn't match
+            AxesUpdateError: If the number doesn't match
             the number of plots.
         """
         if elements_nb != self._axes_nb:
@@ -55,7 +55,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
                 "There must be as many elements to update as axes."
                 f"{self._axes_nb} were expected, {elements_nb} were given."
             )
-            raise ImpossibleAxesUpdateError(msg)
+            raise AxesUpdateError(msg)
 
     def _create_figure_axes(self) -> tuple[Figure, list[Axes]]:
         """Create the Figure and the Axes list.
