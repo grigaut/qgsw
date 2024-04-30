@@ -18,8 +18,8 @@ def compute_beta_plane(
 
     Args:
         mesh (Mesh2D): 2D Mesh to compute values for.
-        f0 (float): f0 (from beta-plane approximation).
-        beta (float): Beta (from beta plane approximation).
+        f0 (float): f0 (from beta-plane approximation: s⁻¹).
+        beta (float): Beta (from beta plane approximation: m⁻¹.s⁻¹).
 
     Returns:
         torch.Tensor: Coriolis  values.
@@ -42,9 +42,9 @@ def _beta_plane_from_meters(
     """Compute beta-plane from y in meters.
 
     Args:
-        y (torch.Tensor): y values.
-        f0 (float): f0 (from beta-plane approximation).
-        beta (float): Beta (from beta plane approximation).
+        y (torch.Tensor): y values (meters).
+        f0 (float): f0 (from beta-plane approximation: s⁻¹).
+        beta (float): Beta (from beta plane approximation: m⁻¹.s⁻¹).
 
     Returns:
         torch.Tensor: Coriolis  values.
@@ -58,9 +58,9 @@ def _beta_plane_from_degree(
     """Compute beat-plane from latitudes in degrees.
 
     Args:
-        latitude (torch.Tensor): latitude values.
-        f0 (float): f0 (from beta-plane approximation).
-        beta (float): Beta (from beta plane approximation).
+        latitude (torch.Tensor): latitude values (degrees).
+        f0 (float): f0 (from beta-plane approximation: s⁻¹).
+        beta (float): Beta (from beta plane approximation: m⁻¹.s⁻¹).
 
     Returns:
         torch.Tensor: Coriolis  values.
@@ -74,9 +74,9 @@ def _beta_plane_from_radians(
     """Compute beat-plane from latitudes in radians.
 
     Args:
-        latitude (torch.Tensor): latitude values.
-        f0 (float): f0 (from beta-plane approximation).
-        beta (float): Beta (from beta plane approximation).
+        latitude (torch.Tensor): latitude values (radians).
+        f0 (float): f0 (from beta-plane approximation: s⁻¹).
+        beta (float): Beta (from beta plane approximation: m⁻¹.s⁻¹).
 
     Returns:
         torch.Tensor: Coriolis  values.
