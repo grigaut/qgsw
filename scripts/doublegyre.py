@@ -20,8 +20,8 @@ torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
-mesh = Meshes3D.from_config(config)
-wind = WindForcing.from_config(config)
+mesh = Meshes3D.from_config(config.mesh, config.model)
+wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 # device = "cuda" if torch.cuda.is_available() else "cpu"
 # dtype = torch.float64
 
@@ -39,12 +39,12 @@ taux, tauy = wind.compute()
 param = {
     "nx": config.mesh.nx,
     "ny": config.mesh.ny,
-    "nl": config.layers.nl,
+    "nl": config.model.nl,
     "dx": config.mesh.dx,
     "dy": config.mesh.dy,
-    "H": config.layers.h.unsqueeze(1).unsqueeze(1),
+    "H": config.model.h.unsqueeze(1).unsqueeze(1),
     "rho": config.physics.rho,
-    "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
+    "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
@@ -73,7 +73,7 @@ for model, name, dt, start_file in [
     # set time step given barotropic mode for SW
     if model == SW:
         c = (
-            torch.sqrt(config.layers.h.sum() * config.layers.g_prime[0])
+            torch.sqrt(config.model.h.sum() * config.model.g_prime[0])
             .cpu()
             .item()
         )

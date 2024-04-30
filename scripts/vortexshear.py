@@ -31,16 +31,18 @@ torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
 config = VortexShearConfig.from_file("config/vortexshear.toml")
-mesh = Meshes3D.from_config(config)
-wind = WindForcing.from_config(config)
+mesh = Meshes3D.from_config(config.mesh, config.model)
+wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 taux, tauy = wind.compute()
-vortex = RankineVortexForcing.from_config(config)
+vortex = RankineVortexForcing.from_config(
+    config.vortex, config.mesh, config.model
+)
 
-h1 = config.layers.h[0]
-h2 = config.layers.h[1]
+h1 = config.model.h[0]
+h2 = config.model.h[1]
 
 Bu = compute_burger(
-    g=config.layers.g_prime[0],
+    g=config.model.g_prime[0],
     h_scale=(h1 * h2) / (h1 + h2),
     f0=config.physics.f0,
     length_scale=vortex.r0,
@@ -80,11 +82,11 @@ for Ro in [
     param_qg = {
         "nx": config.mesh.nx,
         "ny": config.mesh.ny,
-        "nl": config.layers.nl,
+        "nl": config.model.nl,
         "dx": config.mesh.dx,
         "dy": config.mesh.dy,
         "H": mesh.h.xyh[2],
-        "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
+        "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
         "taux": taux,
         "tauy": tauy,
@@ -100,12 +102,12 @@ for Ro in [
     param_sw = {
         "nx": config.mesh.nx,
         "ny": config.mesh.ny,
-        "nl": config.layers.nl,
+        "nl": config.model.nl,
         "dx": config.mesh.dx,
         "dy": config.mesh.dy,
         "H": mesh.h.xyh[2],
         "rho": config.physics.rho,
-        "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
+        "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
         "taux": taux,
         "tauy": tauy,
@@ -127,7 +129,7 @@ for Ro in [
     u_max, v_max, c = (
         torch.abs(u_init).max().item() / config.mesh.dx,
         torch.abs(v_init).max().item() / config.mesh.dy,
-        torch.sqrt(config.layers.g_prime[0] * config.layers.h.sum()),
+        torch.sqrt(config.model.g_prime[0] * config.model.h.sum()),
     )
     verbose.display(
         msg=f"u_max {u_max:.2e}, v_max {v_max:.2e}, c {c:.2e}",

@@ -6,7 +6,9 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 from typing_extensions import Self
 
-from qgsw.configs.core import ScriptConfig
+from qgsw.configs.mesh import MeshConfig
+from qgsw.configs.models import ModelConfig
+from qgsw.configs.vortex import VortexConfig
 from qgsw.mesh.meshes import Meshes2D, Meshes3D
 from qgsw.models.core import helmholtz
 from qgsw.spatial.units._units import METERS, Unit
@@ -269,29 +271,41 @@ class RankineVortexForcing:
         return psi_norm * f0
 
     @classmethod
-    def from_config(cls, script_config: ScriptConfig) -> Self:
+    def from_config(
+        cls,
+        vortex_config: VortexConfig,
+        mesh_config: MeshConfig,
+        model_config: ModelConfig,
+    ) -> Self:
         """Instantiate VortexForcing from ScriptConfig.
 
         Args:
-            script_config (ScriptConfig): Script Configuration.
+            vortex_config (VortexConfig): Vortex configuration.
+            mesh_config (MeshConfig): Mesh configuration.
+            model_config (ModelConfig): Model configuration.
+
+        Raises:
+            KeyError: If the vortex is not recognized.
 
         Returns:
-            Self: VortexForcing.
+            Self: Vortex forcing.
         """
-        vortex_type = script_config.vortex.type
-        perturbation = script_config.vortex.perturbation_magnitude
-        if vortex_type == "active":
-            mesh = Meshes3D.from_config(script_config=script_config)
+        if vortex_config.type == "active":
+            mesh = Meshes3D.from_config(
+                mesh_config=mesh_config, model_config=model_config
+            )
             vortex = ActiveLayersRankineVortex3D(
                 mesh=mesh,
-                perturbation_magnitude=perturbation,
+                perturbation_magnitude=vortex_config.perturbation_magnitude,
             )
             return cls(vortex=vortex)
-        if vortex_type == "passive":
-            mesh = Meshes3D.from_config(script_config=script_config)
+        if vortex_config.type == "passive":
+            mesh = Meshes3D.from_config(
+                mesh_config=mesh_config, model_config=model_config
+            )
             vortex = PassiveLayersRankineVortex3D(
                 mesh=mesh,
-                perturbation_magnitude=perturbation,
+                perturbation_magnitude=vortex_config.perturbation_magnitude,
             )
             return cls(vortex=vortex)
         msg = "Unrecognized vortex type."

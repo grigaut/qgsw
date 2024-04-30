@@ -7,7 +7,8 @@ from qgsw.configs.base import _Config
 from qgsw.configs.bathymetry import BathyConfig
 from qgsw.configs.exceptions import ConfigError, UnexpectedFieldError
 from qgsw.configs.io import IOConfig
-from qgsw.configs.mesh import LayersConfig, MeshConfig
+from qgsw.configs.mesh import MeshConfig
+from qgsw.configs.models import ModelConfig
 from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.vortex import VortexConfig
 from qgsw.configs.windstress import WindStressConfig
@@ -20,6 +21,7 @@ class ScriptConfig(_Config):
     _physics_section: str = keys.PHYSICS["section"]
     _mesh_section: str = keys.MESH["section"]
     _io_section: str = keys.IO["section"]
+    _model_section: str = "model"
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate ScriptConfig.
@@ -28,17 +30,17 @@ class ScriptConfig(_Config):
             params (dict[str, Any]): Script Configuration dictionnary.
         """
         super().__init__(params)
-        self._layers = LayersConfig(params=self.params[self._layers_section])
         self._physics = PhysicsConfig(
             params=self.params[self._physics_section]
         )
         self._mesh = MeshConfig(params=self.params[self._mesh_section])
         self._io = IOConfig(params=self.params[self._io_section])
+        self._model = ModelConfig(params=self.params[self._model_section])
 
     @property
-    def layers(self) -> LayersConfig:
-        """Configuration parameters dictionnary for layers."""
-        return self._layers
+    def model(self) -> ModelConfig:
+        """Model configuration."""
+        return self._model
 
     @property
     def physics(self) -> PhysicsConfig:
@@ -85,11 +87,11 @@ class ScriptConfig(_Config):
         Returns:
             dict[str, Any]: Configuration parameters.
         """
-        # Verify that the layers section is present.
-        if self._layers_section not in params:
+        # Verify that the model section is present.
+        if self._model_section not in params:
             msg = (
                 "The configuration must contain a "
-                f"layers section, named {self._layers_section}."
+                f"model section, named {self._model_section}."
             )
             raise ConfigError(msg)
         # Verify that the physics section is present.

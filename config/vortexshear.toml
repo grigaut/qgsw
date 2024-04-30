@@ -12,6 +12,8 @@ beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
 [layers]
+name = "Two Layers"
+type = "QG"
 h = [
     200,
     1_000

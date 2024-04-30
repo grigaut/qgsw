@@ -11,7 +11,9 @@ f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = nan
 
-[layers]
+[model]
+name = "Three Layer"
+type = "QG"
 h = [
     400,
     1100,

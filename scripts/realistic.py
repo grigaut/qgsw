@@ -23,9 +23,9 @@ torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
 config = RealisticConfig.from_file(Path("config/realistic.toml"))
-mesh = Meshes3D.from_config(config)
-bathy = Bathymetry.from_config(config)
-wind = WindForcing.from_config(config)
+mesh = Meshes3D.from_config(config.mesh, config.model)
+bathy = Bathymetry.from_config(config.bathy)
+wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 
 verbose.display(
     msg=f"Grid lat: {config.mesh.box.y_min:.1f}, {config.mesh.box.y_max:.1f}, ",
@@ -79,12 +79,12 @@ taux, tauy = wind.compute()
 param = {
     "nx": config.mesh.nx,
     "ny": config.mesh.ny,
-    "nl": config.layers.nl,
-    "H": config.layers.h.unsqueeze(1).unsqueeze(1),
+    "nl": config.model.nl,
+    "H": config.model.h.unsqueeze(1).unsqueeze(1),
     "dx": config.mesh.dx,
     "dy": config.mesh.dy,
     "rho": config.physics.rho,
-    "g_prime": config.layers.g_prime.unsqueeze(1).unsqueeze(1),
+    "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "f": f,
     "device": DEVICE,

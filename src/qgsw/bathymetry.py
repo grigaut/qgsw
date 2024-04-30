@@ -20,7 +20,6 @@ from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.bathymetry import BathyConfig
-    from qgsw.configs.core import ScriptConfig
     from qgsw.mesh.mesh import Mesh2D
 
 
@@ -186,13 +185,13 @@ class Bathymetry:
         return avg_2d > 0.5  # noqa: PLR2004
 
     @classmethod
-    def from_config(cls, script_config: ScriptConfig) -> Self:
-        """Construct the Bathymetry given a ScriptConfig object.
+    def from_config(cls, bathy_config: BathyConfig) -> Self:
+        """Construct the Bathymetry given a BathyConfig object.
 
         Args:
-            script_config (ScriptConfig): Script Configuration Object.
+            bathy_config (BathyConfig): Script Configuration Object.
 
         Returns:
             Self: Corresponding Bathymetry.
         """
-        return cls(bathy_config=script_config.bathy)
+        return cls(bathy_config=bathy_config)
