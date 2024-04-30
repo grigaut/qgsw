@@ -9,6 +9,36 @@ from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
 from qgsw.spatial.units.exceptions import UnitError
 
 
+def compute_entire_beta_plane(
+    mesh: Mesh2D,
+) -> torch.Tensor:
+    """Compute Beta-Plane field given only a 2D Mesh.
+
+    Args:
+        mesh (Mesh2D): 2D Mesh.
+
+    Raises:
+        UnitError: If the mesh xy unit is invalid.
+
+    Returns:
+        torch.Tensor: Beta plane values in s⁻¹.
+    """
+    if mesh.xy_unit == DEGREES:
+        return _beta_plane_from_degree(
+            latitude=mesh.xy[1],
+            f0=compute_f0(mesh=mesh),
+            beta=compute_beta(mesh=mesh),
+        )
+    if mesh.xy_unit == RADIANS:
+        return _beta_plane_from_radians(
+            latitude=mesh.xy[1],
+            f0=compute_f0(mesh=mesh),
+            beta=compute_beta(mesh=mesh),
+        )
+    msg = f"Unable to compute beta plane from unit {mesh.xy_unit}."
+    raise UnitError(msg)
+
+
 def compute_beta_plane(
     mesh: Mesh2D,
     f0: float,
@@ -94,7 +124,7 @@ def compute_f0(mesh: Mesh2D) -> float:
         UnitError: If the mesh unit is invalid.
 
     Returns:
-        float: f0 value (value at the mean latitude).
+        float: f0 value (value at the mean latitude) in s⁻¹.
     """
     if mesh.xy_unit == RADIANS:
         return _compute_f0_from_radians(mesh=mesh.xy[1].mean())
@@ -113,7 +143,7 @@ def _compute_f0_from_radians(
         latitude_ref (float): Reference latitude (radians).
 
     Returns:
-        float: f0 value.
+        float: f0 value in s⁻¹.
     """
     return 2 * EARTH_ANGULAR_ROTATION * torch.sin(latitude_ref)
 
@@ -128,7 +158,7 @@ def compute_beta(mesh: Mesh2D) -> float:
         UnitError: If the mesh unit is invalid.
 
     Returns:
-        float: beta value (value at the mean latitude).
+        float: beta value (value at the mean latitude) in m⁻¹.s⁻¹.
     """
     if mesh.xy_unit == RADIANS:
         return _compute_beta_from_radians(mesh=mesh.xy[1].mean())
@@ -147,7 +177,7 @@ def _compute_beta_from_radians(
         latitude_ref (float): Reference latitude (radians).
 
     Returns:
-        float: beta value.
+        float: beta value in m⁻¹.s⁻¹.
     """
     return (
         2
