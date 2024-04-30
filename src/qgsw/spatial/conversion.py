@@ -1,6 +1,8 @@
 """Unit Conversion Tools."""
 
-DEG_TO_M = 111e3
+import numpy as np
+
+DEG_TO_M = 111e3  # π * 6371e3 / 180
 KM_TO_M = 1e3
 
 
@@ -50,3 +52,27 @@ def m_to_m(value: float) -> float:
         float: Value in meters.
     """
     return value
+
+
+def rad_to_deg(value: float) -> float:
+    """Radians to degrees conversion.
+
+    Args:
+        value (float): Value in radians.
+
+    Returns:
+        float: Value in degrees.
+    """
+    return value * 180 / np.pi
+
+
+def deg_to_rad(value: float) -> float:
+    """Degrees to radians conversion.
+
+    Args:
+        value (float): Value in degree.
+
+    Returns:
+        float: Value in radians.
+    """
+    return value * np.pi / 180
