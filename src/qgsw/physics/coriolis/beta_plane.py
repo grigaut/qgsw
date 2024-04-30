@@ -1,9 +1,9 @@
-"""Coriolis-related tools."""
+"""Beta-Plane compuations."""
 
 import torch
 
 from qgsw.mesh.mesh import Mesh2D
-from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
+from qgsw.physics.constants import EARTH_RADIUS
 from qgsw.spatial.conversion import deg_to_m_lat, km_to_m
 from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
 from qgsw.spatial.units.exceptions import UnitError
@@ -82,25 +82,3 @@ def _beta_plane_from_radians(
         torch.Tensor: Coriolis  values.
     """
     return f0 + beta * (latitude - latitude.mean()) * EARTH_RADIUS
-
-
-def compute_coriolis_parameter(
-    mesh: Mesh2D,
-) -> torch.Tensor:
-    """Compute the coriolis parameter given a 2D Mesh.
-
-    Args:
-        mesh (Mesh2D): 2D Mesh.
-
-    Raises:
-        UnitError: If the mesh if not in radians.
-
-    Returns:
-        torch.Tensor: (nx, ny) Coriolis parameter value tensor.
-    """
-    if mesh.xy_unit != RADIANS:
-        msg = f"Unable to compute beta plane from {mesh.xy_unit} mesh."
-        raise UnitError(msg)
-
-    latitude = mesh.xy[1]  # in radians
-    return 2 * EARTH_ANGULAR_ROTATION * torch.sin(latitude)
