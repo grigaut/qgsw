@@ -27,8 +27,6 @@ class BaseFigure:
     @property
     def figure(self) -> Figure:
         """Figure containing the plot."""
-        if self._figure is None:
-            self._figure = self._create_figure()
         return self._figure
 
     def savefig(self, output_file: Path) -> None:
