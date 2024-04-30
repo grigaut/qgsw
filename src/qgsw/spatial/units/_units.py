@@ -34,3 +34,4 @@ class Unit:
 DEGREES = Unit("degree")
 METERS = Unit("meters")
 KILOMETERS = Unit("kilometers")
+RADIANS = Unit("radians")
