@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +10,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from typing_extensions import ParamSpec, Self
 
+from qgsw.mesh.exceptions import InvalidLayerNumberError
 from qgsw.models.sw import SW
 from qgsw.plots.base.axes import (
     BaseAxes,
@@ -30,8 +31,8 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 
 
-class SurfaceVortictyAxesContext(BaseAxesContext):
-    """Axes Context Manager for surface vorticity plot."""
+class VorticityAxesContext(BaseAxesContext):
+    """Axes Context Manager for vorticity plots."""
 
     _default_title = r"$\omega$"
 
@@ -60,8 +61,10 @@ class SurfaceVortictyAxesContext(BaseAxesContext):
         return super()._style_axes(ax)
 
 
-class SurfaceVorticityAxesContent(BaseAxesContent):
-    """Axes Content Manager for surface vorticity plot."""
+class VorticityAxesContent(BaseAxesContent):
+    """Axes Content Manager for vorticity plots."""
+
+    _layer_nb: int = 0
 
     def __init__(
         self, mask: np.ndarray | None = None, **kwargs: P.kwargs
@@ -94,7 +97,13 @@ class SurfaceVorticityAxesContent(BaseAxesContent):
         Returns:
             np.ndarray: Formatted data (nx,ny).
         """
-        return data[0, 0]
+        if data.shape[1] <= self._layer_nb:
+            msg = (
+                f"Impossible to display layer {self._layer_nb} "
+                f"with {data.shape}-shaped data."
+            )
+            raise InvalidLayerNumberError(msg)
+        return data[0, self._layer_nb]
 
     def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
         """Update the Axes content.
@@ -140,22 +149,22 @@ class SurfaceVorticityAxesContent(BaseAxesContent):
         return super().update(ax, data, **kwargs)
 
 
+class SurfaceVorticityAxesContent(VorticityAxesContent):
+    """Axes Content Manager for surface vorticity plot."""
+
+    _layer_nb = 0
+
+
+class SecondLayerVorticityAxesContent(VorticityAxesContent):
+    """Axes Content Manager for second layer vorticity plot."""
+
+    _layer_nb = 1
+
+
 class SurfaceVorticityAxes(
-    BaseAxes[SurfaceVortictyAxesContext, SurfaceVorticityAxesContent]
+    BaseAxes[VorticityAxesContext, SurfaceVorticityAxesContent]
 ):
-    """Surface Vorticity Axes."""
-
-    def update(self, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
-        """Update Axes content.
-
-        Args:
-            data (np.ndarray): Data to use (1,nl,nx,ny).
-            **kwargs: Additional arguments to give to the plotting function.
-
-        Returns:
-            Axes: Updated Axes.
-        """
-        return super().update(data, **kwargs)
+    """Vorticity axes for Surface vorticity plots."""
 
     @classmethod
     def from_mask(
@@ -172,15 +181,43 @@ class SurfaceVorticityAxes(
             Self: Instantiated plot.
         """
         return cls(
-            context=SurfaceVortictyAxesContext(),
+            context=VorticityAxesContext(),
             content=SurfaceVorticityAxesContent(mask=mask, **kwargs),
         )
 
 
-class SurfaceVorticityFigure(BaseSingleFigure[SurfaceVorticityAxes]):
+class SecondLayerVorticityAxes(
+    BaseAxes[VorticityAxesContext, SecondLayerVorticityAxesContent]
+):
+    """Vorticity axes for second layer vorticity plots."""
+
+    @classmethod
+    def from_mask(
+        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
+    ) -> Self:
+        """Instantiate Figure only from the mask.
+
+        Args:
+            mask (np.ndarray | None, optional): Mask to apply on data.
+            Mask will be set to ones if None. Defaults to None.
+            **kwargs: Additional arguments to pass to plotting method.
+
+        Returns:
+            Self: Instantiated plot.
+        """
+        return cls(
+            context=VorticityAxesContext(),
+            content=SecondLayerVorticityAxesContent(mask=mask, **kwargs),
+        )
+
+
+VorticityAxes = Union[SurfaceVorticityAxes, SecondLayerVorticityAxes]
+
+
+class SurfaceVorticityFigure(BaseSingleFigure[VorticityAxes]):
     """Surface Vorticity Figure."""
 
-    def __init__(self, axes_manager: SurfaceVorticityAxes) -> None:
+    def __init__(self, axes_manager: VorticityAxes) -> None:
         """Instantiate the Surface Vorticity Figure.
 
         Args:
@@ -224,29 +261,11 @@ class SurfaceVorticityFigure(BaseSingleFigure[SurfaceVorticityAxes]):
         """
         super().update(data, **kwargs)
 
-    @classmethod
-    def from_mask(
-        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
-    ) -> Self:
-        """Instantiate Figure only from the mask.
 
-        Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
-            **kwargs: Additional arguments to pass to plotting method.
-
-        Returns:
-            Self: Instantiated plot.
-        """
-        return cls(
-            axes_manager=SurfaceVorticityAxes.from_mask(mask=mask, **kwargs),
-        )
-
-
-class SurfaceVorticityComparisonFigure(ComparisonFigure[SurfaceVorticityAxes]):
+class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
     """Comparison between Surface Vorticity Axes."""
 
-    def __init__(self, *axes_managers: SurfaceVorticityAxes) -> None:
+    def __init__(self, *axes_managers: VorticityAxes) -> None:
         """Instantiate the surface vorticity comparison."""
         super().__init__(*axes_managers)
         self._cbar_axes = None
