@@ -155,7 +155,7 @@ class MeshConfig(_Config):
         Returns:
             dict[str, Any]: Grid parameters.
         """
-        # Verify that the layers section is present.
+        # Verify that the box section is present.
         if self._box_section not in params:
             msg = (
                 "The mesh configuration must contain a "
