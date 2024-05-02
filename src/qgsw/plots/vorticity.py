@@ -276,10 +276,13 @@ class SurfaceVorticityFigure(BaseSingleFigure[VorticityAxes]):
 class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
     """Comparison between Surface Vorticity Axes."""
 
-    def __init__(self, *axes_managers: VorticityAxes) -> None:
+    def __init__(
+        self, *axes_managers: VorticityAxes, common_cbar: bool = True
+    ) -> None:
         """Instantiate the surface vorticity comparison."""
         super().__init__(*axes_managers)
         self._cbar_axes = None
+        self._common_cbar = common_cbar
 
     def _set_cbar_extrems(
         self, *datas: np.ndarray, **kwargs: P.kwargs
@@ -316,5 +319,8 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
 
     def _update(self, *datas: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update the Axes."""
-        super()._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
-        self._show_colorbar()
+        if self._common_cbar:
+            kwargs = self._set_cbar_extrems(*datas, **kwargs)
+        super()._update(*datas, **kwargs)
+        if self._common_cbar:
+            self._show_colorbar()
