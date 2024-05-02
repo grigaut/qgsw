@@ -89,23 +89,6 @@ class VorticityAxesContent(BaseAxesContent):
         """Axes Image."""
         return self._axesim
 
-    def _format_data(self, data: np.ndarray) -> np.ndarray:
-        """Format input data.
-
-        Args:
-            data (np.ndarray): Input data (1,nl,nx,ny).
-
-        Returns:
-            np.ndarray: Formatted data (nx,ny).
-        """
-        if data.shape[1] <= self._layer_nb:
-            msg = (
-                f"Impossible to display layer {self._layer_nb} "
-                f"with {data.shape}-shaped data."
-            )
-            raise InvalidLayerNumberError(msg)
-        return data[0, self._layer_nb]
-
     def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
         """Update the Axes content.
 
@@ -122,6 +105,23 @@ class VorticityAxesContent(BaseAxesContent):
         self._axesim = axesim
         return ax
 
+    def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
+        """Format input data.
+
+        Args:
+            array (np.ndarray): Input array (1,nl,nx,ny).
+
+        Returns:
+            np.ndarray: Data (nx,ny).
+        """
+        if array.shape[1] <= self._layer_nb:
+            msg = (
+                f"Impossible to display layer {self._layer_nb} "
+                f"with {array.shape}-shaped array."
+            )
+            raise InvalidLayerNumberError(msg)
+        return array[0, self._layer_nb]
+
     def retrieve_data_from_model(self, model: Model) -> np.ndarray:
         """Retrieve data from a model.
 
@@ -129,9 +129,10 @@ class VorticityAxesContent(BaseAxesContent):
             model (Model): Model model.
 
         Returns:
-            np.ndarray: Retrieved data (1,nl,nx,ny).
+            np.ndarray: Retrieved data (nx,ny).
         """
-        return model.get_physical_omega(numpy=True)
+        omega = model.get_physical_omega(numpy=True)
+        return self.retrieve_data_from_array(omega)
 
     def retrieve_data_from_file(self, filepath: Path) -> np.ndarray:
         """Retrieve relevant from a given file.
@@ -140,9 +141,10 @@ class VorticityAxesContent(BaseAxesContent):
             filepath (Path): File to retrieve data from.
 
         Returns:
-            np.ndarray: Relevant data.
+            np.ndarray: Retrieved data (nx,ny).
         """
-        return np.load(file=filepath)["omega"]
+        omega = np.load(file=filepath)["omega"]
+        return self.retrieve_data_from_array(omega)
 
     def update(self, ax: Axes, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
         """Update Axes content.

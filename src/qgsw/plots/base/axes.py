@@ -125,18 +125,6 @@ class BaseAxesContent(metaclass=ABCMeta):
             raise InvalidMaskError(msg)
 
     @abstractmethod
-    def _format_data(self, data: np.ndarray) -> np.ndarray:
-        """Format input data.
-
-        Args:
-            data (np.ndarray): Data tot format.
-
-        Returns:
-            np.ndarray: Formatted data.
-        """
-        return data
-
-    @abstractmethod
     def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
         """Update ax content using data from a np.ndarray.
 
@@ -161,9 +149,19 @@ class BaseAxesContent(metaclass=ABCMeta):
             Axes: Updated axes.
         """
         self._kwargs = self._kwargs | kwargs
-        formatted_data = self._format_data(data=data)
-        mask = self._validate_mask(data=formatted_data)
-        return self._update(ax=ax, data=formatted_data, mask=mask)
+        mask = self._validate_mask(data=data)
+        return self._update(ax=ax, data=data, mask=mask)
+
+    @abstractmethod
+    def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
+        """Retrieve relevant data from a given array.
+
+        Args:
+            array (np.ndarray): Data tot format.
+
+        Returns:
+            np.ndarray: Formatted data.
+        """
 
     @abstractmethod
     def retrieve_data_from_model(self, model: Model) -> np.ndarray:
@@ -177,53 +175,15 @@ class BaseAxesContent(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def retrieve_data_from_file(self, filepath: Path) -> np.ndarray:
+    def retrieve_data_from_file(self, file: Path) -> np.ndarray:
         """Retrieve relevant from a given file.
 
         Args:
-            filepath (Path): File to retrieve data from.
+            file (Path): File to retrieve data from.
 
         Returns:
             np.ndarray: Relevant data.
         """
-
-    def update_with_model(
-        self, ax: Axes, model: Model, **kwargs: P.kwargs
-    ) -> Axes:
-        """Update Axes content using data from a model.
-
-        Args:
-            ax (Axes): Axes to update the content of.
-            model (SW): MOdel to use for the content update.
-            **kwargs: Additional arguments to give to the plotting function.
-
-        Returns:
-            Axes: Updated Axes.
-        """
-        return self.update(
-            ax=ax,
-            data=self.retrieve_data_from_model(model=model),
-            **kwargs,
-        )
-
-    def update_with_file(
-        self, ax: Axes, filepath: Path, **kwargs: P.kwargs
-    ) -> Axes:
-        """Update Axes content using data from a file.
-
-        Args:
-            ax (Axes): Axes to update the content of.
-            filepath (Path): File to use for the content update.
-            **kwargs: Additional arguments to give to the plotting function.
-
-        Returns:
-            Axes: Updated Axes.
-        """
-        return self.update(
-            ax=ax,
-            data=self.retrieve_data_from_file(filepath=filepath),
-            **kwargs,
-        )
 
     def _validate_mask(self, data: np.ndarray) -> np.ndarray:
         """Validate Mask.
@@ -341,6 +301,17 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         """
         return self._content.update(ax=self._ax, data=data, **kwargs)
 
+    def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
+        """Retrieve data from a given np.ndarray.
+
+        Args:
+            array (np.ndarray): array to use data from.
+
+        Returns:
+            np.ndarray: Loaded data from the array.
+        """
+        return self._content.retrieve_data_from_array(array=array)
+
     def retrieve_data_from_model(self, model: Model) -> np.ndarray:
         """Retrieve data from a given Model.
 
@@ -352,20 +323,6 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         """
         return self._content.retrieve_data_from_model(model=model)
 
-    def update_with_model(self, model: Model, **kwargs: P.kwargs) -> Axes:
-        """Update the Axes content using a Model.
-
-        Args:
-            model (Model): Model to use to update Axes.
-            **kwargs: Additional arguments to give to the plotting function.
-
-        Returns:
-            Axes: Updated Axes.
-        """
-        return self._content.update_with_model(
-            ax=self._ax, model=model, **kwargs
-        )
-
     def retrieve_data_from_file(self, file: Path) -> np.ndarray:
         """Retrieve data from a given npz file.
 
@@ -376,20 +333,6 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
             np.ndarray: Loaded data.
         """
         return self._content.retrieve_data_from_file(filepath=file)
-
-    def update_with_file(self, filepath: Path, **kwargs: P.kwargs) -> Axes:
-        """Update the Axes content using a SW model.
-
-        Args:
-            filepath (Path): Filepath to use to update Axes.
-            **kwargs: Additional arguments to give to the plotting function.
-
-        Returns:
-            Axes: Updated Axes.
-        """
-        return self._content.update_with_file(
-            ax=self._ax, filepath=filepath, **kwargs
-        )
 
     @classmethod
     @abstractmethod

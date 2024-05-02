@@ -79,12 +79,10 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             axes_m.set_ax(self._axes[i])
             axes_m.context.reload_axes(axes_m.ax)
 
-    def _update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+    def _update(self, *datas: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update the Figure."""
         self._raise_if_inconsistent_length(elements_nb=len(datas))
         for i, data in enumerate(datas):
-            if data is None:
-                continue
             self._axes_ms[i].update(data, **kwargs)
 
     def _set_cbar_extrems(
@@ -104,8 +102,15 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             kwargs["vmax"] = max_value
         return kwargs
 
-    def update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+    def update_with_arrays(
+        self, *arrays: np.ndarray | None, **kwargs: P.kwargs
+    ) -> None:
         """Update the Figure."""
+        self._raise_if_inconsistent_length(len(arrays))
+        datas = [
+            self._axes_ms[i].retrieve_data_from_array(arrays[i])
+            for i in range(len(arrays))
+        ]
         self._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
 
     def update_with_files(self, *files: Path, **kwargs: P.kwargs) -> None:
@@ -116,7 +121,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             self._axes_ms[i].retrieve_data_from_file(files[i])
             for i in range(len(files))
         ]
-        self._update(*datas, **kwargs)
+        self._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
 
     def update_with_models(self, *models: Model, **kwargs: P.kwargs) -> None:
         """Update the plot given some models."""
@@ -126,4 +131,4 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             self._axes_ms[i].retrieve_data_from_model(models[i])
             for i in range(len(models))
         ]
-        self._update(*datas, **kwargs)
+        self._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
