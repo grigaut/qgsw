@@ -204,10 +204,13 @@ verbose.display(
 )
 
 t_end = 8 * tau
-freq_plot = int(t_end / 10 / dt) + 1
+freq_plot = int(t_end / config.io.plots.quantity / dt) + 1
+freq_output = int(t_end / config.io.results.quantity / dt) + 1
 freq_checknan = 100
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
+
+plots_required = config.io.plots.save or config.io.plots.show
 
 verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
@@ -222,9 +225,10 @@ qg_2l_inf_axes = SecondLayerVorticityAxes.from_mask(mask=mask)
 qg_2l_inf_axes.set_title(r"$\omega_{QG-ML-INF}$")
 plot = VorticityComparisonFigure(qg_1l_axes, qg_2l_top_axes, qg_2l_inf_axes)
 
+
 # Start runs
 for n in range(n_steps + 1):
-    if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
+    if plots_required and (n % freq_plot == 0 or n == n_steps):
         w_1l = (qg_1l.omega / qg_1l.area / qg_1l.f0).cpu().numpy()
         w_2l = (qg_2l.omega / qg_2l.area / qg_2l.f0).cpu().numpy()
         plot.figure.suptitle(
@@ -232,13 +236,19 @@ for n in range(n_steps + 1):
             f" t={t/tau:.2f}$\\tau$"
         )
         plot.update(w_1l, w_2l, w_2l)
-        plot.show()
-        output_dir = config.io.output_directory
-        name_1l = config.io.name
-        name_2l = config.io.name
-        output_name = Path(f"comparison_{name_1l}_{name_2l}_{n}.png")
-        plot.savefig(output_dir.joinpath(output_name))
+        if config.io.plots.show:
+            plot.show()
+        if config.io.plots.save:
+            output_dir = config.io.plots.directory
+            output_name = Path(f"{config.io.name_sc}_{n}.png")
+            plot.savefig(output_dir.joinpath(output_name))
 
+    if config.io.results.save and (n % freq_output == 0 or n == n_steps):
+        directory = config.io.results.directory
+        name_1l = config.models[0].name_sc
+        name_2l = config.models[1].name_sc
+        qg_1l.save_uvh(directory.joinpath(f"{name_1l}_{n}.npz"))
+        qg_2l.save_uvh(directory.joinpath(f"{name_2l}_{n}.npz"))
     qg_1l.step()
     qg_2l.step()
     t += dt

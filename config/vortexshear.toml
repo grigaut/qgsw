@@ -1,8 +1,15 @@
 [io]
 name = "vortexshear"
-plot_frequency = nan # in days
 performance_log = false
-output_dir = "output"
+[io.output]
+save_results = false
+quantity = 10
+directory = "output"
+[io.plots]
+show = true
+save = false
+quantity = 10
+plots_directory = "output/plots"
 
 [physics]
 rho = 1000

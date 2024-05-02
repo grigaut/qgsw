@@ -51,9 +51,22 @@ BATHY_DATA = {
 IO = {
     "section": "io",
     "name": "name",
-    "output directory": "output_dir",
     "log performance": "performance_log",
-    "plot frequency": "plot_frequency",
+}
+
+OUTPUT = {
+    "section": "output",
+    "save": "save_results",
+    "directory": "directory",
+    "quantity": "quantity",
+}
+
+PLOTS = {
+    "section": "plots",
+    "show": "show",
+    "save": "save",
+    "directory": "plots_directory",
+    "quantity": "quantity",
 }
 
 WINDSTRESS = {

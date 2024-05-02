@@ -105,15 +105,16 @@ for model, name, dt, start_file in [
     freq_log = 100
 
     n_steps = int(10 * 365 * 24 * 3600 / dt) + 1
-    n_steps_save = int(2 * 365 * 24 * 3600 / dt)
-    freq_save = int(15 * 24 * 3600 / dt)
-    freq_plot = int(15 * 24 * 3600 / dt)
+    freq_save = int(n_steps / config.io.results.quantity) + 1
+    freq_plot = int(n_steps / config.io.plots.quantity) + 1
+
+    plots_required = config.io.plots.save or config.io.plots.show
 
     uM, vM, hM = 0, 0, 0
 
-    if freq_save > 0:
+    if config.io.plots.save:
         output_dir = (
-            f"{config.io.output_directory}/{name}_{config.mesh.nx}x"
+            f"{config.io.results.directory}/{name}_{config.mesh.nx}x"
             f"{config.mesh.ny}_dt{dt}_slip{param['slip_coef']}/"
         )
         os.makedirs(output_dir, exist_ok=True)
@@ -121,7 +122,7 @@ for model, name, dt, start_file in [
             msg=f"Outputs will be saved to {output_dir}", trigger_level=1
         )
 
-    if freq_plot > 0:
+    if config.io.plots.show:
         import matplotlib.pyplot as plt
 
         plt.ion()
@@ -163,7 +164,7 @@ for model, name, dt, start_file in [
                 trigger_level=1,
             )
 
-        if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
+        if plots_required and (n % freq_plot == 0 or n == n_steps):
             u, v, h = qgsw_multilayer.get_physical_uvh(numpy=True)
             uM, vM = (
                 max(uM, 0.8 * np.abs(u).max()),
@@ -200,9 +201,12 @@ for model, name, dt, start_file in [
                 a[2].imshow(h[0, nl_plot].T, vmin=-hM, vmax=hM, **plot_kwargs)
 
             f.suptitle(f"{n_years} yrs, {n_days:03d} days")
-            plt.pause(0.05)
+            if config.io.plots.show:
+                plt.pause(0.05)
+            if config.io.plots.save:
+                plt.savefig(config.io.plots.directory.joinpath(f"{n}.png"))
 
-        if freq_save > 0 and n > n_steps_save and n % freq_save == 0:
+        if config.io.results.save and n % freq_save == 0:
             filename = os.path.join(
                 output_dir, f"uvh_{n_years:03d}y_{n_days:03d}d.npz"
             )
