@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from matplotlib.axes import Axes
+    from matplotlib.colorbar import Colorbar
     from matplotlib.figure import Figure
     from matplotlib.image import AxesImage
 
@@ -83,6 +84,8 @@ class VorticityAxesContent(BaseAxesContent):
         kwargs["animated"] = kwargs.get("animated", True)
         super().__init__(mask, **kwargs)
         self._axesim = None
+        self._cbar: Colorbar | None = None
+        self._has_cbar: bool = False
 
     @property
     def axes_image(self) -> AxesImage:
@@ -102,7 +105,8 @@ class VorticityAxesContent(BaseAxesContent):
         """
         masked_data = np.ma.masked_where(mask, data).T
         axesim = ax.imshow(masked_data, **self._kwargs)
-        self._axesim = axesim
+        self.remove_colorbar()
+        self.add_colorbar(ax=ax, axesim=axesim)
         return ax
 
     def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
@@ -158,6 +162,18 @@ class VorticityAxesContent(BaseAxesContent):
             Axes: Updated Axes.
         """
         return super().update(ax, data, **kwargs)
+
+    def remove_colorbar(self) -> None:
+        """Remove the colorbar."""
+        if self._has_cbar:
+            self._cbar.remove()
+            self._has_cbar = False
+
+    def add_colorbar(self, ax: Axes, axesim: AxesImage) -> None:
+        """Remove the colorbar."""
+        self._cbar = ax.figure.colorbar(axesim, label=r"$\omega / f_0$")
+        self._has_cbar = True
+        self._axesim = axesim
 
 
 class SurfaceVorticityAxesContent(VorticityAxesContent):
@@ -321,6 +337,10 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
         """Update the Axes."""
         if self._common_cbar:
             kwargs = self._set_cbar_extrems(*datas, **kwargs)
+
         super()._update(*datas, **kwargs)
+
         if self._common_cbar:
+            for ax_ms in self._axes_ms:
+                ax_ms.content.remove_colorbar()
             self._show_colorbar()
