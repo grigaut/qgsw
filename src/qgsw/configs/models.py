@@ -37,6 +37,11 @@ class ModelConfig(_Config):
         return self.params[self._name]
 
     @property
+    def name_sc(self) -> str:
+        """Model name in Snake Case."""
+        return self.name.lower().replace(" ", "_")
+
+    @property
     def h(self) -> torch.Tensor:
         """Values of layers thickness (h)."""
         h = torch.zeros(
