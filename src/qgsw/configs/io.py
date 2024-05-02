@@ -8,6 +8,7 @@ from typing import Any
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
+from qgsw.utils.storage import get_absolute_storage_path
 
 
 class IOConfig(_Config):
@@ -118,7 +119,7 @@ class PlotsConfig(_Config):
     @property
     def directory(self) -> Path:
         """Directory in which to save the plots."""
-        return Path(self.params[self._dir])
+        return get_absolute_storage_path(Path(self.params[self._dir]))
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         return super()._validate_params(params)
@@ -152,7 +153,7 @@ class OutputsConfig(_Config):
     @property
     def directory(self) -> Path:
         """Directory in which to save the plots."""
-        return Path(self.params[self._dir])
+        return get_absolute_storage_path(Path(self.params[self._dir]))
 
     @property
     def quantity(self) -> int:
