@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 from qgsw import verbose
-from qgsw.configs import VortexShearConfig
+from qgsw.configs.comparison import ModelComparisonConfig
 from qgsw.forcing.vortex import RankineVortexForcing
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
@@ -20,16 +20,11 @@ from qgsw.specs import DEVICE
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
-config_1l = VortexShearConfig.from_file(
-    "config/single_vs_double_layers/single_layer.toml"
-)
-config_2l = VortexShearConfig.from_file(
-    "config/single_vs_double_layers/two_layers.toml"
-)
+config = ModelComparisonConfig.from_file("config/single_vs_double_layers.toml")
 
 # Common Set-up
 ## Wind Forcing
-wind = WindForcing.from_config(config_1l)
+wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 taux, tauy = wind.compute()
 ## Rossby
 Ro = 0.1
@@ -39,20 +34,24 @@ cfl_gravity = 0.5
 
 # Single Layer Set-up
 ## Vortex
-vortex_1l = RankineVortexForcing.from_config(config_1l)
+vortex_1l = RankineVortexForcing.from_config(
+    vortex_config=config.vortex,
+    mesh_config=config.mesh,
+    model_config=config.models[0],
+)
 ## Mesh
-mesh_1l = Meshes3D.from_config(config_1l)
+mesh_1l = Meshes3D.from_config(config.mesh, config.models[0])
 # "" Coriolis
 f = coriolis.compute_beta_plane(
     mesh=mesh_1l.omega.remove_z_h(),
-    f0=config_1l.physics.f0,
-    beta=config_1l.physics.beta,
+    f0=config.physics.f0,
+    beta=config.physics.beta,
 )
 ## Compute Burger Number
 Bu_1l = compute_burger(
-    g=config_1l.layers.g_prime[0],
-    h_scale=config_1l.layers.h[0],
-    f0=config_1l.physics.f0,
+    g=config.models[0].g_prime[0],
+    h_scale=config.models[0].h[0],
+    f0=config.physics.f0,
     length_scale=vortex_1l.r0,
 )
 verbose.display(
@@ -61,17 +60,17 @@ verbose.display(
 )
 ## Set model parameters
 params_1l = {
-    "nx": config_1l.mesh.nx,
-    "ny": config_1l.mesh.ny,
-    "nl": config_1l.layers.nl,
-    "dx": config_1l.mesh.dx,
-    "dy": config_1l.mesh.dy,
+    "nx": config.mesh.nx,
+    "ny": config.mesh.ny,
+    "nl": config.models[0].nl,
+    "dx": config.mesh.dx,
+    "dy": config.mesh.dy,
     "H": mesh_1l.h.xyh[2],
-    "g_prime": config_1l.layers.g_prime.unsqueeze(1).unsqueeze(1),
+    "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
     "f": f,
     "taux": taux,
     "tauy": tauy,
-    "bottom_drag_coef": config_1l.physics.bottom_drag_coef,
+    "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
     "mask": torch.ones_like(mesh_1l.h.remove_z_h().xy[0]),
@@ -80,41 +79,45 @@ params_1l = {
     "dt": 0.0,
 }
 qg_1l = QG(params_1l)
-u0_1l, v0_1l, h0_1l = qg_1l.G(vortex_1l.compute(config_1l.physics.f0, Ro))
+u0_1l, v0_1l, h0_1l = qg_1l.G(vortex_1l.compute(config.physics.f0, Ro))
 
 ## Max speed
 u_max_1l, v_max_1l, c_1l = (
-    torch.abs(u0_1l).max().item() / config_1l.mesh.dx,
-    torch.abs(v0_1l).max().item() / config_1l.mesh.dy,
-    torch.sqrt(config_1l.layers.g_prime[0] * config_1l.layers.h.sum()),
+    torch.abs(u0_1l).max().item() / config.mesh.dx,
+    torch.abs(v0_1l).max().item() / config.mesh.dy,
+    torch.sqrt(config.models[0].g_prime[0] * config.models[0].h.sum()),
 )
 ## Timestep
 dt_1l = min(
-    cfl_adv * config_1l.mesh.dx / u_max_1l,
-    cfl_adv * config_1l.mesh.dy / v_max_1l,
-    cfl_gravity * config_1l.mesh.dx / c_1l,
+    cfl_adv * config.mesh.dx / u_max_1l,
+    cfl_adv * config.mesh.dy / v_max_1l,
+    cfl_gravity * config.mesh.dx / c_1l,
 )
 
 # Two Layers Set-up
 ## Vortex
-vortex_2l = RankineVortexForcing.from_config(config_2l)
+vortex_2l = RankineVortexForcing.from_config(
+    vortex_config=config.vortex,
+    mesh_config=config.mesh,
+    model_config=config.models[1],
+)
 ## Mesh
-mesh_2l = Meshes3D.from_config(config_2l)
+mesh_2l = Meshes3D.from_config(config.mesh, config.models[1])
 ## Coriolis
 f = coriolis.compute_beta_plane(
     mesh=mesh_2l.omega.remove_z_h(),
-    f0=config_1l.physics.f0,
-    beta=config_1l.physics.beta,
+    f0=config.physics.f0,
+    beta=config.physics.beta,
 )
 ## Compute Burger Number
-h1 = config_2l.layers.h[0]
-h2 = config_2l.layers.h[1]
+h1 = config.models[1].h[0]
+h2 = config.models[1].h[1]
 h_eq = (h1 * h2) / (h1 + h2)
 
 Bu_2l = compute_burger(
-    g=config_2l.layers.g_prime[0],
+    g=config.models[1].g_prime[0],
     h_scale=h_eq,
-    f0=config_2l.physics.f0,
+    f0=config.physics.f0,
     length_scale=vortex_2l.r0,
 )
 verbose.display(
@@ -123,17 +126,17 @@ verbose.display(
 )
 ## Set model parameters
 params_2l = {
-    "nx": config_2l.mesh.nx,
-    "ny": config_2l.mesh.ny,
-    "nl": config_2l.layers.nl,
-    "dx": config_2l.mesh.dx,
-    "dy": config_2l.mesh.dy,
+    "nx": config.mesh.nx,
+    "ny": config.mesh.ny,
+    "nl": config.models[1].nl,
+    "dx": config.mesh.dx,
+    "dy": config.mesh.dy,
     "H": mesh_2l.h.xyh[2],
-    "g_prime": config_2l.layers.g_prime.unsqueeze(1).unsqueeze(1),
+    "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
     "f": f,
     "taux": taux,
     "tauy": tauy,
-    "bottom_drag_coef": config_2l.physics.bottom_drag_coef,
+    "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
     "mask": torch.ones_like(mesh_2l.h.remove_z_h().xy[0]),
@@ -142,18 +145,18 @@ params_2l = {
     "dt": 0.0,
 }
 qg_2l = QG(params_2l)
-u0_2l, v0_2l, h0_2l = qg_2l.G(vortex_2l.compute(config_2l.physics.f0, Ro))
+u0_2l, v0_2l, h0_2l = qg_2l.G(vortex_2l.compute(config.physics.f0, Ro))
 ## Max Speed
 u_max_2l, v_max_2l, c_2l = (
-    torch.abs(u0_2l).max().item() / config_2l.mesh.dx,
-    torch.abs(v0_2l).max().item() / config_2l.mesh.dy,
-    torch.sqrt(config_2l.layers.g_prime[0] * config_2l.layers.h.sum()),
+    torch.abs(u0_2l).max().item() / config.mesh.dx,
+    torch.abs(v0_2l).max().item() / config.mesh.dy,
+    torch.sqrt(config.models[1].g_prime[0] * config.models[1].h.sum()),
 )
 ## Timestep
 dt_2l = min(
-    cfl_adv * config_2l.mesh.dx / u_max_2l,
-    cfl_adv * config_2l.mesh.dy / v_max_2l,
-    cfl_gravity * config_2l.mesh.dx / c_2l,
+    cfl_adv * config.mesh.dx / u_max_2l,
+    cfl_adv * config.mesh.dy / v_max_2l,
+    cfl_gravity * config.mesh.dx / c_2l,
 )
 
 
@@ -179,7 +182,7 @@ w_0_1l = qg_1l.omega.squeeze() / qg_1l.dx / qg_1l.dy
 
 tau_1l = 1.0 / torch.sqrt(w_0_1l.pow(2).mean()).cpu().item()
 verbose.display(
-    msg=f"tau (single layer) = {tau_1l *config_1l.physics.f0:.2f} f0-1",
+    msg=f"tau (single layer) = {tau_1l *config.physics.f0:.2f} f0-1",
     trigger_level=1,
 )
 
@@ -191,13 +194,13 @@ w_0_2l = qg_2l.omega.squeeze() / qg_2l.dx / qg_2l.dy
 
 tau_2l = 1.0 / torch.sqrt(w_0_2l.pow(2).mean()).cpu().item()
 verbose.display(
-    msg=f"tau (multi layer) = {tau_2l *config_2l.physics.f0:.2f} f0-1",
+    msg=f"tau (multi layer) = {tau_2l *config.physics.f0:.2f} f0-1",
     trigger_level=1,
 )
 
 tau = max(tau_1l, tau_2l)
 verbose.display(
-    msg=f"tau = {tau *config_2l.physics.f0:.2f} f0-1", trigger_level=1
+    msg=f"tau = {tau *config.physics.f0:.2f} f0-1", trigger_level=1
 )
 
 t_end = 8 * tau
@@ -230,9 +233,9 @@ for n in range(n_steps + 1):
         )
         plot.update(w_1l, w_2l, w_2l)
         plot.show()
-        output_dir = config_1l.io.output_directory
-        name_1l = config_1l.io.name
-        name_2l = config_2l.io.name
+        output_dir = config.io.output_directory
+        name_1l = config.io.name
+        name_2l = config.io.name
         output_name = Path(f"comparison_{name_1l}_{name_2l}_{n}.png")
         plot.savefig(output_dir.joinpath(output_name))
 

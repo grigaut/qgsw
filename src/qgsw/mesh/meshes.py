@@ -12,7 +12,8 @@ from qgsw.spatial.units._units import METERS
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs.core import ScriptConfig
+    from qgsw.configs.mesh import MeshConfig
+    from qgsw.configs.models import ModelConfig
     from qgsw.spatial.units._units import Unit
 
 
@@ -182,32 +183,35 @@ class Meshes2D:
         )
 
     @classmethod
-    def from_config(cls, script_config: ScriptConfig) -> Self:
-        """Construct the Meshes2D given a ScriptConfig object.
+    def from_config(cls, mesh_config: MeshConfig) -> Self:
+        """Construct the Meshes2D given a MeshConfig object.
 
         Args:
-            script_config (ScriptConfig): Script Configuration Object.
+            mesh_config (MeshConfig): Mesh Configuration Object.
 
         Returns:
             Self: Corresponding Meshes2D.
         """
-        box = script_config.mesh.box
-        mesh = script_config.mesh
         x = torch.linspace(
-            box.x_min,
-            box.x_max,
-            mesh.nx + 1,
+            mesh_config.box.x_min,
+            mesh_config.box.x_max,
+            mesh_config.nx + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
         y = torch.linspace(
-            box.y_min,
-            box.y_max,
-            mesh.ny + 1,
+            mesh_config.box.y_min,
+            mesh_config.box.y_max,
+            mesh_config.ny + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
-        return cls.from_tensors(x=x, y=y, x_unit=box.unit, y_unit=box.unit)
+        return cls.from_tensors(
+            x=x,
+            y=y,
+            x_unit=mesh_config.box.unit,
+            y_unit=mesh_config.box.unit,
+        )
 
     @classmethod
     def from_tensors(
@@ -440,37 +444,38 @@ class Meshes3D:
         )
 
     @classmethod
-    def from_config(cls, script_config: ScriptConfig) -> Self:
-        """Construct the 3D Grid given a ScriptConfig object.
+    def from_config(
+        cls, mesh_config: MeshConfig, model_config: ModelConfig
+    ) -> Self:
+        """Construct the 3D Grid given a MeshConfig object.
 
         Args:
-            script_config (ScriptConfig): Script Configuration Object.
+            mesh_config (MeshConfig): Mesh Configuration Object.
+            model_config (ModelConfig): Model Configuration Object.
 
         Returns:
             Self: Corresponding 3D Grid.
         """
-        box = script_config.mesh.box
-        mesh = script_config.mesh
         x = torch.linspace(
-            box.x_min,
-            box.x_max,
-            mesh.nx + 1,
+            mesh_config.box.x_min,
+            mesh_config.box.x_max,
+            mesh_config.nx + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
         y = torch.linspace(
-            box.y_min,
-            box.y_max,
-            mesh.ny + 1,
+            mesh_config.box.y_min,
+            mesh_config.box.y_max,
+            mesh_config.ny + 1,
             dtype=torch.float64,
             device=DEVICE,
         )
         return cls.from_tensors(
             x=x,
             y=y,
-            h=script_config.layers.h,
-            x_unit=box.unit,
-            y_unit=box.unit,
+            h=model_config.h,
+            x_unit=mesh_config.box.unit,
+            y_unit=mesh_config.box.unit,
             zh_unit=METERS,
         )
 

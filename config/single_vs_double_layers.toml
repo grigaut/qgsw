@@ -2,7 +2,7 @@
 name = "1_layer_200"
 plot_frequency = nan # in days
 performance_log = false
-output_dir = "output"
+output_dir = "output/reduced_grav/200_vs_200_4000"
 
 [physics]
 rho = 1000
@@ -11,12 +11,25 @@ f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
-[layers]
+[[models]]
+name = "One Layer"
+type = "QG"
 h = [
-    200
+    200,
 ]
 g_prime = [
-    10.0
+    5e-2
+]
+[[models]]
+name = "Multilayer"
+type = "QG"
+h = [
+    200,
+    800,
+]
+g_prime = [
+    10.0,
+    5e-2,
 ]
 
 [mesh]

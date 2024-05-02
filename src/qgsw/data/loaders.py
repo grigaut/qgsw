@@ -13,7 +13,7 @@ import torch
 from qgsw import verbose
 from qgsw.configs.base import _Config, _DataConfig
 from qgsw.configs.bathymetry import BathyDataConfig
-from qgsw.configs.core import ScriptConfig
+from qgsw.configs.windstress import WindStressConfig
 from qgsw.data.preprocessing import (
     BathyPreprocessor,
     Preprocessor,
@@ -40,7 +40,7 @@ class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
         Args:
             config (Config): Loader data configuration.
         """
-        self._config = self._set_config(config=config)
+        self._config = self._set_config(config)
         filepath = self._set_filepath()
         self._load_from_url(filepath=filepath)
         self._reader = Reader(filepath=filepath)
@@ -116,7 +116,7 @@ class BathyLoader(Loader[BathyDataConfig, BathyData, BathyPreprocessor]):
 
 class WindForcingLoader(
     Loader[
-        ScriptConfig,
+        WindStressConfig,
         tuple[torch.Tensor, torch.Tensor],
         _WindStressPreprocessor,
     ]
@@ -124,7 +124,7 @@ class WindForcingLoader(
     """Wind Forcing Data Loader."""
 
     def set_preprocessor(
-        self, config: ScriptConfig
+        self, config: WindStressConfig
     ) -> _WindStressPreprocessor:
         """Set WindStress preprocessor.
 
@@ -137,7 +137,7 @@ class WindForcingLoader(
         Returns:
             _WindStressPreprocessor: Preprocessor.
         """
-        ws_data = config.windstress.data
+        ws_data = config.data
         if ws_data.data_type == "speed":
             return WindStressPreprocessorSpeed(
                 longitude_key=ws_data.longitude,
@@ -157,13 +157,15 @@ class WindForcingLoader(
         msg = "Unrecognized data type in windstress.data section."
         raise KeyError(msg)
 
-    def _set_config(self, config: ScriptConfig) -> WindStressDataConfig:
+    def _set_config(
+        self, windstress_config: WindStressConfig
+    ) -> WindStressDataConfig:
         """Set Data Configuration.
 
         Args:
-            config (ScriptConfig): Script Configuration.
+            windstress_config (WindStressConfig): Windstress Configuration.
 
         Returns:
             WindStressDataConfig: Data configuration.
         """
-        return config.windstress.data
+        return windstress_config.data
