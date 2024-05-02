@@ -602,6 +602,10 @@ class Model(metaclass=ABCMeta):
     ):
         """Get physical variables u_phys, v_phys, h_phys from state variables.
 
+        Args:
+            numpy (bool, optional): Whether to cast output
+            to ndarray or not. Defaults to False.
+
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray]
         | tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
@@ -615,6 +619,29 @@ class Model(metaclass=ABCMeta):
             if numpy
             else (u_phys, v_phys, h_phys)
         )
+
+    @overload
+    def get_physical_omega(self, numpy: Literal[True]) -> np.ndarray: ...
+
+    @overload
+    def get_physical_omega(self, numpy: Literal[False]) -> torch.Tensor: ...
+
+    def get_physical_omega(
+        self,
+        numpy: bool = False,
+    ) -> torch.Tensor | np.ndarray:
+        """Get physical vorticity.
+
+        Args:
+            numpy (bool, optional): Whether to cast output
+            to ndarray or not. Defaults to False.
+
+        Returns:
+            torch.Tensor | np.ndarray: Vorticity
+        """
+        omega_phys = (self.omega / self.area / self.f0).cpu()
+
+        return omega_phys.numpy() if numpy else omega_phys
 
     def set_physical_uvh(
         self,
@@ -802,6 +829,20 @@ class Model(metaclass=ABCMeta):
         )
 
         verbose.display(msg=f"saved u,v,h to {output_file}", trigger_level=1)
+
+    def save_omega(self, output_file: Path) -> None:
+        """Save vorticity values.
+
+        Args:
+            output_file (Path): File to save value in (.npz).
+        """
+        self._raise_if_invalid_savefile(output_file=output_file)
+
+        omega = self.get_physical_omega(numpy=True)
+
+        np.savez(output_file, omega=omega.astype("float32"))
+
+        verbose.display(msg=f"saved ω to {output_file}", trigger_level=1)
 
     @abstractmethod
     def step(self) -> None:

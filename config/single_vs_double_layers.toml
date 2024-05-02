@@ -7,8 +7,8 @@ quantity = 10
 directory = "output"
 [io.plots]
 show = false
-save = true
-quantity = 2
+save = false
+quantity = 10
 plots_directory = "output/plots"
 
 [physics]
@@ -40,17 +40,17 @@ g_prime = [
 ]
 
 [mesh]
-nx = 24
-ny = 24
+nx = 92
+ny = 92
 dt = 4_000
 [mesh.box]
 unit = "m"
 [mesh.box.x]
-min = -2_200_000
-max = 2_200_000
+min = -150_000 # Meters
+max = 150_000 # Meters
 [mesh.box.y]
-min = -2_200_000
-max = 2_200_000
+min = -150_000 # Meters
+max = 150_000 # Meters
 
 [windstress]
 type = "none"

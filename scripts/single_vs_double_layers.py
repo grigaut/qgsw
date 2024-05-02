@@ -205,7 +205,7 @@ verbose.display(
 
 t_end = 8 * tau
 freq_plot = int(t_end / config.io.plots.quantity / dt) + 1
-freq_output = int(t_end / config.io.results.quantity / dt) + 1
+freq_save = int(t_end / config.io.results.quantity / dt) + 1
 freq_checknan = 100
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
@@ -229,8 +229,9 @@ plot = VorticityComparisonFigure(qg_1l_axes, qg_2l_top_axes, qg_2l_inf_axes)
 # Start runs
 for n in range(n_steps + 1):
     if plots_required and (n % freq_plot == 0 or n == n_steps):
-        w_1l = (qg_1l.omega / qg_1l.area / qg_1l.f0).cpu().numpy()
-        w_2l = (qg_2l.omega / qg_2l.area / qg_2l.f0).cpu().numpy()
+        w_1l = qg_1l.get_physical_omega(numpy=True)
+        w_2l = qg_2l.get_physical_omega(numpy=True)
+
         plot.figure.suptitle(
             f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
             f" t={t/tau:.2f}$\\tau$"
@@ -243,12 +244,12 @@ for n in range(n_steps + 1):
             output_name = Path(f"{config.io.name_sc}_{n}.png")
             plot.savefig(output_dir.joinpath(output_name))
 
-    if config.io.results.save and (n % freq_output == 0 or n == n_steps):
+    if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
         name_1l = config.models[0].name_sc
         name_2l = config.models[1].name_sc
-        qg_1l.save_uvh(directory.joinpath(f"{name_1l}_{n}.npz"))
-        qg_2l.save_uvh(directory.joinpath(f"{name_2l}_{n}.npz"))
+        qg_1l.save_omega(directory.joinpath(f"omega_{name_1l}_{n}.npz"))
+        qg_2l.save_omega(directory.joinpath(f"omega_{name_2l}_{n}.npz"))
     qg_1l.step()
     qg_2l.step()
     t += dt
