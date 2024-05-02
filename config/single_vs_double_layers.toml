@@ -1,8 +1,15 @@
 [io]
-name = "1_layer_200"
-plot_frequency = nan # in days
+name = "200_vs_200_800"
 performance_log = false
-output_dir = "output/reduced_grav/200_vs_200_4000"
+[io.output]
+save_results = true
+quantity = 10
+directory = "output"
+[io.plots]
+show = false
+save = true
+quantity = 2
+plots_directory = "output/plots"
 
 [physics]
 rho = 1000
@@ -33,8 +40,8 @@ g_prime = [
 ]
 
 [mesh]
-nx = 96
-ny = 96
+nx = 24
+ny = 24
 dt = 4_000
 [mesh.box]
 unit = "m"

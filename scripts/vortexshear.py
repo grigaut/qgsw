@@ -173,12 +173,15 @@ for Ro in [
     )
 
     t_end = 8 * tau
-    freq_plot = int(t_end / 100 / dt) + 1
+    freq_plot = int(t_end / config.io.plots.quantity / dt) + 1
+    freq_save = int(t_end / config.io.results.quantity / dt) + 1
     freq_checknan = 100
     freq_log = int(t_end / 10 / dt) + 1
     n_steps = int(t_end / dt) + 1
 
-    if freq_plot > 0:
+    plots_required = config.io.plots.save or config.io.plots.show
+
+    if plots_required:
         mask = sw_ml.masks.not_w[0, 0].cpu().numpy()
         sw_axes = SurfaceVorticityAxes.from_mask(mask=mask)
         sw_axes.set_title(r"$\omega_{SW}$")
@@ -189,14 +192,16 @@ for Ro in [
         plot = VorticityComparisonFigure(sw_axes, qg_axes, diff_axes)
 
     for n in range(n_steps + 1):
-        if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
+        if plots_required and (n % freq_plot == 0 or n == n_steps):
             w_qg = (qg_ml.omega / qg_ml.area / qg_ml.f0).cpu().numpy()
             w_sw = (sw_ml.omega / sw_ml.area / sw_ml.f0).cpu().numpy()
             plot.update(w_sw, w_qg, w_sw - w_qg)
-            plot.show()
-            output_dir = config.io.output_directory
-            output_name = Path(f"{config.io.name}_{n}.png")
-            plot.savefig(output_dir.joinpath(output_name))
+            if config.io.plots.show:
+                plot.show()
+            if config.io.plots.save:
+                output_dir = config.io.plots.directory
+                output_name = Path(f"{config.io.name}_{n}.png")
+                plot.savefig(output_dir.joinpath(output_name))
 
         qg_ml.step()
         sw_ml.step()
