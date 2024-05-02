@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     import numpy as np
     from matplotlib.figure import Figure
 
-    from qgsw.models.sw import SW
+    from qgsw.models.base import Model
 
 P = ParamSpec("P")
 
@@ -39,7 +39,7 @@ class BaseFigure:
 
     def show(self) -> None:
         """Show the figure."""
-        plt.pause(0.05)
+        plt.pause(0.5)
 
 
 class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
@@ -97,16 +97,29 @@ class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
 
     def update_with_model(
         self,
-        model: SW,
+        model: Model,
         **kwargs: P.kwargs,
     ) -> None:
-        """Update the plot content with a SW model.
+        """Update the plot content with a model.
 
         Args:
-            model (SW): Model to use for plot update.
+            model (Model): Model to use for plot update.
             **kwargs: Additional arguments to give to the plotting function.
         """
-        self._ax.update_with_model(model=model, **kwargs)
+        self._update(self._ax.retrieve_data_from_model(model=model), **kwargs)
+
+    def update_with_files(
+        self,
+        file: Path,
+        **kwargs: P.kwargs,
+    ) -> None:
+        """Update the plot content with a file.
+
+        Args:
+            file (Path): File path to use for plot update.
+            **kwargs: Additional arguments to give to the plotting function.
+        """
+        self._update(self._ax.retrieve_data_from_file(file=file), **kwargs)
 
     @classmethod
     @abstractmethod

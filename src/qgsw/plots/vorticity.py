@@ -11,7 +11,6 @@ from matplotlib.figure import Figure
 from typing_extensions import ParamSpec, Self
 
 from qgsw.mesh.exceptions import InvalidLayerNumberError
-from qgsw.models.sw import SW
 from qgsw.plots.base.axes import (
     BaseAxes,
     BaseAxesContent,
@@ -21,11 +20,13 @@ from qgsw.plots.base.comparison import ComparisonFigure
 from qgsw.plots.base.figures import BaseSingleFigure
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from matplotlib.image import AxesImage
 
-    from qgsw.models.sw import SW
+    from qgsw.models.base import Model
 
 
 P = ParamSpec("P")
@@ -121,19 +122,27 @@ class VorticityAxesContent(BaseAxesContent):
         self._axesim = axesim
         return ax
 
-    def _retrieve_data_from_model(self, model: SW) -> np.ndarray:
-        """Retrieve data from a SW model.
+    def retrieve_data_from_model(self, model: Model) -> np.ndarray:
+        """Retrieve data from a model.
 
         Args:
-            model (SW): SW model.
+            model (Model): Model model.
 
         Returns:
             np.ndarray: Retrieved data (1,nl,nx,ny).
         """
-        omega = model.omega
-        area = model.area
-        f0 = model.f0
-        return (omega / area / f0).cpu().numpy()
+        return model.get_physical_omega(numpy=True)
+
+    def retrieve_data_from_file(self, filepath: Path) -> np.ndarray:
+        """Retrieve relevant from a given file.
+
+        Args:
+            filepath (Path): File to retrieve data from.
+
+        Returns:
+            np.ndarray: Relevant data.
+        """
+        return np.load(file=filepath)["omega"]
 
     def update(self, ax: Axes, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
         """Update Axes content.
