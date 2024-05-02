@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +11,6 @@ from matplotlib.figure import Figure
 from typing_extensions import ParamSpec, Self
 
 from qgsw.mesh.exceptions import InvalidLayerNumberError
-from qgsw.models.sw import SW
 from qgsw.plots.base.axes import (
     BaseAxes,
     BaseAxesContent,
@@ -21,11 +20,14 @@ from qgsw.plots.base.comparison import ComparisonFigure
 from qgsw.plots.base.figures import BaseSingleFigure
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from matplotlib.axes import Axes
+    from matplotlib.colorbar import Colorbar
     from matplotlib.figure import Figure
     from matplotlib.image import AxesImage
 
-    from qgsw.models.sw import SW
+    from qgsw.models.base import Model
 
 
 P = ParamSpec("P")
@@ -82,28 +84,13 @@ class VorticityAxesContent(BaseAxesContent):
         kwargs["animated"] = kwargs.get("animated", True)
         super().__init__(mask, **kwargs)
         self._axesim = None
+        self._cbar: Colorbar | None = None
+        self._has_cbar: bool = False
 
     @property
     def axes_image(self) -> AxesImage:
         """Axes Image."""
         return self._axesim
-
-    def _format_data(self, data: np.ndarray) -> np.ndarray:
-        """Format input data.
-
-        Args:
-            data (np.ndarray): Input data (1,nl,nx,ny).
-
-        Returns:
-            np.ndarray: Formatted data (nx,ny).
-        """
-        if data.shape[1] <= self._layer_nb:
-            msg = (
-                f"Impossible to display layer {self._layer_nb} "
-                f"with {data.shape}-shaped data."
-            )
-            raise InvalidLayerNumberError(msg)
-        return data[0, self._layer_nb]
 
     def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
         """Update the Axes content.
@@ -118,22 +105,50 @@ class VorticityAxesContent(BaseAxesContent):
         """
         masked_data = np.ma.masked_where(mask, data).T
         axesim = ax.imshow(masked_data, **self._kwargs)
-        self._axesim = axesim
+        self.remove_colorbar()
+        self.add_colorbar(ax=ax, axesim=axesim)
         return ax
 
-    def _retrieve_data_from_model(self, model: SW) -> np.ndarray:
-        """Retrieve data from a SW model.
+    def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
+        """Format input data.
 
         Args:
-            model (SW): SW model.
+            array (np.ndarray): Input array (1,nl,nx,ny).
 
         Returns:
-            np.ndarray: Retrieved data (1,nl,nx,ny).
+            np.ndarray: Data (nx,ny).
         """
-        omega = model.omega
-        area = model.area
-        f0 = model.f0
-        return (omega / area / f0).cpu().numpy()
+        if array.shape[1] <= self._layer_nb:
+            msg = (
+                f"Impossible to display layer {self._layer_nb} "
+                f"with {array.shape}-shaped array."
+            )
+            raise InvalidLayerNumberError(msg)
+        return array[0, self._layer_nb]
+
+    def retrieve_data_from_model(self, model: Model) -> np.ndarray:
+        """Retrieve data from a model.
+
+        Args:
+            model (Model): Model model.
+
+        Returns:
+            np.ndarray: Retrieved data (nx,ny).
+        """
+        omega = model.get_physical_omega(numpy=True)
+        return self.retrieve_data_from_array(omega)
+
+    def retrieve_data_from_file(self, filepath: Path) -> np.ndarray:
+        """Retrieve relevant from a given file.
+
+        Args:
+            filepath (Path): File to retrieve data from.
+
+        Returns:
+            np.ndarray: Retrieved data (nx,ny).
+        """
+        omega = np.load(file=filepath)["omega"]
+        return self.retrieve_data_from_array(omega)
 
     def update(self, ax: Axes, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
         """Update Axes content.
@@ -147,6 +162,18 @@ class VorticityAxesContent(BaseAxesContent):
             Axes: Updated Axes.
         """
         return super().update(ax, data, **kwargs)
+
+    def remove_colorbar(self) -> None:
+        """Remove the colorbar."""
+        if self._has_cbar:
+            self._cbar.remove()
+            self._has_cbar = False
+
+    def add_colorbar(self, ax: Axes, axesim: AxesImage) -> None:
+        """Remove the colorbar."""
+        self._cbar = ax.figure.colorbar(axesim, label=r"$\omega / f_0$")
+        self._has_cbar = True
+        self._axesim = axesim
 
 
 class SurfaceVorticityAxesContent(VorticityAxesContent):
@@ -265,10 +292,30 @@ class SurfaceVorticityFigure(BaseSingleFigure[VorticityAxes]):
 class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
     """Comparison between Surface Vorticity Axes."""
 
-    def __init__(self, *axes_managers: VorticityAxes) -> None:
+    def __init__(
+        self, *axes_managers: VorticityAxes, common_cbar: bool = True
+    ) -> None:
         """Instantiate the surface vorticity comparison."""
         super().__init__(*axes_managers)
         self._cbar_axes = None
+        self._common_cbar = common_cbar
+
+    def _set_cbar_extrems(
+        self, *datas: np.ndarray, **kwargs: P.kwargs
+    ) -> dict[str, Any]:
+        """Set the colorbar extrem values if needed.
+
+        Returns:
+            dict[str, Any]: Updated kwargs.
+        """
+        if ("vmin" not in kwargs) and ("vmax" in kwargs):
+            return kwargs
+        max_value = max(np.abs(data).max() for data in datas)
+        if "vmin" not in kwargs:
+            kwargs["vmin"] = -max_value
+        if "vmax" not in kwargs:
+            kwargs["vmax"] = max_value
+        return kwargs
 
     def _show_colorbar(self) -> None:
         """Show the colorbar."""
@@ -286,7 +333,14 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
                 label=r"$\omega / f_0$",
             )
 
-    def _update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+    def _update(self, *datas: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update the Axes."""
+        if self._common_cbar:
+            kwargs = self._set_cbar_extrems(*datas, **kwargs)
+
         super()._update(*datas, **kwargs)
-        self._show_colorbar()
+
+        if self._common_cbar:
+            for ax_ms in self._axes_ms:
+                ax_ms.content.remove_colorbar()
+            self._show_colorbar()

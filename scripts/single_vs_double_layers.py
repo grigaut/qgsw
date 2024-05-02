@@ -229,14 +229,11 @@ plot = VorticityComparisonFigure(qg_1l_axes, qg_2l_top_axes, qg_2l_inf_axes)
 # Start runs
 for n in range(n_steps + 1):
     if plots_required and (n % freq_plot == 0 or n == n_steps):
-        w_1l = qg_1l.get_physical_omega(numpy=True)
-        w_2l = qg_2l.get_physical_omega(numpy=True)
-
         plot.figure.suptitle(
             f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
             f" t={t/tau:.2f}$\\tau$"
         )
-        plot.update(w_1l, w_2l, w_2l)
+        plot.update_with_models(qg_1l, qg_2l, qg_2l)
         if config.io.plots.show:
             plot.show()
         if config.io.plots.save:

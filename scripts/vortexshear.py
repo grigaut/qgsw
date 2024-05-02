@@ -195,7 +195,7 @@ for Ro in [
         if plots_required and (n % freq_plot == 0 or n == n_steps):
             w_qg = (qg_ml.omega / qg_ml.area / qg_ml.f0).cpu().numpy()
             w_sw = (sw_ml.omega / sw_ml.area / sw_ml.f0).cpu().numpy()
-            plot.update(w_sw, w_qg, w_sw - w_qg)
+            plot.update_with_arrays(w_sw, w_qg, w_sw - w_qg)
             if config.io.plots.show:
                 plot.show()
             if config.io.plots.save:

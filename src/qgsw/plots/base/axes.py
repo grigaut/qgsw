@@ -15,10 +15,13 @@ from qgsw.plots.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
-    from qgsw.models.sw import SW
+    from qgsw.models.base import Model
+
 
 P = ParamSpec("P")
 
@@ -122,18 +125,6 @@ class BaseAxesContent(metaclass=ABCMeta):
             raise InvalidMaskError(msg)
 
     @abstractmethod
-    def _format_data(self, data: np.ndarray) -> np.ndarray:
-        """Format input data.
-
-        Args:
-            data (np.ndarray): Data tot format.
-
-        Returns:
-            np.ndarray: Formatted data.
-        """
-        return data
-
-    @abstractmethod
     def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
         """Update ax content using data from a np.ndarray.
 
@@ -158,39 +149,41 @@ class BaseAxesContent(metaclass=ABCMeta):
             Axes: Updated axes.
         """
         self._kwargs = self._kwargs | kwargs
-        formatted_data = self._format_data(data=data)
-        mask = self._validate_mask(data=formatted_data)
-        return self._update(ax=ax, data=formatted_data, mask=mask)
+        mask = self._validate_mask(data=data)
+        return self._update(ax=ax, data=data, mask=mask)
 
     @abstractmethod
-    def _retrieve_data_from_model(self, model: SW) -> np.ndarray:
-        """Retrieve relevant from a given SW model.
+    def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
+        """Retrieve relevant data from a given array.
 
         Args:
-            model (SW): Model to retrieve data from.
+            array (np.ndarray): Data tot format.
+
+        Returns:
+            np.ndarray: Formatted data.
+        """
+
+    @abstractmethod
+    def retrieve_data_from_model(self, model: Model) -> np.ndarray:
+        """Retrieve relevant from a given model.
+
+        Args:
+            model (Model): Model to retrieve data from.
 
         Returns:
             np.ndarray: Relevant data.
         """
 
-    def update_with_model(
-        self, ax: Axes, model: SW, **kwargs: P.kwargs
-    ) -> Axes:
-        """Update Axes content using data from a SW model.
+    @abstractmethod
+    def retrieve_data_from_file(self, file: Path) -> np.ndarray:
+        """Retrieve relevant from a given file.
 
         Args:
-            ax (Axes): Axes to update the content of.
-            model (SW): MOdel to use for the content update.
-            **kwargs: Additional arguments to give to the plotting function.
+            file (Path): File to retrieve data from.
 
         Returns:
-            Axes: Updated Axes.
+            np.ndarray: Relevant data.
         """
-        return self.update(
-            ax=ax,
-            data=self._retrieve_data_from_model(model=model),
-            **kwargs,
-        )
 
     def _validate_mask(self, data: np.ndarray) -> np.ndarray:
         """Validate Mask.
@@ -207,7 +200,7 @@ class BaseAxesContent(metaclass=ABCMeta):
             np.ndarray: Valid Mask.
         """
         if self._mask is None:
-            return np.ones(data.shape)
+            return np.zeros(data.shape)
         if self._mask.shape != data.shape:
             msg = "Mask's shape must match data's shape."
             raise MismatchingMaskError(msg)
@@ -308,19 +301,38 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         """
         return self._content.update(ax=self._ax, data=data, **kwargs)
 
-    def update_with_model(self, model: SW, **kwargs: P.kwargs) -> Axes:
-        """Update the Axes content using a SW model.
+    def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
+        """Retrieve data from a given np.ndarray.
 
         Args:
-            model (SW): Model to use to update Axes.
-            **kwargs: Additional arguments to give to the plotting function.
+            array (np.ndarray): array to use data from.
 
         Returns:
-            Axes: Updated Axes.
+            np.ndarray: Loaded data from the array.
         """
-        return self._content.update_with_model(
-            ax=self._ax, model=model, **kwargs
-        )
+        return self._content.retrieve_data_from_array(array=array)
+
+    def retrieve_data_from_model(self, model: Model) -> np.ndarray:
+        """Retrieve data from a given Model.
+
+        Args:
+            model (Model): model to use data from.
+
+        Returns:
+            np.ndarray: Loaded dat from the model.
+        """
+        return self._content.retrieve_data_from_model(model=model)
+
+    def retrieve_data_from_file(self, file: Path) -> np.ndarray:
+        """Retrieve data from a given npz file.
+
+        Args:
+            file (Path): NPZ file path.
+
+        Returns:
+            np.ndarray: Loaded data.
+        """
+        return self._content.retrieve_data_from_file(filepath=file)
 
     @classmethod
     @abstractmethod

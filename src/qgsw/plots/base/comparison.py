@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Generic
 
 import matplotlib.pyplot as plt
-import numpy as np
 from typing_extensions import ParamSpec
 
 from qgsw.plots.base.axes import AxesManager
@@ -16,8 +15,13 @@ from qgsw.plots.exceptions import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+
+    from qgsw.models.base import Model
 
 P = ParamSpec("P")
 
@@ -40,7 +44,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         self._axes: np.ndarray = axes.flatten()
         self._set_axes()
 
-    def _raise_if_inconsistent_datas(self, elements_nb: int) -> None:
+    def _raise_if_inconsistent_length(self, elements_nb: int) -> None:
         """Raise an error if the number of plot to update is invalid.
 
         Args:
@@ -75,31 +79,39 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             axes_m.set_ax(self._axes[i])
             axes_m.context.reload_axes(axes_m.ax)
 
-    def _update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+    def _update(self, *datas: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update the Figure."""
-        self._raise_if_inconsistent_datas(elements_nb=len(datas))
+        self._raise_if_inconsistent_length(elements_nb=len(datas))
         for i, data in enumerate(datas):
-            if data is None:
-                continue
             self._axes_ms[i].update(data, **kwargs)
 
-    def _set_cbar_extrems(
-        self, *datas: np.ndarray | None, **kwargs: P.kwargs
-    ) -> dict[str, Any]:
-        """Set the colorbar extrem values if needed.
-
-        Returns:
-            dict[str, Any]: Updated kwargs.
-        """
-        if ("vmin" not in kwargs) and ("vmax" in kwargs):
-            return kwargs
-        max_value = max(np.abs(data).max() for data in datas)
-        if "vmin" not in kwargs:
-            kwargs["vmin"] = -max_value
-        if "vmax" not in kwargs:
-            kwargs["vmax"] = max_value
-        return kwargs
-
-    def update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+    def update_with_arrays(
+        self, *arrays: np.ndarray, **kwargs: P.kwargs
+    ) -> None:
         """Update the Figure."""
-        self._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
+        self._raise_if_inconsistent_length(len(arrays))
+        datas = [
+            self._axes_ms[i].retrieve_data_from_array(arrays[i])
+            for i in range(len(arrays))
+        ]
+        self._update(*datas, **kwargs)
+
+    def update_with_files(self, *files: Path, **kwargs: P.kwargs) -> None:
+        """Update the plot given some NPZ files."""
+        self._raise_if_inconsistent_length(len(files))
+
+        datas = [
+            self._axes_ms[i].retrieve_data_from_file(files[i])
+            for i in range(len(files))
+        ]
+        self._update(*datas, **kwargs)
+
+    def update_with_models(self, *models: Model, **kwargs: P.kwargs) -> None:
+        """Update the plot given some models."""
+        self._raise_if_inconsistent_length(len(models))
+
+        datas = [
+            self._axes_ms[i].retrieve_data_from_model(models[i])
+            for i in range(len(models))
+        ]
+        self._update(*datas, **kwargs)
