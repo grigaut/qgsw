@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -281,6 +281,23 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
         super().__init__(*axes_managers)
         self._cbar_axes = None
 
+    def _set_cbar_extrems(
+        self, *datas: np.ndarray, **kwargs: P.kwargs
+    ) -> dict[str, Any]:
+        """Set the colorbar extrem values if needed.
+
+        Returns:
+            dict[str, Any]: Updated kwargs.
+        """
+        if ("vmin" not in kwargs) and ("vmax" in kwargs):
+            return kwargs
+        max_value = max(np.abs(data).max() for data in datas)
+        if "vmin" not in kwargs:
+            kwargs["vmin"] = -max_value
+        if "vmax" not in kwargs:
+            kwargs["vmax"] = max_value
+        return kwargs
+
     def _show_colorbar(self) -> None:
         """Show the colorbar."""
         if self._cbar_axes is None:
@@ -297,7 +314,7 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
                 label=r"$\omega / f_0$",
             )
 
-    def _update(self, *datas: np.ndarray | None, **kwargs: P.kwargs) -> None:
+    def _update(self, *datas: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update the Axes."""
-        super()._update(*datas, **kwargs)
+        super()._update(*datas, **self._set_cbar_extrems(*datas, **kwargs))
         self._show_colorbar()
