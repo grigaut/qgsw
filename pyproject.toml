@@ -17,8 +17,6 @@ target-version = "py39"
 extend-exclude = ["*.ipynb"]
 lint.select = ["ALL"]
 lint.ignore = [
-    #no-blank-line-before-class
-    "D211",
     # bandit
     "S",
     # do not assign a lambda expression, use a def
