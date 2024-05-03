@@ -22,7 +22,10 @@ from icecream import ic
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
-config = RealisticConfig.from_file(Path("config/realistic.toml"))
+ROOT_PATH = Path(__file__).parent.parent
+CONFIG_PATH = ROOT_PATH.joinpath("config/realistic.toml")
+config = RealisticConfig.from_file(CONFIG_PATH)
+
 mesh = Meshes3D.from_config(config.mesh, config.model)
 bathy = Bathymetry.from_config(config.bathy)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)

@@ -19,7 +19,10 @@ from icecream import ic
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
-config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
+ROOT_PATH = Path(__file__).parent.parent
+CONFIG_PATH = ROOT_PATH.joinpath("config/vortexshear.toml")
+config = DoubleGyreConfig.from_file(CONFIG_PATH)
+
 mesh = Meshes3D.from_config(config.mesh, config.model)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 

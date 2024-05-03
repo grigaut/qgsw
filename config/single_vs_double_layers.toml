@@ -4,12 +4,12 @@ performance_log = false
 [io.output]
 save_results = true
 quantity = 100
-directory = "qgsw/results"
+directory = "results"
 [io.plots]
 show = false
 save = false
 quantity = 10
-plots_directory = "qgsw/plots"
+plots_directory = "plots"
 
 [physics]
 rho = 1000
