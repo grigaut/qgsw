@@ -10,6 +10,7 @@ Louis Thiry, 2023.
 
 import torch
 import torch.nn.functional as F
+from qgsw.specs import DEVICE
 
 
 def compute_laplace_dctII(
@@ -171,7 +172,7 @@ def compute_capacitance_matrices(
         rhs.fill_(0)
         rhs[..., bound_xids[m], bound_yids[m]] = 1
         sol = dstI2D(dstI2D(rhs) / helmholtz_dstI.type(torch.float64))
-        inv_cap_matrices[:, m] = sol[..., bound_xids, bound_yids].cpu()
+        inv_cap_matrices[:, m] = sol[..., bound_xids, bound_yids].to(DEVICE)
 
     # invert G matrices to get capacitance matrices
     cap_matrices = torch.zeros_like(inv_cap_matrices)
@@ -321,7 +322,7 @@ class HelmholtzNeumannSolver:
             inv_cap_matrix[:, m] = v - self.V_T(self.G(self.U(v)))
 
         # invert on cpu
-        cap_matrix = torch.linalg.inv(inv_cap_matrix.cpu())
+        cap_matrix = torch.linalg.inv(inv_cap_matrix.to(DEVICE))
 
         # convert to dtype and transfer to device
         self.cap_matrix = cap_matrix.type(self.dtype).to(self.device)
@@ -402,10 +403,12 @@ if __name__ == "__main__":
     frect_r = solve_helmholtz_dstI(Hfrect, helmholtz_dstI)
     fig, ax = plt.subplots(1, 2, figsize=(12, 6))
     ax[0].set_title("f")
-    fig.colorbar(ax[0].imshow(frect[0].cpu().T, origin="lower"), ax=ax[0])
+    fig.colorbar(ax[0].imshow(frect[0].to(DEVICE).T, origin="lower"), ax=ax[0])
     ax[1].set_title("|f - f_r|")
     fig.colorbar(
-        ax[1].imshow(torch.abs(frect - frect_r)[0].cpu().T, origin="lower"),
+        ax[1].imshow(
+            torch.abs(frect - frect_r)[0].to(DEVICE).T, origin="lower"
+        ),
         ax=ax[1],
     )
     fig.suptitle(
@@ -447,9 +450,9 @@ if __name__ == "__main__":
     palette = plt.cm.bwr.with_extremes(bad="grey")
     fig, ax = plt.subplots(1, 2, figsize=(18, 9))
     ax[0].set_title("$f$")
-    vM = fcirc[0].abs().max().cpu().item()
-    # fcirc_ma = np.ma.masked_where((1-mask).cpu().numpy(), fcirc[0].cpu().numpy())
-    fcirc_ma = fcirc[0].cpu().numpy()
+    vM = fcirc[0].abs().max().to(DEVICE).item()
+    # fcirc_ma = np.ma.masked_where((1-mask).to(DEVICE).numpy(), fcirc[0].to(DEVICE).numpy())
+    fcirc_ma = fcirc[0].to(DEVICE).numpy()
     fig.colorbar(
         ax[0].imshow(
             fcirc_ma.T, vmin=-vM, vmax=vM, origin="lower", cmap=palette
@@ -457,9 +460,9 @@ if __name__ == "__main__":
         ax=ax[0],
     )
     ax[1].set_title("$f - f_{\\rm inv}$")
-    diff = (fcirc - fcirc_r)[0].cpu().numpy()
+    diff = (fcirc - fcirc_r)[0].to(DEVICE).numpy()
     vM = np.abs(diff).max()
-    # diff_ma = np.ma.masked_where((1-mask).cpu().numpy(), diff)
+    # diff_ma = np.ma.masked_where((1-mask).to(DEVICE).numpy(), diff)
     diff_ma = diff
     fig.colorbar(
         ax[1].imshow(
@@ -494,29 +497,33 @@ if __name__ == "__main__":
     H_f1 = solver1.helmholtz(f1)
     f1_r = solver1.solve(H_f1)
 
-    vM = max(f1.abs().cpu().max().item(), f1_r.cpu().max().item())
+    vM = max(f1.abs().to(DEVICE).max().item(), f1_r.to(DEVICE).max().item())
     diff = (f1 - f1_r) * mask1
-    vM2 = diff.abs().cpu().max().item()
+    vM2 = diff.abs().to(DEVICE).max().item()
 
     fig, ax = plt.subplots(1, 3, figsize=(16, 6))
     ax[0].set_title("f")
     fig.colorbar(
         ax[0].imshow(
-            f1[0].cpu().T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
+            f1[0].to(DEVICE).T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
         ),
         ax=ax[0],
     )
     ax[1].set_title("f_r")
     fig.colorbar(
         ax[1].imshow(
-            f1_r[0].cpu().T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
+            f1_r[0].to(DEVICE).T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
         ),
         ax=ax[1],
     )
     ax[2].set_title("|f - f_r|")
     fig.colorbar(
         ax[2].imshow(
-            diff[0].cpu().T, vmin=-vM2, vmax=vM2, cmap="bwr", origin="lower"
+            diff[0].to(DEVICE).T,
+            vmin=-vM2,
+            vmax=vM2,
+            cmap="bwr",
+            origin="lower",
         ),
         ax=ax[2],
     )
@@ -539,29 +546,33 @@ if __name__ == "__main__":
     H_f2 = solver2.helmholtz(f2)
     f2_r = solver2.solve(H_f2)
 
-    vM = max(f2.abs().cpu().max().item(), f2_r.cpu().max().item())
+    vM = max(f2.abs().to(DEVICE).max().item(), f2_r.to(DEVICE).max().item())
     diff = (f2 - f2_r) * mask2
-    vM2 = diff.abs().cpu().max().item()
+    vM2 = diff.abs().to(DEVICE).max().item()
 
     fig, ax = plt.subplots(1, 3, figsize=(16, 6))
     ax[0].set_title("f")
     fig.colorbar(
         ax[0].imshow(
-            f2[0].cpu().T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
+            f2[0].to(DEVICE).T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
         ),
         ax=ax[0],
     )
     ax[1].set_title("f_r")
     fig.colorbar(
         ax[1].imshow(
-            f2_r[0].cpu().T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
+            f2_r[0].to(DEVICE).T, vmin=-vM, vmax=vM, cmap="bwr", origin="lower"
         ),
         ax=ax[1],
     )
     ax[2].set_title("|f - f_r|")
     fig.colorbar(
         ax[2].imshow(
-            diff[0].cpu().T, vmin=-vM2, vmax=vM2, cmap="bwr", origin="lower"
+            diff[0].to(DEVICE).T,
+            vmin=-vM2,
+            vmax=vM2,
+            cmap="bwr",
+            origin="lower",
         ),
         ax=ax[2],
     )
@@ -592,16 +603,16 @@ if __name__ == "__main__":
     # H_f = solver.helmholtz(f_)
     # f_r = solver.solve(H_f)
 
-    # vM = max(f_.abs().cpu().max().item(), f_r.cpu().max().item())
+    # vM = max(f_.abs().to(DEVICE).max().item(), f_r.to(DEVICE).max().item())
     # diff = (f_ - f_r) * mask
-    # vM2 = diff.abs().cpu().max().item()
+    # vM2 = diff.abs().to(DEVICE).max().item()
 
     # fig, ax = plt.subplots(1,3, figsize=(16,6))
     # ax[0].set_title('f')
-    # fig.colorbar(ax[0].imshow(f_[0].cpu().T, vmin=-vM, vmax=vM, cmap='bwr', origin='lower'), ax=ax[0])
+    # fig.colorbar(ax[0].imshow(f_[0].to(DEVICE).T, vmin=-vM, vmax=vM, cmap='bwr', origin='lower'), ax=ax[0])
     # ax[1].set_title('f_r')
-    # fig.colorbar(ax[1].imshow(f_r[0].cpu().T, vmin=-vM, vmax=vM, cmap='bwr', origin='lower'), ax=ax[1])
+    # fig.colorbar(ax[1].imshow(f_r[0].to(DEVICE).T, vmin=-vM, vmax=vM, cmap='bwr', origin='lower'), ax=ax[1])
     # ax[2].set_title('|f - f_r|')
-    # fig.colorbar(ax[2].imshow(diff[0].cpu().T, vmin=-vM2, vmax=vM2, cmap='bwr', origin='lower'), ax=ax[2])
+    # fig.colorbar(ax[2].imshow(diff[0].to(DEVICE).T, vmin=-vM2, vmax=vM2, cmap='bwr', origin='lower'), ax=ax[2])
     # fig.suptitle(f'{domain}, Neumann-BC, solving Helmholtz eq. with DCT-II')
     # fig.tight_layout()

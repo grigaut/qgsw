@@ -69,8 +69,8 @@ f = coriolis.compute_beta_plane(
 )
 verbose.display(
     msg=(
-        f"Coriolis param min {f.min().cpu().item():.2e},"
-        f" {f.max().cpu().item():.2e}"
+        f"Coriolis param min {f.min().to(DEVICE).item():.2e},"
+        f" {f.max().to(DEVICE).item():.2e}"
     ),
     trigger_level=1,
 )
@@ -219,7 +219,7 @@ for n in range(1, n_steps + 1):
         hM = max(hM, 0.8 * np.abs(h).max())
         if model == QG:
             wM = 0.05
-            w = (qg.omega / qg.area / qg.f0).cpu().numpy()[0, nl_plot]
+            w = (qg.omega / qg.area / qg.f0).to(DEVICE).numpy()[0, nl_plot]
             w = np.ma.masked_where(mask_land_w.numpy(), w)
             a.imshow(w.T, vmin=-wM, vmax=wM, **plot_kwargs)
         else:

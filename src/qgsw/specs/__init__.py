@@ -1,5 +1,5 @@
 """System specs."""
 
-import os
+import torch
 
-DEVICE = os.environ["DEVICE"]  # "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
