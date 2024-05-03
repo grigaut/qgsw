@@ -19,8 +19,6 @@ lint.select = ["ALL"]
 lint.ignore = [
     #no-blank-line-before-class
     "D211",
-    #multi-line-summary-second-line
-    "D213",
     # bandit
     "S",
     # do not assign a lambda expression, use a def
