@@ -1,13 +1,21 @@
 """Plot Grid5000 outputs."""
 
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
     SurfaceVorticityAxes,
     VorticityComparisonFigure,
 )
 from qgsw.utils.sorting import sort_files
+
+load_dotenv()
+
+storage = os.environ["STORAGE"]
+prefix_1l = "omega_one_layer_"
+prefix_2l = "omega_multilayer_"
 
 qg_1l_axes = SurfaceVorticityAxes.from_mask()
 qg_1l_axes.set_title(r"$\omega_{QG-1L-TOP}$")
@@ -21,10 +29,8 @@ plot = VorticityComparisonFigure(
     qg_2l_inf_axes,
     common_cbar=False,
 )
-prefix_1l = "omega_one_layer_"
-res_1l = list(Path("output/results/").glob(f"{prefix_1l}*.npz"))
-prefix_2l = "omega_multilayer_"
-res_2l = list(Path("output/results/").glob(f"{prefix_2l}*.npz"))
+res_1l = list(Path(f"{storage}/g5k/results/").glob(f"{prefix_1l}*.npz"))
+res_2l = list(Path(f"{storage}/g5k/results/").glob(f"{prefix_2l}*.npz"))
 
 files_1l = sort_files(res_1l, prefix=prefix_1l, suffix=".npz")
 files_2l = sort_files(res_2l, prefix=prefix_2l, suffix=".npz")
