@@ -39,8 +39,6 @@ lint.ignore = [
     "ANN101",
     # Missing type annotation for `cls` in classmethod
     "ANN102",
-    # suppressible-exception
-    "SIM105",
 ]
 lint.unfixable = [
     # Remove unused-imports
