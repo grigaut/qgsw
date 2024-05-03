@@ -1,11 +1,13 @@
 """Main Configuration Tool."""
 
+from functools import cached_property
+from pathlib import Path
 from typing import Any
 
-from qgsw.configs import keys
-from qgsw.configs.base import _Config
+import toml
+from typing_extensions import Self
+
 from qgsw.configs.bathymetry import BathyConfig
-from qgsw.configs.exceptions import ConfigError, UnexpectedFieldError
 from qgsw.configs.io import IOConfig
 from qgsw.configs.mesh import MeshConfig
 from qgsw.configs.models import ModelConfig
@@ -14,262 +16,67 @@ from qgsw.configs.vortex import VortexConfig
 from qgsw.configs.windstress import WindStressConfig
 
 
-class ScriptConfig(_Config):
-    """Configuration for a run."""
+class Configuration:
+    """Configuration."""
 
-    _layers_section: str = keys.LAYERS["section"]
-    _physics_section: str = keys.PHYSICS["section"]
-    _mesh_section: str = keys.MESH["section"]
-    _io_section: str = keys.IO["section"]
-    _model_section: str = "model"
-
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate ScriptConfig.
+    def __init__(self, configuration: dict[str, Any]) -> None:
+        """Instantiate the Configuration.
 
         Args:
-            params (dict[str, Any]): Script Configuration dictionnary.
+            configuration (dict[str, Any]): Configuration parameters.
         """
-        super().__init__(params)
-        self._physics = PhysicsConfig(
-            params=self.params[self._physics_section],
-        )
-        self._mesh = MeshConfig(params=self.params[self._mesh_section])
-        self._io = IOConfig(params=self.params[self._io_section])
-        self._model = ModelConfig(params=self.params[self._model_section])
+        self._config = configuration
 
-    @property
+    @cached_property
+    def io(self) -> IOConfig:
+        """Input/output configuration."""
+        return IOConfig.parse(self._config)
+
+    @cached_property
+    def physics(self) -> PhysicsConfig:
+        """Physics configuration."""
+        return PhysicsConfig.parse(self._config)
+
+    @cached_property
     def model(self) -> ModelConfig:
         """Model configuration."""
-        return self._model
+        return ModelConfig.parse(self._config)
 
-    @property
-    def physics(self) -> PhysicsConfig:
-        """Configuration parameters dictionnary for physics."""
-        return self._physics
+    @cached_property
+    def models(self) -> list[ModelConfig]:
+        """Models configuration."""
+        return ModelConfig.parse_several(self._config)
 
-    @property
+    @cached_property
     def mesh(self) -> MeshConfig:
-        """Configuration parameters dictionnary for the mesh."""
-        return self._mesh
+        """Mesh configuration."""
+        return MeshConfig.parse(self._config)
 
-    @property
-    def io(self) -> IOConfig:
-        """Input-Output  Configuration."""
-        return self._io
-
-    @property
-    def bathy(self) -> BathyConfig:
-        """Configuration parameters for the bathymetry."""
-        msg = "No Bathymetry configuration for this configuration."
-        raise UnexpectedFieldError(msg)
-
-    @property
+    @cached_property
     def windstress(self) -> WindStressConfig:
-        """WindStress Configuration."""
-        msg = "No Wind stress configuration for this configuration."
-        raise UnexpectedFieldError(msg)
+        """WindStress configuration."""
+        return WindStressConfig.parse(self._config)
 
-    @property
+    @cached_property
+    def bathymetry(self) -> BathyConfig:
+        """Bathymetry Configuration."""
+        return BathyConfig.parse(self._config)
+
+    @cached_property
     def vortex(self) -> VortexConfig:
         """Vortex Configuration."""
-        msg = "No Vortex configuration for this configuration."
-        raise UnexpectedFieldError(msg)
+        return VortexConfig.parse(self._config)
 
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate configuration parameters.
+    @classmethod
+    def from_file(cls, file: Path) -> Self:
+        """Instantiate Configuration from a given TOML file.
+
+        More informations on TOML files: https://toml.io/en/.
 
         Args:
-            params (dict[str, Any]): Configuration parameters.
-
-        Raises:
-            ConfigError: If the configuration doesn't have a layers section.
+            file (Path): Configuration file path.
 
         Returns:
-            dict[str, Any]: Configuration parameters.
+            Self: Configuration.
         """
-        # Verify that the model section is present.
-        if self._model_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"model section, named {self._model_section}."
-            )
-            raise ConfigError(msg)
-        # Verify that the physics section is present.
-        if self._physics_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"physics section, named {self._physics_section}."
-            )
-            raise ConfigError(msg)
-        # Verify that the mesh section is present.
-        if self._mesh_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"mesh section, named {self._mesh_section}."
-            )
-            raise ConfigError(msg)
-        # Verify that the io section is present.
-        if self._io_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"io section, named {self._io_section}."
-            )
-            raise ConfigError(msg)
-        return super()._validate_params(params)
-
-
-class RealisticConfig(ScriptConfig):
-    """Configuration for realistic script."""
-
-    _bathy_section: str = keys.BATHY["section"]
-    _windstress_section: str = keys.WINDSTRESS["section"]
-
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate RealisticConfig.
-
-        Args:
-            params (dict[str, Any]): Configuration Dictionnary.
-        """
-        super().__init__(params)
-        self._bathy = BathyConfig(params=self.params[self._bathy_section])
-        self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section],
-        )
-
-    @property
-    def bathy(self) -> BathyConfig:
-        """Configuration parameters for the bathymetry."""
-        return self._bathy
-
-    @property
-    def windstress(self) -> WindStressConfig:
-        """WindStress Configuration."""
-        return self._windstress
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate configuration parameters.
-
-        Args:
-            params (dict[str, Any]): Configuration parameters.
-
-        Raises:
-            ConfigError: If the configuration doesn't have a layers section.
-
-        Returns:
-            dict[str, Any]: Configuration parameters.
-        """
-        # Verify that the bathymetry section is present.
-        if self._bathy_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"bathymetry section, named {self._bathy_section}."
-            )
-            raise ConfigError(msg)
-        # Verify that the windstress section is present.
-        if self._windstress_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"windstress section, named {self._windstress_section}."
-            )
-            raise ConfigError(msg)
-        return super()._validate_params(params)
-
-
-class VortexShearConfig(ScriptConfig):
-    """Configuration for vortex Shear Script."""
-
-    _vortex_section: str = keys.VORTEX["section"]
-    _windstress_section: str = keys.WINDSTRESS["section"]
-
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate VortexShearConfig.
-
-        Args:
-            params (dict[str, Any]): Configuration Dictionnary.
-        """
-        super().__init__(params)
-        self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section],
-        )
-        self._vortex = VortexConfig(params=self.params[self._vortex_section])
-
-    @property
-    def windstress(self) -> WindStressConfig:
-        """WindStress Configuration."""
-        return self._windstress
-
-    @property
-    def vortex(self) -> VortexConfig:
-        """Vortex Configuration."""
-        return self._vortex
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate configuration parameters.
-
-        Args:
-            params (dict[str, Any]): Configuration parameters.
-
-        Raises:
-            ConfigError: If the configuration doesn't have a layers section.
-
-        Returns:
-            dict[str, Any]: Configuration parameters.
-        """
-        # Verify that the windstress section is present.
-        if self._windstress_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"windstress section, named {self._windstress_section}."
-            )
-            raise ConfigError(msg)
-        # Verify that the vortex section is present.
-        if self._vortex_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"vortex section, named {self._vortex_section}."
-            )
-            raise ConfigError(msg)
-        return super()._validate_params(params)
-
-
-class DoubleGyreConfig(ScriptConfig):
-    """Configuration for double gyre script."""
-
-    _windstress_section: str = keys.WINDSTRESS["section"]
-
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate DoubleGyreConfig.
-
-        Args:
-            params (dict[str, Any]): Configuration Dictionnary.
-        """
-        super().__init__(params)
-        self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section],
-        )
-
-    @property
-    def windstress(self) -> WindStressConfig:
-        """WindStress Configuration."""
-        return self._windstress
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate configuration parameters.
-
-        Args:
-            params (dict[str, Any]): Configuration parameters.
-
-        Raises:
-            ConfigError: If the configuration doesn't have a layers section.
-
-        Returns:
-            dict[str, Any]: Configuration parameters.
-        """
-        # Verify that the windstress section is present.
-        if self._windstress_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"windstress section, named {self._windstress_section}."
-            )
-            raise ConfigError(msg)
-        return super()._validate_params(params)
+        return cls(configuration=toml.load(file))

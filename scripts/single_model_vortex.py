@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 from qgsw import verbose
-from qgsw.configs import VortexShearConfig
+from qgsw.configs import Configuration
 from qgsw.forcing.vortex import RankineVortexForcing
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
@@ -22,7 +22,7 @@ verbose.set_level(2)
 
 ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/single_model_vortex.toml")
-config = VortexShearConfig.from_file(CONFIG_PATH)
+config = Configuration.from_file(CONFIG_PATH)
 
 # Common Set-up
 ## Wind Forcing

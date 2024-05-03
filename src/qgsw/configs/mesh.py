@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Any, Callable, ClassVar
 
 import numpy as np
-import torch
 
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
@@ -18,75 +18,15 @@ from qgsw.spatial.units._units import (
     RADIANS,
     Unit,
 )
-from qgsw.specs import DEVICE
-
-
-class LayersConfig(_Config):
-    """Layers Configuration."""
-
-    _h: str = keys.LAYERS["layer thickness"]
-    _g_prime: str = keys.LAYERS["reduced gravity"]
-
-    @property
-    def h(self) -> torch.Tensor:
-        """Values of layers thickness (h)."""
-        h = torch.zeros(
-            size=(self.nl, 1, 1),
-            dtype=torch.float64,
-            device=DEVICE,
-        )
-        h[:, 0, 0] = torch.Tensor(self.params[self._h])
-        return torch.Tensor(self.params[self._h]).to(
-            device=DEVICE,
-            dtype=torch.float64,
-        )
-
-    @property
-    def g_prime(self) -> torch.Tensor:
-        """Values of reduced gravity (g')."""
-        return torch.Tensor(self.params[self._g_prime]).to(
-            device=DEVICE,
-            dtype=torch.float64,
-        )
-
-    @property
-    def nl(self) -> int:
-        """Number of layers."""
-        return self._nl
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate that H and g' shapes match.
-
-        Args:
-            params (dict[str, Any]): Configuration Parameters.
-
-        Raises:
-            ConfigError: H and g' shapes don't match.
-
-        Returns:
-            dict[str, Any]: Layers Configuration.
-        """
-        h_shape = len(params[self._h])
-        g_prime_shape = len(params[self._g_prime])
-
-        if h_shape != g_prime_shape:
-            msg = (
-                f"H shape ({h_shape}) and "
-                f"g' 's shape ({g_prime_shape}) don't match."
-            )
-            raise ConfigError(msg)
-        self._nl = h_shape
-
-        return super()._validate_params(params)
 
 
 class MeshConfig(_Config):
     """Grid Configuration."""
 
+    section: str = keys.MESH["section"]
     _nx: str = keys.MESH["points nb x"]
     _ny: str = keys.MESH["points nb y"]
     _dt: str = keys.MESH["timestep"]
-    _box_section: str = keys.BOX["section"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
         DEGREES.name: conversion.deg_to_m_lat,
@@ -102,12 +42,11 @@ class MeshConfig(_Config):
             params (dict[str, Any]): Grid configuration dictionnary.
         """
         super().__init__(params)
-        self._box = BoxConfig(params=params[self._box_section])
 
-    @property
+    @cached_property
     def box(self) -> BoxConfig:
         """Box Configuration."""
-        return self._box
+        return BoxConfig.parse(self.params)
 
     @property
     def nx(self) -> int:
@@ -137,16 +76,16 @@ class MeshConfig(_Config):
     @property
     def lx(self) -> float:
         """Total distance along x (meters)."""
-        if np.isnan(self._box.x_max):
+        if np.isnan(self.box.x_max):
             return self._infer_lx()
-        conversion = self._conversion[self._box.unit.name]
-        return conversion(self._box.x_max - self._box.x_min)
+        conversion = self._conversion[self.box.unit.name]
+        return conversion(self.box.x_max - self.box.x_min)
 
     @property
     def ly(self) -> float:
         """Total distance along y (meters)."""
-        conversion = self._conversion[self._box.unit.name]
-        return conversion(self._box.y_max - self._box.y_min)
+        conversion = self._conversion[self.box.unit.name]
+        return conversion(self.box.y_max - self.box.y_min)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate mesh parameters.
@@ -157,13 +96,6 @@ class MeshConfig(_Config):
         Returns:
             dict[str, Any]: Grid parameters.
         """
-        # Verify that the box section is present.
-        if self._box_section not in params:
-            msg = (
-                "The mesh configuration must contain a "
-                f"box section, named {self._box_section}."
-            )
-            raise ConfigError(msg)
         return super()._validate_params(params)
 
     def _infer_lx(self) -> float:
@@ -178,6 +110,7 @@ class MeshConfig(_Config):
 class BoxConfig(_Config):
     """Space Configuration."""
 
+    section: str = keys.BOX["section"]
     _x: str = keys.BOX["x"]
     _y: str = keys.BOX["y"]
     _unit: str = keys.BOX["unit"]

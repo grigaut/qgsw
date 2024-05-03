@@ -2,22 +2,21 @@
 
 from __future__ import annotations
 
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
-from qgsw.configs.exceptions import ConfigError
 from qgsw.utils.storage import get_absolute_storage_path
 
 
 class IOConfig(_Config):
     """Input-Output configuration."""
 
+    section: str = keys.IO["section"]
     _name: str = keys.IO["name"]
     _log: str = keys.IO["log performance"]
-    _res_section: str = keys.OUTPUT["section"]
-    _plots_section: str = keys.PLOTS["section"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate IOConfig.
@@ -26,8 +25,8 @@ class IOConfig(_Config):
             params (dict[str, Any]): IO configuration dictionnary.
         """
         super().__init__(params)
-        self._res = OutputsConfig(self.params[self._res_section])
-        self._plots = PlotsConfig(self.params[self._plots_section])
+        self._res = OutputsConfig.parse(params)
+        self._plots = PlotsConfig.parse(params)
 
     @property
     def name(self) -> str:
@@ -39,15 +38,15 @@ class IOConfig(_Config):
         """Snake-cased name."""
         return self.name.lower().replace(" ", "_")
 
-    @property
+    @cached_property
     def results(self) -> OutputsConfig:
         """Results saving configuration."""
-        return self._res
+        return OutputsConfig.parse(self.params)
 
-    @property
+    @cached_property
     def plots(self) -> PlotsConfig:
         """Plots configuration."""
-        return self._plots
+        return PlotsConfig.parse(self.params)
 
     @property
     def log_performance(self) -> bool:
@@ -63,26 +62,13 @@ class IOConfig(_Config):
         Returns:
             dict[str, Any]: IO configuration dictionnary.
         """
-        # Verify that the result section is present.
-        if self._res_section not in params:
-            msg = (
-                "The io configuration must contain a "
-                f"result section, named {self._res_section}."
-            )
-            raise ConfigError(msg)
-        # Verify that the plots section is present.
-        if self._plots_section not in params:
-            msg = (
-                "The io configuration must contain a "
-                f"plots section, named {self._plots_section}."
-            )
-            raise ConfigError(msg)
         return super()._validate_params(params)
 
 
 class PlotsConfig(_Config):
     """Plots Configuration."""
 
+    section: str = keys.PLOTS["section"]
     _save: str = keys.PLOTS["save"]
     _show: str = keys.PLOTS["show"]
     _dir: str = keys.PLOTS["directory"]
@@ -128,6 +114,7 @@ class PlotsConfig(_Config):
 class OutputsConfig(_Config):
     """Plots Configuration."""
 
+    section: str = keys.OUTPUT["section"]
     _save: str = keys.OUTPUT["save"]
     _dir: str = keys.OUTPUT["directory"]
     _quantity: str = keys.OUTPUT["quantity"]

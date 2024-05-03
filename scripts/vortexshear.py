@@ -7,12 +7,9 @@ r0 : vortex core radius -> length scale
 ld : deformation length scale -> √(Bu)*r0
 """
 
-import matplotlib.pyplot as plt
-import numpy as np
 import torch
-from icecream import ic
 from qgsw import verbose
-from qgsw.configs import VortexShearConfig
+from qgsw.configs import Configuration
 from qgsw.forcing.vortex import (
     RankineVortexForcing,
 )
@@ -32,7 +29,7 @@ verbose.set_level(2)
 
 ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/vortexshear.toml")
-config = VortexShearConfig.from_file(CONFIG_PATH)
+config = Configuration.from_file(CONFIG_PATH)
 
 mesh = Meshes3D.from_config(config.mesh, config.model)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)

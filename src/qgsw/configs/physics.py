@@ -15,6 +15,7 @@ from qgsw.configs.exceptions import ConfigError
 class PhysicsConfig(_Config):
     """Physics Configuration."""
 
+    section: str = keys.PHYSICS["section"]
     _rho: str = keys.PHYSICS["rho"]
     _slip_coef: str = keys.PHYSICS["slip coef"]
     _coriolis_param: str = keys.PHYSICS["f0"]
