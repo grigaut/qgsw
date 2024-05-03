@@ -22,8 +22,6 @@ verbose.set_level(2)
 config = DoubleGyreConfig.from_file(Path("config/doublegyre.toml"))
 mesh = Meshes3D.from_config(config.mesh, config.model)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-# dtype = torch.float64
 
 mask = torch.ones(
     config.mesh.nx,
@@ -31,8 +29,6 @@ mask = torch.ones(
     dtype=torch.float64,
     device=DEVICE,
 )
-# mask[0,0] = 0
-# mask[0,-1] = 0
 
 taux, tauy = wind.compute()
 
@@ -74,7 +70,7 @@ for model, name, dt, start_file in [
     if model == SW:
         c = (
             torch.sqrt(config.model.h.sum() * config.model.g_prime[0])
-            .cpu()
+            .to(DEVICE)
             .item()
         )
         cfl = 20 if param["barotropic_filter"] else 0.5
@@ -179,12 +175,12 @@ for model, name, dt, start_file in [
                         / qgsw_multilayer.area
                         / qgsw_multilayer.f0
                     )
-                    .cpu()
+                    .to(DEVICE)
                     .numpy()
                 )
                 w_a = (
                     (qgsw_multilayer.omega_a / qgsw_multilayer.f0)
-                    .cpu()
+                    .to(DEVICE)
                     .numpy()
                 )
 

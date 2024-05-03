@@ -24,6 +24,7 @@ Louis Thiry, 2023
 import numpy as np
 import torch
 import torch.nn.functional as F
+from qgsw.specs import DEVICE
 
 
 def compute_nlevels(n):
@@ -223,7 +224,7 @@ class MG_Helmholtz:
         print(
             "PyTorch multigrid solver "
             f"∇.(c∇f) - λf = rhs, "
-            f"λ={self.lambd.view(-1).cpu().numpy()}, {device}, {dtype}, "
+            f"λ={self.lambd.view(-1).to(DEVICE).numpy()}, {device}, {dtype}, "
             f"n_levels={n_levels}"
         )
 
@@ -285,7 +286,7 @@ class MG_Helmholtz:
             )
             self.i_s = i_s
             self.j_s = j_s
-            self.bottom_inv_mat = torch.linalg.pinv(h_mat.cpu()).to(
+            self.bottom_inv_mat = torch.linalg.pinv(h_mat.to(DEVICE)).to(
                 self.device
             )
 
@@ -435,7 +436,7 @@ class MG_Helmholtz:
             self.coefs_vgrid[0],
             self.lambd,
         )
-        # print(f'init resnorm: {(res.norm()/f.norm()).cpu().item():.3e}')
+        # print(f'init resnorm: {(res.norm()/f.norm()).to(DEVICE).item():.3e}')
         # Loop V-cycles until convergence
         while nite < self.max_ite and res.norm() / f.norm() > self.tol:
             f = self.V_cycle(f, rhs, self.n_levels, dx, dy)
@@ -451,7 +452,7 @@ class MG_Helmholtz:
             )
             nite += 1
         # print(f'Number or V-cycle: {nite}, residual norm:
-        #       f'{(res.norm()/f.norm()).cpu().item():.3E}')
+        #       f'{(res.norm()/f.norm()).to(DEVICE).item():.3E}')
 
         return f
 
@@ -604,7 +605,7 @@ class MG_Helmholtz:
                 self.lambd,
             )
             nite += 1
-        # print(f'Number or V-cycle: {nite}, {(res.norm()/f.norm()).cpu().item():.3E}')
+        # print(f'Number or V-cycle: {nite}, {(res.norm()/f.norm()).to(DEVICE).item():.3E}')
 
         return f
 
@@ -722,17 +723,17 @@ if __name__ == "__main__":
         fig.suptitle(f"Solving ∇.(c∇u) - λu = rhs, {title}")
 
         fig.colorbar(
-            ax[0].imshow(coef_ugrid.cpu().T, origin="lower"), ax=ax[0]
+            ax[0].imshow(coef_ugrid.to(DEVICE).T, origin="lower"), ax=ax[0]
         )
         ax[0].set_title("coefficient u grid")
         fig.colorbar(
-            ax[1].imshow(coef_vgrid.cpu().T, origin="lower"), ax=ax[1]
+            ax[1].imshow(coef_vgrid.to(DEVICE).T, origin="lower"), ax=ax[1]
         )
         ax[1].set_title("coefficient v grid")
-        fig.colorbar(ax[2].imshow(f.cpu()[0].T, origin="lower"), ax=ax[2])
+        fig.colorbar(ax[2].imshow(f.to(DEVICE)[0].T, origin="lower"), ax=ax[2])
         ax[2].set_title("true f")
         fig.colorbar(
-            ax[3].imshow(abs_diff.cpu()[0].T, origin="lower"), ax=ax[3]
+            ax[3].imshow(abs_diff.to(DEVICE)[0].T, origin="lower"), ax=ax[3]
         )
         ax[3].set_title("abs diff")
 

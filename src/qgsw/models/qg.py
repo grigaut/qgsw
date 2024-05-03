@@ -19,6 +19,7 @@ from qgsw.models.core.finite_diff import grad_perp
 from qgsw.models.base import Model
 from qgsw import verbose
 from typing import Any, Union
+from qgsw.specs import DEVICE
 
 
 class QG(Model):
@@ -121,7 +122,9 @@ class QG(Model):
         with np.printoptions(precision=1):
             radius = (
                 1e-3
-                / torch.sqrt(self.f0**2 * self.lambd.squeeze()).cpu().numpy()
+                / torch.sqrt(self.f0**2 * self.lambd.squeeze())
+                .to(DEVICE)
+                .numpy()
             )
             verbose.display(
                 msg=f"Rossby deformation Radii (km): {radius}",
