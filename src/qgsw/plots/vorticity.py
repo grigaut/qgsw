@@ -69,7 +69,9 @@ class VorticityAxesContent(BaseAxesContent):
     _layer_nb: int = 0
 
     def __init__(
-        self, mask: np.ndarray | None = None, **kwargs: P.kwargs
+        self,
+        mask: np.ndarray | None = None,
+        **kwargs: P.kwargs,
     ) -> None:
         """Instantiate the AxesContent.
 
@@ -92,6 +94,16 @@ class VorticityAxesContent(BaseAxesContent):
         """Axes Image."""
         return self._axesim
 
+    def _center_cbar(self, data: np.ndarray) -> dict[str, Any]:
+        if ("vmin" in self._kwargs) or ("vmax" in self._kwargs):
+            return self._kwargs
+        max_value = np.abs(data).max()
+        cbar_extrems = {
+            "vmax": max_value,
+            "vmin": -max_value,
+        }
+        return self._kwargs | cbar_extrems
+
     def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
         """Update the Axes content.
 
@@ -104,7 +116,7 @@ class VorticityAxesContent(BaseAxesContent):
             Axes: Updated Axes.
         """
         masked_data = np.ma.masked_where(mask, data).T
-        axesim = ax.imshow(masked_data, **self._kwargs)
+        axesim = ax.imshow(masked_data, **self._center_cbar(data))
         self.remove_colorbar()
         self.add_colorbar(ax=ax, axesim=axesim)
         return ax
@@ -189,13 +201,15 @@ class SecondLayerVorticityAxesContent(VorticityAxesContent):
 
 
 class SurfaceVorticityAxes(
-    BaseAxes[VorticityAxesContext, SurfaceVorticityAxesContent]
+    BaseAxes[VorticityAxesContext, SurfaceVorticityAxesContent],
 ):
     """Vorticity axes for Surface vorticity plots."""
 
     @classmethod
     def from_mask(
-        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
+        cls,
+        mask: np.ndarray | None = None,
+        **kwargs: P.kwargs,
     ) -> Self:
         """Instantiate Figure only from the mask.
 
@@ -214,13 +228,15 @@ class SurfaceVorticityAxes(
 
 
 class SecondLayerVorticityAxes(
-    BaseAxes[VorticityAxesContext, SecondLayerVorticityAxesContent]
+    BaseAxes[VorticityAxesContext, SecondLayerVorticityAxesContent],
 ):
     """Vorticity axes for second layer vorticity plots."""
 
     @classmethod
     def from_mask(
-        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
+        cls,
+        mask: np.ndarray | None = None,
+        **kwargs: P.kwargs,
     ) -> Self:
         """Instantiate Figure only from the mask.
 
@@ -259,7 +275,7 @@ class SurfaceVorticityFigure(BaseSingleFigure[VorticityAxes]):
             # Create the colorbar Axes.
             self.figure.subplots_adjust(right=0.85)
             self._cbar_axes: Axes = self.figure.add_axes(
-                [0.88, 0.15, 0.04, 0.7]
+                [0.88, 0.15, 0.04, 0.7],
             )
         if self._ax.content.axes_image is not None:
             # Update the colorbar.
@@ -301,20 +317,20 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
         self._common_cbar = common_cbar
 
     def _set_cbar_extrems(
-        self, *datas: np.ndarray, **kwargs: P.kwargs
+        self,
+        *datas: np.ndarray,
+        **kwargs: P.kwargs,
     ) -> dict[str, Any]:
         """Set the colorbar extrem values if needed.
 
         Returns:
             dict[str, Any]: Updated kwargs.
         """
-        if ("vmin" not in kwargs) and ("vmax" in kwargs):
+        if ("vmin" in kwargs) or ("vmax" in kwargs):
             return kwargs
         max_value = max(np.abs(data).max() for data in datas)
-        if "vmin" not in kwargs:
-            kwargs["vmin"] = -max_value
-        if "vmax" not in kwargs:
-            kwargs["vmax"] = max_value
+        kwargs["vmax"] = max_value
+        kwargs["vmin"] = -max_value
         return kwargs
 
     def _show_colorbar(self) -> None:
@@ -323,7 +339,7 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
             # create colorbar Axes.
             self.figure.subplots_adjust(right=0.85)
             self._cbar_axes: Axes = self.figure.add_axes(
-                [0.88, 0.15, 0.04, 0.7]
+                [0.88, 0.15, 0.04, 0.7],
             )
         if self._axes_ms[0].content.axes_image is not None:
             # Add colorbar to the Axes.
