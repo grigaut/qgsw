@@ -224,7 +224,7 @@ class MG_Helmholtz:
         print(
             "PyTorch multigrid solver "
             f"∇.(c∇f) - λf = rhs, "
-            f"λ={self.lambd.view(-1).to(device=DEVICE).numpy()}, {device}, {dtype}, "
+            f"λ={self.lambd.view(-1).cpu().numpy()}, {device}, {dtype}, "
             f"n_levels={n_levels}"
         )
 

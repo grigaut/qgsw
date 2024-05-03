@@ -216,7 +216,7 @@ verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
 # Instantiate Figures
-mask = qg_1l.masks.not_w[0, 0].to(device=DEVICE).numpy()
+mask = qg_1l.masks.not_w[0, 0].cpu().numpy()
 qg_1l_axes = SurfaceVorticityAxes.from_mask(mask=mask)
 qg_1l_axes.set_title(r"$\omega_{QG-1L-TOP}$")
 qg_2l_top_axes = SurfaceVorticityAxes.from_mask(mask=mask)
