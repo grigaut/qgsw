@@ -29,8 +29,6 @@ lint.ignore = [
     "E731",
     # implicit-namespace-package
     "INP001",
-    # single-line-implicit-string-concatenation
-    "ISC001",
     # Too many arguments to function call
     "PLR0913",
     # Missing type annotation for `self` in method
