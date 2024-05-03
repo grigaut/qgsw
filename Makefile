@@ -19,7 +19,7 @@ DEV_REQUIREMENTS:=${PWD}/requirements-dev.txt
 
 # G5K runs
 # Zip file
-ZIP_FILE := qgsw.zip
+ZIP_FILE_ROOT := qgsw
 # Folders
 CONFIG := ./config
 SRC := src
@@ -50,19 +50,58 @@ install-dev: ${VENV}
 
 # GRID 5000 -----------------------------------------
 
-export-to-g5k:
+# export current code to grid 5000
+g5k-export:
 	# Create temp directory
 	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
+	$(eval ZIP_FILE := ${ZIP_FILE_ROOT}.zip)
 	# Zip files
 	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
 	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT}
 	# Export to g5k
-	scp ${tmp}/${ZIP_FILE} ${LOGIN}@rennes.g5k:~/
+	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
 	# Remove temp files
 	rm -rf ${tmp}
 
-install-g5k:
-	pip install .
+g5k-export-src:
+	# Create temp directory
+	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
+	$(eval ZIP_FILE := ${ZIP_FILE_ROOT}_src.zip)
+	# Zip files
+	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
+	# Export to g5k
+	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
+	# Remove temp files
+	rm -rf ${tmp}
+
+g5k-export-configs:
+	# Create temp directory
+	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
+	$(eval ZIP_FILE := ${ZIP_FILE_ROOT}_configs.zip)
+	# Zip files
+	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
+	# Export to g5k
+	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
+	# Remove temp files
+	rm -rf ${tmp}
+
+g5k-export-scripts:
+	# Create temp directory
+	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
+	$(eval ZIP_FILE := ${ZIP_FILE_ROOT}_scripts.zip)
+	# Zip files
+	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
+	# Export to g5k
+	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
+	# Remove temp files
+	rm -rf ${tmp}
+
+g5k-import-%:
+	scp -r ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${STORAGE}/g5k
+
+g5k-import:
+	@${MAKE} g5k-import-results
+
 # ---------------------------------------------------
