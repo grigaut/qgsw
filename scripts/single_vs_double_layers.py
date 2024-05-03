@@ -20,7 +20,9 @@ from qgsw.specs import DEVICE
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
-config = ModelComparisonConfig.from_file("config/single_vs_double_layers.toml")
+ROOT_PATH = Path(__file__).parent.parent
+CONFIG_PATH = ROOT_PATH.joinpath("config/single_vs_double_layers.toml")
+config = ModelComparisonConfig.from_file(CONFIG_PATH)
 
 # Common Set-up
 ## Wind Forcing

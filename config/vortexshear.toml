@@ -4,12 +4,12 @@ performance_log = false
 [io.output]
 save_results = false
 quantity = 10
-directory = "output"
+directory = "results"
 [io.plots]
 show = true
 save = false
 quantity = 10
-plots_directory = "output/plots"
+plots_directory = "plots"
 
 [physics]
 rho = 1000
