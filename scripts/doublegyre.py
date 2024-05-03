@@ -20,7 +20,7 @@ torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
 ROOT_PATH = Path(__file__).parent.parent
-CONFIG_PATH = ROOT_PATH.joinpath("config/vortexshear.toml")
+CONFIG_PATH = ROOT_PATH.joinpath("config/doublegyre.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
 mesh = Meshes3D.from_config(config.mesh, config.model)
