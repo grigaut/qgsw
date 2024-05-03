@@ -616,7 +616,7 @@ class Model(metaclass=ABCMeta):
         h_phys = (self.h / self.area).to(device=DEVICE)
 
         return (
-            (u_phys.numpy(), v_phys.numpy(), h_phys.numpy())
+            (u_phys.cpu().numpy(), v_phys.cpu().numpy(), h_phys.cpu().numpy())
             if numpy
             else (u_phys, v_phys, h_phys)
         )
@@ -642,7 +642,7 @@ class Model(metaclass=ABCMeta):
         """
         omega_phys = (self.omega / self.area / self.f0).to(device=DEVICE)
 
-        return omega_phys.numpy() if numpy else omega_phys
+        return omega_phys.cpu().numpy() if numpy else omega_phys
 
     def set_physical_uvh(
         self,
@@ -694,13 +694,7 @@ class Model(metaclass=ABCMeta):
         Returns:
             str: Summary of variables.
         """
-        hl_mean = (
-            (self.h / self.area)
-            .mean((-1, -2))
-            .squeeze()
-            .to(device=DEVICE)
-            .numpy()
-        )
+        hl_mean = (self.h / self.area).mean((-1, -2)).squeeze().cpu().numpy()
         eta = self.eta
         u, v, h = self.u / self.dx, self.v / self.dy, self.h / self.area
         with np.printoptions(precision=2):

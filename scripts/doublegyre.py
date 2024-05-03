@@ -175,12 +175,12 @@ for model, name, dt, start_file in [
                         / qgsw_multilayer.area
                         / qgsw_multilayer.f0
                     )
-                    .to(device=DEVICE)
+                    .cpu()
                     .numpy()
                 )
                 w_a = (
                     (qgsw_multilayer.omega_a / qgsw_multilayer.f0)
-                    .to(device=DEVICE)
+                    .cpu()
                     .numpy()
                 )
 

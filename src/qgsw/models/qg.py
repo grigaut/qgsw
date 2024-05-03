@@ -122,9 +122,7 @@ class QG(Model):
         with np.printoptions(precision=1):
             radius = (
                 1e-3
-                / torch.sqrt(self.f0**2 * self.lambd.squeeze())
-                .to(device=DEVICE)
-                .numpy()
+                / torch.sqrt(self.f0**2 * self.lambd.squeeze()).cpu().numpy()
             )
             verbose.display(
                 msg=f"Rossby deformation Radii (km): {radius}",
@@ -320,8 +318,8 @@ class QG(Model):
 
         np.savez(
             output_file,
-            u=self.u_a.numpy().astype("float32"),
-            v=self.v_a.numpy().astype("float32"),
+            u=self.u_a.cpu().numpy().astype("float32"),
+            v=self.v_a.cpu().numpy().astype("float32"),
         )
 
         verbose.display(msg=f"saved u_a,v_a to {output_file}", trigger_level=1)

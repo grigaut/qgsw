@@ -145,7 +145,7 @@ if config.io.plots.save:
     np.save(os.path.join(output_dir, "mask_land_h.npz"), mask_land)
     np.save(
         os.path.join(output_dir, "mask_land_w.npz"),
-        mask_land_w.numpy(),
+        mask_land_w.cpu().numpy(),
     )
     torch.save(param, os.path.join(output_dir, "param.pth"))
 
@@ -219,12 +219,8 @@ for n in range(1, n_steps + 1):
         hM = max(hM, 0.8 * np.abs(h).max())
         if model == QG:
             wM = 0.05
-            w = (
-                (qg.omega / qg.area / qg.f0)
-                .to(device=DEVICE)
-                .numpy()[0, nl_plot]
-            )
-            w = np.ma.masked_where(mask_land_w.numpy(), w)
+            w = (qg.omega / qg.area / qg.f0).cpu().numpy()[0, nl_plot]
+            w = np.ma.masked_where(mask_land_w.cpu().numpy(), w)
             a.imshow(w.T, vmin=-wM, vmax=wM, **plot_kwargs)
         else:
             a[0].imshow(u[0, nl_plot].T, vmin=-uM, vmax=uM, **plot_kwargs)
