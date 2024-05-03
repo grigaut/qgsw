@@ -149,7 +149,7 @@ for Ro in [
     qg_ml.h = torch.clone(h_init)
     qg_ml.compute_diagnostic_variables()
 
-    w_qg = (qg_ml.omega.squeeze() / qg_ml.area).to(DEVICE).numpy()
+    w_qg = (qg_ml.omega.squeeze() / qg_ml.area).cpu().numpy()
 
     # update time step
     param_sw["dt"] = dt
@@ -163,10 +163,10 @@ for Ro in [
     t = 0
 
     qg_ml.compute_time_derivatives()
-    wa_0 = qg_ml.omega_a.squeeze().to(DEVICE).numpy()
+    wa_0 = qg_ml.omega_a.squeeze().cpu().numpy()
 
     w_0 = qg_ml.omega.squeeze() / qg_ml.dx / qg_ml.dy
-    tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(DEVICE).item()
+    tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(device=DEVICE).item()
     verbose.display(
         msg=f"tau = {tau *f0:.2f} f0-1",
         trigger_level=1,
@@ -182,7 +182,7 @@ for Ro in [
     plots_required = config.io.plots.save or config.io.plots.show
 
     if plots_required:
-        mask = sw_ml.masks.not_w[0, 0].to(DEVICE).numpy()
+        mask = sw_ml.masks.not_w[0, 0].cpu().numpy()
         sw_axes = SurfaceVorticityAxes.from_mask(mask=mask)
         sw_axes.set_title(r"$\omega_{SW}$")
         qg_axes = SurfaceVorticityAxes.from_mask(mask=mask)
@@ -193,8 +193,8 @@ for Ro in [
 
     for n in range(n_steps + 1):
         if plots_required and (n % freq_plot == 0 or n == n_steps):
-            w_qg = (qg_ml.omega / qg_ml.area / qg_ml.f0).to(DEVICE).numpy()
-            w_sw = (sw_ml.omega / sw_ml.area / sw_ml.f0).to(DEVICE).numpy()
+            w_qg = (qg_ml.omega / qg_ml.area / qg_ml.f0).cpu().numpy()
+            w_sw = (sw_ml.omega / sw_ml.area / sw_ml.f0).cpu().numpy()
             plot.update_with_arrays(w_sw, w_qg, w_sw - w_qg)
             if config.io.plots.show:
                 plot.show()

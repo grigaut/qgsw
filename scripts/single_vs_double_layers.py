@@ -180,7 +180,7 @@ qg_1l.compute_time_derivatives()
 w_0_1l = qg_1l.omega.squeeze() / qg_1l.dx / qg_1l.dy
 
 
-tau_1l = 1.0 / torch.sqrt(w_0_1l.pow(2).mean()).to(DEVICE).item()
+tau_1l = 1.0 / torch.sqrt(w_0_1l.pow(2).mean()).to(device=DEVICE).item()
 verbose.display(
     msg=f"tau (single layer) = {tau_1l *config.physics.f0:.2f} f0-1",
     trigger_level=1,
@@ -192,7 +192,7 @@ qg_2l.compute_time_derivatives()
 w_0_2l = qg_2l.omega.squeeze() / qg_2l.dx / qg_2l.dy
 
 
-tau_2l = 1.0 / torch.sqrt(w_0_2l.pow(2).mean()).to(DEVICE).item()
+tau_2l = 1.0 / torch.sqrt(w_0_2l.pow(2).mean()).to(device=DEVICE).item()
 verbose.display(
     msg=f"tau (multi layer) = {tau_2l *config.physics.f0:.2f} f0-1",
     trigger_level=1,
@@ -216,7 +216,7 @@ verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
 # Instantiate Figures
-mask = qg_1l.masks.not_w[0, 0].to(DEVICE).numpy()
+mask = qg_1l.masks.not_w[0, 0].cpu().numpy()
 qg_1l_axes = SurfaceVorticityAxes.from_mask(mask=mask)
 qg_1l_axes.set_title(r"$\omega_{QG-1L-TOP}$")
 qg_2l_top_axes = SurfaceVorticityAxes.from_mask(mask=mask)

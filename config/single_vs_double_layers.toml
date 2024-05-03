@@ -3,13 +3,13 @@ name = "200_vs_200_800"
 performance_log = false
 [io.output]
 save_results = true
-quantity = 10
-directory = "output"
+quantity = 100
+directory = "qgsw/results"
 [io.plots]
 show = false
 save = false
 quantity = 10
-plots_directory = "output/plots"
+plots_directory = "qgsw/plots"
 
 [physics]
 rho = 1000
@@ -40,8 +40,8 @@ g_prime = [
 ]
 
 [mesh]
-nx = 92
-ny = 92
+nx = 192
+ny = 192
 dt = 4_000
 [mesh.box]
 unit = "m"

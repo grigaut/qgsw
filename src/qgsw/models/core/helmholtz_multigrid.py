@@ -224,7 +224,7 @@ class MG_Helmholtz:
         print(
             "PyTorch multigrid solver "
             f"∇.(c∇f) - λf = rhs, "
-            f"λ={self.lambd.view(-1).to(DEVICE).numpy()}, {device}, {dtype}, "
+            f"λ={self.lambd.view(-1).cpu().numpy()}, {device}, {dtype}, "
             f"n_levels={n_levels}"
         )
 
@@ -286,9 +286,9 @@ class MG_Helmholtz:
             )
             self.i_s = i_s
             self.j_s = j_s
-            self.bottom_inv_mat = torch.linalg.pinv(h_mat.to(DEVICE)).to(
-                self.device
-            )
+            self.bottom_inv_mat = torch.linalg.pinv(
+                h_mat.to(device=DEVICE)
+            ).to(self.device)
 
         # precompile torch functions
         if use_compilation:
@@ -436,7 +436,7 @@ class MG_Helmholtz:
             self.coefs_vgrid[0],
             self.lambd,
         )
-        # print(f'init resnorm: {(res.norm()/f.norm()).to(DEVICE).item():.3e}')
+        # print(f'init resnorm: {(res.norm()/f.norm()).to(device=DEVICE).item():.3e}')
         # Loop V-cycles until convergence
         while nite < self.max_ite and res.norm() / f.norm() > self.tol:
             f = self.V_cycle(f, rhs, self.n_levels, dx, dy)
@@ -452,7 +452,7 @@ class MG_Helmholtz:
             )
             nite += 1
         # print(f'Number or V-cycle: {nite}, residual norm:
-        #       f'{(res.norm()/f.norm()).to(DEVICE).item():.3E}')
+        #       f'{(res.norm()/f.norm()).to(device=DEVICE).item():.3E}')
 
         return f
 
@@ -605,6 +605,6 @@ class MG_Helmholtz:
                 self.lambd,
             )
             nite += 1
-        # print(f'Number or V-cycle: {nite}, {(res.norm()/f.norm()).to(DEVICE).item():.3E}')
+        # print(f'Number or V-cycle: {nite}, {(res.norm()/f.norm()).to(device=DEVICE).item():.3E}')
 
         return f
