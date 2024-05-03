@@ -13,7 +13,7 @@ from qgsw.utils.sorting import sort_files
 
 load_dotenv()
 
-storage = os.environ["STORAGE"]
+imports_storage = os.environ["G5K_IMPORT_STORAGE"]
 prefix_1l = "omega_one_layer_"
 prefix_2l = "omega_multilayer_"
 
@@ -29,8 +29,8 @@ plot = VorticityComparisonFigure(
     qg_2l_inf_axes,
     common_cbar=False,
 )
-res_1l = list(Path(f"{storage}/g5k/results/").glob(f"{prefix_1l}*.npz"))
-res_2l = list(Path(f"{storage}/g5k/results/").glob(f"{prefix_2l}*.npz"))
+res_1l = list(Path(imports_storage).glob(f"{prefix_1l}*.npz"))
+res_2l = list(Path(imports_storage).glob(f"{prefix_2l}*.npz"))
 
 files_1l = sort_files(res_1l, prefix=prefix_1l, suffix=".npz")
 files_2l = sort_files(res_2l, prefix=prefix_2l, suffix=".npz")

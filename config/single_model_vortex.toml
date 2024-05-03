@@ -1,0 +1,55 @@
+[io]
+name = "Single Model Vortex"
+performance_log = false
+[io.output]
+save_results = false
+quantity = 10
+directory = "results"
+[io.plots]
+show = true
+save = false
+quantity = 10
+plots_directory = "plots"
+
+[physics]
+rho = 1000
+slip_coef = 1.0
+f0 = 9.375e-5           # mean coriolis (s^-1)
+beta = 0                # coriolis gradient (m^-1 s^-1)
+bottom_drag_coefficient = 0
+
+[model]
+name = "Two Layers"
+type = "QG"
+h = [
+    200,
+    800
+]
+g_prime = [
+    10.0,
+    5e-2
+]
+
+[mesh]
+nx = 24
+ny = 24
+dt = 4_000
+box_unit = "m"
+[mesh.box]
+unit = "m"
+[mesh.box.x]
+min = -150_000
+max = 150_000
+[mesh.box.y]
+min = -150_000
+max = 150_000
+
+[windstress]
+type = "none"
+magnitude = 0.08 # (Pa m-1 kg s-2)
+drag_coefficient = 1.3e-3
+[windstress.data]
+
+[vortex]
+type = "passive"
+perturbation_magnitude = 1e-3

@@ -1,9 +1,5 @@
 """Configuration Tools."""
 
-from qgsw.configs.core import (
-    DoubleGyreConfig,
-    RealisticConfig,
-    VortexShearConfig,
-)
+from qgsw.configs.core import Configuration
 
-__all__ = ["DoubleGyreConfig", "RealisticConfig", "VortexShearConfig"]
+__all__ = ["Configuration"]

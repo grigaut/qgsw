@@ -9,9 +9,14 @@ from typing import Any
 import toml
 from typing_extensions import Self
 
+from qgsw.configs.exceptions import ConfigError
+
 
 class _Config(metaclass=ABCMeta):
     """Configuration."""
+
+    section: str
+    section_several: str
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate configuration from configuration parameters dictionnary.
@@ -38,6 +43,48 @@ class _Config(metaclass=ABCMeta):
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate prameters values."""
         return params
+
+    @classmethod
+    def parse(cls, parameters: dict[str, Any]) -> Self:
+        """Parse a dictionnary to instantiate config from the right section.
+
+        WARNING: it does NOT recursively parse keys.
+
+        Args:
+            parameters (dict[str, Any]): Dictionnary to parse from.
+
+        Returns:
+            Self: Instantiated configuration.
+        """
+        if cls.section not in parameters:
+            msg = (
+                f"The given configuration does not contain a {cls.section}."
+                "Impossible to instantiate the configuration."
+            )
+            raise ConfigError(msg)
+        return cls(params=parameters[cls.section])
+
+    @classmethod
+    def parse_several(cls, parameters: dict[str, Any]) -> list[Self]:
+        """Parse a dicitonnary to instantiate several config.
+
+        WARNING: it does NOT recursively parse keys.
+
+        Args:
+            parameters (dict[str, Any]): Dictionnary to parse from.
+
+        Returns:
+            list[Self]: list of configurations.
+        """
+        if cls.section_several not in parameters:
+            msg = (
+                "The given configuration does not contain a "
+                f"{cls.section_several}. Impossible to instantiate "
+                "the configuration."
+            )
+            raise ConfigError(msg)
+        config_params = parameters[cls.section_several]
+        return [cls(params=param) for param in config_params]
 
     @classmethod
     def from_file(cls, config_path: Path) -> Self:

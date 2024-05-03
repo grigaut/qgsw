@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.append("../src")
 
 from qgsw.models import SW, QG
-from qgsw.configs import DoubleGyreConfig
+from qgsw.configs import Configuration
 from qgsw.physics import coriolis
 from qgsw.mesh import Meshes3D
 from qgsw.forcing.wind import WindForcing
@@ -21,7 +21,7 @@ verbose.set_level(2)
 
 ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/vortexshear.toml")
-config = DoubleGyreConfig.from_file(CONFIG_PATH)
+config = Configuration.from_file(CONFIG_PATH)
 
 mesh = Meshes3D.from_config(config.mesh, config.model)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)

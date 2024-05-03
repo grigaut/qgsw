@@ -9,12 +9,6 @@ PHYSICS = {
     "bottom drag coefficient": "bottom_drag_coefficient",
 }
 
-LAYERS = {
-    "section": "layers",
-    "layer thickness": "h",
-    "reduced gravity": "g_prime",
-}
-
 MESH = {
     "section": "mesh",
     "points nb x": "nx",
@@ -22,6 +16,15 @@ MESH = {
     "x length": "Lx",
     "y length": "Ly",
     "timestep": "dt",
+}
+
+MODELS = {
+    "section": "model",
+    "section several": "models",
+    "type": "type",
+    "name": "name",
+    "layers": "h",
+    "reduced gravity": "g_prime",
 }
 
 BOX = {
