@@ -22,7 +22,7 @@ class WindStressConfig(_Config):
         """
         super().__init__(params)
         self._data = WindStressDataConfig(
-            params=self.params[self._data_section]
+            params=self.params[self._data_section],
         )
 
     @property

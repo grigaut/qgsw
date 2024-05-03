@@ -236,7 +236,9 @@ class Model(metaclass=ABCMeta):
         self.bottom_drag_coef = param["bottom_drag_coef"]
 
     def _validate_layers(
-        self, param: dict[str, Any], key: str
+        self,
+        param: dict[str, Any],
+        key: str,
     ) -> torch.Tensor:
         """Validate H (unperturbed layer thickness) input value.
 
@@ -328,7 +330,9 @@ class Model(metaclass=ABCMeta):
         return value
 
     def _validate_coriolis_param(
-        self, param: dict[str, Any], key: str
+        self,
+        param: dict[str, Any],
+        key: str,
     ) -> torch.Tensor:
         """Validate f (Coriolis parameter) value.
 
@@ -498,20 +502,25 @@ class Model(metaclass=ABCMeta):
                 trigger_level=2,
             )
             self.comp_ke = torch.jit.trace(
-                finite_diff.comp_ke, (self.u, self.U, self.v, self.V)
+                finite_diff.comp_ke,
+                (self.u, self.U, self.v, self.V),
             )
             self.interp_TP = torch.jit.trace(finite_diff.interp_TP, (self.U,))
             self.h_flux_y = torch.jit.trace(
-                self.h_flux_y, (self.h, self.V[..., 1:-1])
+                self.h_flux_y,
+                (self.h, self.V[..., 1:-1]),
             )
             self.h_flux_x = torch.jit.trace(
-                self.h_flux_x, (self.h, self.U[..., 1:-1, :])
+                self.h_flux_x,
+                (self.h, self.U[..., 1:-1, :]),
             )
             self.w_flux_y = torch.jit.trace(
-                self.w_flux_y, (self.omega[..., 1:-1, :], self.V_m)
+                self.w_flux_y,
+                (self.omega[..., 1:-1, :], self.V_m),
             )
             self.w_flux_x = torch.jit.trace(
-                self.w_flux_x, (self.omega[..., 1:-1], self.U_m)
+                self.w_flux_x,
+                (self.omega[..., 1:-1], self.U_m),
             )
 
     def _initialize_vars(self) -> None:
@@ -587,16 +596,19 @@ class Model(metaclass=ABCMeta):
 
     @overload
     def get_physical_uvh(
-        self, numpy: Literal[True]
+        self,
+        numpy: Literal[True],
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
     @overload
     def get_physical_uvh(
-        self, numpy: Literal[False]
+        self,
+        numpy: Literal[False],
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]: ...
 
     def get_physical_uvh(
-        self, numpy: bool = False
+        self,
+        numpy: bool = False,
     ) -> (
         tuple[np.ndarray, np.ndarray, np.ndarray]
         | tuple[torch.Tensor, torch.Tensor, torch.Tensor]
@@ -750,11 +762,14 @@ class Model(metaclass=ABCMeta):
         dt_u, dt_v = self._add_bottom_drag(dt_u, dt_v)
 
         return F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u, F.pad(
-            dt_v, (1, 1, 0, 0)
+            dt_v,
+            (1, 1, 0, 0),
         ) * self.masks.v
 
     def _add_wind_forcing(
-        self, du: torch.Tensor, dv: torch.Tensor
+        self,
+        du: torch.Tensor,
+        dv: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Add wind forcing to the derivatives du, dv.
 
@@ -772,7 +787,9 @@ class Model(metaclass=ABCMeta):
         return du, dv
 
     def _add_bottom_drag(
-        self, du: torch.Tensor, dv: torch.Tensor
+        self,
+        du: torch.Tensor,
+        dv: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Add bottom drag to the derivatives du, dv.
 

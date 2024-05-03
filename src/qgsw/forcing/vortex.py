@@ -104,7 +104,8 @@ class RankineVortex2D:
         self._psi = psi.unsqueeze(0).unsqueeze(0)
 
     def _compute_vorticity(
-        self, mesh_xy: tuple[torch.Tensor, torch.Tensor]
+        self,
+        mesh_xy: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         """Compute the vorticity ω of the vortex.
 
@@ -292,7 +293,8 @@ class RankineVortexForcing:
         """
         if vortex_config.type == "active":
             mesh = Meshes3D.from_config(
-                mesh_config=mesh_config, model_config=model_config
+                mesh_config=mesh_config,
+                model_config=model_config,
             )
             vortex = ActiveLayersRankineVortex3D(
                 mesh=mesh,
@@ -301,7 +303,8 @@ class RankineVortexForcing:
             return cls(vortex=vortex)
         if vortex_config.type == "passive":
             mesh = Meshes3D.from_config(
-                mesh_config=mesh_config, model_config=model_config
+                mesh_config=mesh_config,
+                model_config=model_config,
             )
             vortex = PassiveLayersRankineVortex3D(
                 mesh=mesh,

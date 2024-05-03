@@ -200,7 +200,8 @@ verbose.display(
 
 tau = max(tau_1l, tau_2l)
 verbose.display(
-    msg=f"tau = {tau *config.physics.f0:.2f} f0-1", trigger_level=1
+    msg=f"tau = {tau *config.physics.f0:.2f} f0-1",
+    trigger_level=1,
 )
 
 t_end = 8 * tau
@@ -231,7 +232,7 @@ for n in range(n_steps + 1):
     if plots_required and (n % freq_plot == 0 or n == n_steps):
         plot.figure.suptitle(
             f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
-            f" t={t/tau:.2f}$\\tau$"
+            f" t={t/tau:.2f}$\\tau$",
         )
         plot.update_with_models(qg_1l, qg_2l, qg_2l)
         if config.io.plots.show:

@@ -31,7 +31,7 @@ class ScriptConfig(_Config):
         """
         super().__init__(params)
         self._physics = PhysicsConfig(
-            params=self.params[self._physics_section]
+            params=self.params[self._physics_section],
         )
         self._mesh = MeshConfig(params=self.params[self._mesh_section])
         self._io = IOConfig(params=self.params[self._io_section])
@@ -133,7 +133,7 @@ class RealisticConfig(ScriptConfig):
         super().__init__(params)
         self._bathy = BathyConfig(params=self.params[self._bathy_section])
         self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section]
+            params=self.params[self._windstress_section],
         )
 
     @property
@@ -189,7 +189,7 @@ class VortexShearConfig(ScriptConfig):
         """
         super().__init__(params)
         self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section]
+            params=self.params[self._windstress_section],
         )
         self._vortex = VortexConfig(params=self.params[self._vortex_section])
 
@@ -245,7 +245,7 @@ class DoubleGyreConfig(ScriptConfig):
         """
         super().__init__(params)
         self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section]
+            params=self.params[self._windstress_section],
         )
 
     @property

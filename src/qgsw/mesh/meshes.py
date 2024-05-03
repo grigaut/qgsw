@@ -215,7 +215,12 @@ class Meshes2D:
 
     @classmethod
     def from_tensors(
-        cls, *, x: torch.Tensor, y: torch.Tensor, x_unit: Unit, y_unit: Unit
+        cls,
+        *,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        x_unit: Unit,
+        y_unit: Unit,
     ) -> Self:
         """Generate ω, h, u, v meshes from coordinates tensors.
 
@@ -445,7 +450,9 @@ class Meshes3D:
 
     @classmethod
     def from_config(
-        cls, mesh_config: MeshConfig, model_config: ModelConfig
+        cls,
+        mesh_config: MeshConfig,
+        model_config: ModelConfig,
     ) -> Self:
         """Construct the 3D Grid given a MeshConfig object.
 

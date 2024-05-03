@@ -36,12 +36,12 @@ class ModelComparisonConfig(_Config):
             ModelConfig(params=p) for p in self.params[self._models_section]
         ]
         self._physics = PhysicsConfig(
-            params=self.params[self._physics_section]
+            params=self.params[self._physics_section],
         )
         self._mesh = MeshConfig(params=self.params[self._mesh_section])
         self._io = IOConfig(params=self.params[self._io_section])
         self._windstress = WindStressConfig(
-            params=self.params[self._windstress_section]
+            params=self.params[self._windstress_section],
         )
         self._vortex = VortexConfig(params=self.params[self._vortex_section])
 

@@ -70,7 +70,9 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         ncols = min(self._axes_nb, self._n_cols)
         nrows = (self._axes_nb - 1) // self._n_cols + 1
         return plt.subplots(
-            nrows=nrows, ncols=ncols, figsize=(6 * ncols, 6 * nrows)
+            nrows=nrows,
+            ncols=ncols,
+            figsize=(6 * ncols, 6 * nrows),
         )
 
     def _set_axes(self) -> None:
@@ -86,7 +88,9 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             self._axes_ms[i].update(data, **kwargs)
 
     def update_with_arrays(
-        self, *arrays: np.ndarray, **kwargs: P.kwargs
+        self,
+        *arrays: np.ndarray,
+        **kwargs: P.kwargs,
     ) -> None:
         """Update the Figure."""
         self._raise_if_inconsistent_length(len(arrays))

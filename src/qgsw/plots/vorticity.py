@@ -309,7 +309,9 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
     """Comparison between Surface Vorticity Axes."""
 
     def __init__(
-        self, *axes_managers: VorticityAxes, common_cbar: bool = True
+        self,
+        *axes_managers: VorticityAxes,
+        common_cbar: bool = True,
     ) -> None:
         """Instantiate the surface vorticity comparison."""
         super().__init__(*axes_managers)

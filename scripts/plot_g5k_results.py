@@ -16,7 +16,10 @@ qg_2l_top_axes.set_title(r"$\omega_{QG-ML-TOP}$")
 qg_2l_inf_axes = SecondLayerVorticityAxes.from_mask()
 qg_2l_inf_axes.set_title(r"$\omega_{QG-ML-INF}$")
 plot = VorticityComparisonFigure(
-    qg_1l_axes, qg_2l_top_axes, qg_2l_inf_axes, common_cbar=False
+    qg_1l_axes,
+    qg_2l_top_axes,
+    qg_2l_inf_axes,
+    common_cbar=False,
 )
 prefix_1l = "omega_one_layer_"
 res_1l = list(Path("output/results/").glob(f"{prefix_1l}*.npz"))
