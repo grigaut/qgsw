@@ -147,7 +147,7 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             np.ndarray: Retrieved data (nx,ny).
         """
-        omega = model.get_physical_omega(numpy=True)
+        omega = model.get_physical_omega_as_ndarray()
         return self.retrieve_data_from_array(omega)
 
     def retrieve_data_from_file(self, filepath: Path) -> np.ndarray:

@@ -21,8 +21,6 @@ lint.ignore = [
     "D211",
     #multi-line-summary-second-line
     "D213",
-    # flake8-boolean-trap
-    "FBT",
     # bandit
     "S",
     # do not assign a lambda expression, use a def

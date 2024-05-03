@@ -161,7 +161,7 @@ for model, name, dt, start_file in [
             )
 
         if plots_required and (n % freq_plot == 0 or n == n_steps):
-            u, v, h = qgsw_multilayer.get_physical_uvh(numpy=True)
+            u, v, h = qgsw_multilayer.get_physical_uvh_as_ndarray()
             uM, vM = (
                 max(uM, 0.8 * np.abs(u).max()),
                 max(vM, 0.8 * np.abs(v).max()),
@@ -206,7 +206,7 @@ for model, name, dt, start_file in [
             filename = os.path.join(
                 output_dir, f"uvh_{n_years:03d}y_{n_days:03d}d.npz"
             )
-            u, v, h = qgsw_multilayer.get_physical_uvh(numpy=True)
+            u, v, h = qgsw_multilayer.get_physical_uvh_as_ndarray()
             if model == QG:
                 qgsw_multilayer.save_uvh(Path(filename))
                 filename_a = os.path.join(
