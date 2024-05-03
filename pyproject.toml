@@ -27,10 +27,6 @@ lint.ignore = [
     "FBT",
     # bandit
     "S",
-    # flake8-logging
-    "G",
-    # flake8-print
-    "T",
     # McCabe complexity
     "C901",
     # do not assign a lambda expression, use a def
