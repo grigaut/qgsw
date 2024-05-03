@@ -172,7 +172,9 @@ def compute_capacitance_matrices(
         rhs.fill_(0)
         rhs[..., bound_xids[m], bound_yids[m]] = 1
         sol = dstI2D(dstI2D(rhs) / helmholtz_dstI.type(torch.float64))
-        inv_cap_matrices[:, m] = sol[..., bound_xids, bound_yids].to(DEVICE)
+        inv_cap_matrices[:, m] = sol[..., bound_xids, bound_yids].to(
+            device=DEVICE
+        )
 
     # invert G matrices to get capacitance matrices
     cap_matrices = torch.zeros_like(inv_cap_matrices)
@@ -322,7 +324,7 @@ class HelmholtzNeumannSolver:
             inv_cap_matrix[:, m] = v - self.V_T(self.G(self.U(v)))
 
         # invert on cpu
-        cap_matrix = torch.linalg.inv(inv_cap_matrix.to(DEVICE))
+        cap_matrix = torch.linalg.inv(inv_cap_matrix.to(device=DEVICE))
 
         # convert to dtype and transfer to device
         self.cap_matrix = cap_matrix.type(self.dtype).to(self.device)

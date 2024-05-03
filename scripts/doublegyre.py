@@ -70,7 +70,7 @@ for model, name, dt, start_file in [
     if model == SW:
         c = (
             torch.sqrt(config.model.h.sum() * config.model.g_prime[0])
-            .to(DEVICE)
+            .to(device=DEVICE)
             .item()
         )
         cfl = 20 if param["barotropic_filter"] else 0.5
@@ -175,12 +175,12 @@ for model, name, dt, start_file in [
                         / qgsw_multilayer.area
                         / qgsw_multilayer.f0
                     )
-                    .to(DEVICE)
+                    .to(device=DEVICE)
                     .numpy()
                 )
                 w_a = (
                     (qgsw_multilayer.omega_a / qgsw_multilayer.f0)
-                    .to(DEVICE)
+                    .to(device=DEVICE)
                     .numpy()
                 )
 

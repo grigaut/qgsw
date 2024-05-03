@@ -611,9 +611,9 @@ class Model(metaclass=ABCMeta):
             tuple[np.ndarray, np.ndarray, np.ndarray]
         | tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        u_phys = (self.u / self.dx).to(DEVICE)
-        v_phys = (self.v / self.dy).to(DEVICE)
-        h_phys = (self.h / self.area).to(DEVICE)
+        u_phys = (self.u / self.dx).to(device=DEVICE)
+        v_phys = (self.v / self.dy).to(device=DEVICE)
+        h_phys = (self.h / self.area).to(device=DEVICE)
 
         return (
             (u_phys.numpy(), v_phys.numpy(), h_phys.numpy())
@@ -640,7 +640,7 @@ class Model(metaclass=ABCMeta):
         Returns:
             torch.Tensor | np.ndarray: Vorticity
         """
-        omega_phys = (self.omega / self.area / self.f0).to(DEVICE)
+        omega_phys = (self.omega / self.area / self.f0).to(device=DEVICE)
 
         return omega_phys.numpy() if numpy else omega_phys
 
@@ -695,21 +695,26 @@ class Model(metaclass=ABCMeta):
             str: Summary of variables.
         """
         hl_mean = (
-            (self.h / self.area).mean((-1, -2)).squeeze().to(DEVICE).numpy()
+            (self.h / self.area)
+            .mean((-1, -2))
+            .squeeze()
+            .to(device=DEVICE)
+            .numpy()
         )
         eta = self.eta
         u, v, h = self.u / self.dx, self.v / self.dy, self.h / self.area
         with np.printoptions(precision=2):
+            eta_surface = eta[:, 0].min().to(device=DEVICE).item()
             return (
-                f"u: {u.mean().to(DEVICE).item():+.5E}, "
-                f"{u.abs().max().to(DEVICE).item():.5E}, "
-                f"v: {v.mean().to(DEVICE).item():+.5E}, "
-                f"{v.abs().max().to(DEVICE).item():.5E}, "
+                f"u: {u.mean().to(device=DEVICE).item():+.5E}, "
+                f"{u.abs().max().to(device=DEVICE).item():.5E}, "
+                f"v: {v.mean().to(device=DEVICE).item():+.5E}, "
+                f"{v.abs().max().to(device=DEVICE).item():.5E}, "
                 f"hl_mean: {hl_mean}, "
-                f"h min: {h.min().to(DEVICE).item():.5E}, "
-                f"max: {h.max().to(DEVICE).item():.5E}, "
-                f"eta_sur min: {eta[:,0].min().to(DEVICE).item():+.5f}, "
-                f"max: {eta[:,0].max().to(DEVICE).item():.5f}"
+                f"h min: {h.min().to(device=DEVICE).item():.5E}, "
+                f"max: {h.max().to(device=DEVICE).item():.5E}, "
+                f"eta_sur min: {eta_surface:+.5f}, "
+                f"max: {eta[:,0].max().to(device=DEVICE).item():.5f}"
             )
 
     def advection_h(self) -> torch.Tensor:

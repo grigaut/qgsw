@@ -123,7 +123,7 @@ class QG(Model):
             radius = (
                 1e-3
                 / torch.sqrt(self.f0**2 * self.lambd.squeeze())
-                .to(DEVICE)
+                .to(device=DEVICE)
                 .numpy()
             )
             verbose.display(
