@@ -5,29 +5,27 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.ndimage
 import torch
 
 sys.path.append("../src")
 from qgsw.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
-from qgsw.configs import RealisticConfig
 from qgsw.mesh import Meshes3D
 from qgsw.models import SW, QG
 from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
 from qgsw import verbose
-from icecream import ic
+from qgsw.configs import Configuration
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
 ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/realistic.toml")
-config = RealisticConfig.from_file(CONFIG_PATH)
+config = Configuration.from_file(CONFIG_PATH)
 
 mesh = Meshes3D.from_config(config.mesh, config.model)
-bathy = Bathymetry.from_config(config.bathy)
+bathy = Bathymetry.from_config(config.bathymetry)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 
 verbose.display(
@@ -55,7 +53,7 @@ verbose.display(
 verbose.display(
     msg=(
         "Interpolating bathymetry on mesh with"
-        f" {config.bathy.interpolation_method} interpolation ..."
+        f" {config.bathymetry.interpolation_method} interpolation ..."
     ),
     trigger_level=1,
 )

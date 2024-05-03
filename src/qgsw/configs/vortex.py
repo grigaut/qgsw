@@ -11,6 +11,7 @@ from qgsw.configs.base import _Config
 class VortexConfig(_Config):
     """Vortex Configuration."""
 
+    section: str = keys.VORTEX["section"]
     _type: str = keys.VORTEX["type"]
     _perturbation: str = keys.VORTEX["perturbation magnitude"]
 

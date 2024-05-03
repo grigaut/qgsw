@@ -9,6 +9,7 @@ from qgsw.configs.base import _Config, _DataConfig
 class WindStressConfig(_Config):
     """WindStress Configuration."""
 
+    section: str = keys.WINDSTRESS["section"]
     _data_section: str = keys.WINDSTRESS_DATA["section"]
     _type: str = keys.WINDSTRESS["type"]
     _magnitude: str = keys.WINDSTRESS["magnitude"]
@@ -21,9 +22,7 @@ class WindStressConfig(_Config):
             params (dict[str, Any]): Windstress configuration parameters.
         """
         super().__init__(params)
-        self._data = WindStressDataConfig(
-            params=self.params[self._data_section],
-        )
+        self._data = WindStressDataConfig.parse(self.params)
 
     @property
     def data(self) -> "WindStressDataConfig":
@@ -52,6 +51,7 @@ class WindStressConfig(_Config):
 class WindStressDataConfig(_DataConfig):
     """WindStress Data Configuration."""
 
+    section: str = keys.WINDSTRESS_DATA["section"]
     _url: str = keys.WINDSTRESS_DATA["url"]
     _folder: str = keys.WINDSTRESS_DATA["folder"]
     _data_type: str = keys.WINDSTRESS_DATA["data"]

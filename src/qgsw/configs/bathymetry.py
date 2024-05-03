@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
 from qgsw.configs import keys
 from qgsw.configs.base import _Config, _DataConfig
-from qgsw.configs.exceptions import ConfigError
 
 
 class BathyConfig(_Config):
     """Bathymetry Configuration."""
 
-    _data_section: str = keys.BATHY_DATA["section"]
+    section: str = keys.BATHY["section"]
     _htop: str = keys.BATHY["h top ocean"]
     _lake: str = keys.BATHY["lake minimum area"]
     _island: str = keys.BATHY["island minimum area"]
@@ -22,12 +22,11 @@ class BathyConfig(_Config):
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate Bathymetry Config."""
         super().__init__(params)
-        self._data = BathyDataConfig(params=self.params[self._data_section])
 
-    @property
+    @cached_property
     def data(self) -> BathyDataConfig:
         """Bathymetry Data Configuration."""
-        return self._data
+        return BathyDataConfig.parse(self.params)
 
     @property
     def htop_ocean(self) -> int:
@@ -61,19 +60,13 @@ class BathyConfig(_Config):
         Returns:
             dict[str, Any]: Bathymetry Configuration dictionnary.
         """
-        # Verify that the io section is present.
-        if self._data_section not in params:
-            msg = (
-                "The configuration must contain a "
-                f"io section, named {self._io_section}."
-            )
-            raise ConfigError(msg)
         return super()._validate_params(params)
 
 
 class BathyDataConfig(_DataConfig):
     """Bathymetric Data Configuration."""
 
+    section: str = keys.BATHY_DATA["section"]
     _url: str = keys.BATHY_DATA["url"]
     _folder: str = keys.BATHY_DATA["folder"]
     _lon: str = keys.BATHY_DATA["longitude"]

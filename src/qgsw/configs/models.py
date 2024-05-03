@@ -13,10 +13,12 @@ from qgsw.specs import DEVICE
 class ModelConfig(_Config):
     """Model configuration."""
 
-    _type: str = "type"
-    _name: str = "name"
-    _h: str = keys.LAYERS["layer thickness"]
-    _g_prime: str = keys.LAYERS["reduced gravity"]
+    section: str = keys.MODELS["section"]
+    section_several: str = keys.MODELS["section several"]
+    _type: str = keys.MODELS["type"]
+    _name: str = keys.MODELS["name"]
+    _h: str = keys.MODELS["layers"]
+    _g_prime: str = keys.MODELS["reduced gravity"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate ModelConfig.
