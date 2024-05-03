@@ -27,8 +27,6 @@ lint.ignore = [
     "FBT",
     # bandit
     "S",
-    # McCabe complexity
-    "C901",
     # do not assign a lambda expression, use a def
     "E731",
     # implicit-namespace-package
