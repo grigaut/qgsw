@@ -94,7 +94,7 @@ class Bathymetry:
             skimage.morphology.area_closing(
                 np.logical_not(land_without_lakes),
                 area_threshold=self._config.island_min_area,
-            )
+            ),
         )
         return torch.from_numpy(land).type(torch.float64).to(device=DEVICE)
 
@@ -122,10 +122,10 @@ class Bathymetry:
             skimage.morphology.area_closing(
                 np.logical_not(ocean_without_islands),
                 area_threshold=self._config.lake_min_area,
-            )
+            ),
         )
         ocean = self._remove_isolated_land(
-            ocean_without_lakes.astype("float64")
+            ocean_without_lakes.astype("float64"),
         )
         return torch.from_numpy(ocean).type(torch.float64).to(device=DEVICE)
 
@@ -166,7 +166,9 @@ class Bathymetry:
         """
         bottom_topography = 4000 + np.clip(self.interpolate(mesh_xy), -4000, 0)
         return np.clip(
-            scipy.ndimage.gaussian_filter(bottom_topography, 3.0), 0, 150
+            scipy.ndimage.gaussian_filter(bottom_topography, 3.0),
+            0,
+            150,
         )
 
     def compute_land_mask_w(self, mesh_2d: Mesh2D) -> torch.Tensor:

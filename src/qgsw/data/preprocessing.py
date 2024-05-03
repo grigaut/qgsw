@@ -14,7 +14,11 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 WindStressData = tuple[
-    torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
 ]
 
 
@@ -27,7 +31,7 @@ class Preprocessor(Generic[T], metaclass=ABCMeta):
 
 
 class BathyPreprocessor(
-    Preprocessor[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+    Preprocessor[tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
 ):
     """Bathymetry preprocessor."""
 
@@ -49,7 +53,8 @@ class BathyPreprocessor(
         self._bathy = bathymetry_key
 
     def __call__(
-        self, data: Reader
+        self,
+        data: Reader,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Preprocess bathymetric data.
 

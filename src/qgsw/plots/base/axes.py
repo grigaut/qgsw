@@ -337,7 +337,9 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def from_mask(
-        cls, mask: np.ndarray | None = None, **kwargs: P.kwargs
+        cls,
+        mask: np.ndarray | None = None,
+        **kwargs: P.kwargs,
     ) -> Self:
         """Instantiate Figure only from the mask.
 

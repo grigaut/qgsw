@@ -309,7 +309,10 @@ class Coordinates3D:
             Self: 3D Coordinates.
         """
         coords_2d = Coordinates2D.from_tensors(
-            x=x, x_unit=x_unit, y=y, y_unit=y_unit
+            x=x,
+            x_unit=x_unit,
+            y=y,
+            y_unit=y_unit,
         )
         if (z is None) and (h is None):
             msg = "Exactly one of z and h must be given, none were given."

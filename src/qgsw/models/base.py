@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
@@ -236,7 +236,9 @@ class Model(metaclass=ABCMeta):
         self.bottom_drag_coef = param["bottom_drag_coef"]
 
     def _validate_layers(
-        self, param: dict[str, Any], key: str
+        self,
+        param: dict[str, Any],
+        key: str,
     ) -> torch.Tensor:
         """Validate H (unperturbed layer thickness) input value.
 
@@ -328,7 +330,9 @@ class Model(metaclass=ABCMeta):
         return value
 
     def _validate_coriolis_param(
-        self, param: dict[str, Any], key: str
+        self,
+        param: dict[str, Any],
+        key: str,
     ) -> torch.Tensor:
         """Validate f (Coriolis parameter) value.
 
@@ -498,20 +502,25 @@ class Model(metaclass=ABCMeta):
                 trigger_level=2,
             )
             self.comp_ke = torch.jit.trace(
-                finite_diff.comp_ke, (self.u, self.U, self.v, self.V)
+                finite_diff.comp_ke,
+                (self.u, self.U, self.v, self.V),
             )
             self.interp_TP = torch.jit.trace(finite_diff.interp_TP, (self.U,))
             self.h_flux_y = torch.jit.trace(
-                self.h_flux_y, (self.h, self.V[..., 1:-1])
+                self.h_flux_y,
+                (self.h, self.V[..., 1:-1]),
             )
             self.h_flux_x = torch.jit.trace(
-                self.h_flux_x, (self.h, self.U[..., 1:-1, :])
+                self.h_flux_x,
+                (self.h, self.U[..., 1:-1, :]),
             )
             self.w_flux_y = torch.jit.trace(
-                self.w_flux_y, (self.omega[..., 1:-1, :], self.V_m)
+                self.w_flux_y,
+                (self.omega[..., 1:-1, :], self.V_m),
             )
             self.w_flux_x = torch.jit.trace(
-                self.w_flux_x, (self.omega[..., 1:-1], self.U_m)
+                self.w_flux_x,
+                (self.omega[..., 1:-1], self.U_m),
             )
 
     def _initialize_vars(self) -> None:
@@ -585,27 +594,10 @@ class Model(metaclass=ABCMeta):
         self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
         self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
-    @overload
     def get_physical_uvh(
-        self, numpy: Literal[True]
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
-
-    @overload
-    def get_physical_uvh(
-        self, numpy: Literal[False]
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]: ...
-
-    def get_physical_uvh(
-        self, numpy: bool = False
-    ) -> (
-        tuple[np.ndarray, np.ndarray, np.ndarray]
-        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-    ):
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get physical variables u_phys, v_phys, h_phys from state variables.
-
-        Args:
-            numpy (bool, optional): Whether to cast output
-            to ndarray or not. Defaults to False.
 
         Returns:
             tuple[np.ndarray, np.ndarray, np.ndarray]
@@ -615,34 +607,37 @@ class Model(metaclass=ABCMeta):
         v_phys = (self.v / self.dy).to(device=DEVICE)
         h_phys = (self.h / self.area).to(device=DEVICE)
 
-        return (
-            (u_phys.cpu().numpy(), v_phys.cpu().numpy(), h_phys.cpu().numpy())
-            if numpy
-            else (u_phys, v_phys, h_phys)
-        )
+        return (u_phys, v_phys, h_phys)
 
-    @overload
-    def get_physical_omega(self, numpy: Literal[True]) -> np.ndarray: ...
+    def get_physical_uvh_as_ndarray(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Get physical variables u_phys, v_phys, h_phys from state variables.
 
-    @overload
-    def get_physical_omega(self, numpy: Literal[False]) -> torch.Tensor: ...
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray]: u, v and h
+        """
+        return (e.cpu().numpy() for e in self.get_physical_uvh())
 
     def get_physical_omega(
         self,
-        numpy: bool = False,
-    ) -> torch.Tensor | np.ndarray:
+    ) -> torch.Tensor:
         """Get physical vorticity.
 
-        Args:
-            numpy (bool, optional): Whether to cast output
-            to ndarray or not. Defaults to False.
+        Returns:
+            torch.Tensor: Vorticity
+        """
+        return (self.omega / self.area / self.f0).to(device=DEVICE)
+
+    def get_physical_omega_as_ndarray(
+        self,
+    ) -> torch.Tensor:
+        """Get physical vorticity.
 
         Returns:
-            torch.Tensor | np.ndarray: Vorticity
+            np.ndarray: Vorticity
         """
-        omega_phys = (self.omega / self.area / self.f0).to(device=DEVICE)
-
-        return omega_phys.cpu().numpy() if numpy else omega_phys
+        return self.get_physical_omega().cpu().numpy()
 
     def set_physical_uvh(
         self,
@@ -750,11 +745,14 @@ class Model(metaclass=ABCMeta):
         dt_u, dt_v = self._add_bottom_drag(dt_u, dt_v)
 
         return F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u, F.pad(
-            dt_v, (1, 1, 0, 0)
+            dt_v,
+            (1, 1, 0, 0),
         ) * self.masks.v
 
     def _add_wind_forcing(
-        self, du: torch.Tensor, dv: torch.Tensor
+        self,
+        du: torch.Tensor,
+        dv: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Add wind forcing to the derivatives du, dv.
 
@@ -772,7 +770,9 @@ class Model(metaclass=ABCMeta):
         return du, dv
 
     def _add_bottom_drag(
-        self, du: torch.Tensor, dv: torch.Tensor
+        self,
+        du: torch.Tensor,
+        dv: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Add bottom drag to the derivatives du, dv.
 
@@ -821,7 +821,7 @@ class Model(metaclass=ABCMeta):
         """
         self._raise_if_invalid_savefile(output_file=output_file)
 
-        u, v, h = self.get_physical_uvh(numpy=True)
+        u, v, h = self.get_physical_uvh_as_ndarray()
 
         np.savez(
             output_file,
@@ -840,7 +840,7 @@ class Model(metaclass=ABCMeta):
         """
         self._raise_if_invalid_savefile(output_file=output_file)
 
-        omega = self.get_physical_omega(numpy=True)
+        omega = self.get_physical_omega_as_ndarray()
 
         np.savez(output_file, omega=omega.astype("float32"))
 

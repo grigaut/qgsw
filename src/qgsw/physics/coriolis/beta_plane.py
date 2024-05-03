@@ -67,7 +67,9 @@ def compute_beta_plane(
 
 
 def _beta_plane_from_meters(
-    y: torch.Tensor, f0: float, beta: float
+    y: torch.Tensor,
+    f0: float,
+    beta: float,
 ) -> torch.Tensor:
     """Compute beta-plane from y in meters.
 
@@ -83,7 +85,9 @@ def _beta_plane_from_meters(
 
 
 def _beta_plane_from_degree(
-    latitude: torch.Tensor, f0: float, beta: float
+    latitude: torch.Tensor,
+    f0: float,
+    beta: float,
 ) -> torch.Tensor:
     """Compute beat-plane from latitudes in degrees.
 
@@ -99,7 +103,9 @@ def _beta_plane_from_degree(
 
 
 def _beta_plane_from_radians(
-    latitude: torch.Tensor, f0: float, beta: float
+    latitude: torch.Tensor,
+    f0: float,
+    beta: float,
 ) -> torch.Tensor:
     """Compute beat-plane from latitudes in radians.
 

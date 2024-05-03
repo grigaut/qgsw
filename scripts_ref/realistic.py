@@ -449,7 +449,7 @@ for n in range(1, n_steps + 1):
         )
 
     if freq_plot > 0 and (n % freq_plot == 0 or n == n_steps):
-        u, v, h = qg.get_physical_uvh(numpy=True)
+        u, v, h = qg.get_physical_uvh_as_ndarray()
         uM, vM = max(uM, 0.8 * np.abs(u).max()), max(vM, 0.8 * np.abs(v).max())
         hM = max(hM, 0.8 * np.abs(h).max())
         if model == QG:
@@ -469,7 +469,7 @@ for n in range(1, n_steps + 1):
         filename = os.path.join(
             output_dir, f"uvh_{n_years:03d}y_{n_days:03d}d.npz"
         )
-        u, v, h = qg.get_physical_uvh(numpy=True)
+        u, v, h = qg.get_physical_uvh_as_ndarray()
         if model == QG:
             # u_a = qg.u_a.cpu().numpy()
             # v_a = qg.v_a.cpu().numpy()

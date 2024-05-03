@@ -17,36 +17,18 @@ target-version = "py39"
 extend-exclude = ["*.ipynb"]
 lint.select = ["ALL"]
 lint.ignore = [
-    # missing-trailing-comma (COM812)
-    "COM812",
-    #no-blank-line-before-class
-    "D211",
-    #multi-line-summary-second-line
-    "D213",
-    # flake8-boolean-trap
-    "FBT",
     # bandit
     "S",
-    # flake8-logging
-    "G",
-    # flake8-print
-    "T",
-    # McCabe complexity
-    "C901",
     # do not assign a lambda expression, use a def
     "E731",
     # implicit-namespace-package
     "INP001",
-    # single-line-implicit-string-concatenation
-    "ISC001",
     # Too many arguments to function call
     "PLR0913",
     # Missing type annotation for `self` in method
     "ANN101",
     # Missing type annotation for `cls` in classmethod
     "ANN102",
-    # suppressible-exception
-    "SIM105",
 ]
 lint.unfixable = [
     # Remove unused-imports

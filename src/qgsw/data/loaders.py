@@ -119,12 +119,13 @@ class WindForcingLoader(
         WindStressConfig,
         tuple[torch.Tensor, torch.Tensor],
         _WindStressPreprocessor,
-    ]
+    ],
 ):
     """Wind Forcing Data Loader."""
 
     def set_preprocessor(
-        self, config: WindStressConfig
+        self,
+        config: WindStressConfig,
     ) -> _WindStressPreprocessor:
         """Set WindStress preprocessor.
 
@@ -158,7 +159,8 @@ class WindForcingLoader(
         raise KeyError(msg)
 
     def _set_config(
-        self, windstress_config: WindStressConfig
+        self,
+        windstress_config: WindStressConfig,
     ) -> WindStressDataConfig:
         """Set Data Configuration.
 

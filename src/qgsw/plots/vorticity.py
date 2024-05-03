@@ -147,7 +147,7 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             np.ndarray: Retrieved data (nx,ny).
         """
-        omega = model.get_physical_omega(numpy=True)
+        omega = model.get_physical_omega_as_ndarray()
         return self.retrieve_data_from_array(omega)
 
     def retrieve_data_from_file(self, filepath: Path) -> np.ndarray:
@@ -309,7 +309,9 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
     """Comparison between Surface Vorticity Axes."""
 
     def __init__(
-        self, *axes_managers: VorticityAxes, common_cbar: bool = True
+        self,
+        *axes_managers: VorticityAxes,
+        common_cbar: bool = True,
     ) -> None:
         """Instantiate the surface vorticity comparison."""
         super().__init__(*axes_managers)

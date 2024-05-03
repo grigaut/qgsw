@@ -90,7 +90,7 @@ class CosineZonalWindForcing(_WindForcing):
             self._mesh.omega.xy[1][:, 1:] + self._mesh.omega.xy[1][:, :-1]
         )
         wind_profile = torch.cos(
-            2 * torch.pi * (y_ugrid - self._mesh.ly / 2) / self._mesh.ly
+            2 * torch.pi * (y_ugrid - self._mesh.ly / 2) / self._mesh.ly,
         )
         return self._tau0 * wind_profile[1:-1, :]
 
@@ -235,10 +235,10 @@ class DataWindForcing(_WindForcing):
                 method=self._config.windstress.data.method,
             )
             taux_i = taux_interpolator(
-                (self._mesh.u.xy[0] + 360, self._mesh.u.xy[1])
+                (self._mesh.u.xy[0] + 360, self._mesh.u.xy[1]),
             )
             tauy_i = tauy_interpolator(
-                (self._mesh.v.xy[0] + 360, self._mesh.v.xy[1])
+                (self._mesh.v.xy[0] + 360, self._mesh.v.xy[1]),
             )
 
             taux[t, :, :] = taux_i
@@ -319,7 +319,7 @@ class WindForcing:
                     windstress_config=windstress_config,
                     physics_config=physics_config,
                     mesh=mesh,
-                )
+                ),
             )
         if windstress_config.type == "data":
             mesh = Meshes2D.from_config(mesh_config=mesh_config)
@@ -328,7 +328,7 @@ class WindForcing:
                     windstress_config=windstress_config,
                     physics_config=physics_config,
                     mesh=mesh,
-                )
+                ),
             )
         if windstress_config.type == "none":
             mesh = Meshes2D.from_config(mesh_config=mesh_config)
@@ -337,7 +337,7 @@ class WindForcing:
                     windstress_config=windstress_config,
                     physics_config=physics_config,
                     mesh=mesh,
-                )
+                ),
             )
         msg = "Unrecognized windstress type."
         raise KeyError(msg)

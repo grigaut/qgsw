@@ -22,7 +22,10 @@ def compute_rossby(
 
 
 def compute_burger(
-    g: float, h_scale: float, f0: float, length_scale: float
+    g: float,
+    h_scale: float,
+    f0: float,
+    length_scale: float,
 ) -> float:
     """Compute Burger Number (Bu).
 

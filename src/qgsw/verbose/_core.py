@@ -123,7 +123,7 @@ class VerboseDisplayer:
         """
         trigger = self._check_trigger_level(trigger_level=trigger_level)
         if self.level >= trigger:
-            print(self._indent(msg=msg, level=(trigger - 1)))
+            print(self._indent(msg=msg, level=(trigger - 1)))  # noqa: T201
 
 
 VERBOSE = VerboseDisplayer(0)
