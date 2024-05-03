@@ -257,8 +257,8 @@ class SecondLayerVorticityAxes(
 VorticityAxes = Union[SurfaceVorticityAxes, SecondLayerVorticityAxes]
 
 
-class SurfaceVorticityFigure(BaseSingleFigure[VorticityAxes]):
-    """Surface Vorticity Figure."""
+class VorticityFigure(BaseSingleFigure[VorticityAxes]):
+    """Vorticity Figure."""
 
     def __init__(self, axes_manager: VorticityAxes) -> None:
         """Instantiate the Surface Vorticity Figure.
@@ -269,31 +269,8 @@ class SurfaceVorticityFigure(BaseSingleFigure[VorticityAxes]):
         super().__init__(axes_manager)
         self._cbar_axes = None
 
-    def _show_colorbar(self) -> None:
-        """Show the colorbar."""
-        if self._cbar_axes is None:
-            # Create the colorbar Axes.
-            self.figure.subplots_adjust(right=0.85)
-            self._cbar_axes: Axes = self.figure.add_axes(
-                [0.88, 0.15, 0.04, 0.7],
-            )
-        if self._ax.content.axes_image is not None:
-            # Update the colorbar.
-            self.figure.colorbar(
-                self._ax.content.axes_image,
-                cax=self._cbar_axes,
-                label=r"$\omega / f_0$",
-            )
-
-    def _update(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
-        """Update the Figure.
-
-        Args:
-            data (np.ndarray): Data tuse for update (1,nl,nx,ny).
-            **kwargs: Additional arguments to give to the plotting function.
-        """
-        super()._update(data, **kwargs)
-        self._show_colorbar()
+    def _create_figure(self) -> Figure:
+        return super()._create_figure()
 
     def update(self, data: np.ndarray, **kwargs: P.kwargs) -> None:
         """Update Axes content.
@@ -303,6 +280,26 @@ class SurfaceVorticityFigure(BaseSingleFigure[VorticityAxes]):
             **kwargs: Additional arguments to give to the plotting function.
         """
         super().update(data, **kwargs)
+
+    @classmethod
+    def from_mask(
+        cls,
+        mask: np.ndarray | None = None,
+        **kwargs: P.kwargs,
+    ) -> Self:
+        """Instantiate Figure only from the mask.
+
+        Args:
+            mask (np.ndarray | None, optional): Mask to apply on data.
+            Mask will be set to ones if None. Defaults to None.
+            **kwargs: Additional arguments to pass to plotting method.
+
+        Returns:
+            Self: Instantiated plot.
+        """
+        return cls(
+            axes_manager=SurfaceVorticityAxes.from_mask(mask=mask, **kwargs),
+        )
 
 
 class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
