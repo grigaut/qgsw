@@ -18,6 +18,10 @@ f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = nan
 
+[simulation]
+duration = 50 # number of years
+dt = 2_000 # seconds
+
 [model]
 name = "Three Layer"
 type = "QG"
@@ -35,8 +39,6 @@ g_prime = [
 [mesh]
 nx = 1024
 ny = 512
-dt = 2_000
-# box_unit = "deg"
 [mesh.box]
 unit = "deg"
 [mesh.box.x]

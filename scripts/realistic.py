@@ -91,7 +91,7 @@ param = {
     "device": DEVICE,
     "dtype": torch.float64,
     "slip_coef": config.physics.slip_coef,
-    "dt": config.mesh.dt,  # time-step (s)
+    "dt": config.simulation.dt,  # time-step (s)
     "compile": True,
     "mask": bathy.compute_ocean_mask(mesh.h.remove_z_h()),
     "taux": taux[0, 1:-1, :],
@@ -115,8 +115,11 @@ if start_file:
 t = 0
 
 freq_checknan = 100
-freq_log = int(24 * 3600 / config.mesh.dt)
-n_steps = int(50 * 365 * 24 * 3600 / config.mesh.dt) + 1
+freq_log = int(24 * 3600 / config.simulation.dt)
+n_steps = (
+    int(config.simulation.duration * 365 * 24 * 3600 / config.simulation.dt)
+    + 1
+)
 freq_save = int(n_steps / config.io.results.quantity) + 1
 freq_plot = int(n_steps / config.io.plots.quantity) + 1
 
@@ -191,7 +194,7 @@ for n in range(1, n_steps + 1):
 
     ## one step
     qg.step()
-    t += config.mesh.dt
+    t += config.simulation.dt
 
     if config.io.log_performance:
         walltime = cputime()
