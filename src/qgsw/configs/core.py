@@ -1,7 +1,6 @@
 """Main Configuration Tool."""
 
 from functools import cached_property
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +8,6 @@ import toml
 from typing_extensions import Self
 
 from qgsw.configs.bathymetry import BathyConfig
-from qgsw.configs.exceptions import ConfigSaveError
 from qgsw.configs.io import IOConfig
 from qgsw.configs.mesh import MeshConfig
 from qgsw.configs.models import ModelConfig
@@ -125,23 +123,6 @@ class Configuration:
         """Simulation configuration."""
         return SimulationConfig.parse(self.params)
 
-    def to_file(self, file: Path) -> None:
-        """Save the configuration to a given TOML file.
-
-        More informations on TOML files: https://toml.io/en/.
-
-        Args:
-            file (Path): _description_
-        """
-        if "qgsw-version" in self.params:
-            msg = "Impossible to specify qgsw's version."
-            raise ConfigSaveError(msg)
-        self.params["qgsw-version"] = version("qgsw")
-        if file.suffix != ".toml":
-            msg = "Configuration can only be saved into a .toml file."
-            raise ConfigSaveError(msg)
-        toml.dump(self.params, file.open("w"))
-
     @classmethod
     def from_file(cls, file: Path) -> Self:
         """Instantiate Configuration from a given TOML file.
@@ -154,13 +135,4 @@ class Configuration:
         Returns:
             Self: Configuration.
         """
-        config = cls(configuration=toml.load(file))
-        if not config.has_io:
-            return config
-        if config.io.plots.save:
-            save_file = config.io.plots.directory.joinpath("_config.toml")
-            config.to_file(save_file)
-        if config.io.results.save:
-            save_file = config.io.results.directory.joinpath("_config.toml")
-            config.to_file(save_file)
-        return config
+        return cls(params=toml.load(file))
