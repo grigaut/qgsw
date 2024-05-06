@@ -24,6 +24,11 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/single_vs_double_layers.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
+
+if config.models[0].type != "QG" or config.models[1].type != "QG":
+    msg = "Unsupported model type, possible values are: QG."
+    raise ValueError(msg)
+
 # Common Set-up
 ## Wind Forcing
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)

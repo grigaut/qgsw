@@ -24,6 +24,10 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/single_model_vortex.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
+if config.model.type != "QG":
+    msg = "Unsupported model type, possible values are: QG."
+    raise ValueError(msg)
+
 # Common Set-up
 ## Wind Forcing
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
@@ -80,8 +84,8 @@ params = {
     "slip_coef": config.physics.slip_coef,
     "dt": 0.0,
 }
-qg = QG(params)
-u0, v0, h0 = qg.G(vortex.compute(config.physics.f0, Ro))
+model = QG(params)
+u0, v0, h0 = model.G(vortex.compute(config.physics.f0, Ro))
 
 ## Max speed
 u_max, v_max, c = (
@@ -97,18 +101,18 @@ dt = min(
 )
 
 # Instantiate Model
-qg.dt = dt
-qg.u = torch.clone(u0)
-qg.v = torch.clone(v0)
-qg.h = torch.clone(h0)
+model.dt = dt
+model.u = torch.clone(u0)
+model.v = torch.clone(v0)
+model.h = torch.clone(h0)
 
 ## time params
 t = 0
 
-qg.compute_diagnostic_variables()
-qg.compute_time_derivatives()
+model.compute_diagnostic_variables()
+model.compute_time_derivatives()
 
-w_0 = qg.omega.squeeze() / qg.dx / qg.dy
+w_0 = model.omega.squeeze() / model.dx / model.dy
 
 
 tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(device=DEVICE).item()
@@ -142,7 +146,7 @@ for n in range(n_steps + 1):
         plot.figure.suptitle(
             f"Ro={Ro:.2f}, Bu={Bu:.2f} t={t/tau:.2f}$\\tau$",
         )
-        plot.update_with_models(qg, qg)
+        plot.update_with_models(model, model)
         if config.io.plots.show:
             plot.show()
         if config.io.plots.save:
@@ -153,13 +157,13 @@ for n in range(n_steps + 1):
     if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
         name = config.model.name_sc
-        qg.save_omega(directory.joinpath(f"omega_{name}_{n}.npz"))
-    qg.step()
+        model.save_omega(directory.joinpath(f"omega_{name}_{n}.npz"))
+    model.step()
 
     t += dt
 
     if freq_log > 0 and n % freq_log == 0:
         verbose.display(
-            msg=f"QG-1l: n={n:05d}, {qg.get_print_info()}",
+            msg=f"QG-1l: n={n:05d}, {model.get_print_info()}",
             trigger_level=1,
         )
