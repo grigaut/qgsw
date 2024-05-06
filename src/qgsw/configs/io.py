@@ -101,9 +101,9 @@ class PlotsConfig(_Config):
     def directory(self) -> Path:
         """Directory in which to save the plots."""
         directory = get_absolute_storage_path(Path(self.params[self._dir]))
-        if self.save and not self.directory.is_dir():
-            self.directory.mkdir()
-            gitignore = self.directory.joinpath(".gitignore")
+        if self.save and not directory.is_dir():
+            directory.mkdir()
+            gitignore = directory.joinpath(".gitignore")
             with gitignore.open("w") as file:
                 file.write("*")
         return directory
@@ -137,9 +137,9 @@ class OutputsConfig(_Config):
     def directory(self) -> Path:
         """Directory in which to save the results."""
         directory = get_absolute_storage_path(Path(self.params[self._dir]))
-        if self.save and not self.directory.is_dir():
-            self.directory.mkdir()
-            gitignore = self.directory.joinpath(".gitignore")
+        if self.save and not directory.is_dir():
+            directory.mkdir()
+            gitignore = directory.joinpath(".gitignore")
             with gitignore.open("w") as file:
                 file.write("*")
         return directory
