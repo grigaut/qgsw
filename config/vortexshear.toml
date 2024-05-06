@@ -18,6 +18,10 @@ f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
+[simulation]
+duration = 8 # units of Tau
+dt = nan # dt is automatically computed
+
 [model]
 name = "Two Layers"
 type = "QG"
@@ -33,7 +37,6 @@ g_prime = [
 [mesh]
 nx = 96
 ny = 96
-dt = 4_000
 box_unit = "m"
 [mesh.box]
 unit = "m"

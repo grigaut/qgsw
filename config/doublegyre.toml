@@ -8,7 +8,7 @@ directory = "results"
 [io.plots]
 show = true
 save = false
-quantity = 10
+quantity = 100
 plots_directory = "plots"
 
 [physics]
@@ -17,6 +17,10 @@ slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = nan
+
+[simulation]
+duration = 10 # number of years
+dt = nan # dt is automatically computed
 
 [model]
 name = "Three Layer"
@@ -35,7 +39,6 @@ g_prime = [
 [mesh]
 nx = 32
 ny = 64
-dt = 4_000
 [mesh.box]
 unit = "m"
 [mesh.box.x]

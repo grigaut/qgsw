@@ -26,7 +26,6 @@ class MeshConfig(_Config):
     section: str = keys.MESH["section"]
     _nx: str = keys.MESH["points nb x"]
     _ny: str = keys.MESH["points nb y"]
-    _dt: str = keys.MESH["timestep"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
         DEGREES.name: conversion.deg_to_m_lat,
@@ -57,11 +56,6 @@ class MeshConfig(_Config):
     def ny(self) -> int:
         """Number of points on the y direction."""
         return self.params[self._ny]
-
-    @property
-    def dt(self) -> int:
-        """Timestep (in seconds)."""
-        return self.params[self._dt]
 
     @property
     def dx(self) -> float:

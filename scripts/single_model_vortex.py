@@ -77,7 +77,7 @@ params = {
     "dtype": torch.float64,
     "mask": torch.ones_like(mesh.h.remove_z_h().xy[0]),
     "compile": True,
-    "slip_coef": 1.0,
+    "slip_coef": config.physics.slip_coef,
     "dt": 0.0,
 }
 qg = QG(params)
@@ -117,7 +117,7 @@ verbose.display(
     trigger_level=1,
 )
 
-t_end = 8 * tau
+t_end = config.simulation.duration * tau
 freq_plot = int(t_end / config.io.plots.quantity / dt) + 1
 freq_save = int(t_end / config.io.results.quantity / dt) + 1
 freq_log = int(t_end / 100 / dt) + 1

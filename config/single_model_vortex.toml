@@ -18,6 +18,10 @@ f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
+[simulation]
+duration = 8 # units of Tau
+dt = nan # dt is automatically computed
+
 [model]
 name = "Two Layers"
 type = "QG"
@@ -33,7 +37,6 @@ g_prime = [
 [mesh]
 nx = 24
 ny = 24
-dt = 4_000
 box_unit = "m"
 [mesh.box]
 unit = "m"
@@ -46,8 +49,8 @@ max = 150_000
 
 [windstress]
 type = "none"
-magnitude = 0.08 # (Pa m-1 kg s-2)
-drag_coefficient = 1.3e-3
+magnitude = nan # (Pa m-1 kg s-2)
+drag_coefficient = nan
 [windstress.data]
 
 [vortex]

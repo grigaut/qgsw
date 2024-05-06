@@ -206,7 +206,7 @@ verbose.display(
     trigger_level=1,
 )
 
-t_end = 8 * tau
+t_end = config.simulation.duration * tau
 freq_plot = int(t_end / config.io.plots.quantity / dt) + 1
 freq_save = int(t_end / config.io.results.quantity / dt) + 1
 freq_checknan = 100
