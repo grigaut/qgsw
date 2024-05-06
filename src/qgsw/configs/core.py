@@ -22,103 +22,108 @@ from qgsw.configs.windstress import WindStressConfig
 class Configuration:
     """Configuration."""
 
-    def __init__(self, configuration: dict[str, Any]) -> None:
+    def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate the Configuration.
 
         Args:
-            configuration (dict[str, Any]): Configuration parameters.
+            params (dict[str, Any]): Configuration parameters.
         """
-        self._config = configuration
+        self._params = params
+
+    @property
+    def params(self) -> dict[str, Any]:
+        """Configuration parameters."""
+        return self._params
 
     @property
     def has_io(self) -> bool:
         """Whether the configuration contains an 'io' section or not."""
-        return IOConfig.section in self._config
+        return IOConfig.section in self.params
 
     @cached_property
     def io(self) -> IOConfig:
         """Input/output configuration."""
-        return IOConfig.parse(self._config)
+        return IOConfig.parse(self.params)
 
     @property
     def has_physics(self) -> bool:
         """Whether the configuration contains a 'physics' section or not."""
-        return PhysicsConfig.section in self._config
+        return PhysicsConfig.section in self.params
 
     @cached_property
     def physics(self) -> PhysicsConfig:
         """Physics configuration."""
-        return PhysicsConfig.parse(self._config)
+        return PhysicsConfig.parse(self.params)
 
     @property
     def has_model(self) -> bool:
         """Whether the configuration contains a 'model' section or not."""
-        return ModelConfig.section in self._config
+        return ModelConfig.section in self.params
 
     @cached_property
     def model(self) -> ModelConfig:
         """Model configuration."""
-        return ModelConfig.parse(self._config)
+        return ModelConfig.parse(self.params)
 
     @property
     def has_models(self) -> bool:
         """Whether the configuration contains a 'models' section or not."""
-        return ModelConfig.section_several in self._config
+        return ModelConfig.section_several in self.params
 
     @cached_property
     def models(self) -> list[ModelConfig]:
         """Models configuration."""
-        return ModelConfig.parse_several(self._config)
+        return ModelConfig.parse_several(self.params)
 
     @property
     def has_mesh(self) -> bool:
         """Whether the configuration contains a 'mesh' section or not."""
-        return MeshConfig.section in self._config
+        return MeshConfig.section in self.params
 
     @cached_property
     def mesh(self) -> MeshConfig:
         """Mesh configuration."""
-        return MeshConfig.parse(self._config)
+        return MeshConfig.parse(self.params)
 
     @cached_property
     def has_windstress(self) -> bool:
         """Whether the configuration contains a 'windstress' section or not."""
-        return WindStressConfig.section in self._config
+        return WindStressConfig.section in self.params
 
     @property
     def windstress(self) -> WindStressConfig:
         """WindStress configuration."""
-        return WindStressConfig.parse(self._config)
+        return WindStressConfig.parse(self.params)
 
     @property
     def has_bathymetry(self) -> bool:
         """Whether the configuration contains a 'bathymetry' section or not."""
-        return BathyConfig.section in self._config
+        return BathyConfig.section in self.params
 
     @cached_property
     def bathymetry(self) -> BathyConfig:
         """Bathymetry Configuration."""
-        return BathyConfig.parse(self._config)
+        return BathyConfig.parse(self.params)
 
     @property
     def has_vortex(self) -> bool:
         """Whether the configuration contains a 'vortex' section or not."""
-        return VortexConfig.section in self._config
+        return VortexConfig.section in self.params
 
     @cached_property
     def vortex(self) -> VortexConfig:
         """Vortex Configuration."""
-        return VortexConfig.parse(self._config)
+        return VortexConfig.parse(self.params)
 
     @property
     def has_simulation(self) -> bool:
         """Whether the configuration contains a 'simulation' section or not."""
-        return SimulationConfig.section in self._config
+        return SimulationConfig.section in self.params
 
     @cached_property
     def simulation(self) -> SimulationConfig:
         """Simulation configuration."""
-        return SimulationConfig.parse(self._config)
+        return SimulationConfig.parse(self.params)
 
     def to_file(self, file: Path) -> None:
         """Save the configuration to a given TOML file.
@@ -128,14 +133,14 @@ class Configuration:
         Args:
             file (Path): _description_
         """
-        if "qgsw-version" in self._config:
+        if "qgsw-version" in self.params:
             msg = "Impossible to specify qgsw's version."
             raise ConfigSaveError(msg)
-        self._config["qgsw-version"] = version("qgsw")
+        self.params["qgsw-version"] = version("qgsw")
         if file.suffix != ".toml":
             msg = "Configuration can only be saved into a .toml file."
             raise ConfigSaveError(msg)
-        toml.dump(self._config, file.open("w"))
+        toml.dump(self.params, file.open("w"))
 
     @classmethod
     def from_file(cls, file: Path) -> Self:
