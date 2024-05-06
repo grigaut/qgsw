@@ -49,7 +49,7 @@ param = {
     "dtype": torch.float64,
     "slip_coef": config.physics.slip_coef,
     "interp_fd": False,
-    "dt": config.mesh.dt,
+    "dt": 0.0,
     "compile": True,
     "barotropic_filter": True,
     "barotropic_filter_spectral": True,
@@ -103,7 +103,7 @@ for model, name, dt, start_file in [
     freq_checknan = 10
     freq_log = 100
 
-    n_steps = int(10 * 365 * 24 * 3600 / dt) + 1
+    n_steps = int(config.simulation.duration * 365 * 24 * 3600 / dt) + 1
     freq_save = int(n_steps / config.io.results.quantity) + 1
     freq_plot = int(n_steps / config.io.plots.quantity) + 1
 
