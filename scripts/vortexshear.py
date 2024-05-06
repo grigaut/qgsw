@@ -17,7 +17,7 @@ from pathlib import Path
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.physics import compute_burger
-from qgsw.models import SW, QG
+from qgsw.models import SW, QG, SWFilterBarotropic
 from qgsw.specs import DEVICE
 from qgsw.plots.vorticity import (
     SurfaceVorticityAxes,
@@ -153,7 +153,10 @@ for Ro in [
 
     # update time step
     param_sw["dt"] = dt
-    sw_ml = SW(param_sw)
+    if param_sw["barotropic_filter"]:
+        sw_ml = SWFilterBarotropic(param_sw)
+    else:
+        sw_ml = SW(param_sw)
     sw_ml.u = torch.clone(u_init)
     sw_ml.v = torch.clone(v_init)
     sw_ml.h = torch.clone(h_init)

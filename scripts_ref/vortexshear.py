@@ -13,7 +13,7 @@ import torch.nn.functional as F
 sys.path.append("../src")
 
 from qgsw.models.core.helmholtz import compute_laplace_dstI, dstI2D
-from qgsw.models import SW, QG
+from qgsw.models import SW, QG, SWFilterBarotropic
 
 torch.backends.cudnn.deterministic = True
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -175,7 +175,10 @@ for Bu, Ro in [
 
     # update time step
     param_sw["dt"] = dt
-    sw_multilayer = SW(param_sw)
+    if param_sw["barotropic_filter"]:
+        sw_multilayer = SWFilterBarotropic(param_sw)
+    else:
+        sw_multilayer = SW(param_sw)
     sw_multilayer.u = torch.clone(u_init)
     sw_multilayer.v = torch.clone(v_init)
     sw_multilayer.h = torch.clone(h_init)

@@ -7,7 +7,7 @@ Louis Thiry, Nov 2023 for IFREMER.
 from __future__ import annotations
 
 from typing import Any
-
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -16,28 +16,49 @@ from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.base import Model
 
+from qgsw.models.core import finite_diff, flux
 
-def replicate_pad(f, mask):
+
+def pool_2d(padded_f: torch.Tensor) -> torch.Tensor:
+    """2D pool a padded tensor.
+
+    Args:
+        padded_f (torch.Tensor): Tensor to pool.
+
+    Returns:
+        torch.Tensor: Padded tensor.
+    """
+    # average pool padded value
+    f_sum_pooled = F.avg_pool2d(
+        padded_f,
+        (3, 1),
+        stride=(1, 1),
+        padding=(1, 0),
+        divisor_override=1,
+    )
+    return F.avg_pool2d(
+        f_sum_pooled,
+        (1, 3),
+        stride=(1, 1),
+        padding=(0, 1),
+        divisor_override=1,
+    )
+
+
+def replicate_pad(f: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Replicate a given pad.
+
+    Args:
+        f (torch.Tensor): Tensor to pad.
+        mask (torch.Tensor): Mask tensor.
+
+    Returns:
+        torch.Tensor: Result
+    """
     f_ = F.pad(f, (1, 1, 1, 1))
     mask_ = F.pad(mask, (1, 1, 1, 1))
-    mask_sum = F.avg_pool2d(
-        F.avg_pool2d(
-            mask_, (3, 1), stride=(1, 1), padding=(1, 0), divisor_override=1
-        ),
-        (1, 3),
-        stride=(1, 1),
-        padding=(0, 1),
-        divisor_override=1,
-    )
-    f_sum = F.avg_pool2d(
-        F.avg_pool2d(
-            f_, (3, 1), stride=(1, 1), padding=(1, 0), divisor_override=1
-        ),
-        (1, 3),
-        stride=(1, 1),
-        padding=(0, 1),
-        divisor_override=1,
-    )
+    mask_sum = pool_2d(mask_)
+    f_sum = pool_2d(f_)
     f_out = f_sum / torch.maximum(torch.ones_like(mask_sum), mask_sum)
     return mask_ * f_ + (1 - mask_) * f_out
 
@@ -110,28 +131,173 @@ class SW(Model):
             'slip_coef':    float, 1 for free slip, 0 for no-slip, inbetween for
                         partial free slip.
             'bottom_drag_coef': float, linear bottom drag coefficient
-            'barotropic_filter': boolean, i true applies implicit FS calculation
         """
         super().__init__(param)
-        # barotropic waves filtering
-        self.barotropic_filter = param.get("barotropic_filter", False)
-        if self.barotropic_filter:
-            self.tau = 2 * self.dt
-            self.barotropic_filter_spectral = param.get(
-                "barotropic_filter_spectral", False
+
+    def set_physical_uvh(
+        self,
+        u_phys: torch.Tensor | np.ndarray,
+        v_phys: torch.Tensor | np.ndarray,
+        h_phys: torch.Tensor | np.ndarray,
+    ) -> None:
+        """Set state variables from physical variables.
+
+        Args:
+            u_phys (torch.Tensor|np.ndarray): Physical U.
+            v_phys (torch.Tensor|np.ndarray): Physical V.
+            h_phys (torch.Tensor|np.ndarray): Physical H.
+        """
+        u_ = (
+            torch.from_numpy(u_phys)
+            if isinstance(u_phys, np.ndarray)
+            else u_phys
+        )
+        v_ = (
+            torch.from_numpy(v_phys)
+            if isinstance(v_phys, np.ndarray)
+            else v_phys
+        )
+        h_ = (
+            torch.from_numpy(h_phys)
+            if isinstance(h_phys, np.ndarray)
+            else h_phys
+        )
+        u_ = u_.to(self.device)
+        v_ = u_.to(self.device)
+        h_ = u_.to(self.device)
+        assert u_ * self.masks.u == u_, (
+            "Input velocity u incoherent with domain mask, "
+            "velocity must be zero out of domain."
+        )
+        assert v_ * self.masks.v == v_, (
+            "Input velocity v incoherent with domain mask, "
+            "velocity must be zero out of domain."
+        )
+        self.u = u_.type(self.dtype) * self.masks.u * self.dx
+        self.v = v_.type(self.dtype) * self.masks.v * self.dy
+        self.h = h_.type(self.dtype) * self.masks.h * self.area
+        self.compute_diagnostic_variables()
+
+    def compute_time_derivatives(self):
+        dt_u, dt_v, dt_h = super().compute_time_derivatives()
+        return dt_u, dt_v, dt_h
+
+    def step(self):
+        """Performs one step time-integration with RK3-SSP scheme."""
+        dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
+        self.u += self.dt * dt0_u
+        self.v += self.dt * dt0_v
+        self.h += self.dt * dt0_h
+
+        dt1_u, dt1_v, dt1_h = self.compute_time_derivatives()
+        self.u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
+        self.v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
+        self.h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
+
+        dt2_u, dt2_v, dt2_h = self.compute_time_derivatives()
+        self.u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
+        self.v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
+        self.h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
+
+    def compute_diagnostic_variables(self) -> None:
+        """Compute the model's diagnostic variables.
+
+        Compute the result given the prognostic
+        variables self.u, self.v, self.h .
+        """
+        self.omega = self.compute_omega(self.u, self.v)
+        self.eta = reverse_cumsum(self.h / self.area, dim=-3)
+        self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
+        self.U = self.u / self.dx**2
+        self.V = self.v / self.dy**2
+        self.U_m = self.interp_TP(self.U)
+        self.V_m = self.interp_TP(self.V)
+        self.k_energy = (
+            self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
+        )
+
+        h_ = replicate_pad(self.h, self.masks.h)
+        self.h_ugrid = 0.5 * (h_[..., 1:, 1:-1] + h_[..., :-1, 1:-1])
+        self.h_vgrid = 0.5 * (h_[..., 1:-1, 1:] + h_[..., 1:-1, :-1])
+        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
+        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
+
+    def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Advection RHS for momentum (u, v).
+
+        Returns:
+            tuple[torch.Tensor,torch.Tensor]: u, v advection.
+        """
+        # Vortex-force + Coriolis
+        omega_v_m = self.w_flux_y(self.omega[..., 1:-1, :], self.V_m)
+        omega_u_m = self.w_flux_x(self.omega[..., 1:-1], self.U_m)
+
+        dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * self.V_m
+        dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * self.U_m)
+
+        # grad pressure + k_energy
+        ke_pressure = self.k_energy + self.p
+        dt_u -= torch.diff(ke_pressure, dim=-2) + self.dx_p_ref
+        dt_v -= torch.diff(ke_pressure, dim=-1) + self.dy_p_ref
+
+        # wind forcing and bottom drag
+        dt_u, dt_v = self._add_wind_forcing(dt_u, dt_v)
+        dt_u, dt_v = self._add_bottom_drag(dt_u, dt_v)
+
+        return F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u, F.pad(
+            dt_v,
+            (1, 1, 0, 0),
+        ) * self.masks.v
+
+    def advection_h(self) -> torch.Tensor:
+        """Advection RHS for thickness perturbation h.
+
+        dt_h = - div(h_tot [u v])
+
+        h_tot = h_ref + h
+
+        Returns:
+            torch.Tensor: h advection.
+        """
+        h_tot = self.h_ref + self.h
+        h_tot_flux_y = self.h_flux_y(h_tot, self.V[..., 1:-1])
+        h_tot_flux_x = self.h_flux_x(h_tot, self.U[..., 1:-1, :])
+        div_no_flux = -finite_diff.div_nofluxbc(h_tot_flux_x, h_tot_flux_y)
+        return div_no_flux * self.masks.h
+
+    def compute_time_derivatives(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute the state variables derivatives dt_u, dt_v, dt_h.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
+        """
+        self.compute_diagnostic_variables()
+        dt_h = self.advection_h()
+        dt_u, dt_v = self.advection_momentum()
+        return dt_u, dt_v, dt_h
+
+
+class SWFilterBarotropic(SW):
+    def __init__(self, param: dict[str, Any]):
+        super().__init__(param)
+        self.tau = 2 * self.dt
+        self.barotropic_filter_spectral = param.get(
+            "barotropic_filter_spectral", False
+        )
+        if self.barotropic_filter_spectral:
+            verbose.display(
+                msg="Using barotropic filter in spectral approximation.",
+                trigger_level=2,
             )
-            if self.barotropic_filter_spectral:
-                verbose.display(
-                    msg="Using barotropic filter in spectral approximation.",
-                    trigger_level=2,
-                )
-                self._set_barotropic_filter_spectral()
-            else:
-                verbose.display(
-                    msg="Using barotropic filter in exact form.",
-                    trigger_level=2,
-                )
-                self._set_barotropic_filter_exact()
+            self._set_barotropic_filter_spectral()
+        else:
+            verbose.display(
+                msg="Using barotropic filter in exact form.",
+                trigger_level=2,
+            )
+            self._set_barotropic_filter_exact()
 
     def _set_barotropic_filter_spectral(self) -> None:
         """Set Helmoltz Solver for barotropic and spectral."""
@@ -220,10 +386,5 @@ class SW(Model):
 
     def compute_time_derivatives(self):
         dt_u, dt_v, dt_h = super().compute_time_derivatives()
-        if self.barotropic_filter:
-            dt_u, dt_v, dt_h = self.filter_barotropic_waves(dt_u, dt_v, dt_h)
+        dt_u, dt_v, dt_h = self.filter_barotropic_waves(dt_u, dt_v, dt_h)
         return dt_u, dt_v, dt_h
-
-    def step(self):
-        """Performs one step time-integration with RK3-SSP scheme."""
-        super().step()
