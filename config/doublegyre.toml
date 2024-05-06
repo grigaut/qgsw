@@ -39,7 +39,6 @@ g_prime = [
 [mesh]
 nx = 32
 ny = 64
-dt = 4_000
 [mesh.box]
 unit = "m"
 [mesh.box.x]
