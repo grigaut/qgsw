@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.append("../src")
 
 from qgsw.models import SW, QG
+from qgsw.models.sw import SWFilterBarotropic
 from qgsw.configs import Configuration
 from qgsw.physics import coriolis
 from qgsw.mesh import Meshes3D
@@ -79,6 +80,8 @@ for model, name, dt, start_file in [
         cfl = 20 if param["barotropic_filter"] else 0.5
         dt = float(int(cfl * min(config.mesh.dx, config.mesh.dy) / c))
         param["dt"] = dt
+        if param["barotropic_filter"]:
+            model = SWFilterBarotropic
     # exit()
     verbose.display(
         msg=(

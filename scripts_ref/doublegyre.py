@@ -7,7 +7,7 @@ import torch
 sys.path.append("../src")
 
 
-from qgsw.models import SW, QG
+from qgsw.models import SW, QG, SWFilterBarotropic
 
 torch.backends.cudnn.deterministic = True
 
@@ -88,6 +88,8 @@ for model, name, dt, start_file in [
     if model == SW:
         c = torch.sqrt(H.sum() * g_prime[0, 0, 0]).cpu().item()
         cfl = 20 if param["barotropic_filter"] else 0.5
+        if param["barotropic_filter"]:
+            model = SWFilterBarotropic
         dt = float(int(cfl * min(dx, dy) / c))
         print(f"dt = {dt:.1f} s.")
         param["dt"] = dt
