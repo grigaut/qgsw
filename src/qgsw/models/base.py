@@ -36,55 +36,17 @@ def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
 
 
-def pool_2d(padded_f: torch.Tensor) -> torch.Tensor:
-    """2D pool a padded tensor.
-
-    Args:
-        padded_f (torch.Tensor): Tensor to pool.
-
-    Returns:
-        torch.Tensor: Padded tensor.
-    """
-    # average pool padded value
-    f_sum_pooled = F.avg_pool2d(
-        padded_f,
-        (3, 1),
-        stride=(1, 1),
-        padding=(1, 0),
-        divisor_override=1,
-    )
-    return F.avg_pool2d(
-        f_sum_pooled,
-        (1, 3),
-        stride=(1, 1),
-        padding=(0, 1),
-        divisor_override=1,
-    )
-
-
-def replicate_pad(f: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    """Replicate a given pad.
-
-    Args:
-        f (torch.Tensor): Tensor to pad.
-        mask (torch.Tensor): Mask tensor.
-
-    Returns:
-        torch.Tensor: Result
-    """
-    f_ = F.pad(f, (1, 1, 1, 1))
-    mask_ = F.pad(mask, (1, 1, 1, 1))
-    mask_sum = pool_2d(mask_)
-    f_sum = pool_2d(f_)
-    f_out = f_sum / torch.maximum(torch.ones_like(mask_sum), mask_sum)
-    return mask_ * f_ + (1 - mask_) * f_out
-
-
 class Model(metaclass=ABCMeta):
     """Base class for models."""
 
-    barotropic_filter: bool
-    barotropic_filter_spectral: bool
+    omega: torch.Tensor
+    eta: torch.Tensor
+    U: torch.Tensor
+    V: torch.Tensor
+    V_m: torch.Tensor
+    U_m: torch.Tensor
+    h_tot_ugrid: torch.Tensor
+    h_tot_vgrid: torch.Tensor
 
     def __init__(self, param: dict[str, Any]) -> None:
         """Parameters
@@ -110,7 +72,6 @@ class Model(metaclass=ABCMeta):
             'slip_coef':    float, 1 for free slip, 0 for no-slip,
             inbetween for partial free slip.
             'bottom_drag_coef': float, linear bottom drag coefficient
-            'barotropic_filter': boolean, applies implicit FS calculation
             if True
         """
         verbose.display(
@@ -571,28 +532,13 @@ class Model(metaclass=ABCMeta):
         )
         return omega
 
+    @abstractmethod
     def compute_diagnostic_variables(self) -> None:
         """Compute the model's diagnostic variables.
 
         Compute the result given the prognostic
         variables self.u, self.v, self.h .
         """
-        self.omega = self.compute_omega(self.u, self.v)
-        self.eta = reverse_cumsum(self.h / self.area, dim=-3)
-        self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
-        self.U = self.u / self.dx**2
-        self.V = self.v / self.dy**2
-        self.U_m = self.interp_TP(self.U)
-        self.V_m = self.interp_TP(self.V)
-        self.k_energy = (
-            self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
-        )
-
-        h_ = replicate_pad(self.h, self.masks.h)
-        self.h_ugrid = 0.5 * (h_[..., 1:, 1:-1] + h_[..., :-1, 1:-1])
-        self.h_vgrid = 0.5 * (h_[..., 1:-1, 1:] + h_[..., 1:-1, :-1])
-        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
-        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
     def get_physical_uvh(
         self,
@@ -639,6 +585,7 @@ class Model(metaclass=ABCMeta):
         """
         return self.get_physical_omega().cpu().numpy()
 
+    @abstractmethod
     def set_physical_uvh(
         self,
         u_phys: torch.Tensor | np.ndarray,
@@ -652,36 +599,6 @@ class Model(metaclass=ABCMeta):
             v_phys (torch.Tensor|np.ndarray): Physical V.
             h_phys (torch.Tensor|np.ndarray): Physical H.
         """
-        u_ = (
-            torch.from_numpy(u_phys)
-            if isinstance(u_phys, np.ndarray)
-            else u_phys
-        )
-        v_ = (
-            torch.from_numpy(v_phys)
-            if isinstance(v_phys, np.ndarray)
-            else v_phys
-        )
-        h_ = (
-            torch.from_numpy(h_phys)
-            if isinstance(h_phys, np.ndarray)
-            else h_phys
-        )
-        u_ = u_.to(self.device)
-        v_ = u_.to(self.device)
-        h_ = u_.to(self.device)
-        assert u_ * self.masks.u == u_, (
-            "Input velocity u incoherent with domain mask, "
-            "velocity must be zero out of domain."
-        )
-        assert v_ * self.masks.v == v_, (
-            "Input velocity v incoherent with domain mask, "
-            "velocity must be zero out of domain."
-        )
-        self.u = u_.type(self.dtype) * self.masks.u * self.dx
-        self.v = v_.type(self.dtype) * self.masks.v * self.dy
-        self.h = h_.type(self.dtype) * self.masks.h * self.area
-        self.compute_diagnostic_variables()
 
     def get_print_info(self) -> str:
         """Returns a string with summary of current variables.
@@ -706,6 +623,7 @@ class Model(metaclass=ABCMeta):
                 f"max: {eta[:,0].max().to(device=DEVICE).item():.5f}"
             )
 
+    @abstractmethod
     def advection_h(self) -> torch.Tensor:
         """Advection RHS for thickness perturbation h.
 
@@ -716,38 +634,14 @@ class Model(metaclass=ABCMeta):
         Returns:
             torch.Tensor: h advection.
         """
-        h_tot = self.h_ref + self.h
-        h_tot_flux_y = self.h_flux_y(h_tot, self.V[..., 1:-1])
-        h_tot_flux_x = self.h_flux_x(h_tot, self.U[..., 1:-1, :])
-        div_no_flux = -finite_diff.div_nofluxbc(h_tot_flux_x, h_tot_flux_y)
-        return div_no_flux * self.masks.h
 
+    @abstractmethod
     def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
         Returns:
             tuple[torch.Tensor,torch.Tensor]: u, v advection.
         """
-        # Vortex-force + Coriolis
-        omega_v_m = self.w_flux_y(self.omega[..., 1:-1, :], self.V_m)
-        omega_u_m = self.w_flux_x(self.omega[..., 1:-1], self.U_m)
-
-        dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * self.V_m
-        dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * self.U_m)
-
-        # grad pressure + k_energy
-        ke_pressure = self.k_energy + self.p
-        dt_u -= torch.diff(ke_pressure, dim=-2) + self.dx_p_ref
-        dt_v -= torch.diff(ke_pressure, dim=-1) + self.dy_p_ref
-
-        # wind forcing and bottom drag
-        dt_u, dt_v = self._add_wind_forcing(dt_u, dt_v)
-        dt_u, dt_v = self._add_bottom_drag(dt_u, dt_v)
-
-        return F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u, F.pad(
-            dt_v,
-            (1, 1, 0, 0),
-        ) * self.masks.v
 
     def _add_wind_forcing(
         self,
@@ -787,6 +681,7 @@ class Model(metaclass=ABCMeta):
         dv[..., -1, :, :] += -self.bottom_drag_coef * self.v[..., -1, :, 1:-1]
         return du, dv
 
+    @abstractmethod
     def compute_time_derivatives(
         self,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -795,10 +690,6 @@ class Model(metaclass=ABCMeta):
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
         """
-        self.compute_diagnostic_variables()
-        dt_h = self.advection_h()
-        dt_u, dt_v = self.advection_momentum()
-        return dt_u, dt_v, dt_h
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
         """Raise and error if the saving file is invalid.
@@ -849,17 +740,3 @@ class Model(metaclass=ABCMeta):
     @abstractmethod
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
-        self.u += self.dt * dt0_u
-        self.v += self.dt * dt0_v
-        self.h += self.dt * dt0_h
-
-        dt1_u, dt1_v, dt1_h = self.compute_time_derivatives()
-        self.u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
-        self.v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
-        self.h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
-
-        dt2_u, dt2_v, dt2_h = self.compute_time_derivatives()
-        self.u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
-        self.v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
-        self.h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
