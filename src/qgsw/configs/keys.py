@@ -1,12 +1,33 @@
 """Configurations keys."""
 
-PHYSICS = {
-    "section": "physics",
-    "rho": "rho",
-    "slip coef": "slip_coef",
-    "f0": "f0",
-    "beta": "beta",
-    "bottom drag coefficient": "bottom_drag_coefficient",
+BATHY = {
+    "section": "bathymetry",
+    "h top ocean": "htop_ocean",
+    "island minimum area": "island_min_area",
+    "lake minimum area": "lake_min_area",
+    "interpolation": "interpolation",
+}
+
+BATHY_DATA = {
+    "section": "data",
+    "url": "URL",
+    "folder": "folder",
+    "longitude": "longitude",
+    "latitude": "latitude",
+    "elevation": "elevation",
+}
+
+BOX = {
+    "section": "box",
+    "unit": "unit",
+    "x": "x",
+    "y": "y",
+}
+
+IO = {
+    "section": "io",
+    "name": "name",
+    "log performance": "performance_log",
 }
 
 MESH = {
@@ -27,36 +48,6 @@ MODELS = {
     "reduced gravity": "g_prime",
 }
 
-BOX = {
-    "section": "box",
-    "unit": "unit",
-    "x": "x",
-    "y": "y",
-}
-
-BATHY = {
-    "section": "bathymetry",
-    "h top ocean": "htop_ocean",
-    "island minimum area": "island_min_area",
-    "lake minimum area": "lake_min_area",
-    "interpolation": "interpolation",
-}
-
-BATHY_DATA = {
-    "section": "data",
-    "url": "URL",
-    "folder": "folder",
-    "longitude": "longitude",
-    "latitude": "latitude",
-    "elevation": "elevation",
-}
-
-IO = {
-    "section": "io",
-    "name": "name",
-    "log performance": "performance_log",
-}
-
 OUTPUT = {
     "section": "output",
     "save": "save_results",
@@ -70,6 +61,21 @@ PLOTS = {
     "save": "save",
     "directory": "plots_directory",
     "quantity": "quantity",
+}
+
+PHYSICS = {
+    "section": "physics",
+    "rho": "rho",
+    "slip coef": "slip_coef",
+    "f0": "f0",
+    "beta": "beta",
+    "bottom drag coefficient": "bottom_drag_coefficient",
+}
+
+VORTEX = {
+    "section": "vortex",
+    "type": "type",
+    "perturbation magnitude": "perturbation_magnitude",
 }
 
 WINDSTRESS = {
@@ -90,10 +96,4 @@ WINDSTRESS_DATA = {
     "field 1": "field_1",
     "field 2": "field_2",
     "method": "method",
-}
-
-VORTEX = {
-    "section": "vortex",
-    "type": "type",
-    "perturbation magnitude": "perturbation_magnitude",
 }
