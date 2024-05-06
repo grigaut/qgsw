@@ -36,7 +36,6 @@ MESH = {
     "points nb y": "ny",
     "x length": "Lx",
     "y length": "Ly",
-    "timestep": "dt",
 }
 
 MODELS = {
@@ -70,6 +69,12 @@ PHYSICS = {
     "f0": "f0",
     "beta": "beta",
     "bottom drag coefficient": "bottom_drag_coefficient",
+}
+
+SIMULATION = {
+    "section": "simulation",
+    "duration": "duration",
+    "timestep": "dt",
 }
 
 VORTEX = {

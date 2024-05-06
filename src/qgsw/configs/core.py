@@ -12,6 +12,7 @@ from qgsw.configs.io import IOConfig
 from qgsw.configs.mesh import MeshConfig
 from qgsw.configs.models import ModelConfig
 from qgsw.configs.physics import PhysicsConfig
+from qgsw.configs.simulations import SimulationConfig
 from qgsw.configs.vortex import VortexConfig
 from qgsw.configs.windstress import WindStressConfig
 
@@ -66,6 +67,11 @@ class Configuration:
     def vortex(self) -> VortexConfig:
         """Vortex Configuration."""
         return VortexConfig.parse(self._config)
+
+    @cached_property
+    def simulation(self) -> SimulationConfig:
+        """Simulation configuration."""
+        return SimulationConfig.parse(self._config)
 
     @classmethod
     def from_file(cls, file: Path) -> Self:
