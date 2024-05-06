@@ -18,6 +18,10 @@ f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
+[simulation]
+duration = 8 # units of Tau
+dt = nan # dt is automatically computed
+
 [[models]]
 name = "One Layer"
 type = "QG"
@@ -42,7 +46,6 @@ g_prime = [
 [mesh]
 nx = 192
 ny = 192
-dt = 4_000
 [mesh.box]
 unit = "m"
 [mesh.box.x]
