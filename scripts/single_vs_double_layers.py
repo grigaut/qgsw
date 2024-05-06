@@ -15,6 +15,7 @@ from qgsw.plots.vorticity import (
     SurfaceVorticityAxes,
     VorticityComparisonFigure,
 )
+from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
@@ -23,7 +24,14 @@ verbose.set_level(2)
 ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/single_vs_double_layers.toml")
 config = Configuration.from_file(CONFIG_PATH)
+summary = RunSummary.from_configuration(config)
 
+if config.io.plots.save:
+    save_file = config.io.plots.directory.joinpath("_config.toml")
+    summary.to_file(save_file)
+if config.io.results.save:
+    save_file = config.io.results.directory.joinpath("_config.toml")
+    summary.to_file(save_file)
 
 if config.models[0].type != "QG" or config.models[1].type != "QG":
     msg = "Unsupported model type, possible values are: QG."
@@ -218,6 +226,8 @@ freq_checknan = 100
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
 
+summary.register_steps(t_end=t_end, dt=dt.cpu().item(), n_steps=n_steps)
+
 plots_required = config.io.plots.save or config.io.plots.show
 
 verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
@@ -233,7 +243,7 @@ qg_2l_inf_axes = SecondLayerVorticityAxes.from_mask(mask=mask)
 qg_2l_inf_axes.set_title(r"$\omega_{QG-ML-INF}$")
 plot = VorticityComparisonFigure(qg_1l_axes, qg_2l_top_axes, qg_2l_inf_axes)
 
-
+summary.register_start()
 # Start runs
 for n in range(n_steps + 1):
     if plots_required and (n % freq_plot == 0 or n == n_steps):
@@ -268,3 +278,5 @@ for n in range(n_steps + 1):
             msg=f"QG_ML: n={n:05d}, {qg_2l.get_print_info()}",
             trigger_level=1,
         )
+        summary.register_step(n)
+summary.register_end()
