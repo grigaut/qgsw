@@ -14,7 +14,7 @@ from qgsw.utils.sorting import sort_files
 load_dotenv()
 
 storage = Path(os.environ["G5K_IMPORT_STORAGE"])
-folder = storage.parent.joinpath("200_vs_200_800_passive")
+folder = storage.parent.joinpath("200_vs_200_800_active")
 prefix_1l = "omega_one_layer_"
 prefix_2l = "omega_multilayer_"
 
@@ -30,6 +30,7 @@ plot = VorticityComparisonFigure(
     qg_2l_inf_axes,
     common_cbar=False,
 )
+plot.figure.suptitle(f"Plotting from: {folder.name}")
 res_1l = list(folder.glob(f"{prefix_1l}*.npz"))
 res_2l = list(folder.glob(f"{prefix_2l}*.npz"))
 
