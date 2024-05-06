@@ -6,7 +6,6 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Any
 
-import toml
 from typing_extensions import Self
 
 from qgsw.configs.exceptions import ConfigError
@@ -85,18 +84,6 @@ class _Config(metaclass=ABCMeta):
             raise ConfigError(msg)
         config_params = parameters[cls.section_several]
         return [cls(params=param) for param in config_params]
-
-    @classmethod
-    def from_file(cls, config_path: Path) -> Self:
-        """Instantiate Parser from configuration filepath.
-
-        Args:
-            config_path (Path): Configuration file path.
-
-        Returns:
-            Self: Parser.
-        """
-        return cls(params=toml.load(config_path))
 
 
 class _DataConfig(_Config):

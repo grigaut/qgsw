@@ -81,11 +81,6 @@ class PlotsConfig(_Config):
             params (dict[str, Any]): Configuration parameters.
         """
         super().__init__(params)
-        if self.save and not self.directory.is_dir():
-            self.directory.mkdir()
-            gitignore = self.directory.joinpath(".gitignore")
-            with gitignore.open("w") as file:
-                file.write("*")
 
     @property
     def save(self) -> bool:
@@ -105,7 +100,13 @@ class PlotsConfig(_Config):
     @property
     def directory(self) -> Path:
         """Directory in which to save the plots."""
-        return get_absolute_storage_path(Path(self.params[self._dir]))
+        directory = get_absolute_storage_path(Path(self.params[self._dir]))
+        if self.save and not directory.is_dir():
+            directory.mkdir()
+            gitignore = directory.joinpath(".gitignore")
+            with gitignore.open("w") as file:
+                file.write("*")
+        return directory
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         return super()._validate_params(params)
@@ -126,11 +127,6 @@ class OutputsConfig(_Config):
             params (dict[str, Any]): Configuration parameters.
         """
         super().__init__(params)
-        if self.save and not self.directory.is_dir():
-            self.directory.mkdir()
-            gitignore = self.directory.joinpath(".gitignore")
-            with gitignore.open("w") as file:
-                file.write("*")
 
     @property
     def save(self) -> bool:
@@ -139,8 +135,14 @@ class OutputsConfig(_Config):
 
     @property
     def directory(self) -> Path:
-        """Directory in which to save the plots."""
-        return get_absolute_storage_path(Path(self.params[self._dir]))
+        """Directory in which to save the results."""
+        directory = get_absolute_storage_path(Path(self.params[self._dir]))
+        if self.save and not directory.is_dir():
+            directory.mkdir()
+            gitignore = directory.joinpath(".gitignore")
+            with gitignore.open("w") as file:
+                file.write("*")
+        return directory
 
     @property
     def quantity(self) -> int:
