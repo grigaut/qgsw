@@ -16,17 +16,13 @@ from qgsw.models.core.helmholtz import (
     compute_capacitance_matrices,
 )
 from qgsw.models.core.finite_diff import grad_perp
-from qgsw.models.base import Model
 from qgsw import verbose
 from typing import Any, Union
-from qgsw.specs import DEVICE
+from qgsw.models.sw import SW
 
 
-class QG(Model):
+class QG(SW):
     """Multilayer quasi-geostrophic model as projected SW."""
-
-    barotropic_filter: bool = False
-    barotropic_filter_spectral: bool = False
 
     def __init__(self, param):
         super().__init__(param)
