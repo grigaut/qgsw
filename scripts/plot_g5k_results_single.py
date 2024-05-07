@@ -19,6 +19,9 @@ folder = storage
 
 summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
 model = summary.configuration.model
+
+tau = summary.total_steps / summary.configuration.simulation.duration
+
 results = list(folder.glob(f"{model.prefix}*.npz"))
 qg_axes = SurfaceVorticityAxes.from_mask()
 qg_axes.set_title(r"$\omega_{TOP}$" + f"-{model.prefix}")
@@ -34,6 +37,6 @@ for i in range(len(files)):
         files[i],
     )
     plot.figure.suptitle(
-        f"Steps:{(steps[i])}/{summary.total_steps}",
+        f"Time: {(steps[i]) / tau:.2f} " + r"$\tau$",
     )
     plot.show()

@@ -19,6 +19,8 @@ folder = storage.parent.joinpath("imports")
 
 summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
 
+tau = summary.total_steps / summary.configuration.simulation.duration
+
 axes = []
 nbs = []
 files = []
@@ -53,6 +55,6 @@ for i in range(steps):
         *[f[i] for f in files],
     )
     plot.figure.suptitle(
-        f"Steps:{(nbs[0][i])}/{summary.total_steps}",
+        f"Time: {(steps[i]) / tau:.2f} " + r"$\tau$",
     )
     plot.show()
