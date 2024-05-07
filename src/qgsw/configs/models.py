@@ -19,6 +19,7 @@ class ModelConfig(_Config):
     _name: str = keys.MODELS["name"]
     _h: str = keys.MODELS["layers"]
     _g_prime: str = keys.MODELS["reduced gravity"]
+    _prefix: str = keys.MODELS["prefix"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate ModelConfig.
@@ -69,6 +70,11 @@ class ModelConfig(_Config):
     def nl(self) -> int:
         """Number of layers."""
         return self._nl
+
+    @property
+    def prefix(self) -> int:
+        """Prefix."""
+        return self.params[self._prefix]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate that H and g' shapes match.

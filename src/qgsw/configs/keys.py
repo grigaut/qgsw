@@ -45,6 +45,7 @@ MODELS = {
     "name": "name",
     "layers": "h",
     "reduced gravity": "g_prime",
+    "prefix": "prefix",
 }
 
 OUTPUT = {
