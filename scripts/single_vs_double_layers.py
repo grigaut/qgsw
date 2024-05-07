@@ -27,10 +27,10 @@ config = Configuration.from_file(CONFIG_PATH)
 summary = RunSummary.from_configuration(config)
 
 if config.io.plots.save:
-    save_file = config.io.plots.directory.joinpath("_config.toml")
+    save_file = config.io.plots.directory.joinpath("_summary.toml")
     summary.to_file(save_file)
 if config.io.results.save:
-    save_file = config.io.results.directory.joinpath("_config.toml")
+    save_file = config.io.results.directory.joinpath("_summary.toml")
     summary.to_file(save_file)
 
 if config.models[0].type != "QG" or config.models[1].type != "QG":
