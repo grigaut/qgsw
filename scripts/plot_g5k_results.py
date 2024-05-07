@@ -9,38 +9,50 @@ from qgsw.plots.vorticity import (
     SurfaceVorticityAxes,
     VorticityComparisonFigure,
 )
+from qgsw.run_summary import RunSummary
 from qgsw.utils.sorting import sort_files
 
 load_dotenv()
 
 storage = Path(os.environ["G5K_IMPORT_STORAGE"])
-folder = storage.parent.joinpath("200_vs_200_800_active")
-prefix_1l = "omega_one_layer_"
-prefix_2l = "omega_multilayer_"
+folder = storage.parent.joinpath("imports")
 
-qg_1l_axes = SurfaceVorticityAxes.from_mask()
-qg_1l_axes.set_title(r"$\omega_{QG-1L-TOP}$")
-qg_2l_top_axes = SurfaceVorticityAxes.from_mask()
-qg_2l_top_axes.set_title(r"$\omega_{QG-ML-TOP}$")
-qg_2l_inf_axes = SecondLayerVorticityAxes.from_mask()
-qg_2l_inf_axes.set_title(r"$\omega_{QG-ML-INF}$")
+summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
+
+axes = []
+nbs = []
+files = []
+for model in summary.configuration.models:
+    results = list(folder.glob(f"{model.prefix}*.npz"))
+    ax = SurfaceVorticityAxes.from_mask()
+    ax.set_title(r"$\omega_{TOP}$" + f"-{model.prefix}")
+    axes.append(ax)
+    nb, fs = sort_files(results, model.prefix, ".npz")
+    nbs.append(nb)
+    files.append(fs)
+    if model.nl > 1:
+        ax = SecondLayerVorticityAxes.from_mask()
+        ax.set_title(r"$\omega_{INF}$" + f"-{model.prefix}")
+        axes.append(ax)
+        nb, fs = sort_files(results, model.prefix, ".npz")
+        nbs.append(nb)
+        files.append(fs)
 plot = VorticityComparisonFigure(
-    qg_1l_axes,
-    qg_2l_top_axes,
-    qg_2l_inf_axes,
+    *axes,
     common_cbar=False,
 )
-plot.figure.suptitle(f"Plotting from: {folder.name}")
-res_1l = list(folder.glob(f"{prefix_1l}*.npz"))
-res_2l = list(folder.glob(f"{prefix_2l}*.npz"))
 
-files_1l = sort_files(res_1l, prefix=prefix_1l, suffix=".npz")
-files_2l = sort_files(res_2l, prefix=prefix_2l, suffix=".npz")
+steps = min(len(f) for f in files)
 
-for i in range(min(len(files_1l), len(files_2l))):
+if not all(nb == nbs[0] for nb in nbs[1:]):
+    msg = "Files have different step values."
+    raise ValueError(msg)
+
+for i in range(steps):
     plot.update_with_files(
-        files_1l[i],
-        files_2l[i],
-        files_2l[i],
+        *[f[i] for f in files],
+    )
+    plot.figure.suptitle(
+        f"Steps:{(nbs[0][i])}/{summary.total_steps}",
     )
     plot.show()
