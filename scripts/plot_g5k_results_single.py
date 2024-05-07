@@ -14,7 +14,7 @@ from qgsw.utils.sorting import sort_files
 load_dotenv()
 
 storage = Path(os.environ["G5K_IMPORT_STORAGE"])
-folder = storage.parent.joinpath("single_layer_1000")
+folder = storage.joinpath("results")
 
 
 summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
