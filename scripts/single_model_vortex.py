@@ -173,7 +173,7 @@ for n in range(n_steps + 1):
 
     t += dt
 
-    if freq_log > 0 and n % freq_log == 0:
+    if (freq_log > 0 and n % freq_log == 0) or (n == n_steps):
         verbose.display(
             msg=f"QG-1l: n={n:05d}, {model.get_print_info()}",
             trigger_level=1,
