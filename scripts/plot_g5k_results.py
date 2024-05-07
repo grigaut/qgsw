@@ -15,7 +15,7 @@ from qgsw.utils.sorting import sort_files
 load_dotenv()
 
 storage = Path(os.environ["G5K_IMPORT_STORAGE"])
-folder = storage.parent.joinpath("200_vs_200_800_passive")
+folder = storage.parent.joinpath("imports")
 
 summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
 config = summary.configuration
@@ -49,7 +49,7 @@ steps = min(len(f) for f in files)
 if not all(nb == nbs[0] for nb in nbs[1:]):
     msg = "Files have different step values."
     raise ValueError(msg)
-freq_save = steps // 10 - 1
+freq_save = steps // 10
 for i in range(steps):
     plot.update_with_files(
         *[f[i] for f in files],
