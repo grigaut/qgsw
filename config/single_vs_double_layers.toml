@@ -24,6 +24,7 @@ dt = nan # dt is automatically computed
 
 [[models]]
 name = "One Layer"
+prefix = "one_layer_"
 type = "QG"
 h = [
     200,
@@ -33,6 +34,7 @@ g_prime = [
 ]
 [[models]]
 name = "Multilayer"
+prefix = "two_layers_"
 type = "QG"
 h = [
     200,

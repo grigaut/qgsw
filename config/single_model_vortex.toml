@@ -24,6 +24,7 @@ dt = nan # dt is automatically computed
 
 [model]
 name = "Two Layers"
+prefix = "two_layers_"
 type = "QG"
 h = [
     200,
