@@ -55,6 +55,6 @@ for i in range(steps):
         *[f[i] for f in files],
     )
     plot.figure.suptitle(
-        f"Time: {(steps[i]) / tau:.2f} " + r"$\tau$",
+        f"Time: {(nbs[0][i]) / tau:.2f} " + r"$\tau$",
     )
     plot.show()
