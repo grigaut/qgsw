@@ -15,16 +15,16 @@ from qgsw.utils.sorting import sort_files
 load_dotenv()
 
 storage = Path(os.environ["G5K_IMPORT_STORAGE"])
-folder = storage.parent.joinpath("imports")
+folder = storage.parent.joinpath("200_vs_200_800_passive")
 
 summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
-
-tau = summary.total_steps / summary.configuration.simulation.duration
+config = summary.configuration
+tau = summary.total_steps / config.simulation.duration
 
 axes = []
 nbs = []
 files = []
-for model in summary.configuration.models:
+for model in config.models:
     results = list(folder.glob(f"{model.prefix}*.npz"))
     ax = SurfaceVorticityAxes.from_mask()
     ax.set_title(r"$\omega_{TOP}$" + f"-{model.prefix}")
@@ -49,7 +49,7 @@ steps = min(len(f) for f in files)
 if not all(nb == nbs[0] for nb in nbs[1:]):
     msg = "Files have different step values."
     raise ValueError(msg)
-
+freq_save = steps // 10 - 1
 for i in range(steps):
     plot.update_with_files(
         *[f[i] for f in files],
@@ -58,3 +58,10 @@ for i in range(steps):
         f"Time: {(nbs[0][i]) / tau:.2f} " + r"$\tau$",
     )
     plot.show()
+    if i % freq_save == 0 or (i == steps - 1):
+        snapshots_folder = Path(folder.joinpath("snapshots"))
+        name = f"{config.io.name_sc}_{nbs[0][i]}.png"
+        file = snapshots_folder.joinpath(name)
+        if not snapshots_folder.is_dir():
+            snapshots_folder.mkdir()
+        plot.savefig(file)
