@@ -48,6 +48,7 @@ cfl_adv = 0.5
 cfl_gravity = 0.5
 
 # Single Layer Set-up
+prefix_1l = config.models[0].prefix
 ## Vortex
 vortex_1l = RankineVortexForcing.from_config(
     vortex_config=config.vortex,
@@ -110,6 +111,7 @@ dt_1l = min(
 )
 
 # Two Layers Set-up
+prefix_2l = config.models[1].prefix
 ## Vortex
 vortex_2l = RankineVortexForcing.from_config(
     vortex_config=config.vortex,
@@ -261,10 +263,8 @@ for n in range(n_steps + 1):
 
     if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
-        name_1l = config.models[0].name_sc
-        name_2l = config.models[1].name_sc
-        qg_1l.save_omega(directory.joinpath(f"omega_{name_1l}_{n}.npz"))
-        qg_2l.save_omega(directory.joinpath(f"omega_{name_2l}_{n}.npz"))
+        qg_1l.save_omega(directory.joinpath(f"{prefix_1l}{n}.npz"))
+        qg_2l.save_omega(directory.joinpath(f"{prefix_2l}{n}.npz"))
     qg_1l.step()
     qg_2l.step()
     t += dt

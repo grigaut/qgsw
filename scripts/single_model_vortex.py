@@ -151,6 +151,7 @@ qg_inf_axes.set_title(r"$\omega_{QG-INF}$")
 plot = VorticityComparisonFigure(qg_top_axes, qg_inf_axes)
 
 summary.register_start()
+prefix = config.model.prefix
 # Start runs
 for n in range(n_steps + 1):
     if plots_required and (n % freq_plot == 0 or n == n_steps):
@@ -168,7 +169,7 @@ for n in range(n_steps + 1):
     if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
         name = config.model.name_sc
-        model.save_omega(directory.joinpath(f"omega_{name}_{n}.npz"))
+        model.save_omega(directory.joinpath(f"{prefix}{n}.npz"))
     model.step()
 
     t += dt
