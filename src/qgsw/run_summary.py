@@ -70,7 +70,7 @@ class RunSummary:
         raise SummaryError(msg)
 
     @property
-    def _dt(self) -> float:
+    def dt(self) -> float:
         """Timestep (in seconds)."""
         if self._dt in self._summary[self._summary_section]:
             return self._summary[self._summary_section][self._dt]
