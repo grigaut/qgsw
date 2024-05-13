@@ -8,7 +8,7 @@ from typing_extensions import Self
 
 from qgsw.configs.mesh import MeshConfig
 from qgsw.configs.models import ModelConfig
-from qgsw.configs.vortex import VortexConfig
+from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.mesh.meshes import Meshes2D, Meshes3D
 from qgsw.models.core import helmholtz
 from qgsw.spatial.units._units import METERS, Unit
@@ -274,14 +274,14 @@ class RankineVortexForcing:
     @classmethod
     def from_config(
         cls,
-        vortex_config: VortexConfig,
+        vortex_config: PerturbationConfig,
         mesh_config: MeshConfig,
         model_config: ModelConfig,
     ) -> Self:
         """Instantiate VortexForcing from ScriptConfig.
 
         Args:
-            vortex_config (VortexConfig): Vortex configuration.
+            vortex_config (PerturbationConfig): Vortex configuration.
             mesh_config (MeshConfig): Mesh configuration.
             model_config (ModelConfig): Model configuration.
 

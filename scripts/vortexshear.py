@@ -10,7 +10,7 @@ ld : deformation length scale -> √(Bu)*r0
 import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
-from qgsw.forcing.vortex import (
+from qgsw.perturbations.vortex import (
     RankineVortexForcing,
 )
 from pathlib import Path

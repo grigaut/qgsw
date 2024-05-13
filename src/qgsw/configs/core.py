@@ -11,9 +11,9 @@ from qgsw.configs.bathymetry import BathyConfig
 from qgsw.configs.io import IOConfig
 from qgsw.configs.mesh import MeshConfig
 from qgsw.configs.models import ModelConfig
+from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.simulations import SimulationConfig
-from qgsw.configs.vortex import VortexConfig
 from qgsw.configs.windstress import WindStressConfig
 
 
@@ -104,14 +104,14 @@ class Configuration:
         return BathyConfig.parse(self.params)
 
     @property
-    def has_vortex(self) -> bool:
-        """Whether the configuration contains a 'vortex' section or not."""
-        return VortexConfig.section in self.params
+    def has_perturbation(self) -> bool:
+        """If the configuration contains a 'perturbation' section or not."""
+        return PerturbationConfig.section in self.params
 
     @cached_property
-    def vortex(self) -> VortexConfig:
+    def perturbation(self) -> PerturbationConfig:
         """Vortex Configuration."""
-        return VortexConfig.parse(self.params)
+        return PerturbationConfig.parse(self.params)
 
     @property
     def has_simulation(self) -> bool:

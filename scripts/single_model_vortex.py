@@ -5,10 +5,10 @@ from pathlib import Path
 import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
-from qgsw.forcing.vortex import RankineVortexForcing
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.models import QG
+from qgsw.perturbations.vortex import RankineVortexForcing
 from qgsw.physics import compute_burger, coriolis
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
@@ -49,8 +49,8 @@ cfl_gravity = 0.5
 
 # Model Set-up
 ## Vortex
-vortex = RankineVortexForcing.from_config(
-    vortex_config=config.vortex,
+perturbation = RankineVortexForcing.from_config(
+    vortex_config=config.perturbation,
     mesh_config=config.mesh,
     model_config=config.model,
 )
@@ -67,7 +67,7 @@ Bu = compute_burger(
     g=config.model.g_prime[0],
     h_scale=config.model.h[0],
     f0=config.physics.f0,
-    length_scale=vortex.r0,
+    length_scale=perturbation.r0,
 )
 verbose.display(
     msg=f"Single-Layer Burger Number: {Bu:.2f}",
@@ -94,7 +94,7 @@ params = {
     "dt": 0.0,
 }
 model = QG(params)
-u0, v0, h0 = model.G(vortex.compute(config.physics.f0, Ro))
+u0, v0, h0 = model.G(perturbation.compute(config.physics.f0, Ro))
 
 ## Max speed
 u_max, v_max, c = (

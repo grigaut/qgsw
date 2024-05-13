@@ -55,6 +55,12 @@ OUTPUT = {
     "quantity": "quantity",
 }
 
+PERTURBATION = {
+    "section": "perturbation",
+    "type": "type",
+    "perturbation magnitude": "perturbation_magnitude",
+}
+
 PLOTS = {
     "section": "plots",
     "show": "show",
@@ -76,12 +82,6 @@ SIMULATION = {
     "section": "simulation",
     "duration": "duration",
     "timestep": "dt",
-}
-
-VORTEX = {
-    "section": "vortex",
-    "type": "type",
-    "perturbation magnitude": "perturbation_magnitude",
 }
 
 WINDSTRESS = {
