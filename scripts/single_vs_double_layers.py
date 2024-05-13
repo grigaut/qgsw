@@ -5,10 +5,10 @@ from pathlib import Path
 import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
-from qgsw.forcing.vortex import RankineVortexForcing
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.models import QG
+from qgsw.perturbations.vortex import RankineVortexForcing
 from qgsw.physics import compute_burger, coriolis
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
