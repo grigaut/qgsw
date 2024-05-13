@@ -54,6 +54,6 @@ magnitude = nan # (Pa m-1 kg s-2)
 drag_coefficient = nan
 [windstress.data]
 
-[vortex]
+[perturbation]
 type = "passive"
 perturbation_magnitude = 1e-3

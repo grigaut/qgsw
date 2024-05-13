@@ -50,8 +50,8 @@ cfl_gravity = 0.5
 # Single Layer Set-up
 prefix_1l = config.models[0].prefix
 ## Vortex
-vortex_1l = RankineVortexForcing.from_config(
-    vortex_config=config.vortex,
+perturbation_1l = RankineVortexForcing.from_config(
+    perturbation_config=config.perturbation,
     mesh_config=config.mesh,
     model_config=config.models[0],
 )
@@ -68,7 +68,7 @@ Bu_1l = compute_burger(
     g=config.models[0].g_prime[0],
     h_scale=config.models[0].h[0],
     f0=config.physics.f0,
-    length_scale=vortex_1l.r0,
+    length_scale=perturbation_1l.r0,
 )
 verbose.display(
     msg=f"Single-Layer Burger Number: {Bu_1l:.2f}",
@@ -95,7 +95,7 @@ params_1l = {
     "dt": 0.0,
 }
 qg_1l = QG(params_1l)
-u0_1l, v0_1l, h0_1l = qg_1l.G(vortex_1l.compute(config.physics.f0, Ro))
+u0_1l, v0_1l, h0_1l = qg_1l.G(perturbation_1l.compute(config.physics.f0, Ro))
 
 ## Max speed
 u_max_1l, v_max_1l, c_1l = (
@@ -113,8 +113,8 @@ dt_1l = min(
 # Two Layers Set-up
 prefix_2l = config.models[1].prefix
 ## Vortex
-vortex_2l = RankineVortexForcing.from_config(
-    vortex_config=config.vortex,
+perturbation_2l = RankineVortexForcing.from_config(
+    perturbation_config=config.perturbation,
     mesh_config=config.mesh,
     model_config=config.models[1],
 )
@@ -135,7 +135,7 @@ Bu_2l = compute_burger(
     g=config.models[1].g_prime[0],
     h_scale=h_eq,
     f0=config.physics.f0,
-    length_scale=vortex_2l.r0,
+    length_scale=perturbation_2l.r0,
 )
 verbose.display(
     msg=f"Multi-Layers Burger Number: {Bu_2l:.2f}",
@@ -162,7 +162,7 @@ params_2l = {
     "dt": 0.0,
 }
 qg_2l = QG(params_2l)
-u0_2l, v0_2l, h0_2l = qg_2l.G(vortex_2l.compute(config.physics.f0, Ro))
+u0_2l, v0_2l, h0_2l = qg_2l.G(perturbation_2l.compute(config.physics.f0, Ro))
 ## Max Speed
 u_max_2l, v_max_2l, c_2l = (
     torch.abs(u0_2l).max().item() / config.mesh.dx,
