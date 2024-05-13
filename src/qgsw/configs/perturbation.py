@@ -11,9 +11,9 @@ from qgsw.configs.base import _Config
 class PerturbationConfig(_Config):
     """Perturbation Configuration."""
 
-    section: str = keys.VORTEX["section"]
-    _type: str = keys.VORTEX["type"]
-    _perturbation: str = keys.VORTEX["perturbation magnitude"]
+    section: str = keys.PERTURBATION["section"]
+    _type: str = keys.PERTURBATION["type"]
+    _perturbation: str = keys.PERTURBATION["perturbation magnitude"]
 
     @property
     def type(self) -> str:
