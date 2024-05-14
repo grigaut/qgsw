@@ -159,8 +159,8 @@ class DataWindForcing(_WindForcing):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y
         """
-        taux = np.zeros((time.shape[0] + 1, self._mesh.nx + 1, self._mesh.ny))
-        tauy = np.zeros((time.shape[0] + 1, self._mesh.nx, self._mesh.ny + 1))
+        taux = np.zeros((time.shape[0] + 1, self._mesh.u.nx, self._mesh.u.ny))
+        tauy = np.zeros((time.shape[0] + 1, self._mesh.v.nx, self._mesh.v.ny))
 
         drag_coef = self._windstress.drag_coefficient
         rho = self._physics.rho

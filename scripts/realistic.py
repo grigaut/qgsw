@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 sys.path.append("../src")
-from qgsw.bathymetry import Bathymetry
+from qgsw.forcing.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.models import SW, QG
