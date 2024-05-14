@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import torch
 from typing_extensions import Self
@@ -11,6 +11,29 @@ from qgsw.mesh.coordinates import Coordinates1D, Coordinates2D, Coordinates3D
 
 if TYPE_CHECKING:
     from qgsw.spatial.units._units import Unit
+
+
+class XY(NamedTuple):
+    """X,Y mesh wrapper."""
+
+    x: torch.Tensor
+    y: torch.Tensor
+
+
+class XYZ(NamedTuple):
+    """X,Y and Z mesh wrapper."""
+
+    x: torch.Tensor
+    y: torch.Tensor
+    z: torch.Tensor
+
+
+class XYH(NamedTuple):
+    """X, Y and H mesh wrapper."""
+
+    x: torch.Tensor
+    y: torch.Tensor
+    h: torch.Tensor
 
 
 class Mesh2D:
@@ -70,12 +93,12 @@ class Mesh2D:
         return self._coords
 
     @property
-    def xy(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def xy(self) -> XY:
         """X and Y meshes.
 
         Both tensors shapes are (nx, ny).
         """
-        return self._x, self._y
+        return XY(self._x, self._y)
 
     def add_z(self, z: Coordinates1D) -> Mesh3D:
         """Switch to 3D Mesh adding z coordinates.
@@ -202,21 +225,21 @@ class Mesh3D:
         return self.ly / self.ny
 
     @property
-    def xyz(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def xyz(self) -> XYZ:
         """X,Y,Z meshes.
 
         X,Y and Z tensors all have (nz, nx, ny) shapes.
         """
-        return self._zx, self._zy, self._z
+        return XYZ(self._zx, self._zy, self._z)
 
     @property
-    def xyh(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def xyh(self) -> XYH:
         """X,Y,H meshes.
 
         X and Y have (nl, nx, ny) shapes and H has (nl,1,1) shape
         (constant thickness layers).
         """
-        return self._hx, self._hy, self._h
+        return XYH(self._hx, self._hy, self._h)
 
     @property
     def xy_unit(self) -> Unit:
