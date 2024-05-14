@@ -68,7 +68,7 @@ Bu = compute_burger(
     length_scale=perturbation.compute_scale(mesh.omega),
 )
 verbose.display(
-    msg=f"Single-Layer Burger Number: {Bu:.2f}",
+    msg=f"Burger Number: {Bu:.2f}",
     trigger_level=1,
 )
 ## Set model parameters
@@ -147,7 +147,7 @@ qg_top_axes = SurfaceVorticityAxes.from_mask()
 qg_top_axes.set_title(r"$\omega_{QG-TOP}$")
 qg_inf_axes = SecondLayerVorticityAxes.from_mask()
 qg_inf_axes.set_title(r"$\omega_{QG-INF}$")
-plot = VorticityComparisonFigure(qg_top_axes, qg_inf_axes)
+plot = VorticityComparisonFigure(qg_top_axes, qg_inf_axes, common_cbar=False)
 
 summary.register_start()
 prefix = config.model.prefix
