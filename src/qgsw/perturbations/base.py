@@ -16,5 +16,5 @@ class _Perturbation(metaclass=ABCMeta):
         return self._type
 
     @abstractmethod
-    def retrieve_pressure(self) -> torch.Tensor:
-        """Retrieve pressure values."""
+    def compute_initial_pressure(self) -> torch.Tensor:
+        """Compute Initial Pressure Values."""

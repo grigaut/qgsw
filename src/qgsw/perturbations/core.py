@@ -17,6 +17,6 @@ class Perturbation:
         """Perturbation type."""
         return self._perturbation.type
 
-    def retrieve_pressure(self) -> torch.Tensor:
+    def compute_initial_pressure(self) -> torch.Tensor:
         """Retrieve pressure values."""
-        return self._perturbation.retrieve_pressure()
+        return self._perturbation.compute_initial_pressure()
