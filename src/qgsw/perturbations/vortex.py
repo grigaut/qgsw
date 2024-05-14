@@ -79,8 +79,8 @@ class RankineVortex2D:
         """Compute the value of the streamfunction ψ.
 
         Returns:
-            torch.Tensor: Streamfunction values over the
-        (nx + 1, ny + 1) domain.
+            torch.Tensor: Streamfunction values over the domain,
+            (1, 1, nx, ny)-shaped..
         """
         vor = self._compute_vorticity(mesh)
         # Compute Laplacian operator in Fourier Space
@@ -162,7 +162,7 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
             mesh (Mesh3D): 3D Mesh to generate Stream Function on.
 
         Returns:
-            torch.Tensor: Stream function values.
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
 
 
@@ -176,7 +176,7 @@ class ActiveLayersRankineVortex3D(RankineVortex3D):
             mesh (Mesh3D): 3D Mesh to generate Stream Function on.
 
         Returns:
-            torch.Tensor: Stream function values.
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
         psi_2d = self._2d_vortex.compute_stream_function(mesh.remove_z_h())
         nx, ny = psi_2d.shape[-2:]
@@ -193,7 +193,7 @@ class PassiveLayersRankineVortex3D(RankineVortex3D):
             mesh (Mesh3D): 3D Mesh to generate Stream Function on.
 
         Returns:
-            torch.Tensor: Stream function values.
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped.
         """
         psi_2d = self._2d_vortex.compute_stream_function(mesh.remove_z_h())
         nx, ny = psi_2d.shape[-2:]

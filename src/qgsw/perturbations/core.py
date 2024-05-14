@@ -53,7 +53,7 @@ class Perturbation:
             Ro (float): Rossby Number.
 
         Returns:
-            torch.Tensor: Pressure values.
+            torch.Tensor: Pressure values, (1, nl, nx, ny)-shaped..
         """
         return self._perturbation.compute_initial_pressure(
             mesh=mesh,

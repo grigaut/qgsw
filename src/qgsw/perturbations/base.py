@@ -55,7 +55,7 @@ class _Perturbation(metaclass=ABCMeta):
             mesh (Mesh3D): 3D Mesh.
 
         Returns:
-            torch.Tensor: Stream function values.
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
 
     def _convert_to_pressure(
@@ -74,7 +74,7 @@ class _Perturbation(metaclass=ABCMeta):
             Ro (float): Rossby Number.
 
         Returns:
-            torch.Tensor: Pressure
+            torch.Tensor: Pressure, (1, nl, nx, ny)-shaped.
         """
         u, v = grad_perp(
             psi,
