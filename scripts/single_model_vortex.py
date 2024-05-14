@@ -8,7 +8,7 @@ from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.models import QG
-from qgsw.perturbations.vortex import RankineVortexForcing
+from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger, coriolis
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
@@ -49,10 +49,8 @@ cfl_gravity = 0.5
 
 # Model Set-up
 ## Vortex
-perturbation = RankineVortexForcing.from_config(
-    vortex_config=config.perturbation,
-    mesh_config=config.mesh,
-    model_config=config.model,
+perturbation = Perturbation.from_config(
+    perturbation_config=config.perturbation,
 )
 ## Mesh
 mesh = Meshes3D.from_config(config.mesh, config.model)
@@ -67,7 +65,7 @@ Bu = compute_burger(
     g=config.model.g_prime[0],
     h_scale=config.model.h[0],
     f0=config.physics.f0,
-    length_scale=perturbation.r0,
+    length_scale=perturbation.compute_scale(mesh.omega),
 )
 verbose.display(
     msg=f"Single-Layer Burger Number: {Bu:.2f}",
@@ -94,7 +92,8 @@ params = {
     "dt": 0.0,
 }
 model = QG(params)
-u0, v0, h0 = model.G(perturbation.compute(config.physics.f0, Ro))
+p0 = perturbation.compute_initial_pressure(mesh.omega, config.physics.f0, Ro)
+u0, v0, h0 = model.G(p0)
 
 ## Max speed
 u_max, v_max, c = (

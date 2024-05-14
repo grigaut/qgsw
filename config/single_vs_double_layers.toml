@@ -2,11 +2,11 @@
 name = "200_vs_200_800"
 performance_log = false
 [io.output]
-save_results = true
+save_results = false
 quantity = 100
 directory = "results"
 [io.plots]
-show = false
+show = true
 save = false
 quantity = 10
 plots_directory = "plots"
@@ -46,8 +46,8 @@ g_prime = [
 ]
 
 [mesh]
-nx = 192
-ny = 192
+nx = 24
+ny = 24
 [mesh.box]
 unit = "m"
 [mesh.box.x]
@@ -64,5 +64,5 @@ drag_coefficient = 1.3e-3
 [windstress.data]
 
 [perturbation]
-type = "passive"
+type = "vortex-passive"
 perturbation_magnitude = 1e-3

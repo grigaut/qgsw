@@ -55,5 +55,5 @@ drag_coefficient = nan
 [windstress.data]
 
 [perturbation]
-type = "passive"
+type = "vortex-passive"
 perturbation_magnitude = 1e-3
