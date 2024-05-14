@@ -69,7 +69,6 @@ class RankineVortex2D:
         Returns:
             tuple[float, float, float]: R0, R1, R2.
         """
-        self._raise_if_invalid_unit(mesh)
         r0 = 0.1 * mesh.lx
         r1 = r0
         r2 = 0.14 * mesh.lx
@@ -109,6 +108,7 @@ class RankineVortex2D:
         Returns:
             torch.Tensor: Vorticity Value.
         """
+        self._raise_if_invalid_unit(mesh)
         x, y = mesh.xy
         r0, r1, r2 = self.compute_vortex_scales(mesh=mesh)
         # Compute cylindrical components
