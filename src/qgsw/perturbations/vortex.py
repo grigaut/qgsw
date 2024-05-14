@@ -274,14 +274,14 @@ class RankineVortexForcing:
     @classmethod
     def from_config(
         cls,
-        vortex_config: PerturbationConfig,
+        perturbation_config: PerturbationConfig,
         mesh_config: MeshConfig,
         model_config: ModelConfig,
     ) -> Self:
         """Instantiate VortexForcing from ScriptConfig.
 
         Args:
-            vortex_config (PerturbationConfig): Vortex configuration.
+            perturbation_config (PerturbationConfig): Vortex configuration.
             mesh_config (MeshConfig): Mesh configuration.
             model_config (ModelConfig): Model configuration.
 
@@ -291,24 +291,24 @@ class RankineVortexForcing:
         Returns:
             Self: Vortex forcing.
         """
-        if vortex_config.type == "active":
+        if perturbation_config.type == "active":
             mesh = Meshes3D.from_config(
                 mesh_config=mesh_config,
                 model_config=model_config,
             )
             vortex = ActiveLayersRankineVortex3D(
                 mesh=mesh,
-                perturbation_magnitude=vortex_config.perturbation_magnitude,
+                perturbation_magnitude=perturbation_config.perturbation_magnitude,
             )
             return cls(vortex=vortex)
-        if vortex_config.type == "passive":
+        if perturbation_config.type == "passive":
             mesh = Meshes3D.from_config(
                 mesh_config=mesh_config,
                 model_config=model_config,
             )
             vortex = PassiveLayersRankineVortex3D(
                 mesh=mesh,
-                perturbation_magnitude=vortex_config.perturbation_magnitude,
+                perturbation_magnitude=perturbation_config.perturbation_magnitude,
             )
             return cls(vortex=vortex)
         msg = "Unrecognized vortex type."
