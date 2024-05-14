@@ -58,14 +58,14 @@ class _Perturbation(metaclass=ABCMeta):
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
 
-    def _convert_to_pressure(
+    def _adjust_stream_function(
         self,
         psi: torch.Tensor,
         mesh: Mesh3D,
         f0: float,
         Ro: float,  # noqa: N803
     ) -> torch.Tensor:
-        """Convert stream function to pressure.
+        """Adjust stream function values to match Rossby's number.
 
         Args:
             psi (torch.Tensor): Stream function.
@@ -83,9 +83,23 @@ class _Perturbation(metaclass=ABCMeta):
         )
         u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
         # set psi amplitude to have a correct Rossby number
-        psi_norm = psi * (Ro * f0 * self.compute_scale(mesh) / u_norm_max)
-        # Return pressure value
-        return psi_norm * f0
+        return psi * (Ro * f0 * self.compute_scale(mesh) / u_norm_max)
+
+    def _convert_to_pressure(
+        self,
+        psi: torch.Tensor,
+        f0: float,
+    ) -> torch.Tensor:
+        """Convert stream function to pressure.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+            f0 (float): Coriolis Parameter.
+
+        Returns:
+            torch.Tensor: Pressure, (1, nl, nx, ny)-shaped.
+        """
+        return psi * f0
 
     def compute_initial_pressure(
         self,
@@ -104,9 +118,5 @@ class _Perturbation(metaclass=ABCMeta):
             torch.Tensor: Pressure values.
         """
         psi = self.compute_stream_function(mesh=mesh)
-        return self._convert_to_pressure(
-            psi=psi,
-            mesh=mesh,
-            f0=f0,
-            Ro=Ro,
-        )
+        psi_adjusted = self._adjust_stream_function(psi, mesh, f0, Ro)
+        return self._convert_to_pressure(psi=psi_adjusted, f0=f0)

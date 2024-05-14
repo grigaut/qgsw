@@ -6,6 +6,7 @@ from typing_extensions import Self
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.mesh.mesh import Mesh3D
 from qgsw.perturbations.base import _Perturbation
+from qgsw.perturbations.random import RandomSurfacePerturbation
 from qgsw.perturbations.vortex import (
     ActiveLayersRankineVortex3D,
     PassiveLayersRankineVortex3D,
@@ -86,7 +87,9 @@ class Perturbation:
             )
             return cls(perturbation)
         if perturbation_config.type == "random-uniform":
-            ...
-
-        msg = "Unrecognized vortex type."
+            perturbation = RandomSurfacePerturbation(
+                magnitude=perturbation_config.perturbation_magnitude,
+            )
+            return cls(perturbation)
+        msg = "Unrecognized perturbation type."
         raise KeyError(msg)
