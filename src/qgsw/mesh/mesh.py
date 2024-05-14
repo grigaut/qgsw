@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import torch
 from typing_extensions import Self
@@ -11,6 +11,29 @@ from qgsw.mesh.coordinates import Coordinates1D, Coordinates2D, Coordinates3D
 
 if TYPE_CHECKING:
     from qgsw.spatial.units._units import Unit
+
+
+class XY(NamedTuple):
+    """X,Y mesh wrapper."""
+
+    x: torch.Tensor
+    y: torch.Tensor
+
+
+class XYZ(NamedTuple):
+    """X,Y and Z mesh wrapper."""
+
+    x: torch.Tensor
+    y: torch.Tensor
+    z: torch.Tensor
+
+
+class XYH(NamedTuple):
+    """X, Y and H mesh wrapper."""
+
+    x: torch.Tensor
+    y: torch.Tensor
+    h: torch.Tensor
 
 
 class Mesh2D:
@@ -30,6 +53,36 @@ class Mesh2D:
         )
 
     @property
+    def nx(self) -> int:
+        """Number of points on the x direction."""
+        return self._coords.x.n
+
+    @property
+    def ny(self) -> int:
+        """Number of points on the y direction."""
+        return self._coords.y.n
+
+    @property
+    def lx(self) -> int:
+        """Total length in the x direction (in meters)."""
+        return self._coords.x.l
+
+    @property
+    def ly(self) -> int:
+        """Total length in the y direction (in meters)."""
+        return self._coords.y.l
+
+    @property
+    def dx(self) -> float:
+        """Dx."""
+        return self.lx / self.nx
+
+    @property
+    def dy(self) -> float:
+        """Dy."""
+        return self.ly / self.ny
+
+    @property
     def xy_unit(self) -> Unit:
         """Mesh unit."""
         return self._coords.xy_unit
@@ -40,12 +93,12 @@ class Mesh2D:
         return self._coords
 
     @property
-    def xy(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def xy(self) -> XY:
         """X and Y meshes.
 
         Both tensors shapes are (nx, ny).
         """
-        return self._x, self._y
+        return XY(self._x, self._y)
 
     def add_z(self, z: Coordinates1D) -> Mesh3D:
         """Switch to 3D Mesh adding z coordinates.
@@ -132,21 +185,61 @@ class Mesh3D:
         return self._coords
 
     @property
-    def xyz(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def nx(self) -> int:
+        """Number of points on the x direction."""
+        return self._coords.x.n
+
+    @property
+    def ny(self) -> int:
+        """Number of points on the y direction."""
+        return self._coords.y.n
+
+    @property
+    def nl(self) -> int:
+        """Number of layers."""
+        return self._coords.h.n
+
+    @property
+    def lx(self) -> int:
+        """Total length in the x direction (in meters)."""
+        return self._coords.x.l
+
+    @property
+    def ly(self) -> int:
+        """Total length in the y direction (in meters)."""
+        return self._coords.y.l
+
+    @property
+    def lz(self) -> int:
+        """Total length in the z direction (in meters)."""
+        return self._coords.z.l
+
+    @property
+    def dx(self) -> float:
+        """dx."""  # noqa: D403
+        return self.lx / self.nx
+
+    @property
+    def dy(self) -> float:
+        """dy."""  # noqa: D403
+        return self.ly / self.ny
+
+    @property
+    def xyz(self) -> XYZ:
         """X,Y,Z meshes.
 
         X,Y and Z tensors all have (nz, nx, ny) shapes.
         """
-        return self._zx, self._zy, self._z
+        return XYZ(self._zx, self._zy, self._z)
 
     @property
-    def xyh(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def xyh(self) -> XYH:
         """X,Y,H meshes.
 
         X and Y have (nl, nx, ny) shapes and H has (nl,1,1) shape
         (constant thickness layers).
         """
-        return self._hx, self._hy, self._h
+        return XYH(self._hx, self._hy, self._h)
 
     @property
     def xy_unit(self) -> Unit:

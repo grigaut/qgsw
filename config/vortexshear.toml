@@ -54,5 +54,5 @@ drag_coefficient = 1.3e-3
 [windstress.data]
 
 [perturbation]
-type = "active"
+type = "vortex-active"
 perturbation_magnitude = 1e-3

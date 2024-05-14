@@ -8,7 +8,7 @@ from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
 from qgsw.models import QG
-from qgsw.perturbations.vortex import RankineVortexForcing
+from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger, coriolis
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
@@ -50,10 +50,8 @@ cfl_gravity = 0.5
 # Single Layer Set-up
 prefix_1l = config.models[0].prefix
 ## Vortex
-perturbation_1l = RankineVortexForcing.from_config(
+perturbation_1l = Perturbation.from_config(
     perturbation_config=config.perturbation,
-    mesh_config=config.mesh,
-    model_config=config.models[0],
 )
 ## Mesh
 mesh_1l = Meshes3D.from_config(config.mesh, config.models[0])
@@ -68,7 +66,7 @@ Bu_1l = compute_burger(
     g=config.models[0].g_prime[0],
     h_scale=config.models[0].h[0],
     f0=config.physics.f0,
-    length_scale=perturbation_1l.r0,
+    length_scale=perturbation_1l.compute_scale(mesh_1l.omega),
 )
 verbose.display(
     msg=f"Single-Layer Burger Number: {Bu_1l:.2f}",
@@ -95,7 +93,12 @@ params_1l = {
     "dt": 0.0,
 }
 qg_1l = QG(params_1l)
-u0_1l, v0_1l, h0_1l = qg_1l.G(perturbation_1l.compute(config.physics.f0, Ro))
+p0_1l = perturbation_1l.compute_initial_pressure(
+    mesh_1l.omega,
+    config.physics.f0,
+    Ro,
+)
+u0_1l, v0_1l, h0_1l = qg_1l.G(p0_1l)
 
 ## Max speed
 u_max_1l, v_max_1l, c_1l = (
@@ -113,10 +116,8 @@ dt_1l = min(
 # Two Layers Set-up
 prefix_2l = config.models[1].prefix
 ## Vortex
-perturbation_2l = RankineVortexForcing.from_config(
+perturbation_2l = Perturbation.from_config(
     perturbation_config=config.perturbation,
-    mesh_config=config.mesh,
-    model_config=config.models[1],
 )
 ## Mesh
 mesh_2l = Meshes3D.from_config(config.mesh, config.models[1])
@@ -135,7 +136,7 @@ Bu_2l = compute_burger(
     g=config.models[1].g_prime[0],
     h_scale=h_eq,
     f0=config.physics.f0,
-    length_scale=perturbation_2l.r0,
+    length_scale=perturbation_2l.compute_scale(mesh_2l.omega),
 )
 verbose.display(
     msg=f"Multi-Layers Burger Number: {Bu_2l:.2f}",
@@ -162,7 +163,12 @@ params_2l = {
     "dt": 0.0,
 }
 qg_2l = QG(params_2l)
-u0_2l, v0_2l, h0_2l = qg_2l.G(perturbation_2l.compute(config.physics.f0, Ro))
+p0_2l = perturbation_2l.compute_initial_pressure(
+    mesh_2l.omega,
+    config.physics.f0,
+    Ro,
+)
+u0_2l, v0_2l, h0_2l = qg_2l.G(p0_2l)
 ## Max Speed
 u_max_2l, v_max_2l, c_2l = (
     torch.abs(u0_2l).max().item() / config.mesh.dx,

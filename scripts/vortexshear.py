@@ -10,9 +10,7 @@ ld : deformation length scale -> √(Bu)*r0
 import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
-from qgsw.perturbations.vortex import (
-    RankineVortexForcing,
-)
+from qgsw.perturbations import Perturbation
 from pathlib import Path
 from qgsw.forcing.wind import WindForcing
 from qgsw.mesh import Meshes3D
@@ -34,9 +32,7 @@ config = Configuration.from_file(CONFIG_PATH)
 mesh = Meshes3D.from_config(config.mesh, config.model)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 taux, tauy = wind.compute()
-vortex = RankineVortexForcing.from_config(
-    config.vortex, config.mesh, config.model
-)
+perturbation = Perturbation.from_config(config.perturbation)
 
 h1 = config.model.h[0]
 h2 = config.model.h[1]
@@ -45,7 +41,7 @@ Bu = compute_burger(
     g=config.model.g_prime[0],
     h_scale=(h1 * h2) / (h1 + h2),
     f0=config.physics.f0,
-    length_scale=vortex.r0,
+    length_scale=perturbation.compute_scale(mesh.omega),
 )
 
 mesh_2d = mesh.remove_z_h()
@@ -123,8 +119,8 @@ for Ro in [
     }
 
     qg_ml = QG(param_qg)
-
-    u_init, v_init, h_init = qg_ml.G(vortex.compute(f0, Ro))
+    p_init = perturbation.compute_initial_pressure(mesh.omega, f0, Ro)
+    u_init, v_init, h_init = qg_ml.G(p_init)
 
     u_max, v_max, c = (
         torch.abs(u_init).max().item() / config.mesh.dx,

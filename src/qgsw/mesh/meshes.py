@@ -47,32 +47,32 @@ class Meshes2D:
     @property
     def nx(self) -> int:
         """Number of points on the x direction."""
-        return self.h.coordinates.x.n
+        return self.omega.nx
 
     @property
     def ny(self) -> int:
         """Number of points on the y direction."""
-        return self.h.coordinates.y.n
+        return self.omega.ny
 
     @property
     def lx(self) -> int:
         """Total length in the x direction (in meters)."""
-        return self.omega.coordinates.x.l
+        return self.omega.lx
 
     @property
     def ly(self) -> int:
         """Total length in the y direction (in meters)."""
-        return self.omega.coordinates.y.l
+        return self.omega.ly
 
     @property
     def dx(self) -> float:
         """Dx."""
-        return self.lx / self.nx
+        return self.omega.dx
 
     @property
     def dy(self) -> float:
         """Dy."""
-        return self.ly / self.ny
+        return self.omega.dy
 
     @property
     def xy_unit(self) -> Unit:
@@ -308,42 +308,42 @@ class Meshes3D:
     @property
     def nx(self) -> int:
         """Number of points on the x direction."""
-        return self.h.coordinates.x.n
+        return self.omega.nx
 
     @property
     def ny(self) -> int:
         """Number of points on the y direction."""
-        return self.h.coordinates.y.n
+        return self.omega.ny
 
     @property
     def nl(self) -> int:
         """Number of layers."""
-        return self.h.coordinates.h.n
+        return self.omega.nl
 
     @property
     def lx(self) -> int:
         """Total length in the x direction (in meters)."""
-        return self.omega.coordinates.x.l
+        return self.omega.lx
 
     @property
     def ly(self) -> int:
         """Total length in the y direction (in meters)."""
-        return self.omega.coordinates.y.l
+        return self.omega.ly
 
     @property
     def lz(self) -> int:
         """Total length in the z direction (in meters)."""
-        return self.omega.coordinates.z.l
+        return self.omega.lz
 
     @property
     def dx(self) -> float:
         """dx."""  # noqa: D403
-        return self.lx / self.nx
+        return self.omega.dx
 
     @property
     def dy(self) -> float:
         """dy."""  # noqa: D403
-        return self.ly / self.ny
+        return self.omega.dy
 
     @property
     def omega(self) -> Mesh3D:
