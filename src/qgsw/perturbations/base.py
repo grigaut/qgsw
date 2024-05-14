@@ -103,7 +103,7 @@ class _Perturbation(metaclass=ABCMeta):
         Returns:
             torch.Tensor: Pressure values.
         """
-        psi = self._compute_stream_function(mesh=mesh)
+        psi = self.compute_stream_function(mesh=mesh)
         return self._convert_to_pressure(
             psi=psi,
             mesh=mesh,
