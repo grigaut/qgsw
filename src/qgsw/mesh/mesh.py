@@ -30,6 +30,36 @@ class Mesh2D:
         )
 
     @property
+    def nx(self) -> int:
+        """Number of points on the x direction."""
+        return self._coords.x.n
+
+    @property
+    def ny(self) -> int:
+        """Number of points on the y direction."""
+        return self._coords.y.n
+
+    @property
+    def lx(self) -> int:
+        """Total length in the x direction (in meters)."""
+        return self._coords.x.l
+
+    @property
+    def ly(self) -> int:
+        """Total length in the y direction (in meters)."""
+        return self._coords.y.l
+
+    @property
+    def dx(self) -> float:
+        """Dx."""
+        return self.lx / self.nx
+
+    @property
+    def dy(self) -> float:
+        """Dy."""
+        return self.ly / self.ny
+
+    @property
     def xy_unit(self) -> Unit:
         """Mesh unit."""
         return self._coords.xy_unit
@@ -130,6 +160,46 @@ class Mesh3D:
     def coordinates(self) -> Coordinates3D:
         """X,Y,Z (,H) Coordinates."""
         return self._coords
+
+    @property
+    def nx(self) -> int:
+        """Number of points on the x direction."""
+        return self._coords.x.n
+
+    @property
+    def ny(self) -> int:
+        """Number of points on the y direction."""
+        return self._coords.y.n
+
+    @property
+    def nl(self) -> int:
+        """Number of layers."""
+        return self._coords.h.n
+
+    @property
+    def lx(self) -> int:
+        """Total length in the x direction (in meters)."""
+        return self._coords.x.l
+
+    @property
+    def ly(self) -> int:
+        """Total length in the y direction (in meters)."""
+        return self._coords.y.l
+
+    @property
+    def lz(self) -> int:
+        """Total length in the z direction (in meters)."""
+        return self._coords.z.l
+
+    @property
+    def dx(self) -> float:
+        """dx."""  # noqa: D403
+        return self.lx / self.nx
+
+    @property
+    def dy(self) -> float:
+        """dy."""  # noqa: D403
+        return self.ly / self.ny
 
     @property
     def xyz(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
