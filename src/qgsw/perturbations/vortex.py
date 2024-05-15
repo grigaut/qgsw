@@ -166,10 +166,10 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
         """
 
 
-class ActiveLayersRankineVortex3D(RankineVortex3D):
+class BarotropicVortex(RankineVortex3D):
     """3D Rankine Vortex with similar vortex behavior accross all layers."""
 
-    _type = "vortex-active"
+    _type = "vortex-barotropic"
 
     def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
         """Value of the stream function ψ.
@@ -185,10 +185,10 @@ class ActiveLayersRankineVortex3D(RankineVortex3D):
         return psi_2d.expand((1, mesh.nl, nx, ny))
 
 
-class PassiveLayersRankineVortex3D(RankineVortex3D):
+class BaroclinicVortex(RankineVortex3D):
     """3D Rankine Vortex with only superior layer active."""
 
-    _type = "vortex-passive"
+    _type = "vortex-baroclinic"
 
     def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
         """Value of the stream function ψ.

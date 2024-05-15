@@ -8,8 +8,8 @@ from qgsw.mesh.mesh import Mesh3D
 from qgsw.perturbations.base import _Perturbation
 from qgsw.perturbations.random import RandomSurfacePerturbation
 from qgsw.perturbations.vortex import (
-    ActiveLayersRankineVortex3D,
-    PassiveLayersRankineVortex3D,
+    BaroclinicVortex,
+    BarotropicVortex,
 )
 
 
@@ -76,13 +76,13 @@ class Perturbation:
         Returns:
             Self: Perturbation.
         """
-        if ActiveLayersRankineVortex3D.match_type(perturbation_config.type):
-            perturbation = ActiveLayersRankineVortex3D(
+        if BarotropicVortex.match_type(perturbation_config.type):
+            perturbation = BarotropicVortex(
                 magnitude=perturbation_config.perturbation_magnitude,
             )
             return cls(perturbation)
-        if PassiveLayersRankineVortex3D.match_type(perturbation_config.type):
-            perturbation = PassiveLayersRankineVortex3D(
+        if BaroclinicVortex.match_type(perturbation_config.type):
+            perturbation = BaroclinicVortex(
                 magnitude=perturbation_config.perturbation_magnitude,
             )
             return cls(perturbation)
