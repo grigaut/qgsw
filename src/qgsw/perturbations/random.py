@@ -26,6 +26,10 @@ class RandomSurfacePerturbation(_Perturbation):
         """
         super().__init__(magnitude)
 
+    def _set_seed(self) -> None:
+        """Set torch seed to 0."""
+        torch.random.manual_seed(0)
+
     def compute_scale(self, mesh: Mesh3D) -> float:
         """Compute the scale of the perturbation.
 
@@ -56,6 +60,7 @@ class RandomSurfacePerturbation(_Perturbation):
         Returns:
             torch.Tensor: Random field.
         """
+        self._set_seed()
         # Select a sub area of the entire grid
         nx_rand_area = nx // self._concerned_area_ratio
         ny_rand_area = ny // self._concerned_area_ratio
