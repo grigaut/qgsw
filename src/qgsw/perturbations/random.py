@@ -12,6 +12,7 @@ from qgsw.specs import DEVICE
 class RandomSurfacePerturbation(_Perturbation):
     """Random perturbation."""
 
+    _type = "random-uniform"
     _concerned_area_ratio: int = 2
     _kernel_size_ratio: int = 5
     _sigma: float = 3
