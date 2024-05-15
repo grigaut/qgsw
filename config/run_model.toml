@@ -8,7 +8,7 @@ directory = "results"
 [io.plots]
 show = true
 save = false
-quantity = 10
+quantity = 100
 plots_directory = "plots"
 
 [physics]

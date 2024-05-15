@@ -15,13 +15,12 @@ class TypeSwitch:
         return self._type
 
     @classmethod
-    def match_type(cls, type_string: str) -> bool:
-        """Check if a string matches the object's type.
+    def get_type(cls) -> str:
+        """Return the string type of the object.
 
-        Args:
-            type_string (str): String to check.
+        Use it to validate input from configuration.
 
         Returns:
-            bool: True if the string matches the type.
+            str: Object type string.
         """
-        return cls._type == type_string
+        return cls._type

@@ -76,20 +76,18 @@ class Perturbation:
         Returns:
             Self: Perturbation.
         """
-        if BarotropicVortex.match_type(perturbation_config.type):
-            perturbation = BarotropicVortex(
-                magnitude=perturbation_config.perturbation_magnitude,
+        perturbations = {
+            BaroclinicVortex.get_type(): BaroclinicVortex,
+            BarotropicVortex.get_type(): BarotropicVortex,
+            RandomSurfacePerturbation.get_type(): RandomSurfacePerturbation,
+        }
+        if perturbation_config.type not in perturbations:
+            msg = (
+                "Unrecognized perturbation type. "
+                f"Possible values are {perturbations.keys()}"
             )
-            return cls(perturbation)
-        if BaroclinicVortex.match_type(perturbation_config.type):
-            perturbation = BaroclinicVortex(
-                magnitude=perturbation_config.perturbation_magnitude,
-            )
-            return cls(perturbation)
-        if RandomSurfacePerturbation.match_type(perturbation_config.type):
-            perturbation = RandomSurfacePerturbation(
-                magnitude=perturbation_config.perturbation_magnitude,
-            )
-            return cls(perturbation)
-        msg = "Unrecognized perturbation type."
-        raise KeyError(msg)
+            raise KeyError(msg)
+        perturbation = perturbations[perturbation_config.type](
+            magnitude=perturbation_config.perturbation_magnitude,
+        )
+        return cls(perturbation)

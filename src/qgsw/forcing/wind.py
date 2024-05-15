@@ -322,32 +322,23 @@ class WindForcing:
         Returns:
             Self: Wind Forcing
         """
-        if CosineZonalWindForcing.match_type(windstress_config.type):
-            mesh = Meshes2D.from_config(mesh_config=mesh_config)
-            return cls(
-                forcing=CosineZonalWindForcing(
-                    windstress_config=windstress_config,
-                    physics_config=physics_config,
-                    mesh=mesh,
-                ),
+        wind_forcings = {
+            CosineZonalWindForcing.get_type(): CosineZonalWindForcing,
+            DataWindForcing.get_type(): DataWindForcing,
+            NoWindForcing.get_type(): NoWindForcing,
+        }
+        if windstress_config.type not in wind_forcings:
+            msg = (
+                "Unrecognized perturbation type. "
+                f"Possible values are {wind_forcings.keys()}"
             )
-        if DataWindForcing.match_type(windstress_config.type):
-            mesh = Meshes2D.from_config(mesh_config=mesh_config)
-            return cls(
-                forcing=DataWindForcing(
-                    windstress_config=windstress_config,
-                    physics_config=physics_config,
-                    mesh=mesh,
-                ),
-            )
-        if NoWindForcing.match_type(windstress_config.type):
-            mesh = Meshes2D.from_config(mesh_config=mesh_config)
-            return cls(
-                forcing=NoWindForcing(
-                    windstress_config=windstress_config,
-                    physics_config=physics_config,
-                    mesh=mesh,
-                ),
-            )
-        msg = "Unrecognized windstress type."
-        raise KeyError(msg)
+            raise KeyError(msg)
+
+        mesh = Meshes2D.from_config(mesh_config=mesh_config)
+
+        forcing = wind_forcings[windstress_config.type](
+            windstress_config=windstress_config,
+            physics_config=physics_config,
+            mesh=mesh,
+        )
+        return cls(forcing=forcing)
