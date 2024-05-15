@@ -10,6 +10,8 @@ from qgsw.perturbations.random import RandomSurfacePerturbation
 from qgsw.perturbations.vortex import (
     BaroclinicVortex,
     BarotropicVortex,
+    PerturbedBaroclinicVortex,
+    PerturbedBarotropicVortex,
 )
 
 
@@ -80,6 +82,8 @@ class Perturbation:
             BaroclinicVortex.get_type(): BaroclinicVortex,
             BarotropicVortex.get_type(): BarotropicVortex,
             RandomSurfacePerturbation.get_type(): RandomSurfacePerturbation,
+            PerturbedBaroclinicVortex.get_type(): PerturbedBaroclinicVortex,
+            PerturbedBarotropicVortex.get_type(): PerturbedBarotropicVortex,
         }
         if perturbation_config.type not in perturbations:
             msg = (
