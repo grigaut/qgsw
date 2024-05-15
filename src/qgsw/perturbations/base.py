@@ -5,6 +5,7 @@ from abc import ABCMeta, abstractmethod
 import torch
 
 from qgsw.mesh.mesh import Mesh3D
+from qgsw.utils.type_switch import TypeSwitch
 
 
 def grad_perp(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
@@ -14,12 +15,13 @@ def grad_perp(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
     ) / dx
 
 
-class _Perturbation(metaclass=ABCMeta):
+class _Perturbation(TypeSwitch, metaclass=ABCMeta):
     """Perturbation base class."""
 
     _type: str
 
     def __init__(self, magnitude: float = 1e-3) -> None:
+        super(TypeSwitch).__init__()
         self._magnitude = magnitude
 
     @property

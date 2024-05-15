@@ -13,6 +13,7 @@ from typing_extensions import Self
 from qgsw.data.loaders import WindForcingLoader
 from qgsw.mesh import Meshes2D
 from qgsw.specs import DEVICE
+from qgsw.utils.type_switch import TypeSwitch
 
 if TYPE_CHECKING:
     from qgsw.configs.mesh import MeshConfig
@@ -20,8 +21,10 @@ if TYPE_CHECKING:
     from qgsw.configs.windstress import WindStressConfig
 
 
-class _WindForcing(metaclass=ABCMeta):
+class _WindForcing(TypeSwitch, metaclass=ABCMeta):
     """Wind Forcing Representation."""
+
+    _type: str
 
     def __init__(
         self,
@@ -36,6 +39,7 @@ class _WindForcing(metaclass=ABCMeta):
             physics_config (PhysicsConfig): Physics configuration
             mesh (Meshes2D): Mesh
         """
+        super(TypeSwitch).__init__()
         self._physics = physics_config
         self._windstress = windstress_config
         self._mesh = mesh
@@ -54,6 +58,8 @@ class _WindForcing(metaclass=ABCMeta):
 
 class CosineZonalWindForcing(_WindForcing):
     """Simple Cosine Zonal Wind."""
+
+    _type = "cosine"
 
     def __init__(
         self,
@@ -105,6 +111,8 @@ class CosineZonalWindForcing(_WindForcing):
 
 class DataWindForcing(_WindForcing):
     """Wind Forcing object to handle data-based wind forcing."""
+
+    _type = "data"
 
     def __init__(
         self,
@@ -262,6 +270,8 @@ class DataWindForcing(_WindForcing):
 class NoWindForcing(_WindForcing):
     """No wind forcing."""
 
+    _type = "none"
+
     def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
         """Compute no wind forcing -> return 0.0s.
 
@@ -312,7 +322,7 @@ class WindForcing:
         Returns:
             Self: Wind Forcing
         """
-        if windstress_config.type == "cosine":
+        if CosineZonalWindForcing.match_type(windstress_config.type):
             mesh = Meshes2D.from_config(mesh_config=mesh_config)
             return cls(
                 forcing=CosineZonalWindForcing(
@@ -321,7 +331,7 @@ class WindForcing:
                     mesh=mesh,
                 ),
             )
-        if windstress_config.type == "data":
+        if DataWindForcing.match_type(windstress_config.type):
             mesh = Meshes2D.from_config(mesh_config=mesh_config)
             return cls(
                 forcing=DataWindForcing(
@@ -330,7 +340,7 @@ class WindForcing:
                     mesh=mesh,
                 ),
             )
-        if windstress_config.type == "none":
+        if NoWindForcing.match_type(windstress_config.type):
             mesh = Meshes2D.from_config(mesh_config=mesh_config)
             return cls(
                 forcing=NoWindForcing(

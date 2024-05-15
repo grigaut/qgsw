@@ -76,17 +76,17 @@ class Perturbation:
         Returns:
             Self: Perturbation.
         """
-        if perturbation_config.type == "vortex-active":
+        if ActiveLayersRankineVortex3D.match_type(perturbation_config.type):
             perturbation = ActiveLayersRankineVortex3D(
                 magnitude=perturbation_config.perturbation_magnitude,
             )
             return cls(perturbation)
-        if perturbation_config.type == "vortex-passive":
+        if PassiveLayersRankineVortex3D.match_type(perturbation_config.type):
             perturbation = PassiveLayersRankineVortex3D(
                 magnitude=perturbation_config.perturbation_magnitude,
             )
             return cls(perturbation)
-        if perturbation_config.type == "random-uniform":
+        if RandomSurfacePerturbation.match_type(perturbation_config.type):
             perturbation = RandomSurfacePerturbation(
                 magnitude=perturbation_config.perturbation_magnitude,
             )
