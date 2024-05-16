@@ -4,7 +4,6 @@ import torch
 from typing_extensions import Self
 
 from qgsw.configs.perturbation import PerturbationConfig
-from qgsw.mesh.mesh import Mesh3D
 from qgsw.perturbations.base import _Perturbation
 from qgsw.perturbations.random import RandomSurfacePerturbation
 from qgsw.perturbations.vortex import (
@@ -13,6 +12,7 @@ from qgsw.perturbations.vortex import (
     PerturbedBaroclinicVortex,
     PerturbedBarotropicVortex,
 )
+from qgsw.spatial.core.mesh import Mesh3D
 
 
 class Perturbation:

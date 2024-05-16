@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 from typing_extensions import Self
 
-from qgsw.mesh.mesh import Mesh2D, Mesh3D
+from qgsw.spatial.core.mesh import Mesh2D, Mesh3D
 from qgsw.spatial.units._units import METERS
 from qgsw.specs import DEVICE
 

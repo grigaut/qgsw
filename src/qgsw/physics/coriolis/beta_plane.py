@@ -2,9 +2,9 @@
 
 import torch
 
-from qgsw.mesh.mesh import Mesh2D
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.spatial.conversion import deg_to_m_lat, deg_to_rad, km_to_m
+from qgsw.spatial.core.mesh import Mesh2D
 from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
 from qgsw.spatial.units.exceptions import UnitError
 

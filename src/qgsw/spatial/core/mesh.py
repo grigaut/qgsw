@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING, NamedTuple
 import torch
 from typing_extensions import Self
 
-from qgsw.mesh.coordinates import Coordinates1D, Coordinates2D, Coordinates3D
+from qgsw.spatial.core.coordinates import (
+    Coordinates1D,
+    Coordinates2D,
+    Coordinates3D,
+)
 
 if TYPE_CHECKING:
     from qgsw.spatial.units._units import Unit

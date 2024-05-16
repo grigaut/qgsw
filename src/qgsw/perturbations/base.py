@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 
-from qgsw.mesh.mesh import Mesh2D, Mesh3D
+from qgsw.spatial.core.mesh import Mesh2D, Mesh3D
 from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
 
