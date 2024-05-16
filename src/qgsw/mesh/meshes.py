@@ -21,8 +21,8 @@ class MeshesInstanciationError(Exception):
     """Error raised when instantiating meshes."""
 
 
-class Meshes2D:
-    """Meshes2D Object."""
+class SpaceDiscretization2D:
+    """SpaceDiscretization2D Object."""
 
     def __init__(
         self,
@@ -32,7 +32,7 @@ class Meshes2D:
         u_mesh: Mesh2D,
         v_mesh: Mesh2D,
     ) -> None:
-        """Instantiate the Meshes2D."""
+        """Instantiate the SpaceDiscretization2D."""
         self._verify_xy_units(
             omega_xy_unit=omega_mesh.xy_unit,
             h_xy_unit=h_mesh.xy_unit,
@@ -184,13 +184,13 @@ class Meshes2D:
 
     @classmethod
     def from_config(cls, mesh_config: MeshConfig) -> Self:
-        """Construct the Meshes2D given a MeshConfig object.
+        """Construct the SpaceDiscretization2D given a MeshConfig object.
 
         Args:
             mesh_config (MeshConfig): Mesh Configuration Object.
 
         Returns:
-            Self: Corresponding Meshes2D.
+            Self: Corresponding SpaceDiscretization2D.
         """
         x = torch.linspace(
             mesh_config.box.x_min,
@@ -435,13 +435,13 @@ class Meshes3D:
         msg = "All meshes zh units must correspond."
         raise MeshesInstanciationError(msg)
 
-    def remove_z_h(self) -> Meshes2D:
+    def remove_z_h(self) -> SpaceDiscretization2D:
         """Remove z coordinates.
 
         Returns:
-            Meshes2D: 2D Mesh for only X and Y.
+            SpaceDiscretization2D: 2D Mesh for only X and Y.
         """
-        return Meshes2D(
+        return SpaceDiscretization2D(
             omega_mesh=self._omega.remove_z_h(),
             h_mesh=self._h.remove_z_h(),
             u_mesh=self._u.remove_z_h(),

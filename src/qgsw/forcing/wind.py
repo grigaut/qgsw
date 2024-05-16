@@ -11,7 +11,7 @@ import torch
 from typing_extensions import Self
 
 from qgsw.data.loaders import WindForcingLoader
-from qgsw.mesh import Meshes2D
+from qgsw.mesh import SpaceDiscretization2D
 from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
 
@@ -30,14 +30,14 @@ class _WindForcing(TypeSwitch, metaclass=ABCMeta):
         self,
         windstress_config: WindStressConfig,
         physics_config: PhysicsConfig,
-        mesh: Meshes2D,
+        mesh: SpaceDiscretization2D,
     ) -> None:
         """Instantiate _WindForcing.
 
         Args:
             windstress_config (WindStressConfig): Windstress Forcing.
             physics_config (PhysicsConfig): Physics configuration
-            mesh (Meshes2D): Mesh
+            mesh (SpaceDiscretization2D): Mesh
         """
         super(TypeSwitch).__init__()
         self._physics = physics_config
@@ -49,7 +49,7 @@ class _WindForcing(TypeSwitch, metaclass=ABCMeta):
         """Generate Wind Stress constraints over the given mesh.
 
         Args:
-            mesh (Meshes2D): Grid to generate wind stress over.
+            mesh (SpaceDiscretization2D): Grid to generate wind stress over.
 
         Returns:
             tuple[float | torch.Tensor, float | torch.Tensor]: tau_x, tau_y
@@ -65,14 +65,14 @@ class CosineZonalWindForcing(_WindForcing):
         self,
         windstress_config: WindStressConfig,
         physics_config: PhysicsConfig,
-        mesh: Meshes2D,
+        mesh: SpaceDiscretization2D,
     ) -> None:
         """Instantiate CosineZonalWindForcing.
 
         Args:
             windstress_config (WindStressConfig): Windstress configuration
             physics_config (PhysicsConfig): Physics configuration
-            mesh (Meshes2D): Mesh
+            mesh (SpaceDiscretization2D): Mesh
         """
         super().__init__(windstress_config, physics_config, mesh)
         magnitude = self._windstress.magnitude
@@ -118,14 +118,14 @@ class DataWindForcing(_WindForcing):
         self,
         windstress_config: WindStressConfig,
         physics_config: PhysicsConfig,
-        mesh: Meshes2D,
+        mesh: SpaceDiscretization2D,
     ) -> None:
         """Instantiate DataWindForcing.
 
         Args:
             windstress_config (WindStressConfig): Windstress configuration
             physics_config (PhysicsConfig): Physics configuration
-            mesh (Meshes2D): Mesh
+            mesh (SpaceDiscretization2D): Mesh
         """
         super().__init__(windstress_config, physics_config, mesh)
         self._loader = WindForcingLoader(config=windstress_config)
@@ -334,7 +334,7 @@ class WindForcing:
             )
             raise KeyError(msg)
 
-        mesh = Meshes2D.from_config(mesh_config=mesh_config)
+        mesh = SpaceDiscretization2D.from_config(mesh_config=mesh_config)
 
         forcing = wind_forcings[windstress_config.type](
             windstress_config=windstress_config,
