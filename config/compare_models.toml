@@ -45,15 +45,15 @@ g_prime = [
     5e-2,
 ]
 
-[mesh]
+[space]
 nx = 24
 ny = 24
-[mesh.box]
+[space.box]
 unit = "m"
-[mesh.box.x]
+[space.box.x]
 min = -150_000 # Meters
 max = 150_000 # Meters
-[mesh.box.y]
+[space.box.y]
 min = -150_000 # Meters
 max = 150_000 # Meters
 

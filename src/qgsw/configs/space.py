@@ -20,12 +20,12 @@ from qgsw.spatial.units._units import (
 )
 
 
-class MeshConfig(_Config):
+class SpaceConfig(_Config):
     """Grid Configuration."""
 
-    section: str = keys.MESH["section"]
-    _nx: str = keys.MESH["points nb x"]
-    _ny: str = keys.MESH["points nb y"]
+    section: str = keys.SPACE["section"]
+    _nx: str = keys.SPACE["points nb x"]
+    _ny: str = keys.SPACE["points nb y"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
         DEGREES.name: conversion.deg_to_m_lat,
@@ -82,7 +82,7 @@ class MeshConfig(_Config):
         return conversion(self.box.y_max - self.box.y_min)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate mesh parameters.
+        """Validate space parameters.
 
         Args:
             params (dict[str, Any]): Grid parameters.

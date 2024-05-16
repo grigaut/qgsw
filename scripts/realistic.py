@@ -24,20 +24,20 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/realistic.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
-mesh = SpaceDiscretization3D.from_config(config.mesh, config.model)
+space = SpaceDiscretization3D.from_config(config.space, config.model)
 bathy = Bathymetry.from_config(config.bathymetry)
-wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
+wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 
 verbose.display(
-    msg=f"Grid lat: {config.mesh.box.y_min:.1f}, {config.mesh.box.y_max:.1f}, ",
+    msg=f"Grid lat: {config.space.box.y_min:.1f}, {config.space.box.y_max:.1f}, ",
     trigger_level=1,
 )
 verbose.display(
-    msg=f"lon: {config.mesh.box.x_min:.1f}, {config.mesh.box.x_max:.1f}, ",
+    msg=f"lon: {config.space.box.x_min:.1f}, {config.space.box.x_max:.1f}, ",
     trigger_level=1,
 )
 verbose.display(
-    msg=f"dx={config.mesh.dx/1e3:.1f}km, dy={config.mesh.dy/1e3:.1f}km .",
+    msg=f"dx={config.space.dx/1e3:.1f}km, dy={config.space.dy/1e3:.1f}km .",
     trigger_level=1,
 )
 verbose.display(
@@ -52,19 +52,19 @@ verbose.display(
 
 verbose.display(
     msg=(
-        "Interpolating bathymetry on mesh with"
+        "Interpolating bathymetry on space with"
         f" {config.bathymetry.interpolation_method} interpolation ..."
     ),
     trigger_level=1,
 )
 # Land Mask Generation
 
-mask_land = bathy.compute_land_mask(mesh.h.remove_z_h())
-mask_land_w = bathy.compute_land_mask_w(mesh.h.remove_z_h())
+mask_land = bathy.compute_land_mask(space.h.remove_z_h())
+mask_land_w = bathy.compute_land_mask_w(space.h.remove_z_h())
 
 # coriolis beta plane
 f = coriolis.compute_beta_plane(
-    mesh=mesh.omega.remove_z_h(),
+    mesh_2d=space.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
@@ -78,12 +78,12 @@ verbose.display(
 taux, tauy = wind.compute()
 
 param = {
-    "nx": config.mesh.nx,
-    "ny": config.mesh.ny,
+    "nx": config.space.nx,
+    "ny": config.space.ny,
     "nl": config.model.nl,
     "H": config.model.h.unsqueeze(1).unsqueeze(1),
-    "dx": config.mesh.dx,
-    "dy": config.mesh.dy,
+    "dx": config.space.dx,
+    "dy": config.space.dy,
     "rho": config.physics.rho,
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
@@ -93,7 +93,7 @@ param = {
     "slip_coef": config.physics.slip_coef,
     "dt": config.simulation.dt,  # time-step (s)
     "compile": True,
-    "mask": bathy.compute_ocean_mask(mesh.h.remove_z_h()),
+    "mask": bathy.compute_ocean_mask(space.h.remove_z_h()),
     "taux": taux[0, 1:-1, :],
     "tauy": tauy[0, :, 1:-1],
 }
@@ -138,7 +138,7 @@ if config.io.log_performance:
 
 if config.io.plots.save:
     output_dir = (
-        f'{config.io.results.directory}/{name}_{config.mesh.nx}x{config.mesh.ny}_dt{config.mesh.dt}_'
+        f'{config.io.results.directory}/{name}_{config.space.nx}x{config.space.ny}_dt{config.space.dt}_'
         f'slip{param["slip_coef"]}/'
     )
     os.makedirs(output_dir, exist_ok=True)

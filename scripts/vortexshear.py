@@ -29,8 +29,8 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/vortexshear.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
-mesh = SpaceDiscretization3D.from_config(config.mesh, config.model)
-wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
+space = SpaceDiscretization3D.from_config(config.space, config.model)
+wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 taux, tauy = wind.compute()
 perturbation = Perturbation.from_config(config.perturbation)
 
@@ -41,17 +41,17 @@ Bu = compute_burger(
     g=config.model.g_prime[0],
     h_scale=(h1 * h2) / (h1 + h2),
     f0=config.physics.f0,
-    length_scale=perturbation.compute_scale(mesh.omega),
+    length_scale=perturbation.compute_scale(space.omega),
 )
 
-mesh_2d = mesh.remove_z_h()
+mesh_2d = space.remove_z_h()
 x, y = mesh_2d.omega.xy
 xc, yc = mesh_2d.h.xy
 rc = torch.sqrt(xc**2 + yc**2)
 # circular domain mask
 apply_mask = False
 mask = (
-    (rc < config.mesh.lx / 2).type(torch.float64)
+    (rc < config.space.lx / 2).type(torch.float64)
     if apply_mask
     else torch.ones_like(xc)
 )
@@ -65,23 +65,23 @@ for Ro in [
 
     # vortex set up
     r0, r1, r2 = (
-        0.1 * config.mesh.lx,
-        0.1 * config.mesh.lx,
-        0.14 * config.mesh.lx,
+        0.1 * config.space.lx,
+        0.1 * config.space.lx,
+        0.14 * config.space.lx,
     )
 
     # set coriolis with burger number
     f0 = config.physics.f0
     beta = config.physics.beta
-    f = f0 + beta * (y - config.mesh.ly / 2)
+    f = f0 + beta * (y - config.space.ly / 2)
 
     param_qg = {
-        "nx": config.mesh.nx,
-        "ny": config.mesh.ny,
+        "nx": config.space.nx,
+        "ny": config.space.ny,
         "nl": config.model.nl,
-        "dx": config.mesh.dx,
-        "dy": config.mesh.dy,
-        "H": mesh.h.xyh[2],
+        "dx": config.space.dx,
+        "dy": config.space.dy,
+        "H": space.h.xyh[2],
         "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
         "taux": taux,
@@ -96,12 +96,12 @@ for Ro in [
     }
 
     param_sw = {
-        "nx": config.mesh.nx,
-        "ny": config.mesh.ny,
+        "nx": config.space.nx,
+        "ny": config.space.ny,
         "nl": config.model.nl,
-        "dx": config.mesh.dx,
-        "dy": config.mesh.dy,
-        "H": mesh.h.xyh[2],
+        "dx": config.space.dx,
+        "dy": config.space.dy,
+        "H": space.h.xyh[2],
         "rho": config.physics.rho,
         "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
         "f": f,
@@ -119,12 +119,12 @@ for Ro in [
     }
 
     qg_ml = QG(param_qg)
-    p_init = perturbation.compute_initial_pressure(mesh.omega, f0, Ro)
+    p_init = perturbation.compute_initial_pressure(space.omega, f0, Ro)
     u_init, v_init, h_init = qg_ml.G(p_init)
 
     u_max, v_max, c = (
-        torch.abs(u_init).max().item() / config.mesh.dx,
-        torch.abs(v_init).max().item() / config.mesh.dy,
+        torch.abs(u_init).max().item() / config.space.dx,
+        torch.abs(v_init).max().item() / config.space.dy,
         torch.sqrt(config.model.g_prime[0] * config.model.h.sum()),
     )
     verbose.display(
@@ -134,9 +134,9 @@ for Ro in [
     cfl_adv = 0.5
     cfl_gravity = 5 if param_sw["barotropic_filter"] else 0.5
     dt = min(
-        cfl_adv * config.mesh.dx / u_max,
-        cfl_adv * config.mesh.dy / v_max,
-        cfl_gravity * config.mesh.dx / c,
+        cfl_adv * config.space.dx / u_max,
+        cfl_adv * config.space.dy / v_max,
+        cfl_gravity * config.space.dx / c,
     )
 
     qg_ml.dt = dt

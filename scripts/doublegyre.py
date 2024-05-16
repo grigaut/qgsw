@@ -24,12 +24,12 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/doublegyre.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
-mesh = SpaceDiscretization3D.from_config(config.mesh, config.model)
-wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
+space = SpaceDiscretization3D.from_config(config.space, config.model)
+wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 
 mask = torch.ones(
-    config.mesh.nx,
-    config.mesh.ny,
+    config.space.nx,
+    config.space.ny,
     dtype=torch.float64,
     device=DEVICE,
 )
@@ -37,11 +37,11 @@ mask = torch.ones(
 taux, tauy = wind.compute()
 
 param = {
-    "nx": config.mesh.nx,
-    "ny": config.mesh.ny,
+    "nx": config.space.nx,
+    "ny": config.space.ny,
     "nl": config.model.nl,
-    "dx": config.mesh.dx,
-    "dy": config.mesh.dy,
+    "dx": config.space.dx,
+    "dy": config.space.dy,
     "H": config.model.h.unsqueeze(1).unsqueeze(1),
     "rho": config.physics.rho,
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
@@ -56,7 +56,7 @@ param = {
     "barotropic_filter_spectral": True,
     "mask": mask,
     "f": coriolis.compute_beta_plane(
-        mesh=mesh.omega.remove_z_h(),
+        mesh_2d=space.omega.remove_z_h(),
         f0=config.physics.f0,
         beta=config.physics.beta,
     ),
@@ -78,7 +78,7 @@ for model, name, dt, start_file in [
             .item()
         )
         cfl = 20 if param["barotropic_filter"] else 0.5
-        dt = float(int(cfl * min(config.mesh.dx, config.mesh.dy) / c))
+        dt = float(int(cfl * min(config.space.dx, config.space.dy) / c))
         param["dt"] = dt
         if param["barotropic_filter"]:
             model = SWFilterBarotropic
@@ -86,7 +86,7 @@ for model, name, dt, start_file in [
     verbose.display(
         msg=(
             f"Double gyre config, {name} model, "
-            f"{config.mesh.nx}x{config.mesh.ny} mesh, dt {dt:.1f}s."
+            f"{config.space.nx}x{config.space.ny} space, dt {dt:.1f}s."
         ),
         trigger_level=1,
     )
@@ -116,8 +116,8 @@ for model, name, dt, start_file in [
 
     if config.io.plots.save:
         output_dir = (
-            f"{config.io.results.directory}/{name}_{config.mesh.nx}x"
-            f"{config.mesh.ny}_dt{dt}_slip{param['slip_coef']}/"
+            f"{config.io.results.directory}/{name}_{config.space.nx}x"
+            f"{config.space.ny}_dt{dt}_slip{param['slip_coef']}/"
         )
         os.makedirs(output_dir, exist_ok=True)
         verbose.display(
