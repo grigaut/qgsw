@@ -246,14 +246,11 @@ class PerturbedVortex2D(RankineVortex2D):
         vortex = self._generate_vortex(mesh=mesh)
         vortex_norm = vortex / vortex.abs().max()
         perturbation = self._compute_perturbation(mesh)
-
         is_vortex = vortex_norm.abs() > self._threshold
-
         masked_perturbation = perturbation.where(
             is_vortex,
             torch.zeros_like(perturbation),
         )
-
         return vortex + self.perturbation_magnitude * masked_perturbation
 
 
