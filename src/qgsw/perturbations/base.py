@@ -4,7 +4,8 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 
-from qgsw.mesh.mesh import Mesh3D
+from qgsw.mesh.mesh import Mesh2D, Mesh3D
+from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
 
 
@@ -47,6 +48,17 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
 
         Returns:
             float: Perturbation scale.
+        """
+
+    @abstractmethod
+    def _compute_streamfunction_2d(self, mesh: Mesh2D) -> torch.Tensor:
+        """Compute the streamfunction for a single layer.
+
+        Args:
+            mesh (Mesh2D): Mesh to use for stream function computation.
+
+        Returns:
+            torch.Tensor: Stream function values.
         """
 
     @abstractmethod
@@ -122,3 +134,44 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         psi = self.compute_stream_function(mesh=mesh)
         psi_adjusted = self._adjust_stream_function(psi, mesh, f0, Ro)
         return self._convert_to_pressure(psi=psi_adjusted, f0=f0)
+
+
+class BarotropicPerturbation(_Perturbation):
+    """Barotropic Perturbation."""
+
+    def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
+        """Value of the stream function ψ.
+
+        Args:
+            mesh (Mesh3D): 3D Mesh to generate Stream Function on.
+
+        Returns:
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
+        """
+        psi_2d = self._compute_streamfunction_2d(mesh.remove_z_h())
+        nx, ny = psi_2d.shape[-2:]
+        return psi_2d.expand((1, mesh.nl, nx, ny))
+
+
+class BaroclinicPerturbation(_Perturbation):
+    """Baroclinic Perturbation."""
+
+    def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
+        """Value of the stream function ψ.
+
+        Args:
+            mesh (Mesh3D): 3D Mesh to generate Stream Function on.
+
+        Returns:
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
+        """
+        psi_2d = self._compute_streamfunction_2d(mesh.remove_z_h())
+        nx, ny = psi_2d.shape[-2:]
+        psi = torch.ones(
+            (1, mesh.nl, nx, ny),
+            device=DEVICE,
+            dtype=torch.float64,
+        )
+
+        psi[0, 0, ...] = psi_2d
+        return psi
