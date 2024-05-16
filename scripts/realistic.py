@@ -10,7 +10,7 @@ import torch
 sys.path.append("../src")
 from qgsw.forcing.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
-from qgsw.mesh import Meshes3D
+from qgsw.mesh import SpaceDiscretization3D
 from qgsw.models import SW, QG
 from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
@@ -24,7 +24,7 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/realistic.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
-mesh = Meshes3D.from_config(config.mesh, config.model)
+mesh = SpaceDiscretization3D.from_config(config.mesh, config.model)
 bathy = Bathymetry.from_config(config.bathymetry)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 

@@ -37,7 +37,7 @@ class RankineVortex2D:
         """Instantiate Vortex.
 
         Args:
-            mesh (Meshes2D): Spatial Meshes2D.
+            mesh (SpaceDiscretization2D): Spatial SpaceDiscretization2D.
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """

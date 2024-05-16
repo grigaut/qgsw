@@ -13,7 +13,7 @@ from qgsw.configs import Configuration
 from qgsw.perturbations import Perturbation
 from pathlib import Path
 from qgsw.forcing.wind import WindForcing
-from qgsw.mesh import Meshes3D
+from qgsw.mesh import SpaceDiscretization3D
 from qgsw.physics import compute_burger
 from qgsw.models import SW, QG, SWFilterBarotropic
 from qgsw.specs import DEVICE
@@ -29,7 +29,7 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/vortexshear.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
-mesh = Meshes3D.from_config(config.mesh, config.model)
+mesh = SpaceDiscretization3D.from_config(config.mesh, config.model)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 taux, tauy = wind.compute()
 perturbation = Perturbation.from_config(config.perturbation)
