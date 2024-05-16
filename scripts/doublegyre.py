@@ -56,7 +56,7 @@ param = {
     "barotropic_filter_spectral": True,
     "mask": mask,
     "f": coriolis.compute_beta_plane(
-        mesh=mesh.omega.remove_z_h(),
+        mesh_2d=mesh.omega.remove_z_h(),
         f0=config.physics.f0,
         beta=config.physics.beta,
     ),

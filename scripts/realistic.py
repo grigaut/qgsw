@@ -64,7 +64,7 @@ mask_land_w = bathy.compute_land_mask_w(mesh.h.remove_z_h())
 
 # coriolis beta plane
 f = coriolis.compute_beta_plane(
-    mesh=mesh.omega.remove_z_h(),
+    mesh_2d=mesh.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )

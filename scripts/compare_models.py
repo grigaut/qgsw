@@ -57,7 +57,7 @@ perturbation_1l = Perturbation.from_config(
 mesh_1l = SpaceDiscretization3D.from_config(config.mesh, config.models[0])
 # "" Coriolis
 f = coriolis.compute_beta_plane(
-    mesh=mesh_1l.omega.remove_z_h(),
+    mesh_2d=mesh_1l.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
@@ -123,7 +123,7 @@ perturbation_2l = Perturbation.from_config(
 mesh_2l = SpaceDiscretization3D.from_config(config.mesh, config.models[1])
 ## Coriolis
 f = coriolis.compute_beta_plane(
-    mesh=mesh_2l.omega.remove_z_h(),
+    mesh_2d=mesh_2l.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
