@@ -30,8 +30,8 @@ IO = {
     "log performance": "performance_log",
 }
 
-MESH = {
-    "section": "mesh",
+SPACE = {
+    "section": "space",
     "points nb x": "nx",
     "points nb y": "ny",
     "x length": "Lx",

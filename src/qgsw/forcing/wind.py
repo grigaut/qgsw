@@ -16,8 +16,8 @@ from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
 
 if TYPE_CHECKING:
-    from qgsw.configs.mesh import SpaceConfig
     from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
     from qgsw.configs.windstress import WindStressConfig
 
 

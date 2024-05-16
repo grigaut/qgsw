@@ -12,8 +12,8 @@ from qgsw.spatial.units._units import METERS
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs.mesh import SpaceConfig
     from qgsw.configs.models import ModelConfig
+    from qgsw.configs.space import SpaceConfig
     from qgsw.spatial.units._units import Unit
 
 

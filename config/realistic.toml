@@ -36,15 +36,15 @@ g_prime = [
     0.0125,
 ]
 
-[mesh]
+[space]
 nx = 1024
 ny = 512
-[mesh.box]
+[space.box]
 unit = "deg"
-[mesh.box.x]
+[space.box.x]
 min = -5.5
 max = 37
-[mesh.box.y]
+[space.box.y]
 min = 31
 max = 45
 

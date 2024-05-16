@@ -39,7 +39,7 @@ if config.model.type != "QG":
 
 # Common Set-up
 ## Wind Forcing
-wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
+wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 taux, tauy = wind.compute()
 ## Rossby
 Ro = 0.1
@@ -53,10 +53,10 @@ perturbation = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
 ## Mesh
-mesh = SpaceDiscretization3D.from_config(config.mesh, config.model)
+space = SpaceDiscretization3D.from_config(config.space, config.model)
 # "" Coriolis
 f = coriolis.compute_beta_plane(
-    mesh_2d=mesh.omega.remove_z_h(),
+    mesh_2d=space.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
@@ -65,7 +65,7 @@ Bu = compute_burger(
     g=config.model.g_prime[0],
     h_scale=config.model.h[0],
     f0=config.physics.f0,
-    length_scale=perturbation.compute_scale(mesh.omega),
+    length_scale=perturbation.compute_scale(space.omega),
 )
 verbose.display(
     msg=f"Burger Number: {Bu:.2f}",
@@ -73,12 +73,12 @@ verbose.display(
 )
 ## Set model parameters
 params = {
-    "nx": config.mesh.nx,
-    "ny": config.mesh.ny,
+    "nx": config.space.nx,
+    "ny": config.space.ny,
     "nl": config.model.nl,
-    "dx": config.mesh.dx,
-    "dy": config.mesh.dy,
-    "H": mesh.h.xyh[2],
+    "dx": config.space.dx,
+    "dy": config.space.dy,
+    "H": space.h.xyh[2],
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "f": f,
     "taux": taux,
@@ -86,26 +86,26 @@ params = {
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
-    "mask": torch.ones_like(mesh.h.remove_z_h().xy[0]),
+    "mask": torch.ones_like(space.h.remove_z_h().xy[0]),
     "compile": True,
     "slip_coef": config.physics.slip_coef,
     "dt": 0.0,
 }
 model = QG(params)
-p0 = perturbation.compute_initial_pressure(mesh.omega, config.physics.f0, Ro)
+p0 = perturbation.compute_initial_pressure(space.omega, config.physics.f0, Ro)
 u0, v0, h0 = model.G(p0)
 
 ## Max speed
 u_max, v_max, c = (
-    torch.abs(u0).max().item() / config.mesh.dx,
-    torch.abs(v0).max().item() / config.mesh.dy,
+    torch.abs(u0).max().item() / config.space.dx,
+    torch.abs(v0).max().item() / config.space.dy,
     torch.sqrt(config.model.g_prime[0] * config.model.h.sum()),
 )
 ## Timestep
 dt = min(
-    cfl_adv * config.mesh.dx / u_max,
-    cfl_adv * config.mesh.dy / v_max,
-    cfl_gravity * config.mesh.dx / c,
+    cfl_adv * config.space.dx / u_max,
+    cfl_adv * config.space.dy / v_max,
+    cfl_gravity * config.space.dx / c,
 )
 
 # Instantiate Model
