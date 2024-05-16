@@ -246,11 +246,14 @@ class PerturbedVortex2D(RankineVortex2D):
         vortex = self._generate_vortex(mesh=mesh)
         vortex_norm = vortex / vortex.abs().max()
         perturbation = self._compute_perturbation(mesh)
+
         is_vortex = vortex_norm.abs() > self._threshold
+
         masked_perturbation = perturbation.where(
             is_vortex,
             torch.zeros_like(perturbation),
         )
+
         return vortex + self.perturbation_magnitude * masked_perturbation
 
 
@@ -325,19 +328,29 @@ class BaroclinicVortex(RankineVortex3D, BaroclinicPerturbation):
         self._2d_vortex = RankineVortex2D(perturbation_magnitude=magnitude)
 
 
-class PerturbedBarotropicVortex(BarotropicVortex):
+class PerturbedBarotropicVortex(RankineVortex3D, BarotropicPerturbation):
     """Perturbed Barotropic vortex."""
 
     _type = "vortex-barotropic-perturbed"
 
     def _set_2d_vortex(self, magnitude: float) -> None:
+        """Set the 2D  vortex.
+
+        Args:
+            magnitude (float): Vortex perturbation magnitude
+        """
         self._2d_vortex = PerturbedVortex2D(perturbation_magnitude=magnitude)
 
 
-class PerturbedBaroclinicVortex(BaroclinicVortex):
+class PerturbedBaroclinicVortex(RankineVortex3D, BaroclinicPerturbation):
     """Perturbed Baroclinic vortex."""
 
     _type = "vortex-baroclinic-perturbed"
 
     def _set_2d_vortex(self, magnitude: float) -> None:
+        """Set the 2D  vortex.
+
+        Args:
+            magnitude (float): Vortex perturbation magnitude
+        """
         self._2d_vortex = PerturbedVortex2D(perturbation_magnitude=magnitude)
