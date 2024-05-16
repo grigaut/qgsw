@@ -293,17 +293,6 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
         """
         return self._2d_vortex.compute_vortex_scales(mesh.remove_z_h())[0]
 
-    @abstractmethod
-    def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
-        """Value of the stream function ψ.
-
-        Args:
-            mesh (Mesh3D): 3D Mesh to generate Stream Function on.
-
-        Returns:
-            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
-        """
-
 
 class BarotropicVortex(RankineVortex3D):
     """3D Rankine Vortex with similar vortex behavior accross all layers."""
