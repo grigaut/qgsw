@@ -2,20 +2,20 @@
 
 import torch
 
-from qgsw.mesh.mesh import Mesh2D
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.spatial.conversion import deg_to_m_lat, deg_to_rad, km_to_m
+from qgsw.spatial.core.mesh import Mesh2D
 from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
 from qgsw.spatial.units.exceptions import UnitError
 
 
 def compute_entire_beta_plane(
-    mesh: Mesh2D,
+    mesh_2d: Mesh2D,
 ) -> torch.Tensor:
     """Compute Beta-Plane field given only a 2D Mesh.
 
     Args:
-        mesh (Mesh2D): 2D Mesh.
+        mesh_2d (Mesh2D): 2D Mesh.
 
     Raises:
         UnitError: If the mesh xy unit is invalid.
@@ -23,46 +23,49 @@ def compute_entire_beta_plane(
     Returns:
         torch.Tensor: Beta plane values in s⁻¹.
     """
-    if mesh.xy_unit == DEGREES:
+    if mesh_2d.xy_unit == DEGREES:
         return _beta_plane_from_degree(
-            latitude=mesh.xy[1],
-            f0=compute_f0(mesh=mesh),
-            beta=compute_beta(mesh=mesh),
+            latitude=mesh_2d.xy[1],
+            f0=compute_f0(mesh_2d=mesh_2d),
+            beta=compute_beta(mesh_2d=mesh_2d),
         )
-    if mesh.xy_unit == RADIANS:
+    if mesh_2d.xy_unit == RADIANS:
         return _beta_plane_from_radians(
-            latitude=mesh.xy[1],
-            f0=compute_f0(mesh=mesh),
-            beta=compute_beta(mesh=mesh),
+            latitude=mesh_2d.xy[1],
+            f0=compute_f0(mesh_2d=mesh_2d),
+            beta=compute_beta(mesh_2d=mesh_2d),
         )
-    msg = f"Unable to compute beta plane from unit {mesh.xy_unit}."
+    msg = f"Unable to compute beta plane from unit {mesh_2d.xy_unit}."
     raise UnitError(msg)
 
 
 def compute_beta_plane(
-    mesh: Mesh2D,
+    mesh_2d: Mesh2D,
     f0: float,
     beta: float,
 ) -> torch.Tensor:
-    """Compute beta-plane from a given mesh.
+    """Compute beta-plane from a given mesh_2d.
 
     Args:
-        mesh (Mesh2D): 2D Mesh to compute values for.
+        mesh_2d (Mesh2D): 2D Mesh to compute values for.
         f0 (float): f0 (from beta-plane approximation: s⁻¹).
         beta (float): Beta (from beta plane approximation: m⁻¹.s⁻¹).
 
     Returns:
         torch.Tensor: Coriolis  values.
     """
-    if mesh.xy_unit == METERS:
-        return _beta_plane_from_meters(y=mesh.xy[1], f0=f0, beta=beta)
-    if mesh.xy_unit == KILOMETERS:
-        return _beta_plane_from_meters(y=km_to_m(mesh.xy[1]), f0=f0, beta=beta)
-    if mesh.xy_unit == DEGREES:
-        return _beta_plane_from_degree(latitude=mesh.xy[1], f0=f0, beta=beta)
-    if mesh.xy_unit == RADIANS:
-        return _beta_plane_from_radians(latitude=mesh.xy[1], f0=f0, beta=beta)
-    msg = f"Unable to compute beta plane from unit {mesh.xy_unit}."
+    if mesh_2d.xy_unit == METERS:
+        return _beta_plane_from_meters(y=mesh_2d.xy.y, f0=f0, beta=beta)
+    if mesh_2d.xy_unit == KILOMETERS:
+        y = km_to_m(mesh_2d.xy.y)
+        return _beta_plane_from_meters(y=y, f0=f0, beta=beta)
+    if mesh_2d.xy_unit == DEGREES:
+        latitude = mesh_2d.xy.y
+        return _beta_plane_from_degree(latitude=latitude, f0=f0, beta=beta)
+    if mesh_2d.xy_unit == RADIANS:
+        latitude = mesh_2d.xy.y
+        return _beta_plane_from_radians(latitude=latitude, f0=f0, beta=beta)
+    msg = f"Unable to compute beta plane from unit {mesh_2d.xy_unit}."
     raise UnitError(msg)
 
 
@@ -120,11 +123,11 @@ def _beta_plane_from_radians(
     return f0 + beta * (latitude - latitude.mean()) * EARTH_RADIUS
 
 
-def compute_f0(mesh: Mesh2D) -> float:
+def compute_f0(mesh_2d: Mesh2D) -> float:
     """Compute f0 value given 2D Mesh.
 
     Args:
-        mesh (Mesh2D): Mesh to compute f0 from.
+        mesh_2d (Mesh2D): Mesh to compute f0 from.
 
     Raises:
         UnitError: If the mesh unit is invalid.
@@ -132,11 +135,12 @@ def compute_f0(mesh: Mesh2D) -> float:
     Returns:
         float: f0 value (value at the mean latitude) in s⁻¹.
     """
-    if mesh.xy_unit == RADIANS:
-        return _compute_f0_from_radians(mesh=mesh.xy[1].mean())
-    if mesh.xy_unit == DEGREES:
-        return _compute_f0_from_radians(mesh=deg_to_rad(mesh.xy[1].mean()))
-    msg = f"Unable to compute f0 using a {mesh.xy_unit} mesh."
+    if mesh_2d.xy_unit == RADIANS:
+        return _compute_f0_from_radians(latitude_ref=mesh_2d.xy.y.mean())
+    if mesh_2d.xy_unit == DEGREES:
+        latitude_ref = deg_to_rad(mesh_2d.xy.y.mean())
+        return _compute_f0_from_radians(latitude_ref=latitude_ref)
+    msg = f"Unable to compute f0 using a {mesh_2d.xy_unit} mesh."
     raise UnitError(msg)
 
 
@@ -154,11 +158,11 @@ def _compute_f0_from_radians(
     return 2 * EARTH_ANGULAR_ROTATION * torch.sin(latitude_ref)
 
 
-def compute_beta(mesh: Mesh2D) -> float:
+def compute_beta(mesh_2d: Mesh2D) -> float:
     """Compute beta value given 2D Mesh.
 
     Args:
-        mesh (Mesh2D): Mesh to compute beta from.
+        mesh_2d (Mesh2D): Mesh to compute beta from.
 
     Raises:
         UnitError: If the mesh unit is invalid.
@@ -166,11 +170,12 @@ def compute_beta(mesh: Mesh2D) -> float:
     Returns:
         float: beta value (value at the mean latitude) in m⁻¹.s⁻¹.
     """
-    if mesh.xy_unit == RADIANS:
-        return _compute_beta_from_radians(mesh=mesh.xy[1].mean())
-    if mesh.xy_unit == DEGREES:
-        return _compute_beta_from_radians(mesh=deg_to_rad(mesh.xy[1].mean()))
-    msg = f"Unable to compute beta using a {mesh.xy_unit} mesh."
+    if mesh_2d.xy_unit == RADIANS:
+        return _compute_beta_from_radians(latitude_ref=mesh_2d.xy.y.mean())
+    if mesh_2d.xy_unit == DEGREES:
+        latitude_ref = deg_to_rad(mesh_2d.xy.y.mean())
+        return _compute_beta_from_radians(latitude_ref=latitude_ref)
+    msg = f"Unable to compute beta using a {mesh_2d.xy_unit} mesh."
     raise UnitError(msg)
 
 

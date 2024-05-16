@@ -4,8 +4,8 @@ import torch
 from torch.nn import functional as F  # noqa: N812
 
 from qgsw import verbose
-from qgsw.mesh.mesh import Mesh3D
 from qgsw.perturbations.base import _Perturbation
+from qgsw.spatial.core.mesh import Mesh3D
 from qgsw.specs import DEVICE
 
 
@@ -30,7 +30,7 @@ class RandomSurfacePerturbation(_Perturbation):
         """Set torch seed to 0."""
         torch.random.manual_seed(0)
 
-    def compute_scale(self, mesh: Mesh3D) -> float:
+    def compute_scale(self, mesh_3d: Mesh3D) -> float:
         """Compute the scale of the perturbation.
 
         The scale refers to the typical size of the perturbation, not its
@@ -38,13 +38,13 @@ class RandomSurfacePerturbation(_Perturbation):
         radius.
 
         Args:
-            mesh (Mesh3D): 3D Mesh.
+            mesh_3d (Mesh3D): 3D Mesh.
 
         Returns:
             float: Perturbation scale.
         """
         # Real size of the gaussian kernel window
-        return mesh.lx / self._kernel_size_ratio
+        return mesh_3d.lx / self._kernel_size_ratio
 
     def _generate_random_field(
         self,
@@ -113,20 +113,20 @@ class RandomSurfacePerturbation(_Perturbation):
         # Make sure sum of values in gaussian kernel equals 1.
         return gaussian_kernel / torch.sum(gaussian_kernel)
 
-    def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
+    def compute_stream_function(self, mesh_3d: Mesh3D) -> torch.Tensor:
         """Compute the stream function induced by the perturbation.
 
         Args:
-            mesh (Mesh3D): 3D Mesh.
+            mesh_3d (Mesh3D): 3D Mesh.
 
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
-        kernel_size = int(mesh.nx / self._kernel_size_ratio)
+        kernel_size = int(mesh_3d.nx / self._kernel_size_ratio)
         size = kernel_size + 1 if kernel_size % 2 == 0 else kernel_size
         random_field = self._generate_random_field(
-            nx=mesh.nx,  # + (size - 1),
-            ny=mesh.ny,  # + (size - 1),
+            nx=mesh_3d.nx,  # + (size - 1),
+            ny=mesh_3d.ny,  # + (size - 1),
         )
         verbose.display(
             f"Random perturbation: Gaussian kernel size: {size}",
@@ -140,7 +140,7 @@ class RandomSurfacePerturbation(_Perturbation):
         )  # shape: (1,1,nx,ny)
         nx, ny = psi_2d.shape[-2:]
         psi = torch.ones(
-            (1, mesh.nl, nx, ny),
+            (1, mesh_3d.nl, nx, ny),
             device=DEVICE,
             dtype=torch.float64,
         )

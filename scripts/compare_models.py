@@ -6,7 +6,6 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.mesh import Meshes3D
 from qgsw.models import QG
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger, coriolis
@@ -16,6 +15,7 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
+from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
@@ -39,7 +39,7 @@ if config.models[0].type != "QG" or config.models[1].type != "QG":
 
 # Common Set-up
 ## Wind Forcing
-wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
+wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 taux, tauy = wind.compute()
 ## Rossby
 Ro = 0.1
@@ -54,10 +54,10 @@ perturbation_1l = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
 ## Mesh
-mesh_1l = Meshes3D.from_config(config.mesh, config.models[0])
+space_1l = SpaceDiscretization3D.from_config(config.space, config.models[0])
 # "" Coriolis
 f = coriolis.compute_beta_plane(
-    mesh=mesh_1l.omega.remove_z_h(),
+    mesh_2d=space_1l.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
@@ -66,7 +66,7 @@ Bu_1l = compute_burger(
     g=config.models[0].g_prime[0],
     h_scale=config.models[0].h[0],
     f0=config.physics.f0,
-    length_scale=perturbation_1l.compute_scale(mesh_1l.omega),
+    length_scale=perturbation_1l.compute_scale(space_1l.omega),
 )
 verbose.display(
     msg=f"Single-Layer Burger Number: {Bu_1l:.2f}",
@@ -74,12 +74,12 @@ verbose.display(
 )
 ## Set model parameters
 params_1l = {
-    "nx": config.mesh.nx,
-    "ny": config.mesh.ny,
+    "nx": config.space.nx,
+    "ny": config.space.ny,
     "nl": config.models[0].nl,
-    "dx": config.mesh.dx,
-    "dy": config.mesh.dy,
-    "H": mesh_1l.h.xyh[2],
+    "dx": config.space.dx,
+    "dy": config.space.dy,
+    "H": space_1l.h.xyh[2],
     "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
     "f": f,
     "taux": taux,
@@ -87,14 +87,14 @@ params_1l = {
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
-    "mask": torch.ones_like(mesh_1l.h.remove_z_h().xy[0]),
+    "mask": torch.ones_like(space_1l.h.remove_z_h().xy[0]),
     "compile": True,
     "slip_coef": 1.0,
     "dt": 0.0,
 }
 qg_1l = QG(params_1l)
 p0_1l = perturbation_1l.compute_initial_pressure(
-    mesh_1l.omega,
+    space_1l.omega,
     config.physics.f0,
     Ro,
 )
@@ -102,15 +102,15 @@ u0_1l, v0_1l, h0_1l = qg_1l.G(p0_1l)
 
 ## Max speed
 u_max_1l, v_max_1l, c_1l = (
-    torch.abs(u0_1l).max().item() / config.mesh.dx,
-    torch.abs(v0_1l).max().item() / config.mesh.dy,
+    torch.abs(u0_1l).max().item() / config.space.dx,
+    torch.abs(v0_1l).max().item() / config.space.dy,
     torch.sqrt(config.models[0].g_prime[0] * config.models[0].h.sum()),
 )
 ## Timestep
 dt_1l = min(
-    cfl_adv * config.mesh.dx / u_max_1l,
-    cfl_adv * config.mesh.dy / v_max_1l,
-    cfl_gravity * config.mesh.dx / c_1l,
+    cfl_adv * config.space.dx / u_max_1l,
+    cfl_adv * config.space.dy / v_max_1l,
+    cfl_gravity * config.space.dx / c_1l,
 )
 
 # Two Layers Set-up
@@ -120,10 +120,10 @@ perturbation_2l = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
 ## Mesh
-mesh_2l = Meshes3D.from_config(config.mesh, config.models[1])
+space_2l = SpaceDiscretization3D.from_config(config.space, config.models[1])
 ## Coriolis
 f = coriolis.compute_beta_plane(
-    mesh=mesh_2l.omega.remove_z_h(),
+    mesh_2d=space_2l.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
@@ -136,7 +136,7 @@ Bu_2l = compute_burger(
     g=config.models[1].g_prime[0],
     h_scale=h_eq,
     f0=config.physics.f0,
-    length_scale=perturbation_2l.compute_scale(mesh_2l.omega),
+    length_scale=perturbation_2l.compute_scale(space_2l.omega),
 )
 verbose.display(
     msg=f"Multi-Layers Burger Number: {Bu_2l:.2f}",
@@ -144,12 +144,12 @@ verbose.display(
 )
 ## Set model parameters
 params_2l = {
-    "nx": config.mesh.nx,
-    "ny": config.mesh.ny,
+    "nx": config.space.nx,
+    "ny": config.space.ny,
     "nl": config.models[1].nl,
-    "dx": config.mesh.dx,
-    "dy": config.mesh.dy,
-    "H": mesh_2l.h.xyh[2],
+    "dx": config.space.dx,
+    "dy": config.space.dy,
+    "H": space_2l.h.xyh[2],
     "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
     "f": f,
     "taux": taux,
@@ -157,29 +157,29 @@ params_2l = {
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "device": DEVICE,
     "dtype": torch.float64,
-    "mask": torch.ones_like(mesh_2l.h.remove_z_h().xy[0]),
+    "mask": torch.ones_like(space_2l.h.remove_z_h().xy[0]),
     "compile": True,
     "slip_coef": 1.0,
     "dt": 0.0,
 }
 qg_2l = QG(params_2l)
 p0_2l = perturbation_2l.compute_initial_pressure(
-    mesh_2l.omega,
+    space_2l.omega,
     config.physics.f0,
     Ro,
 )
 u0_2l, v0_2l, h0_2l = qg_2l.G(p0_2l)
 ## Max Speed
 u_max_2l, v_max_2l, c_2l = (
-    torch.abs(u0_2l).max().item() / config.mesh.dx,
-    torch.abs(v0_2l).max().item() / config.mesh.dy,
+    torch.abs(u0_2l).max().item() / config.space.dx,
+    torch.abs(v0_2l).max().item() / config.space.dy,
     torch.sqrt(config.models[1].g_prime[0] * config.models[1].h.sum()),
 )
 ## Timestep
 dt_2l = min(
-    cfl_adv * config.mesh.dx / u_max_2l,
-    cfl_adv * config.mesh.dy / v_max_2l,
-    cfl_gravity * config.mesh.dx / c_2l,
+    cfl_adv * config.space.dx / u_max_2l,
+    cfl_adv * config.space.dy / v_max_2l,
+    cfl_gravity * config.space.dx / c_2l,
 )
 
 

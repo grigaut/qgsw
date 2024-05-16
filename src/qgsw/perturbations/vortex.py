@@ -9,19 +9,19 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
-from qgsw.mesh.mesh import Mesh2D
 from qgsw.models.core import helmholtz
 from qgsw.perturbations.base import (
     BaroclinicPerturbation,
     BarotropicPerturbation,
     _Perturbation,
 )
+from qgsw.spatial.core.mesh import Mesh2D
 from qgsw.spatial.units._units import METERS, Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.mesh.mesh import Mesh2D, Mesh3D
+    from qgsw.spatial.core.mesh import Mesh2D, Mesh3D
 
 
 class RankineVortex2D:
@@ -37,7 +37,6 @@ class RankineVortex2D:
         """Instantiate Vortex.
 
         Args:
-            mesh (Meshes2D): Spatial Meshes2D.
             perturbation_magnitude (float, optional): Tripolar perturbation
             magnitude. Defaults to 1e-3.
         """
@@ -48,25 +47,25 @@ class RankineVortex2D:
         """Tripolar perturbation magnitude."""
         return self._perturbation
 
-    def _raise_if_invalid_unit(self, mesh: Mesh2D) -> None:
-        """Check the mesh unit.
+    def _raise_if_invalid_unit(self, mesh_2d: Mesh2D) -> None:
+        """Check the 2D mesh unit.
 
         Args:
-            mesh (Mesh2D): 2D Mesh.
+            mesh_2d (Mesh2D): 2D Mesh.
 
         Raises:
             UnitError: If the mesh has an invalid unit
         """
-        if mesh.xy_unit != self._required_xy_unit:
+        if mesh_2d.xy_unit != self._required_xy_unit:
             msg = (
-                "The mesh must have the following xy unit:"
+                "The mesh_2d must have the following xy unit:"
                 f" {self._required_xy_unit.name}"
             )
             raise UnitError(msg)
 
     def compute_vortex_scales(
         self,
-        mesh: Mesh2D,
+        mesh_2d: Mesh2D,
     ) -> tuple[float, float, float]:
         """Compute the vortex radiuses.
 
@@ -75,30 +74,30 @@ class RankineVortex2D:
         R2 is the radius of the outermost part of the ring.
 
         Args:
-            mesh (Mesh3D): 3D Mesh.
+            mesh_2d (Mesh3D): 3D Mesh.
 
         Returns:
             tuple[float, float, float]: R0, R1, R2.
         """
-        r0 = 0.1 * mesh.lx
+        r0 = 0.1 * mesh_2d.lx
         r1 = r0
-        r2 = 0.14 * mesh.lx
+        r2 = 0.14 * mesh_2d.lx
         return r0, r1, r2
 
-    def compute_stream_function(self, mesh: Mesh2D) -> torch.Tensor:
+    def compute_stream_function(self, mesh_2d: Mesh2D) -> torch.Tensor:
         """Compute the value of the streamfunction ψ.
 
         Returns:
             torch.Tensor: Streamfunction values over the domain,
             (1, 1, nx, ny)-shaped..
         """
-        vor = self._compute_vorticity(mesh)
+        vor = self._compute_vorticity(mesh_2d)
         # Compute Laplacian operator in Fourier Space
         laplacian = helmholtz.compute_laplace_dstI(
-            mesh.nx - 1,
-            mesh.ny - 1,
-            mesh.dx,
-            mesh.dy,
+            mesh_2d.nx - 1,
+            mesh_2d.ny - 1,
+            mesh_2d.dx,
+            mesh_2d.dy,
             {"device": DEVICE, "dtype": torch.float64},
         )
         # Solve problem in Fourier space : "ψ = ω/∆"
@@ -109,19 +108,19 @@ class RankineVortex2D:
 
     def _compute_vorticity(
         self,
-        mesh: Mesh2D,
+        mesh_2d: Mesh2D,
     ) -> torch.Tensor:
         """Compute the vorticity ω of the vortex.
 
         Args:
-            mesh (Mesh2D): Grid.
+            mesh_2d (Mesh2D): Grid.
 
         Returns:
             torch.Tensor: Vorticity Value.
         """
-        self._raise_if_invalid_unit(mesh)
-        x, y = mesh.xy
-        r0, r1, r2 = self.compute_vortex_scales(mesh=mesh)
+        self._raise_if_invalid_unit(mesh_2d)
+        x, y = mesh_2d.xy
+        r0, r1, r2 = self.compute_vortex_scales(mesh_2d=mesh_2d)
         # Compute cylindrical components
         theta = torch.angle(x + 1j * y)
         r = torch.sqrt(x**2 + y**2)
@@ -200,12 +199,12 @@ class PerturbedVortex2D(RankineVortex2D):
         # Make sure sum of values in gaussian kernel equals 1.
         return gaussian_kernel / torch.sum(gaussian_kernel)
 
-    def _compute_perturbation(self, mesh: Mesh2D) -> torch.Tensor:
-        kernel_size = int(mesh.nx / self._kernel_size_ratio)
+    def _compute_perturbation(self, mesh_2d: Mesh2D) -> torch.Tensor:
+        kernel_size = int(mesh_2d.nx / self._kernel_size_ratio)
         size = kernel_size + 1 if kernel_size % 2 == 0 else kernel_size
         random_field = self._generate_random_field(
-            nx=mesh.nx,  # + (size - 1),
-            ny=mesh.ny,  # + (size - 1),
+            nx=mesh_2d.nx,  # + (size - 1),
+            ny=mesh_2d.ny,  # + (size - 1),
         )
         verbose.display(
             f"Random perturbation: Gaussian kernel size: {size}",
@@ -219,10 +218,10 @@ class PerturbedVortex2D(RankineVortex2D):
         ).squeeze()  # shape: (nx,ny)
         return filtered_field / filtered_field.abs().max()
 
-    def _generate_vortex(self, mesh: Mesh2D) -> torch.Tensor:
-        self._raise_if_invalid_unit(mesh)
-        x, y = mesh.xy
-        r0, r1, r2 = self.compute_vortex_scales(mesh=mesh)
+    def _generate_vortex(self, mesh_2d: Mesh2D) -> torch.Tensor:
+        self._raise_if_invalid_unit(mesh_2d)
+        x, y = mesh_2d.xy
+        r0, r1, r2 = self.compute_vortex_scales(mesh_2d=mesh_2d)
         # Compute cylindrical components
         r = torch.sqrt(x**2 + y**2)
         # Mask vortex's core
@@ -234,18 +233,18 @@ class PerturbedVortex2D(RankineVortex2D):
         mask_ring = inner_ring * outer_ring
         return mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
 
-    def _compute_vorticity(self, mesh: Mesh2D) -> torch.Tensor:
+    def _compute_vorticity(self, mesh_2d: Mesh2D) -> torch.Tensor:
         """Compute the vorticity ω of the vortex.
 
         Args:
-            mesh (Mesh2D): Grid.
+            mesh_2d (Mesh2D): Grid.
 
         Returns:
             torch.Tensor: Vorticity Value.
         """
-        vortex = self._generate_vortex(mesh=mesh)
+        vortex = self._generate_vortex(mesh_2d=mesh_2d)
         vortex_norm = vortex / vortex.abs().max()
-        perturbation = self._compute_perturbation(mesh)
+        perturbation = self._compute_perturbation(mesh_2d)
         is_vortex = vortex_norm.abs() > self._threshold
         masked_perturbation = perturbation.where(
             is_vortex,
@@ -277,32 +276,32 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
             magnitude (float): Vortex perturbation magnitude
         """
 
-    def _compute_streamfunction_2d(self, mesh: Mesh2D) -> torch.Tensor:
+    def _compute_streamfunction_2d(self, mesh_2d: Mesh2D) -> torch.Tensor:
         """Compute the streamfunction for a single layer.
 
         Args:
-            mesh (Mesh2D): Mesh to use for stream function computation.
+            mesh_2d (Mesh2D): Mesh to use for stream function computation.
 
         Returns:
             torch.Tensor: Stream function values.
         """
-        return self._2d_vortex.compute_stream_function(mesh)
+        return self._2d_vortex.compute_stream_function(mesh_2d)
 
     @property
     def perturbation_magnitude(self) -> float:
         """Perturbation magnitude."""
         return self._2d_vortex.perturbation_magnitude
 
-    def compute_scale(self, mesh: Mesh3D) -> float:
+    def compute_scale(self, mesh_3d: Mesh3D) -> float:
         """Compute Vortex Scale.
 
         Args:
-            mesh (Mesh3D): 3D Mesh
+            mesh_3d (Mesh3D): 3D Mesh
 
         Returns:
             float: Inner vortex gyre radius.
         """
-        return self._2d_vortex.compute_vortex_scales(mesh.remove_z_h())[0]
+        return self._2d_vortex.compute_vortex_scales(mesh_3d.remove_z_h())[0]
 
 
 class BarotropicVortex(RankineVortex3D, BarotropicPerturbation):

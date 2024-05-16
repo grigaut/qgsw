@@ -8,12 +8,10 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 from typing_extensions import Self
 
+from qgsw.spatial.exceptions import CoordinatesInstanciationError
+
 if TYPE_CHECKING:
     from qgsw.spatial.units._units import Unit
-
-
-class CoordinatesInstanciationError(Exception):
-    """Exception raised when instantiating coordinates."""
 
 
 class Coordinates1D:

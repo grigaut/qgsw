@@ -9,11 +9,11 @@ from typing_extensions import Self
 
 from qgsw.configs.bathymetry import BathyConfig
 from qgsw.configs.io import IOConfig
-from qgsw.configs.mesh import MeshConfig
 from qgsw.configs.models import ModelConfig
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.simulations import SimulationConfig
+from qgsw.configs.space import SpaceConfig
 from qgsw.configs.windstress import WindStressConfig
 
 
@@ -74,14 +74,14 @@ class Configuration:
         return ModelConfig.parse_several(self.params)
 
     @property
-    def has_mesh(self) -> bool:
-        """Whether the configuration contains a 'mesh' section or not."""
-        return MeshConfig.section in self.params
+    def has_space(self) -> bool:
+        """Whether the configuration contains a 'space' section or not."""
+        return SpaceConfig.section in self.params
 
     @cached_property
-    def mesh(self) -> MeshConfig:
+    def space(self) -> SpaceConfig:
         """Mesh configuration."""
-        return MeshConfig.parse(self.params)
+        return SpaceConfig.parse(self.params)
 
     @cached_property
     def has_windstress(self) -> bool:

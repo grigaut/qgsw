@@ -10,7 +10,6 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from typing_extensions import ParamSpec, Self
 
-from qgsw.mesh.exceptions import InvalidLayerNumberError
 from qgsw.plots.base.axes import (
     BaseAxes,
     BaseAxesContent,
@@ -18,6 +17,7 @@ from qgsw.plots.base.axes import (
 )
 from qgsw.plots.base.comparison import ComparisonFigure
 from qgsw.plots.base.figures import BaseSingleFigure
+from qgsw.spatial.exceptions import InvalidLayerNumberError
 
 if TYPE_CHECKING:
     from pathlib import Path

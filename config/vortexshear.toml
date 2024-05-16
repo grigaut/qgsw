@@ -34,16 +34,16 @@ g_prime = [
     2e-2
 ]
 
-[mesh]
+[space]
 nx = 96
 ny = 96
 box_unit = "m"
-[mesh.box]
+[space.box]
 unit = "m"
-[mesh.box.x]
+[space.box.x]
 min = -2_200_000
 max = 2_200_000
-[mesh.box.y]
+[space.box.y]
 min = -2_200_000
 max = 2_200_000
 

@@ -4,7 +4,6 @@ import torch
 from typing_extensions import Self
 
 from qgsw.configs.perturbation import PerturbationConfig
-from qgsw.mesh.mesh import Mesh3D
 from qgsw.perturbations.base import _Perturbation
 from qgsw.perturbations.random import RandomSurfacePerturbation
 from qgsw.perturbations.vortex import (
@@ -13,6 +12,7 @@ from qgsw.perturbations.vortex import (
     PerturbedBaroclinicVortex,
     PerturbedBarotropicVortex,
 )
+from qgsw.spatial.core.mesh import Mesh3D
 
 
 class Perturbation:
@@ -27,7 +27,7 @@ class Perturbation:
         """Perturbation type."""
         return self._perturbation.type
 
-    def compute_scale(self, mesh: Mesh3D) -> float:
+    def compute_scale(self, mesh_3d: Mesh3D) -> float:
         """Compute the scale of the perturbation.
 
         The scale refers to the typical size of the perturbation, not its
@@ -35,23 +35,23 @@ class Perturbation:
         radius.
 
         Args:
-            mesh (Mesh3D): 3D Mesh.
+            mesh_3d (Mesh3D): 3D Mesh.
 
         Returns:
             float: Perturbation scale.
         """
-        return self._perturbation.compute_scale(mesh=mesh)
+        return self._perturbation.compute_scale(mesh_3d=mesh_3d)
 
     def compute_initial_pressure(
         self,
-        mesh: Mesh3D,
+        mesh_3d: Mesh3D,
         f0: float,
         Ro: float,  # noqa: N803
     ) -> torch.Tensor:
         """Compute the initial pressure values.
 
         Args:
-            mesh (Mesh3D): 3D Mesh.
+            mesh_3d (Mesh3D): 3D Mesh.
             f0 (float): Coriolis parameter.
             Ro (float): Rossby Number.
 
@@ -59,7 +59,7 @@ class Perturbation:
             torch.Tensor: Pressure values, (1, nl, nx, ny)-shaped..
         """
         return self._perturbation.compute_initial_pressure(
-            mesh=mesh,
+            mesh_3d=mesh_3d,
             f0=f0,
             Ro=Ro,
         )
