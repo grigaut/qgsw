@@ -6,7 +6,7 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.mesh import Meshes3D
+from qgsw.mesh import SpaceDiscretization3D
 from qgsw.models import QG
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger, coriolis
@@ -54,7 +54,7 @@ perturbation_1l = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
 ## Mesh
-mesh_1l = Meshes3D.from_config(config.mesh, config.models[0])
+mesh_1l = SpaceDiscretization3D.from_config(config.mesh, config.models[0])
 # "" Coriolis
 f = coriolis.compute_beta_plane(
     mesh=mesh_1l.omega.remove_z_h(),
@@ -120,7 +120,7 @@ perturbation_2l = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
 ## Mesh
-mesh_2l = Meshes3D.from_config(config.mesh, config.models[1])
+mesh_2l = SpaceDiscretization3D.from_config(config.mesh, config.models[1])
 ## Coriolis
 f = coriolis.compute_beta_plane(
     mesh=mesh_2l.omega.remove_z_h(),

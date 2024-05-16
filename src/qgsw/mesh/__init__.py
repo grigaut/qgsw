@@ -1,8 +1,8 @@
 """Meshing-related objects."""
 
-from qgsw.mesh.meshes import Meshes3D, SpaceDiscretization2D
+from qgsw.mesh.meshes import SpaceDiscretization2D, SpaceDiscretization3D
 
 __all__ = [
     "SpaceDiscretization2D",
-    "Meshes3D",
+    "SpaceDiscretization3D",
 ]

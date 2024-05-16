@@ -142,40 +142,40 @@ class SpaceDiscretization2D:
         msg = "All meshes xy units must correspond."
         raise MeshesInstanciationError(msg)
 
-    def add_h(self, h: torch.Tensor) -> Meshes3D:
+    def add_h(self, h: torch.Tensor) -> SpaceDiscretization3D:
         """Switch to 3D Meshes adding layers thickness.
 
         Args:
             h (torch.Tensor): Layers thickness.
 
         Returns:
-            Meshes3D: 3D Meshes.
+            SpaceDiscretization3D: 3D Meshes.
         """
         omega_3d = self.omega.add_h(h=h)
         h_3d = self._h.add_h(h=h)
         u_3d = self._u.add_h(h=h)
         v_3d = self._v.add_h(h=h)
-        return Meshes3D(
+        return SpaceDiscretization3D(
             omega_mesh=omega_3d,
             h_mesh=h_3d,
             u_mesh=u_3d,
             v_mesh=v_3d,
         )
 
-    def add_z(self, z: torch.Tensor) -> Meshes3D:
+    def add_z(self, z: torch.Tensor) -> SpaceDiscretization3D:
         """Switch to 3D Mesh adding z coordinates.
 
         Args:
             z (torch.Tensor): Z coordinates.
 
         Returns:
-            Meshes3D: 3D Mesh.
+            SpaceDiscretization3D: 3D Mesh.
         """
         omega_3d = self.omega.add_z(z=z)
         h_3d = self._h.add_z(z=z)
         u_3d = self._u.add_z(z=z)
         v_3d = self._v.add_z(z=z)
-        return Meshes3D(
+        return SpaceDiscretization3D(
             omega_mesh=omega_3d,
             h_mesh=h_3d,
             u_mesh=u_3d,
@@ -269,7 +269,7 @@ class SpaceDiscretization2D:
         )
 
 
-class Meshes3D:
+class SpaceDiscretization3D:
     """3D Grid."""
 
     def __init__(
@@ -280,7 +280,7 @@ class Meshes3D:
         u_mesh: Mesh3D,
         v_mesh: Mesh3D,
     ) -> None:
-        """Instantiate the Meshes3D.
+        """Instantiate the SpaceDiscretization3D.
 
         Args:
             omega_mesh (Mesh3D): Omega mesh.

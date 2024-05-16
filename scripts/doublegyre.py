@@ -11,7 +11,7 @@ from qgsw.models import SW, QG
 from qgsw.models.sw import SWFilterBarotropic
 from qgsw.configs import Configuration
 from qgsw.physics import coriolis
-from qgsw.mesh import Meshes3D
+from qgsw.mesh import SpaceDiscretization3D
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
 from qgsw import verbose
@@ -24,7 +24,7 @@ ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath("config/doublegyre.toml")
 config = Configuration.from_file(CONFIG_PATH)
 
-mesh = Meshes3D.from_config(config.mesh, config.model)
+mesh = SpaceDiscretization3D.from_config(config.mesh, config.model)
 wind = WindForcing.from_config(config.windstress, config.mesh, config.physics)
 
 mask = torch.ones(
