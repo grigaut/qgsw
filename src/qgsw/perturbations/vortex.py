@@ -15,13 +15,13 @@ from qgsw.perturbations.base import (
     BarotropicPerturbation,
     _Perturbation,
 )
-from qgsw.spatial.mesh import Mesh2D
+from qgsw.spatial.core.mesh import Mesh2D
 from qgsw.spatial.units._units import METERS, Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.spatial.mesh import Mesh2D, Mesh3D
+    from qgsw.spatial.core.mesh import Mesh2D, Mesh3D
 
 
 class RankineVortex2D:

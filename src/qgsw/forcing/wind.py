@@ -11,7 +11,7 @@ import torch
 from typing_extensions import Self
 
 from qgsw.data.loaders import WindForcingLoader
-from qgsw.spatial.meshes import SpaceDiscretization2D
+from qgsw.spatial.core.meshes import SpaceDiscretization2D
 from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
 

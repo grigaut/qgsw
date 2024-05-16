@@ -20,7 +20,7 @@ from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.bathymetry import BathyConfig
-    from qgsw.spatial.mesh import Mesh2D
+    from qgsw.spatial.core.mesh import Mesh2D
 
 
 class Bathymetry:

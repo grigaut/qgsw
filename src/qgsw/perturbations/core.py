@@ -12,7 +12,7 @@ from qgsw.perturbations.vortex import (
     PerturbedBaroclinicVortex,
     PerturbedBarotropicVortex,
 )
-from qgsw.spatial.mesh import Mesh3D
+from qgsw.spatial.core.mesh import Mesh3D
 
 
 class Perturbation:

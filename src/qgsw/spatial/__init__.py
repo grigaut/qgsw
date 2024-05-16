@@ -1,6 +1,9 @@
 """Spatial tools."""
 
-from qgsw.spatial.meshes import SpaceDiscretization2D, SpaceDiscretization3D
+from qgsw.spatial.core.meshes import (
+    SpaceDiscretization2D,
+    SpaceDiscretization3D,
+)
 
 __all__ = [
     "SpaceDiscretization2D",

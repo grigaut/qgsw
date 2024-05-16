@@ -5,7 +5,7 @@ from torch.nn import functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.perturbations.base import _Perturbation
-from qgsw.spatial.mesh import Mesh3D
+from qgsw.spatial.core.mesh import Mesh3D
 from qgsw.specs import DEVICE
 
 
