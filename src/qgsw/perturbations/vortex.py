@@ -275,7 +275,14 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
 
     @abstractmethod
     def _set_2d_vortex(self, magnitude: float) -> None:
-        """Sets the 2d Vortex."""
+        """Set the 2D  vortex.
+
+        Args:
+            magnitude (float): Vortex perturbation magnitude
+        """
+
+    def _compute_streamfunction_2d(self, mesh: Mesh2D) -> torch.Tensor:
+        return self._2d_vortex.compute_stream_function(mesh)
 
     @property
     def perturbation_magnitude(self) -> float:
