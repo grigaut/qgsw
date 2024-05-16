@@ -9,8 +9,13 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.mesh.mesh import Mesh2D
 from qgsw.models.core import helmholtz
-from qgsw.perturbations.base import _Perturbation
+from qgsw.perturbations.base import (
+    BaroclinicPerturbation,
+    BarotropicPerturbation,
+    _Perturbation,
+)
 from qgsw.spatial.units._units import METERS, Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
@@ -301,55 +306,32 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
         return self._2d_vortex.compute_vortex_scales(mesh.remove_z_h())[0]
 
 
-class BarotropicVortex(RankineVortex3D):
+class BarotropicVortex(RankineVortex3D, BarotropicPerturbation):
     """3D Rankine Vortex with similar vortex behavior accross all layers."""
 
     _type = "vortex-barotropic"
 
     def _set_2d_vortex(self, magnitude: float) -> None:
-        self._2d_vortex = RankineVortex2D(perturbation_magnitude=magnitude)
-
-    def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
-        """Value of the stream function ψ.
+        """Set the 2D  vortex.
 
         Args:
-            mesh (Mesh3D): 3D Mesh to generate Stream Function on.
-
-        Returns:
-            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
+            magnitude (float): Vortex perturbation magnitude
         """
-        psi_2d = self._2d_vortex.compute_stream_function(mesh.remove_z_h())
-        nx, ny = psi_2d.shape[-2:]
-        return psi_2d.expand((1, mesh.nl, nx, ny))
+        self._2d_vortex = RankineVortex2D(perturbation_magnitude=magnitude)
 
 
-class BaroclinicVortex(RankineVortex3D):
+class BaroclinicVortex(RankineVortex3D, BaroclinicPerturbation):
     """3D Rankine Vortex with only superior layer active."""
 
     _type = "vortex-baroclinic"
 
     def _set_2d_vortex(self, magnitude: float) -> None:
-        self._2d_vortex = RankineVortex2D(perturbation_magnitude=magnitude)
-
-    def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
-        """Value of the stream function ψ.
+        """Set the 2D  vortex.
 
         Args:
-            mesh (Mesh3D): 3D Mesh to generate Stream Function on.
-
-        Returns:
-            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped.
+            magnitude (float): Vortex perturbation magnitude
         """
-        psi_2d = self._2d_vortex.compute_stream_function(mesh.remove_z_h())
-        nx, ny = psi_2d.shape[-2:]
-        psi = torch.ones(
-            (1, mesh.nl, nx, ny),
-            device=DEVICE,
-            dtype=torch.float64,
-        )
-
-        psi[0, 0, ...] = psi_2d
-        return psi
+        self._2d_vortex = RankineVortex2D(perturbation_magnitude=magnitude)
 
 
 class PerturbedBarotropicVortex(BarotropicVortex):
