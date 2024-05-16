@@ -6,7 +6,6 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.mesh import SpaceDiscretization3D
 from qgsw.models import QG
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger, coriolis
@@ -16,6 +15,7 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
+from qgsw.spatial import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True

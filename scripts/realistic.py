@@ -10,7 +10,7 @@ import torch
 sys.path.append("../src")
 from qgsw.forcing.bathymetry import Bathymetry
 from qgsw.forcing.wind import WindForcing
-from qgsw.mesh import SpaceDiscretization3D
+from qgsw.spatial import SpaceDiscretization3D
 from qgsw.models import SW, QG
 from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
