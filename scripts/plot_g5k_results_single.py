@@ -5,8 +5,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from qgsw.plots.vorticity import (
+    SecondLayerVorticityAxes,
     SurfaceVorticityAxes,
-    VorticityFigure,
+    VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
 from qgsw.utils.sorting import sort_files
@@ -26,8 +27,12 @@ tau = summary.total_steps / config.simulation.duration
 results = list(folder.glob(f"{model.prefix}*.npz"))
 qg_axes = SurfaceVorticityAxes.from_mask()
 qg_axes.set_title(r"$\omega_{TOP}$" + f"-{model.prefix}")
-plot = VorticityFigure(
+qg_axes_2 = SecondLayerVorticityAxes.from_mask()
+qg_axes_2.set_title(r"$\omega_{INF}$" + f"-{model.prefix}")
+plot = VorticityComparisonFigure(
     qg_axes,
+    qg_axes_2,
+    common_cbar=False,
 )
 plot.figure.suptitle(f"Plotting from: {folder.name}")
 results = list(folder.glob(f"{model.prefix}*.npz"))
@@ -38,6 +43,7 @@ steps = len(nbs)
 freq_save = steps // 10
 for i in range(steps):
     plot.update_with_files(
+        files[i],
         files[i],
     )
     plot.figure.suptitle(
