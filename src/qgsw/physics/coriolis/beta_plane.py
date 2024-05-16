@@ -25,13 +25,13 @@ def compute_entire_beta_plane(
     """
     if mesh_2d.xy_unit == DEGREES:
         return _beta_plane_from_degree(
-            latitude=mesh_2d.xy[1],
+            latitude=mesh_2d.xy.y,
             f0=compute_f0(mesh_2d=mesh_2d),
             beta=compute_beta(mesh_2d=mesh_2d),
         )
     if mesh_2d.xy_unit == RADIANS:
         return _beta_plane_from_radians(
-            latitude=mesh_2d.xy[1],
+            latitude=mesh_2d.xy.y,
             f0=compute_f0(mesh_2d=mesh_2d),
             beta=compute_beta(mesh_2d=mesh_2d),
         )
