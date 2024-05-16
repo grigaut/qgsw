@@ -2,8 +2,8 @@
 
 import torch
 
-from qgsw.mesh.mesh import Mesh2D
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION
+from qgsw.spatial.mesh import Mesh2D
 from qgsw.spatial.units._units import RADIANS
 from qgsw.spatial.units.exceptions import UnitError
 

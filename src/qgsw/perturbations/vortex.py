@@ -9,19 +9,19 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
-from qgsw.mesh.mesh import Mesh2D
 from qgsw.models.core import helmholtz
 from qgsw.perturbations.base import (
     BaroclinicPerturbation,
     BarotropicPerturbation,
     _Perturbation,
 )
+from qgsw.spatial.mesh import Mesh2D
 from qgsw.spatial.units._units import METERS, Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.mesh.mesh import Mesh2D, Mesh3D
+    from qgsw.spatial.mesh import Mesh2D, Mesh3D
 
 
 class RankineVortex2D:
