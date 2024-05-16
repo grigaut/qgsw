@@ -11,7 +11,7 @@ from qgsw.models import SW, QG
 from qgsw.models.sw import SWFilterBarotropic
 from qgsw.configs import Configuration
 from qgsw.physics import coriolis
-from qgsw.spatial import SpaceDiscretization3D
+from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.forcing.wind import WindForcing
 from qgsw.specs import DEVICE
 from qgsw import verbose

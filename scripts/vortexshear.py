@@ -13,7 +13,7 @@ from qgsw.configs import Configuration
 from qgsw.perturbations import Perturbation
 from pathlib import Path
 from qgsw.forcing.wind import WindForcing
-from qgsw.spatial import SpaceDiscretization3D
+from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.physics import compute_burger
 from qgsw.models import SW, QG, SWFilterBarotropic
 from qgsw.specs import DEVICE

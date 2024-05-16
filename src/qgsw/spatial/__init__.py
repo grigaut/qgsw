@@ -1,6 +1,6 @@
 """Spatial tools."""
 
-from qgsw.spatial.core.meshes import (
+from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     SpaceDiscretization3D,
 )

@@ -15,7 +15,7 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
-from qgsw.spatial import SpaceDiscretization3D
+from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 
 torch.backends.cudnn.deterministic = True
