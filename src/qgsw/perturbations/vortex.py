@@ -278,6 +278,14 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
         """
 
     def _compute_streamfunction_2d(self, mesh: Mesh2D) -> torch.Tensor:
+        """Compute the streamfunction for a single layer.
+
+        Args:
+            mesh (Mesh2D): Mesh to use for stream function computation.
+
+        Returns:
+            torch.Tensor: Stream function values.
+        """
         return self._2d_vortex.compute_stream_function(mesh)
 
     @property

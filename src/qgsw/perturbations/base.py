@@ -51,7 +51,15 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _compute_streamfunction_2d(self, mesh: Mesh2D) -> torch.Tensor: ...
+    def _compute_streamfunction_2d(self, mesh: Mesh2D) -> torch.Tensor:
+        """Compute the streamfunction for a single layer.
+
+        Args:
+            mesh (Mesh2D): Mesh to use for stream function computation.
+
+        Returns:
+            torch.Tensor: Stream function values.
+        """
 
     @abstractmethod
     def compute_stream_function(self, mesh: Mesh3D) -> torch.Tensor:
