@@ -20,7 +20,7 @@ from qgsw.spatial.units._units import (
 )
 
 
-class MeshConfig(_Config):
+class SpaceConfig(_Config):
     """Grid Configuration."""
 
     section: str = keys.MESH["section"]

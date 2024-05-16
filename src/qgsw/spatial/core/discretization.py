@@ -12,7 +12,7 @@ from qgsw.spatial.units._units import METERS
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs.mesh import MeshConfig
+    from qgsw.configs.mesh import SpaceConfig
     from qgsw.configs.models import ModelConfig
     from qgsw.spatial.units._units import Unit
 
@@ -183,11 +183,11 @@ class SpaceDiscretization2D:
         )
 
     @classmethod
-    def from_config(cls, mesh_config: MeshConfig) -> Self:
-        """Construct the SpaceDiscretization2D given a MeshConfig object.
+    def from_config(cls, mesh_config: SpaceConfig) -> Self:
+        """Construct the SpaceDiscretization2D given a SpaceConfig object.
 
         Args:
-            mesh_config (MeshConfig): Mesh Configuration Object.
+            mesh_config (SpaceConfig): Mesh Configuration Object.
 
         Returns:
             Self: Corresponding SpaceDiscretization2D.
@@ -451,13 +451,13 @@ class SpaceDiscretization3D:
     @classmethod
     def from_config(
         cls,
-        mesh_config: MeshConfig,
+        mesh_config: SpaceConfig,
         model_config: ModelConfig,
     ) -> Self:
-        """Construct the 3D Grid given a MeshConfig object.
+        """Construct the 3D Grid given a SpaceConfig object.
 
         Args:
-            mesh_config (MeshConfig): Mesh Configuration Object.
+            mesh_config (SpaceConfig): Mesh Configuration Object.
             model_config (ModelConfig): Model Configuration Object.
 
         Returns:

@@ -16,7 +16,7 @@ from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
 
 if TYPE_CHECKING:
-    from qgsw.configs.mesh import MeshConfig
+    from qgsw.configs.mesh import SpaceConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.windstress import WindStressConfig
 
@@ -303,16 +303,16 @@ class WindForcing:
     def from_config(
         cls,
         windstress_config: WindStressConfig,
-        mesh_config: MeshConfig,
+        mesh_config: SpaceConfig,
         physics_config: PhysicsConfig,
     ) -> Self:
-        """Construct the Wind Forcing given a MeshConfig object.
+        """Construct the Wind Forcing given a SpaceConfig object.
 
         The method creates the Grid based on the space configuration.
 
         Args:
             windstress_config (WindStressConfig): Windstress Configuration
-            mesh_config (MeshConfig): Space configuration
+            mesh_config (SpaceConfig): Space configuration
             physics_config (PhysicsConfig): Physics configuration
 
         Raises:
