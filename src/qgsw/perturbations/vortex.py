@@ -219,15 +219,7 @@ class PerturbedVortex2D(RankineVortex2D):
         ).squeeze()  # shape: (nx,ny)
         return filtered_field / filtered_field.abs().max()
 
-    def _compute_vorticity(self, mesh: Mesh2D) -> torch.Tensor:
-        """Compute the vorticity ω of the vortex.
-
-        Args:
-            mesh (Mesh2D): Grid.
-
-        Returns:
-            torch.Tensor: Vorticity Value.
-        """
+    def _generate_vortex(self, mesh: Mesh2D) -> torch.Tensor:
         self._raise_if_invalid_unit(mesh)
         x, y = mesh.xy
         r0, r1, r2 = self.compute_vortex_scales(mesh=mesh)
@@ -240,27 +232,26 @@ class PerturbedVortex2D(RankineVortex2D):
         outer_ring = torch.sigmoid((r2 - r) / self._norm_factor)
 
         mask_ring = inner_ring * outer_ring
-        ring_values = (
-            mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
-        )
+        return mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
+
+    def _compute_vorticity(self, mesh: Mesh2D) -> torch.Tensor:
+        """Compute the vorticity ω of the vortex.
+
+        Args:
+            mesh (Mesh2D): Grid.
+
+        Returns:
+            torch.Tensor: Vorticity Value.
+        """
+        vortex = self._generate_vortex(mesh=mesh)
+        vortex_norm = vortex / vortex.abs().max()
         perturbation = self._compute_perturbation(mesh)
+        is_vortex = vortex_norm.abs() > self._threshold
         masked_perturbation = perturbation.where(
-            ring_values.abs() > self._threshold,
+            is_vortex,
             torch.zeros_like(perturbation),
         )
-        nb = (ring_values.abs() > self._threshold).sum()
-        total = (
-            ring_values.abs()
-            .where(
-                ring_values.abs() > self._threshold,
-                torch.zeros_like(ring_values),
-            )
-            .sum()
-        )
-        return (
-            ring_values
-            + total / nb * self.perturbation_magnitude * masked_perturbation
-        )
+        return vortex + self.perturbation_magnitude * masked_perturbation
 
 
 class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
