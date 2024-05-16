@@ -30,26 +30,23 @@ class _WindForcing(TypeSwitch, metaclass=ABCMeta):
         self,
         windstress_config: WindStressConfig,
         physics_config: PhysicsConfig,
-        mesh: SpaceDiscretization2D,
+        space_2d: SpaceDiscretization2D,
     ) -> None:
         """Instantiate _WindForcing.
 
         Args:
             windstress_config (WindStressConfig): Windstress Forcing.
             physics_config (PhysicsConfig): Physics configuration
-            mesh (SpaceDiscretization2D): Mesh
+            space_2d (SpaceDiscretization2D): 2D Space Discretization
         """
         super(TypeSwitch).__init__()
         self._physics = physics_config
         self._windstress = windstress_config
-        self._mesh = mesh
+        self._space = space_2d
 
     @abstractmethod
     def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
-        """Generate Wind Stress constraints over the given mesh.
-
-        Args:
-            mesh (SpaceDiscretization2D): Grid to generate wind stress over.
+        """Generate Wind Stress constraints over the space.
 
         Returns:
             tuple[float | torch.Tensor, float | torch.Tensor]: tau_x, tau_y
@@ -65,16 +62,16 @@ class CosineZonalWindForcing(_WindForcing):
         self,
         windstress_config: WindStressConfig,
         physics_config: PhysicsConfig,
-        mesh: SpaceDiscretization2D,
+        spave_2d: SpaceDiscretization2D,
     ) -> None:
         """Instantiate CosineZonalWindForcing.
 
         Args:
             windstress_config (WindStressConfig): Windstress configuration
             physics_config (PhysicsConfig): Physics configuration
-            mesh (SpaceDiscretization2D): Mesh
+            spave_2d (SpaceDiscretization2D): 2D Space Discretization
         """
-        super().__init__(windstress_config, physics_config, mesh)
+        super().__init__(windstress_config, physics_config, spave_2d)
         magnitude = self._windstress.magnitude
         self._tau0 = magnitude / self._physics.rho
 
@@ -93,10 +90,10 @@ class CosineZonalWindForcing(_WindForcing):
             float | torch.Tensor: Tau_x
         """
         y_ugrid = 0.5 * (
-            self._mesh.omega.xy[1][:, 1:] + self._mesh.omega.xy[1][:, :-1]
+            self._space.omega.xy.y[:, 1:] + self._space.omega.xy.y[:, :-1]
         )
         wind_profile = torch.cos(
-            2 * torch.pi * (y_ugrid - self._mesh.ly / 2) / self._mesh.ly,
+            2 * torch.pi * (y_ugrid - self._space.ly / 2) / self._space.ly,
         )
         return self._tau0 * wind_profile[1:-1, :]
 
@@ -118,16 +115,16 @@ class DataWindForcing(_WindForcing):
         self,
         windstress_config: WindStressConfig,
         physics_config: PhysicsConfig,
-        mesh: SpaceDiscretization2D,
+        space: SpaceDiscretization2D,
     ) -> None:
         """Instantiate DataWindForcing.
 
         Args:
             windstress_config (WindStressConfig): Windstress configuration
             physics_config (PhysicsConfig): Physics configuration
-            mesh (SpaceDiscretization2D): Mesh
+            space (SpaceDiscretization2D): 2D Space Discretization
         """
-        super().__init__(windstress_config, physics_config, mesh)
+        super().__init__(windstress_config, physics_config, space)
         self._loader = WindForcingLoader(config=windstress_config)
         self._data_type = windstress_config.data.data_type
 
@@ -167,8 +164,9 @@ class DataWindForcing(_WindForcing):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y
         """
-        taux = np.zeros((time.shape[0] + 1, self._mesh.u.nx, self._mesh.u.ny))
-        tauy = np.zeros((time.shape[0] + 1, self._mesh.v.nx, self._mesh.v.ny))
+        time_shape = time.shape[0] + 1
+        taux = np.zeros((time_shape, self._space.u.nx, self._space.u.ny))
+        tauy = np.zeros((time_shape, self._space.v.nx, self._space.v.ny))
 
         drag_coef = self._windstress.drag_coefficient
         rho = self._physics.rho
@@ -189,8 +187,8 @@ class DataWindForcing(_WindForcing):
                 tauy_ref,
                 method=self._windstress.data.method,
             )
-            taux_i = taux_interpolator(self._mesh.u.xy)
-            tauy_i = tauy_interpolator(self._mesh.v.xy)
+            taux_i = taux_interpolator(self._space.u.xy)
+            tauy_i = tauy_interpolator(self._space.v.xy)
             taux[t, :, :] = taux_i
             tauy[t, :, :] = tauy_i
 
@@ -226,8 +224,9 @@ class DataWindForcing(_WindForcing):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y
         """
-        taux = np.zeros((time.shape[0] + 1, self._mesh.nx + 1, self._mesh.ny))
-        tauy = np.zeros((time.shape[0] + 1, self._mesh.nx, self._mesh.ny + 1))
+        time_shape = time.shape[0] + 1
+        taux = np.zeros((time_shape, self._space.nx + 1, self._space.ny))
+        tauy = np.zeros((time_shape, self._space.nx, self._space.ny + 1))
         for t in range(time.shape[0]):
             ## linear interpolation with scipy
             taux_ref = full_taux_ref[t].T
@@ -243,10 +242,10 @@ class DataWindForcing(_WindForcing):
                 method=self._config.windstress.data.method,
             )
             taux_i = taux_interpolator(
-                (self._mesh.u.xy[0] + 360, self._mesh.u.xy[1]),
+                (self._space.u.xy.x + 360, self._space.u.xy.y),
             )
             tauy_i = tauy_interpolator(
-                (self._mesh.v.xy[0] + 360, self._mesh.v.xy[1]),
+                (self._space.v.xy.x + 360, self._space.v.xy.y),
             )
 
             taux[t, :, :] = taux_i
@@ -309,11 +308,11 @@ class WindForcing:
     ) -> Self:
         """Construct the Wind Forcing given a MeshConfig object.
 
-        The method creates the Gird based on the mesh configuration.
+        The method creates the Grid based on the space configuration.
 
         Args:
             windstress_config (WindStressConfig): Windstress Configuration
-            mesh_config (MeshConfig): Mesh configuration
+            mesh_config (MeshConfig): Space configuration
             physics_config (PhysicsConfig): Physics configuration
 
         Raises:
@@ -334,11 +333,11 @@ class WindForcing:
             )
             raise KeyError(msg)
 
-        mesh = SpaceDiscretization2D.from_config(mesh_config=mesh_config)
+        space_2d = SpaceDiscretization2D.from_config(mesh_config=mesh_config)
 
         forcing = wind_forcings[windstress_config.type](
             windstress_config=windstress_config,
             physics_config=physics_config,
-            mesh=mesh,
+            space_2d=space_2d,
         )
         return cls(forcing=forcing)
