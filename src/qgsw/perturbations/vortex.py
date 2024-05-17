@@ -132,7 +132,8 @@ class RankineVortex2D:
         outer_ring = torch.sigmoid((r2 - r) / self._norm_factor)
         mask_ring = inner_ring * outer_ring
         # compute vorticity
-        return mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
+        vortex = mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
+        return vortex / vortex.abs().max()
 
 
 class PerturbedVortex2D(RankineVortex2D):
@@ -231,7 +232,8 @@ class PerturbedVortex2D(RankineVortex2D):
         outer_ring = torch.sigmoid((r2 - r) / self._norm_factor)
 
         mask_ring = inner_ring * outer_ring
-        return mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
+        vortex = mask_ring / mask_ring.mean() - mask_core / mask_core.mean()
+        return vortex / vortex.abs().max()
 
     def _compute_vorticity(self, mesh_2d: Mesh2D) -> torch.Tensor:
         """Compute the vorticity ω of the vortex.
