@@ -148,7 +148,11 @@ class BarotropicPerturbation(_Perturbation):
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
-        psi = torch.ones(1, mesh_3d.nl, mesh_3d.nx, mesh_3d.ny)
+        psi = torch.ones(
+            (1, mesh_3d.nl, mesh_3d.nx, mesh_3d.ny),
+            device=DEVICE,
+            dtype=torch.float64,
+        )
         for i in range(mesh_3d.nl):
             psi_2d = self._compute_streamfunction_2d(mesh_3d.remove_z_h())
             psi[0, i, ...] = psi_2d
