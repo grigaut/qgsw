@@ -143,10 +143,6 @@ class PerturbedVortex2D(RankineVortex2D):
     _sigma: float = 3
     _threshold: float = 1e-6
 
-    def _set_seed(self) -> None:
-        """Set torch seed to 0."""
-        torch.random.manual_seed(0)
-
     def _generate_random_field(
         self,
         nx: int,
@@ -159,11 +155,9 @@ class PerturbedVortex2D(RankineVortex2D):
             ny (int): Number of cells in the y direction
 
         Returns:
-            torch.Tensor: Random field.
+            torch.Tensor: Random field, (nx, ny) shaped.
         """
-        self._set_seed()
         # Select a sub area of the entire grid
-
         random_field = torch.rand(
             (nx, ny),
             dtype=torch.float64,
@@ -201,6 +195,14 @@ class PerturbedVortex2D(RankineVortex2D):
         return gaussian_kernel / torch.sum(gaussian_kernel)
 
     def _compute_perturbation(self, mesh_2d: Mesh2D) -> torch.Tensor:
+        """Compute the perturbation over the entire domain.
+
+        Args:
+            mesh_2d (Mesh2D): Mesh to generate the perturbation on.
+
+        Returns:
+            torch.Tensor: Perturbation values (nx, ny) shaped.
+        """
         kernel_size = int(mesh_2d.nx / self._kernel_size_ratio)
         size = kernel_size + 1 if kernel_size % 2 == 0 else kernel_size
         random_field = self._generate_random_field(
@@ -220,6 +222,15 @@ class PerturbedVortex2D(RankineVortex2D):
         return filtered_field / filtered_field.abs().max()
 
     def _generate_vortex(self, mesh_2d: Mesh2D) -> torch.Tensor:
+        """Generate the vortex.
+
+        Args:
+            mesh_2d (Mesh2D): Mesh to generate vortex on.
+
+        Returns:
+            torch.Tensor: Vorticity values, between -1 and 1,
+            (nx, ny) shaped.
+        """
         self._raise_if_invalid_unit(mesh_2d)
         x, y = mesh_2d.xy
         r0, r1, r2 = self.compute_vortex_scales(mesh_2d=mesh_2d)
@@ -242,7 +253,7 @@ class PerturbedVortex2D(RankineVortex2D):
             mesh_2d (Mesh2D): Grid.
 
         Returns:
-            torch.Tensor: Vorticity Value.
+            torch.Tensor: Vorticity Value, (nx,ny) shaped.
         """
         vortex = self._generate_vortex(mesh_2d=mesh_2d)
         vortex_norm = vortex / vortex.abs().max()

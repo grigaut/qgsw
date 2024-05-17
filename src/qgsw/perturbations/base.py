@@ -58,7 +58,7 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
             mesh_3d (Mesh2D): Mesh to use for stream function computation.
 
         Returns:
-            torch.Tensor: Stream function values.
+            torch.Tensor: Stream function values, (1, nl, nx, ny) shaped.
         """
 
     @abstractmethod
@@ -148,9 +148,11 @@ class BarotropicPerturbation(_Perturbation):
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
-        psi_2d = self._compute_streamfunction_2d(mesh_3d.remove_z_h())
-        nx, ny = psi_2d.shape[-2:]
-        return psi_2d.expand((1, mesh_3d.nl, nx, ny))
+        psi = torch.ones(1, mesh_3d.nl, mesh_3d.nx, mesh_3d.ny)
+        for i in range(mesh_3d.nl):
+            psi_2d = self._compute_streamfunction_2d(mesh_3d.remove_z_h())
+            psi[0, i, ...] = psi_2d
+        return psi
 
 
 class BaroclinicPerturbation(_Perturbation):
