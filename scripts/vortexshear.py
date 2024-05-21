@@ -182,11 +182,11 @@ for Ro in [
 
     if plots_required:
         mask = sw_ml.masks.not_w[0, 0].cpu().numpy()
-        sw_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+        sw_axes = SurfaceVorticityAxes.from_kwargs(mask=mask)
         sw_axes.set_title(r"$\omega_{SW}$")
-        qg_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+        qg_axes = SurfaceVorticityAxes.from_kwargs(mask=mask)
         qg_axes.set_title(r"$\omega_{QG}$")
-        diff_axes = SurfaceVorticityAxes.from_mask(mask=mask)
+        diff_axes = SurfaceVorticityAxes.from_kwargs(mask=mask)
         diff_axes.set_title(r"$\omega_{SW} - \omega_{QG}$")
         plot = VorticityComparisonFigure(sw_axes, qg_axes, diff_axes)
 

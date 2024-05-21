@@ -10,13 +10,12 @@ from typing_extensions import ParamSpec, Self
 
 from qgsw.plots.exceptions import (
     AxesInstantiationError,
-    InvalidMaskError,
-    MismatchingMaskError,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
@@ -95,43 +94,22 @@ class BaseAxesContent(metaclass=ABCMeta):
 
     def __init__(
         self,
-        mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> None:
         """Instantiate the AxesContent.
 
         Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
             **kwargs: Additional arguments to pass to plotting method.
         """
-        self._raise_if_invalid_mask(mask=mask)
-        self._mask = mask
         self._kwargs = kwargs
 
-    def _raise_if_invalid_mask(self, mask: np.ndarray | None) -> None:
-        """Raise error if the Mask is not valid.
-
-        Args:
-            mask (np.ndarray | None): Mask to inspect.
-
-        Raises:
-            InvalidMaskError: If the mask does not only contain 0s and 1s.
-        """
-        if mask is None:
-            return
-        if not np.all([(e in {0, 1}) for e in np.unique(mask)]):
-            msg = "The mask must contain only 0s and 1s."
-            raise InvalidMaskError(msg)
-
     @abstractmethod
-    def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
+    def _update(self, ax: Axes, data: np.ndarray) -> Axes:
         """Update ax content using data from a np.ndarray.
 
         Args:
             ax (Axes): Axes to update the content of.
             data (np.ndarray): Data to use for content update.
-            mask (np.ndarray): Mask to use to show data.
 
         Returns:
             Axes: Updated axes.
@@ -149,8 +127,7 @@ class BaseAxesContent(metaclass=ABCMeta):
             Axes: Updated axes.
         """
         self._kwargs = self._kwargs | kwargs
-        mask = self._validate_mask(data=data)
-        return self._update(ax=ax, data=data, mask=mask)
+        return self._update(ax=ax, data=data)
 
     @abstractmethod
     def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
@@ -184,27 +161,6 @@ class BaseAxesContent(metaclass=ABCMeta):
         Returns:
             np.ndarray: Relevant data.
         """
-
-    def _validate_mask(self, data: np.ndarray) -> np.ndarray:
-        """Validate Mask.
-
-        Args:
-            data (np.ndarray): Data to use as content.
-
-        Raises:
-            MismatchingMaskError: If the mask's shape doesn't match
-            the data's shape.
-            InvalidMaskError: If the mask do
-
-        Returns:
-            np.ndarray: Valid Mask.
-        """
-        if self._mask is None:
-            return np.zeros(data.shape)
-        if self._mask.shape != data.shape:
-            msg = "Mask's shape must match data's shape."
-            raise MismatchingMaskError(msg)
-        return self._mask
 
 
 AxesContext = TypeVar("AxesContext", bound=BaseAxesContext)
@@ -336,16 +292,13 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def from_mask(
+    def from_kwargs(
         cls,
-        mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> Self:
-        """Instantiate Figure only from the mask.
+        """Instantiate Figure only from the kwargs.
 
         Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
             **kwargs: Additional arguments to pass to plotting method.
 
         Returns:

@@ -123,19 +123,15 @@ class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def from_mask(
+    def from_kwargs(
         cls,
-        mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> Self:
-        """Instantiate Figure only from the mask.
+        """Instantiate Figure only from the kwargs.
 
         Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
             **kwargs: Additional arguments to pass to plotting method.
 
         Returns:
             Self: Instantiated plot.
         """
-        return cls()
