@@ -26,14 +26,14 @@ nbs = []
 files = []
 for model in config.models:
     results = list(folder.glob(f"{model.prefix}*.npz"))
-    ax = SurfaceVorticityAxes.from_mask()
+    ax = SurfaceVorticityAxes.from_kwargs()
     ax.set_title(r"$\omega_{TOP}$" + f"-{model.prefix}")
     axes.append(ax)
     nb, fs = sort_files(results, model.prefix, ".npz")
     nbs.append(nb)
     files.append(fs)
     if model.nl > 1:
-        ax = SecondLayerVorticityAxes.from_mask()
+        ax = SecondLayerVorticityAxes.from_kwargs()
         ax.set_title(r"$\omega_{INF}$" + f"-{model.prefix}")
         axes.append(ax)
         nb, fs = sort_files(results, model.prefix, ".npz")

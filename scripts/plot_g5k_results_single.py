@@ -15,7 +15,7 @@ from qgsw.utils.sorting import sort_files
 load_dotenv()
 
 storage = Path(os.environ["G5K_IMPORT_STORAGE"])
-folder = storage.parent.joinpath("imports")
+folder = storage.parent.joinpath("random_30km_baroclinic")
 
 
 summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
@@ -25,9 +25,9 @@ model = config.model
 tau = summary.total_steps / config.simulation.duration
 
 results = list(folder.glob(f"{model.prefix}*.npz"))
-qg_axes = SurfaceVorticityAxes.from_mask()
+qg_axes = SurfaceVorticityAxes.from_kwargs()
 qg_axes.set_title(r"$\omega_{TOP}$" + f"-{model.prefix}")
-qg_axes_2 = SecondLayerVorticityAxes.from_mask()
+qg_axes_2 = SecondLayerVorticityAxes.from_kwargs()
 qg_axes_2.set_title(r"$\omega_{INF}$" + f"-{model.prefix}")
 plot = VorticityComparisonFigure(
     qg_axes,

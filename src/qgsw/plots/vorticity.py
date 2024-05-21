@@ -70,21 +70,18 @@ class VorticityAxesContent(BaseAxesContent):
 
     def __init__(
         self,
-        mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> None:
         """Instantiate the AxesContent.
 
         Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
             **kwargs: Additional arguments to pass to plotting method.
         """
         palette = plt.cm.bwr
         kwargs["cmap"] = kwargs.get("cmap", palette)
         kwargs["origin"] = kwargs.get("origin", "lower")
         kwargs["animated"] = kwargs.get("animated", True)
-        super().__init__(mask, **kwargs)
+        super().__init__(**kwargs)
         self._axesim = None
         self._cbar: Colorbar | None = None
         self._has_cbar: bool = False
@@ -104,19 +101,17 @@ class VorticityAxesContent(BaseAxesContent):
         }
         return self._kwargs | cbar_extrems
 
-    def _update(self, ax: Axes, data: np.ndarray, mask: np.ndarray) -> Axes:
+    def _update(self, ax: Axes, data: np.ndarray) -> Axes:
         """Update the Axes content.
 
         Args:
             ax (Axes): Axes to update.
             data (np.ndarray): Data to use for update (nx,ny).
-            mask (np.ndarray): Mask to apply on data.
 
         Returns:
             Axes: Updated Axes.
         """
-        masked_data = np.ma.masked_where(mask, data).T
-        axesim = ax.imshow(masked_data, **self._center_cbar(data))
+        axesim = ax.imshow(data, **self._center_cbar(data))
         self.remove_colorbar()
         self.add_colorbar(ax=ax, axesim=axesim)
         return ax
@@ -206,16 +201,13 @@ class SurfaceVorticityAxes(
     """Vorticity axes for Surface vorticity plots."""
 
     @classmethod
-    def from_mask(
+    def from_kwargs(
         cls,
-        mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> Self:
-        """Instantiate Figure only from the mask.
+        """Instantiate Figure only from the kwargs.
 
         Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
             **kwargs: Additional arguments to pass to plotting method.
 
         Returns:
@@ -223,7 +215,7 @@ class SurfaceVorticityAxes(
         """
         return cls(
             context=VorticityAxesContext(),
-            content=SurfaceVorticityAxesContent(mask=mask, **kwargs),
+            content=SurfaceVorticityAxesContent(**kwargs),
         )
 
 
@@ -233,16 +225,13 @@ class SecondLayerVorticityAxes(
     """Vorticity axes for second layer vorticity plots."""
 
     @classmethod
-    def from_mask(
+    def from_kwargs(
         cls,
-        mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> Self:
-        """Instantiate Figure only from the mask.
+        """Instantiate Figure only from the kwargs.
 
         Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
             **kwargs: Additional arguments to pass to plotting method.
 
         Returns:
@@ -250,7 +239,7 @@ class SecondLayerVorticityAxes(
         """
         return cls(
             context=VorticityAxesContext(),
-            content=SecondLayerVorticityAxesContent(mask=mask, **kwargs),
+            content=SecondLayerVorticityAxesContent(**kwargs),
         )
 
 
@@ -282,23 +271,20 @@ class VorticityFigure(BaseSingleFigure[VorticityAxes]):
         super().update(data, **kwargs)
 
     @classmethod
-    def from_mask(
+    def from_kwargs(
         cls,
-        mask: np.ndarray | None = None,
         **kwargs: P.kwargs,
     ) -> Self:
-        """Instantiate Figure only from the mask.
+        """Instantiate Figure only from the kwargs.
 
         Args:
-            mask (np.ndarray | None, optional): Mask to apply on data.
-            Mask will be set to ones if None. Defaults to None.
             **kwargs: Additional arguments to pass to plotting method.
 
         Returns:
             Self: Instantiated plot.
         """
         return cls(
-            axes_manager=SurfaceVorticityAxes.from_mask(mask=mask, **kwargs),
+            axes_manager=SurfaceVorticityAxes.from_kwargs(**kwargs),
         )
 
 

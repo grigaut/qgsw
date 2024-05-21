@@ -143,9 +143,9 @@ verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
 # Instantiate Figures
-qg_top_axes = SurfaceVorticityAxes.from_mask()
+qg_top_axes = SurfaceVorticityAxes.from_kwargs()
 qg_top_axes.set_title(r"$\omega_{QG-TOP}$")
-qg_inf_axes = SecondLayerVorticityAxes.from_mask()
+qg_inf_axes = SecondLayerVorticityAxes.from_kwargs()
 qg_inf_axes.set_title(r"$\omega_{QG-INF}$")
 plot = VorticityComparisonFigure(qg_top_axes, qg_inf_axes, common_cbar=False)
 
