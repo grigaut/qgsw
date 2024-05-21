@@ -15,7 +15,7 @@ from qgsw.perturbations.base import (
     BarotropicPerturbation,
     _Perturbation,
 )
-from qgsw.spatial.core.mesh import Mesh2D
+from qgsw.spatial.core.mesh import Mesh2D, Mesh3D
 from qgsw.spatial.units._units import METERS, Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
@@ -142,6 +142,14 @@ class PerturbedVortex2D(RankineVortex2D):
     _kernel_size_ratio: int = 10
     _sigma: float = 3
     _threshold: float = 1e-6
+
+    def set_random_seed(self, seed: int) -> None:
+        """Set the pytorch random seed.
+
+        Args:
+            seed (int): Seed to set.
+        """
+        torch.random.manual_seed(seed=seed)
 
     def _generate_random_field(
         self,
@@ -358,6 +366,18 @@ class PerturbedBarotropicVortex(RankineVortex3D, BarotropicPerturbation):
         """
         self._2d_vortex = PerturbedVortex2D(perturbation_magnitude=magnitude)
 
+    def compute_stream_function(self, mesh_3d: Mesh3D) -> torch.Tensor:
+        """Value of the stream function ψ.
+
+        Args:
+            mesh_3d (Mesh3D): 3D Mesh to generate Stream Function on.
+
+        Returns:
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
+        """
+        self._2d_vortex.set_random_seed(0)
+        return super().compute_stream_function(mesh_3d)
+
 
 class PerturbedBaroclinicVortex(RankineVortex3D, BaroclinicPerturbation):
     """Perturbed Baroclinic vortex."""
@@ -371,3 +391,15 @@ class PerturbedBaroclinicVortex(RankineVortex3D, BaroclinicPerturbation):
             magnitude (float): Vortex perturbation magnitude
         """
         self._2d_vortex = PerturbedVortex2D(perturbation_magnitude=magnitude)
+
+    def compute_stream_function(self, mesh_3d: Mesh3D) -> torch.Tensor:
+        """Value of the stream function ψ.
+
+        Args:
+            mesh_3d (Mesh3D): 3D Mesh to generate Stream Function on.
+
+        Returns:
+            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
+        """
+        self._2d_vortex.set_random_seed(0)
+        return super().compute_stream_function(mesh_3d)
