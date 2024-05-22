@@ -47,12 +47,13 @@ Ro = 0.1
 cfl_adv = 0.5
 cfl_gravity = 0.5
 
-# Single Layer Set-up
-prefix_1l = config.models[0].prefix
-## Vortex
-perturbation_1l = Perturbation.from_config(
+## Perturbation
+perturbation = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
+
+# Single Layer Set-up
+prefix_1l = config.models[0].prefix
 ## Mesh
 space_1l = SpaceDiscretization3D.from_config(config.space, config.models[0])
 # "" Coriolis
@@ -66,7 +67,7 @@ Bu_1l = compute_burger(
     g=config.models[0].g_prime[0],
     h_scale=config.models[0].h[0],
     f0=config.physics.f0,
-    length_scale=perturbation_1l.compute_scale(space_1l.omega),
+    length_scale=perturbation.compute_scale(space_1l.omega),
 )
 verbose.display(
     msg=f"Single-Layer Burger Number: {Bu_1l:.2f}",
@@ -93,7 +94,7 @@ params_1l = {
     "dt": 0.0,
 }
 qg_1l = QG(params_1l)
-p0_1l = perturbation_1l.compute_initial_pressure(
+p0_1l = perturbation.compute_initial_pressure(
     space_1l.omega,
     config.physics.f0,
     Ro,
@@ -115,10 +116,6 @@ dt_1l = min(
 
 # Two Layers Set-up
 prefix_2l = config.models[1].prefix
-## Vortex
-perturbation_2l = Perturbation.from_config(
-    perturbation_config=config.perturbation,
-)
 ## Mesh
 space_2l = SpaceDiscretization3D.from_config(config.space, config.models[1])
 ## Coriolis
@@ -136,7 +133,7 @@ Bu_2l = compute_burger(
     g=config.models[1].g_prime[0],
     h_scale=h_eq,
     f0=config.physics.f0,
-    length_scale=perturbation_2l.compute_scale(space_2l.omega),
+    length_scale=perturbation.compute_scale(space_2l.omega),
 )
 verbose.display(
     msg=f"Multi-Layers Burger Number: {Bu_2l:.2f}",
@@ -163,7 +160,7 @@ params_2l = {
     "dt": 0.0,
 }
 qg_2l = QG(params_2l)
-p0_2l = perturbation_2l.compute_initial_pressure(
+p0_2l = perturbation.compute_initial_pressure(
     space_2l.omega,
     config.physics.f0,
     Ro,
@@ -181,7 +178,6 @@ dt_2l = min(
     cfl_adv * config.space.dy / v_max_2l,
     cfl_gravity * config.space.dx / c_2l,
 )
-
 
 # Instantiate Models
 dt = min(dt_1l, dt_2l)
