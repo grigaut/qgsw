@@ -60,7 +60,6 @@ class Model(metaclass=ABCMeta):
             'nl':       nl, number of stacked layer
             'dx':       float or Tensor (nx, ny), dx metric term
             'dy':       float or Tensor (nx, ny), dy metric term
-            'H':        Tensor (nl,) or (nl, nx, ny),
             unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
             'f':        Tensor (nx, ny), Coriolis parameter
@@ -197,7 +196,7 @@ class Model(metaclass=ABCMeta):
         """
         # Validate parameters values and shapes.
         ## H
-        self.H = self._validate_layers(param=param, key="H")
+        self.H = self._validate_layers(self.space.h.xyh.h)
         ## optional mask
         self.masks = self._validate_mask(param=param, key="mask")
         ## boundary conditions
@@ -229,27 +228,24 @@ class Model(metaclass=ABCMeta):
 
     def _validate_layers(
         self,
-        param: dict[str, Any],
-        key: str,
+        h: torch.Tensor,
     ) -> torch.Tensor:
         """Validate H (unperturbed layer thickness) input value.
 
         Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for H value.
+            h (torch.Tensor): Layers Thickness.
 
         Returns:
             torch.Tensor: H
         """
-        value: torch.Tensor = param[key]
-        if len(value.shape) < 3:  # noqa: PLR2004
+        if len(h.shape) < 3:  # noqa: PLR2004
             msg = (
                 "H must be a nz x ny x nx tensor "
                 "with nx=1 or ny=1 if H does not vary "
-                f"in x or y direction, got shape {value.shape}."
+                f"in x or y direction, got shape {h.shape}."
             )
             raise KeyError(msg)
-        return value
+        return h
 
     def _validate_mask(self, param: dict[str, Any], key: str) -> Masks:
         """Validate Mask value.

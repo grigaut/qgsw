@@ -38,14 +38,11 @@ class QG(SW):
         # precompile functions
         self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
 
-    def _validate_layers(
-        self, param: dict[str, Any], key: str
-    ) -> torch.Tensor:
+    def _validate_layers(self, h: torch.Tensor) -> torch.Tensor:
         """Perform additional validation over H.
 
         Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for H value.
+            h (torch.Tensor): Layers thickness.
 
         Raises:
             ValueError: if H is not constant in space
@@ -53,7 +50,7 @@ class QG(SW):
         Returns:
             torch.Tensor: H
         """
-        value = super()._validate_layers(param, key)
+        value = super()._validate_layers(h)
         if value.shape[-2:] != (1, 1):
             msg = (
                 "H must me constant in space for "

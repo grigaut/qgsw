@@ -72,7 +72,6 @@ params = {
     "nl": config.model.nl,
     "dx": config.space.dx,
     "dy": config.space.dy,
-    "H": space.h.xyh.h,
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "f0": config.physics.f0,
     "beta": config.physics.beta,
