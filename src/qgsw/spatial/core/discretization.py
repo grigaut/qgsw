@@ -22,7 +22,30 @@ class MeshesInstanciationError(Exception):
 
 
 class SpaceDiscretization2D:
-    """SpaceDiscretization2D Object."""
+    """SpaceDiscretization2D Object.
+
+    Horizontal Grids Sizes:
+        - ω : (nx, ny)
+        - h : (nx - 1, ny - 1)
+        - u : (nx, ny - 1)
+        - v : (nx - 1, ny)
+
+
+    Grid Patterns:
+    ω---v---w---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    """
 
     def __init__(
         self,
@@ -270,7 +293,30 @@ class SpaceDiscretization2D:
 
 
 class SpaceDiscretization3D:
-    """3D Grid."""
+    """3D Space Discretization.
+
+    Horizontal Grids sizes:
+        - ω : (nx, ny)
+        - h : (nx - 1, ny - 1)
+        - u : (nx, ny - 1)
+        - v : (nx - 1, ny)
+
+
+    Grids Pattern:
+    ω---v---w---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    """
 
     def __init__(
         self,
