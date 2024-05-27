@@ -13,10 +13,13 @@ from qgsw import reconstruction, verbose
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.exceptions import InvalidSavingFileError
+from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -61,6 +64,9 @@ class Model(metaclass=ABCMeta):
             unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
             'f':        Tensor (nx, ny), Coriolis parameter
+            'f0':       float, Coriolis Parameter
+            'beta':     float, Rossby Parameter
+            'space':    SpaceDiscretization3D, space discretization
             'taux':     float or Tensor (nx-1, ny),
             top-layer forcing, x component
             'tauy':     float or Tensor (nx, ny-1),
@@ -86,6 +92,10 @@ class Model(metaclass=ABCMeta):
         self._set_array_kwargs(param=param)
         ## grid
         self._set_grid(param=param)
+        ## Space
+        self.space: SpaceDiscretization3D = param["space"]
+        ## Coriolis
+        self._set_coriolis_values(param=param)
         ## Physical Variables
         self._set_physical_variables(param=param)
         ## Forcing
@@ -139,6 +149,29 @@ class Model(metaclass=ABCMeta):
             trigger_level=2,
         )
 
+    def _set_coriolis_values(self, param: dict[str, Any]) -> None:
+        """Set the Coriolis parameter values.
+
+        Args:
+            param (dict[str, Any]): Parameters dictionnary.
+        """
+        self.f0 = param["f0"]
+        self.beta = param.get("beta", 0)
+        f = coriolis.compute_beta_plane(
+            mesh_2d=self.space.omega.remove_z_h(),
+            f0=self.f0,
+            beta=self.beta,
+        )
+        self.f = self._validate_coriolis_param(f)
+        verbose.display(
+            msg=f"dtype: {self.dtype}.",
+            trigger_level=2,
+        )
+        verbose.display(
+            msg=f"device: {self.device}",
+            trigger_level=2,
+        )
+
     def _set_grid(self, param: dict[str, Any]) -> None:
         """Set the Grid informations.
 
@@ -169,8 +202,6 @@ class Model(metaclass=ABCMeta):
         self.masks = self._validate_mask(param=param, key="mask")
         ## boundary conditions
         self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
-        ## Coriolis parameter
-        self.f = self._validate_coriolis_param(param=param, key="f")
         ## Coriolis grids
         self.f0 = self.f.mean()
         self.f_ugrid = 0.5 * (self.f[:, :, 1:] + self.f[:, :, :-1])
@@ -292,24 +323,21 @@ class Model(metaclass=ABCMeta):
 
     def _validate_coriolis_param(
         self,
-        param: dict[str, Any],
-        key: str,
+        f: torch.Tensor,
     ) -> torch.Tensor:
         """Validate f (Coriolis parameter) value.
 
         Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for coriolis parameter.
+            f (torch.Tensor): Coriolis Parameter dict.
 
         Returns:
             torch.Tensor: Coriolis parameter value.
         """
-        value: torch.Tensor = param[key]
-        shape = value.shape[0], value.shape[1]
+        shape = f.shape[0], f.shape[1]
         if shape != (self.nx + 1, self.ny + 1):
             msg = f"Invalid f shape {shape=}!=({self.nx},{self.ny})"
             raise KeyError(msg)
-        return value.unsqueeze(0)
+        return f.unsqueeze(0)
 
     def set_wind_forcing(
         self,
