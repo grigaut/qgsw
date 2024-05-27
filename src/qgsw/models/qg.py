@@ -266,7 +266,7 @@ class QG(SW):
         """QG projector P = G o (Q o G)^{-1} o Q"""
         return self.G(*self.QoG_inv(self.Q(u, v, h)))
 
-    def compute_ageostrophic_velocity(self, dt_uvh_qg, dt_uvh_sw):
+    def compute_ageostrophic_velocity(self, dt_uvh_qg, dt_uvh_sw) -> None:
         self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / self.f0 / self.dy
         self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / self.f0 / self.dx
         self.k_energy_a = 0.25 * (
@@ -284,11 +284,25 @@ class QG(SW):
             + torch.diff(self.v_a[..., 1:-1, :], dim=-1) / self.dy
         )
 
+    def compute_pv(
+        self,
+        h: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute Shallow Water Potential Vorticty.
+
+        Args:
+            h (torch.Tensor): Prognostic layer thickness perturbation.
+
+        Returns:
+            torch.Tensor: Potential Vorticity
+        """
+        beta_y = self.interp_TP((self.f - self.f0).unsqueeze(0))
+        omega = self.interp_TP(self.omega)
+        return beta_y + omega - self.f0 * h / self.h_ref
+
     def compute_diagnostic_variables(self):
         super().compute_diagnostic_variables()
-        self.pv = self.interp_TP(self.omega) / self.area - self.f0 * (
-            self.h / self.h_ref
-        )
+        self.pv = self.compute_pv(self.h)
 
     def compute_time_derivatives(self):
         dt_uvh_sw = super().compute_time_derivatives()
