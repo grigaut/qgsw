@@ -22,6 +22,62 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
+def pool_2d(padded_f: torch.Tensor) -> torch.Tensor:
+    """Convolute by summing on 3x3 kernels.
+
+    The Matrix :
+    | 0, 0, 0, 0 |
+    | 0, a, b, 0 |
+    | 0, c, d, 0 |
+    | 0, 0, 0, 0 |
+
+    will return :
+    |  a ,   a+b  ,   a+b  ,  b  |
+    | a+c, a+b+c+d, a+b+c+d, b+c |
+    | a+c, a+b+c+d, a+b+c+d, b+c |
+    |  c ,   c+d  ,   c+d  ,  d  |
+
+    Args:
+        padded_f (torch.Tensor): Tensor to pool.
+
+    Returns:
+        torch.Tensor: Padded tensor.
+    """
+    # average pool padded value
+    f_sum_pooled = F.avg_pool2d(
+        padded_f,
+        (3, 1),
+        stride=(1, 1),
+        padding=(1, 0),
+        divisor_override=1,
+    )
+    return F.avg_pool2d(
+        f_sum_pooled,
+        (1, 3),
+        stride=(1, 1),
+        padding=(0, 1),
+        divisor_override=1,
+    )
+
+
+def replicate_pad(f: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Replicate a given pad.
+
+    Args:
+        f (torch.Tensor): Tensor to pad.
+        mask (torch.Tensor): Mask tensor.
+
+    Returns:
+        torch.Tensor: Result
+    """
+    f_ = F.pad(f, (1, 1, 1, 1))
+    mask_ = F.pad(mask, (1, 1, 1, 1))
+    mask_sum = pool_2d(mask_)
+    f_sum = pool_2d(f_)
+    f_out = f_sum / torch.maximum(torch.ones_like(mask_sum), mask_sum)
+    return mask_ * f_ + (1 - mask_) * f_out
+
+
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     """Pytorch cumsum in the reverse order.
 
@@ -588,13 +644,40 @@ class Model(metaclass=ABCMeta):
         )
         return omega
 
-    @abstractmethod
     def compute_diagnostic_variables(self) -> None:
         """Compute the model's diagnostic variables.
 
         Compute the result given the prognostic
         variables self.u, self.v, self.h .
         """
+        # Diagnostic: vorticity values
+        self.omega = self.compute_omega(self.u, self.v)
+        # Diagnostic: interface height : physical
+        self.eta = reverse_cumsum(self.h / self.area, dim=-3)
+        # Diagnostic: potential vorticity
+        self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
+        # Diagnostic: zonal velocity
+        self.U = self.u / self.dx**2
+        # Diagnostic: meridional velocity
+        self.V = self.v / self.dy**2
+        # Zonal velocity momentum
+        self.U_m = self.interp_TP(self.U)
+        # Meridional velocity momentum
+        self.V_m = self.interp_TP(self.V)
+        # Diagnostic: kinetic energy
+        self.k_energy = (
+            self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
+        )
+        # Expand h grid (1, nl, nx-1, ny-1) by 1 in x and y dimension
+        h_ = replicate_pad(self.h, self.masks.h)
+        # Match u grid dimensions (1, nl, nx, ny)
+        self.h_ugrid = 0.5 * (h_[..., 1:, 1:-1] + h_[..., :-1, 1:-1])
+        # Match v grid dimension
+        self.h_vgrid = 0.5 * (h_[..., 1:-1, 1:] + h_[..., 1:-1, :-1])
+        # Sum h on u grid
+        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
+        # Sum h on v grid
+        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
     def get_physical_uvh(
         self,
