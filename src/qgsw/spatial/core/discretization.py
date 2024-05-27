@@ -1,4 +1,27 @@
-"""Mesh defining objects."""
+"""Space Discretizations.
+
+Horizontal Grids Sizes:
+- ω : (nx, ny)
+- h : (nx - 1, ny - 1)
+- u : (nx, ny - 1)
+- v : (nx - 1, ny)
+
+
+Grid Patterns:
+ω---v---ω---v---ω---v---ω
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω
+"""
 
 from __future__ import annotations
 
@@ -32,7 +55,7 @@ class SpaceDiscretization2D:
 
 
     Grid Patterns:
-    ω---v---w---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
@@ -108,6 +131,23 @@ class SpaceDiscretization2D:
 
         See https://agupubs.oFinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx, ny)
+
+        Pattern:
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
         """
         return self._omega
 
@@ -117,6 +157,23 @@ class SpaceDiscretization2D:
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx - 1, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
         """
         return self._h
 
@@ -126,6 +183,23 @@ class SpaceDiscretization2D:
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
         """
         return self._u
 
@@ -135,6 +209,23 @@ class SpaceDiscretization2D:
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx - 1, ny)
+
+        Pattern:
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
         """
         return self._v
 
@@ -303,7 +394,7 @@ class SpaceDiscretization3D:
 
 
     Grids Pattern:
-    ω---v---w---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
@@ -397,6 +488,23 @@ class SpaceDiscretization3D:
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx, ny)
+
+        Pattern:
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
         """
         return self._omega
 
@@ -406,6 +514,23 @@ class SpaceDiscretization3D:
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx - 1, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
         """
         return self._h
 
@@ -415,6 +540,23 @@ class SpaceDiscretization3D:
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
         """
         return self._u
 
@@ -424,6 +566,23 @@ class SpaceDiscretization3D:
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
+
+        Size: (nx - 1, ny)
+
+        Pattern:
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
         """
         return self._v
 
