@@ -12,7 +12,23 @@ def interp_TP(f: torch.Tensor) -> torch.Tensor:
     )
 
 
-def comp_ke(u, U, v, V):
+def comp_ke(
+    u: torch.Tensor,
+    U: torch.Tensor,
+    v: torch.Tensor,
+    V: torch.Tensor,
+) -> torch.Tensor:
+    """Compute Kinetic Energy.
+
+    Args:
+        u (torch.Tensor): Prognostic zonal velocity.
+        U (torch.Tensor): Diagnostic zonal velocity.
+        v (torch.Tensor): Prognostic mridional velocity.
+        V (torch.Tensor): Diagnostic meridional velocity.
+
+    Returns:
+        torch.Tensor: _description_
+    """
     u_sq = u * U
     v_sq = v * V
     return 0.25 * (
