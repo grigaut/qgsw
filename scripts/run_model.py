@@ -8,7 +8,7 @@ from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import QG
 from qgsw.perturbations import Perturbation
-from qgsw.physics import compute_burger, coriolis
+from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
     SurfaceVorticityAxes,
@@ -54,12 +54,6 @@ perturbation = Perturbation.from_config(
 )
 ## Mesh
 space = SpaceDiscretization3D.from_config(config.space, config.model)
-# "" Coriolis
-f = coriolis.compute_beta_plane(
-    mesh_2d=space.omega.remove_z_h(),
-    f0=config.physics.f0,
-    beta=config.physics.beta,
-)
 ## Compute Burger Number
 Bu = compute_burger(
     g=config.model.g_prime[0],
@@ -78,9 +72,10 @@ params = {
     "nl": config.model.nl,
     "dx": config.space.dx,
     "dy": config.space.dy,
-    "H": space.h.xyh.h,
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
-    "f": f,
+    "f0": config.physics.f0,
+    "beta": config.physics.beta,
+    "space": space,
     "taux": taux,
     "tauy": tauy,
     "bottom_drag_coef": config.physics.bottom_drag_coef,

@@ -7,12 +7,54 @@ import torch.nn.functional as F
 
 
 def interp_TP(f: torch.Tensor) -> torch.Tensor:
+    """Compute interpolated values from f's cells centers.
+
+    Considering f is the main grid 'the 'o's). Then this function
+    averages on every cell to return a value of f
+    for every inner cell (the 'x's).
+
+    o ------- o ------- o ------- o
+    |         |         |         |
+    |    x    |    x    |    x    |
+    |         |         |         |
+    o ------- o ------- o ------- o
+    |         |         |         |
+    |    x    |    x    |    x    |
+    |         |         |         |
+    o ------- o ------- o ------- o
+    |         |         |         |
+    |    x    |    x    |    x    |
+    |         |         |         |
+    o ------- o ------- o ------- o
+
+    Args:
+        f (torch.Tensor): _description_
+
+    Returns:
+        torch.Tensor: _description_
+    """
     return 0.25 * (
         f[..., 1:, 1:] + f[..., 1:, :-1] + f[..., :-1, 1:] + f[..., :-1, :-1]
     )
 
 
-def comp_ke(u, U, v, V):
+def comp_ke(
+    u: torch.Tensor,
+    U: torch.Tensor,
+    v: torch.Tensor,
+    V: torch.Tensor,
+) -> torch.Tensor:
+    """Compute Kinetic Energy.
+
+    Args:
+        u (torch.Tensor): Prognostic zonal velocity.
+        U (torch.Tensor): Diagnostic zonal velocity.
+        v (torch.Tensor): Prognostic meridional velocity.
+        V (torch.Tensor): Diagnostic meridional velocity.
+
+    Returns:
+        torch.Tensor: Kinetic Energy
+    """
     u_sq = u * U
     v_sq = v * V
     return 0.25 * (
@@ -20,7 +62,7 @@ def comp_ke(u, U, v, V):
     )
 
 
-def laplacian(f, dx, dy):
+def laplacian(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
     return (
         f[..., 2:, 1:-1] - 2 * f[..., 1:-1, 1:-1] + f[..., :-2, 1:-1]
     ) / dx**2 + (
@@ -28,12 +70,12 @@ def laplacian(f, dx, dy):
     ) / dy**2
 
 
-def grad_perp(f):
+def grad_perp(f: torch.Tensor) -> torch.Tensor:
     """Orthogonal gradient"""
     return f[..., :-1] - f[..., 1:], f[..., 1:, :] - f[..., :-1, :]
 
 
-def div_nofluxbc(flux_x, flux_y):
+def div_nofluxbc(flux_x: torch.Tensor, flux_y: torch.Tensor) -> torch.Tensor:
     return torch.diff(F.pad(flux_y, (1, 1)), dim=-1) + torch.diff(
         F.pad(flux_x, (0, 0, 1, 1)), dim=-2
     )

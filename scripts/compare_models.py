@@ -8,7 +8,7 @@ from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import QG
 from qgsw.perturbations import Perturbation
-from qgsw.physics import compute_burger, coriolis
+from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
     SurfaceVorticityAxes,
@@ -56,12 +56,6 @@ perturbation = Perturbation.from_config(
 prefix_1l = config.models[0].prefix
 ## Mesh
 space_1l = SpaceDiscretization3D.from_config(config.space, config.models[0])
-# "" Coriolis
-f = coriolis.compute_beta_plane(
-    mesh_2d=space_1l.omega.remove_z_h(),
-    f0=config.physics.f0,
-    beta=config.physics.beta,
-)
 ## Compute Burger Number
 Bu_1l = compute_burger(
     g=config.models[0].g_prime[0],
@@ -80,9 +74,10 @@ params_1l = {
     "nl": config.models[0].nl,
     "dx": config.space.dx,
     "dy": config.space.dy,
-    "H": space_1l.h.xyh.h,
     "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
-    "f": f,
+    "f0": config.physics.f0,
+    "beta": config.physics.beta,
+    "space": space_1l,
     "taux": taux,
     "tauy": tauy,
     "bottom_drag_coef": config.physics.bottom_drag_coef,
@@ -118,12 +113,6 @@ dt_1l = min(
 prefix_2l = config.models[1].prefix
 ## Mesh
 space_2l = SpaceDiscretization3D.from_config(config.space, config.models[1])
-## Coriolis
-f = coriolis.compute_beta_plane(
-    mesh_2d=space_2l.omega.remove_z_h(),
-    f0=config.physics.f0,
-    beta=config.physics.beta,
-)
 ## Compute Burger Number
 h1 = config.models[1].h[0]
 h2 = config.models[1].h[1]
@@ -146,9 +135,10 @@ params_2l = {
     "nl": config.models[1].nl,
     "dx": config.space.dx,
     "dy": config.space.dy,
-    "H": space_2l.h.xyh.h,
     "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
-    "f": f,
+    "f0": config.physics.f0,
+    "beta": config.physics.beta,
+    "space": space_2l,
     "taux": taux,
     "tauy": tauy,
     "bottom_drag_coef": config.physics.bottom_drag_coef,

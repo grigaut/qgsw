@@ -22,7 +22,38 @@ from qgsw.models.sw import SW
 
 
 class QG(SW):
-    """Multilayer quasi-geostrophic model as projected SW."""
+    """Multilayer quasi-geostrophic model as projected SW.
+
+    Following https://doi.org/10.1029/2021MS002663 .
+
+    Physical Variables are :
+        - u_phys: Zonal velocity
+        - v_phys: Meridional Velocity
+        - h_phys: layers thickness
+
+    Prognostic Variables are linked to physical variables through:
+        - u = u_phys x dx
+        - v = v_phys x dy
+        - h = h_phys x dx x dy
+
+    Diagnostic variables are:
+        - U = u_phys / dx
+        - V = v_phys / dx
+        - omega = omega_phys x dx x dy    (rel. vorticity)
+        - eta = eta_phys                  (interface height)
+        - p = p_phys                      (hydrostratic pressure)
+        - k_energy = k_energy_phys        (kinetic energy)
+        - pv = pv_phys                    (potential vorticity)
+
+    References variables are denoted with the subscript _ref:
+        - h_ref
+        - eta_ref
+        - p_ref
+        - h_ref_ugrid
+        - h_ref_vgrid
+        - dx_p_ref
+        - dy_p_ref
+    """
 
     def __init__(self, param):
         super().__init__(param)
@@ -38,14 +69,11 @@ class QG(SW):
         # precompile functions
         self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
 
-    def _validate_layers(
-        self, param: dict[str, Any], key: str
-    ) -> torch.Tensor:
+    def _validate_layers(self, h: torch.Tensor) -> torch.Tensor:
         """Perform additional validation over H.
 
         Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for H value.
+            h (torch.Tensor): Layers thickness.
 
         Raises:
             ValueError: if H is not constant in space
@@ -53,7 +81,7 @@ class QG(SW):
         Returns:
             torch.Tensor: H
         """
-        value = super()._validate_layers(param, key)
+        value = super()._validate_layers(h)
         if value.shape[-2:] != (1, 1):
             msg = (
                 "H must me constant in space for "
@@ -269,7 +297,7 @@ class QG(SW):
         """QG projector P = G o (Q o G)^{-1} o Q"""
         return self.G(*self.QoG_inv(self.Q(u, v, h)))
 
-    def compute_ageostrophic_velocity(self, dt_uvh_qg, dt_uvh_sw):
+    def compute_ageostrophic_velocity(self, dt_uvh_qg, dt_uvh_sw) -> None:
         self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / self.f0 / self.dy
         self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / self.f0 / self.dx
         self.k_energy_a = 0.25 * (
@@ -287,11 +315,25 @@ class QG(SW):
             + torch.diff(self.v_a[..., 1:-1, :], dim=-1) / self.dy
         )
 
+    def compute_pv(
+        self,
+        h: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute Shallow Water Potential Vorticty.
+
+        Args:
+            h (torch.Tensor): Prognostic layer thickness perturbation.
+
+        Returns:
+            torch.Tensor: Potential Vorticity
+        """
+        beta_y = self.interp_TP((self.f - self.f0).unsqueeze(0))
+        omega = self.interp_TP(self.omega)
+        return beta_y + omega - self.f0 * h / self.h_ref
+
     def compute_diagnostic_variables(self):
         super().compute_diagnostic_variables()
-        self.pv = self.interp_TP(self.omega) / self.area - self.f0 * (
-            self.h / self.h_ref
-        )
+        self.pv = self.compute_pv(self.h)
 
     def compute_time_derivatives(self):
         dt_uvh_sw = super().compute_time_derivatives()

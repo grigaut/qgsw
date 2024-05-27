@@ -13,10 +13,69 @@ from qgsw import reconstruction, verbose
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.exceptions import InvalidSavingFileError
+from qgsw.physics import coriolis
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from qgsw.spatial.core.discretization import SpaceDiscretization3D
+
+
+def pool_2d(padded_f: torch.Tensor) -> torch.Tensor:
+    """Convolute by summing on 3x3 kernels.
+
+    The Matrix :
+    | 0, 0, 0, 0 |
+    | 0, a, b, 0 |
+    | 0, c, d, 0 |
+    | 0, 0, 0, 0 |
+
+    will return :
+    |  a ,   a+b  ,   a+b  ,  b  |
+    | a+c, a+b+c+d, a+b+c+d, b+c |
+    | a+c, a+b+c+d, a+b+c+d, b+c |
+    |  c ,   c+d  ,   c+d  ,  d  |
+
+    Args:
+        padded_f (torch.Tensor): Tensor to pool.
+
+    Returns:
+        torch.Tensor: Padded tensor.
+    """
+    # average pool padded value
+    f_sum_pooled = F.avg_pool2d(
+        padded_f,
+        (3, 1),
+        stride=(1, 1),
+        padding=(1, 0),
+        divisor_override=1,
+    )
+    return F.avg_pool2d(
+        f_sum_pooled,
+        (1, 3),
+        stride=(1, 1),
+        padding=(0, 1),
+        divisor_override=1,
+    )
+
+
+def replicate_pad(f: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Replicate a given pad.
+
+    Args:
+        f (torch.Tensor): Tensor to pad.
+        mask (torch.Tensor): Mask tensor.
+
+    Returns:
+        torch.Tensor: Result
+    """
+    f_ = F.pad(f, (1, 1, 1, 1))
+    mask_ = F.pad(mask, (1, 1, 1, 1))
+    mask_sum = pool_2d(mask_)
+    f_sum = pool_2d(f_)
+    f_out = f_sum / torch.maximum(torch.ones_like(mask_sum), mask_sum)
+    return mask_ * f_ + (1 - mask_) * f_out
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -37,7 +96,37 @@ def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
 
 
 class Model(metaclass=ABCMeta):
-    """Base class for models."""
+    """Base class for models.
+
+    Following https://doi.org/10.1029/2021MS002663 .
+
+    Physical Variables are :
+        - u_phys: Zonal velocity
+        - v_phys: Meridional Velocity
+        - h_phys: layers thickness
+
+    Prognostic Variables are linked to physical variables through:
+        - u = u_phys x dx
+        - v = v_phys x dy
+        - h = h_phys x dx x dy
+
+    Diagnostic variables are:
+        - U = u_phys / dx
+        - V = v_phys / dx
+        - omega = omega_phys x dx x dy    (rel. vorticity)
+        - eta = eta_phys                  (interface height)
+        - p = p_phys                      (hydrostratic pressure)
+        - k_energy = k_energy_phys        (kinetic energy)
+
+    References variables are denoted with the subscript _ref:
+        - h_ref
+        - eta_ref
+        - p_ref
+        - h_ref_ugrid
+        - h_ref_vgrid
+        - dx_p_ref
+        - dy_p_ref
+    """
 
     omega: torch.Tensor
     eta: torch.Tensor
@@ -57,10 +146,12 @@ class Model(metaclass=ABCMeta):
             'nl':       nl, number of stacked layer
             'dx':       float or Tensor (nx, ny), dx metric term
             'dy':       float or Tensor (nx, ny), dy metric term
-            'H':        Tensor (nl,) or (nl, nx, ny),
             unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
             'f':        Tensor (nx, ny), Coriolis parameter
+            'f0':       float, Coriolis Parameter
+            'beta':     float, Rossby Parameter
+            'space':    SpaceDiscretization3D, space discretization
             'taux':     float or Tensor (nx-1, ny),
             top-layer forcing, x component
             'tauy':     float or Tensor (nx, ny-1),
@@ -86,6 +177,10 @@ class Model(metaclass=ABCMeta):
         self._set_array_kwargs(param=param)
         ## grid
         self._set_grid(param=param)
+        ## Space
+        self.space: SpaceDiscretization3D = param["space"]
+        ## Coriolis
+        self._set_coriolis_values(param=param)
         ## Physical Variables
         self._set_physical_variables(param=param)
         ## Forcing
@@ -139,6 +234,29 @@ class Model(metaclass=ABCMeta):
             trigger_level=2,
         )
 
+    def _set_coriolis_values(self, param: dict[str, Any]) -> None:
+        """Set the Coriolis parameter values.
+
+        Args:
+            param (dict[str, Any]): Parameters dictionnary.
+        """
+        self.f0 = param["f0"]
+        self.beta = param.get("beta", 0)
+        f = coriolis.compute_beta_plane(
+            mesh_2d=self.space.omega.remove_z_h(),
+            f0=self.f0,
+            beta=self.beta,
+        )
+        self.f = self._validate_coriolis_param(f)
+        verbose.display(
+            msg=f"dtype: {self.dtype}.",
+            trigger_level=2,
+        )
+        verbose.display(
+            msg=f"device: {self.device}",
+            trigger_level=2,
+        )
+
     def _set_grid(self, param: dict[str, Any]) -> None:
         """Set the Grid informations.
 
@@ -164,13 +282,11 @@ class Model(metaclass=ABCMeta):
         """
         # Validate parameters values and shapes.
         ## H
-        self.H = self._validate_layers(param=param, key="H")
+        self.H = self._validate_layers(self.space.h.xyh.h)
         ## optional mask
         self.masks = self._validate_mask(param=param, key="mask")
         ## boundary conditions
         self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
-        ## Coriolis parameter
-        self.f = self._validate_coriolis_param(param=param, key="f")
         ## Coriolis grids
         self.f0 = self.f.mean()
         self.f_ugrid = 0.5 * (self.f[:, :, 1:] + self.f[:, :, :-1])
@@ -198,27 +314,24 @@ class Model(metaclass=ABCMeta):
 
     def _validate_layers(
         self,
-        param: dict[str, Any],
-        key: str,
+        h: torch.Tensor,
     ) -> torch.Tensor:
         """Validate H (unperturbed layer thickness) input value.
 
         Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for H value.
+            h (torch.Tensor): Layers Thickness.
 
         Returns:
             torch.Tensor: H
         """
-        value: torch.Tensor = param[key]
-        if len(value.shape) < 3:  # noqa: PLR2004
+        if len(h.shape) < 3:  # noqa: PLR2004
             msg = (
                 "H must be a nz x ny x nx tensor "
                 "with nx=1 or ny=1 if H does not vary "
-                f"in x or y direction, got shape {value.shape}."
+                f"in x or y direction, got shape {h.shape}."
             )
             raise KeyError(msg)
-        return value
+        return h
 
     def _validate_mask(self, param: dict[str, Any], key: str) -> Masks:
         """Validate Mask value.
@@ -292,24 +405,21 @@ class Model(metaclass=ABCMeta):
 
     def _validate_coriolis_param(
         self,
-        param: dict[str, Any],
-        key: str,
+        f: torch.Tensor,
     ) -> torch.Tensor:
         """Validate f (Coriolis parameter) value.
 
         Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for coriolis parameter.
+            f (torch.Tensor): Coriolis Parameter dict.
 
         Returns:
             torch.Tensor: Coriolis parameter value.
         """
-        value: torch.Tensor = param[key]
-        shape = value.shape[0], value.shape[1]
+        shape = f.shape[0], f.shape[1]
         if shape != (self.nx + 1, self.ny + 1):
             msg = f"Invalid f shape {shape=}!=({self.nx},{self.ny})"
             raise KeyError(msg)
-        return value.unsqueeze(0)
+        return f.unsqueeze(0)
 
     def set_wind_forcing(
         self,
@@ -512,8 +622,8 @@ class Model(metaclass=ABCMeta):
         Possible boundary conditions: free-slip, partial free-slip, no-slip.
 
         Args:
-            u (torch.Tensor): U
-            v (torch.Tensor): V
+            u (torch.Tensor): Prognostic zonal velocity.
+            v (torch.Tensor): Prognostic meridional velocity.
 
         Returns:
             torch.Tensor: result
@@ -532,13 +642,40 @@ class Model(metaclass=ABCMeta):
         )
         return omega
 
-    @abstractmethod
     def compute_diagnostic_variables(self) -> None:
         """Compute the model's diagnostic variables.
 
         Compute the result given the prognostic
         variables self.u, self.v, self.h .
         """
+        # Diagnostic: vorticity values
+        self.omega = self.compute_omega(self.u, self.v)
+        # Diagnostic: interface height : physical
+        self.eta = reverse_cumsum(self.h / self.area, dim=-3)
+        # Diagnostic: potential vorticity
+        self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
+        # Diagnostic: zonal velocity
+        self.U = self.u / self.dx**2
+        # Diagnostic: meridional velocity
+        self.V = self.v / self.dy**2
+        # Zonal velocity momentum
+        self.U_m = self.interp_TP(self.U)
+        # Meridional velocity momentum
+        self.V_m = self.interp_TP(self.V)
+        # Diagnostic: kinetic energy
+        self.k_energy = (
+            self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
+        )
+        # Expand h grid (1, nl, nx-1, ny-1) by 1 in x and y dimension
+        h_ = replicate_pad(self.h, self.masks.h)
+        # Match u grid dimensions (1, nl, nx, ny)
+        self.h_ugrid = 0.5 * (h_[..., 1:, 1:-1] + h_[..., :-1, 1:-1])
+        # Match v grid dimension
+        self.h_vgrid = 0.5 * (h_[..., 1:-1, 1:] + h_[..., 1:-1, :-1])
+        # Sum h on u grid
+        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
+        # Sum h on v grid
+        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
     def get_physical_uvh(
         self,

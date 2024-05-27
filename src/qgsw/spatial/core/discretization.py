@@ -1,4 +1,27 @@
-"""Mesh defining objects."""
+"""Space Discretizations.
+
+Horizontal Grids Sizes:
+- ω : (nx, ny)
+- h : (nx - 1, ny - 1)
+- u : (nx, ny - 1)
+- v : (nx - 1, ny)
+
+
+Grid Patterns:
+ω---v---ω---v---ω---v---ω
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω
+"""
 
 from __future__ import annotations
 
@@ -22,7 +45,30 @@ class MeshesInstanciationError(Exception):
 
 
 class SpaceDiscretization2D:
-    """SpaceDiscretization2D Object."""
+    """SpaceDiscretization2D Object.
+
+    Horizontal Grids Sizes:
+        - ω : (nx, ny)
+        - h : (nx - 1, ny - 1)
+        - u : (nx, ny - 1)
+        - v : (nx - 1, ny)
+
+
+    Grid Patterns:
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    """
 
     def __init__(
         self,
@@ -83,6 +129,23 @@ class SpaceDiscretization2D:
     def omega(self) -> Mesh2D:
         """Omega Mesh.
 
+        Size: (nx, ny)
+
+        Pattern:
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+
         See https://agupubs.oFinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -91,6 +154,23 @@ class SpaceDiscretization2D:
     @property
     def h(self) -> Mesh2D:
         """H Mesh.
+
+        Size: (nx - 1, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -101,6 +181,23 @@ class SpaceDiscretization2D:
     def u(self) -> Mesh2D:
         """U Mesh.
 
+        Size: (nx, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -109,6 +206,23 @@ class SpaceDiscretization2D:
     @property
     def v(self) -> Mesh2D:
         """V Mesh.
+
+        Size: (nx - 1, ny)
+
+        Pattern:
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -270,7 +384,30 @@ class SpaceDiscretization2D:
 
 
 class SpaceDiscretization3D:
-    """3D Grid."""
+    """3D Space Discretization.
+
+    Horizontal Grids sizes:
+        - ω : (nx, ny)
+        - h : (nx - 1, ny - 1)
+        - u : (nx, ny - 1)
+        - v : (nx - 1, ny)
+
+
+    Grids Pattern:
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    |       |       |       |
+    u   h   u   h   u   h   u
+    |       |       |       |
+    ω---v---ω---v---ω---v---ω
+    """
 
     def __init__(
         self,
@@ -349,6 +486,23 @@ class SpaceDiscretization3D:
     def omega(self) -> Mesh3D:
         """X,Y cordinates of the Omega mesh ('classical' mesh corners).
 
+        Size: (nx, ny)
+
+        Pattern:
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω
+
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -358,6 +512,23 @@ class SpaceDiscretization3D:
     def h(self) -> Mesh3D:
         """X,Y coordinates of the H mesh (center of 'classical' mesh cells).
 
+        Size: (nx - 1, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- -------
+
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -365,7 +536,24 @@ class SpaceDiscretization3D:
 
     @property
     def u(self) -> Mesh3D:
-        """X,Y coordinates of the u mesh .
+        """X,Y coordinates of the u mesh.
+
+        Size: (nx, ny - 1)
+
+        Pattern:
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
+        |       |       |       |
+        u       u       u       u
+        |       |       |       |
+         ------- ------- -------
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -375,6 +563,23 @@ class SpaceDiscretization3D:
     @property
     def v(self) -> Mesh3D:
         """X,Y coordinates of the H mesh (center of 'classical' mesh cells).
+
+        Size: (nx - 1, ny)
+
+        Pattern:
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---v--- ---v--- ---v---
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
