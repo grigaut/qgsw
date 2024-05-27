@@ -117,7 +117,6 @@ class Model(metaclass=ABCMeta):
         - eta = eta_phys                  (interface height)
         - p = p_phys                      (hydrostratic pressure)
         - k_energy = k_energy_phys        (kinetic energy)
-        - pv = pv_phys                    (potential vorticity)
 
     References variables are denoted with the subscript _ref:
         - h_ref
@@ -127,7 +126,6 @@ class Model(metaclass=ABCMeta):
         - h_ref_vgrid
         - dx_p_ref
         - dy_p_ref
-
     """
 
     omega: torch.Tensor

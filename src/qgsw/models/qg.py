@@ -22,7 +22,38 @@ from qgsw.models.sw import SW
 
 
 class QG(SW):
-    """Multilayer quasi-geostrophic model as projected SW."""
+    """Multilayer quasi-geostrophic model as projected SW.
+
+    Following https://doi.org/10.1029/2021MS002663 .
+
+    Physical Variables are :
+        - u_phys: Zonal velocity
+        - v_phys: Meridional Velocity
+        - h_phys: layers thickness
+
+    Prognostic Variables are linked to physical variables through:
+        - u = u_phys x dx
+        - v = v_phys x dy
+        - h = h_phys x dx x dy
+
+    Diagnostic variables are:
+        - U = u_phys / dx
+        - V = v_phys / dx
+        - omega = omega_phys x dx x dy    (rel. vorticity)
+        - eta = eta_phys                  (interface height)
+        - p = p_phys                      (hydrostratic pressure)
+        - k_energy = k_energy_phys        (kinetic energy)
+        - pv = pv_phys                    (potential vorticity)
+
+    References variables are denoted with the subscript _ref:
+        - h_ref
+        - eta_ref
+        - p_ref
+        - h_ref_ugrid
+        - h_ref_vgrid
+        - dx_p_ref
+        - dy_p_ref
+    """
 
     def __init__(self, param):
         super().__init__(param)
