@@ -129,9 +129,6 @@ class SpaceDiscretization2D:
     def omega(self) -> Mesh2D:
         """Omega Mesh.
 
-        See https://agupubs.oFinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
-
         Size: (nx, ny)
 
         Pattern:
@@ -148,15 +145,15 @@ class SpaceDiscretization2D:
         |       |       |       |
         |       |       |       |
         ω-------ω-------ω-------ω
+
+        See https://agupubs.oFinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._omega
 
     @property
     def h(self) -> Mesh2D:
         """H Mesh.
-
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
 
         Size: (nx - 1, ny - 1)
 
@@ -174,15 +171,15 @@ class SpaceDiscretization2D:
         |   h   |   h   |   h   |
         |       |       |       |
          ------- ------- -------
+
+        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._h
 
     @property
     def u(self) -> Mesh2D:
         """U Mesh.
-
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
 
         Size: (nx, ny - 1)
 
@@ -200,15 +197,15 @@ class SpaceDiscretization2D:
         u       u       u       u
         |       |       |       |
          ------- ------- -------
+
+        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._u
 
     @property
     def v(self) -> Mesh2D:
         """V Mesh.
-
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
 
         Size: (nx - 1, ny)
 
@@ -226,6 +223,9 @@ class SpaceDiscretization2D:
         |       |       |       |
         |       |       |       |
          ---v--- ---v--- ---v---
+
+        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._v
 
@@ -486,9 +486,6 @@ class SpaceDiscretization3D:
     def omega(self) -> Mesh3D:
         """X,Y cordinates of the Omega mesh ('classical' mesh corners).
 
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
-
         Size: (nx, ny)
 
         Pattern:
@@ -505,15 +502,15 @@ class SpaceDiscretization3D:
         |       |       |       |
         |       |       |       |
         ω-------ω-------ω-------ω
+
+        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._omega
 
     @property
     def h(self) -> Mesh3D:
         """X,Y coordinates of the H mesh (center of 'classical' mesh cells).
-
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
 
         Size: (nx - 1, ny - 1)
 
@@ -531,15 +528,15 @@ class SpaceDiscretization3D:
         |   h   |   h   |   h   |
         |       |       |       |
          ------- ------- -------
+
+        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._h
 
     @property
     def u(self) -> Mesh3D:
-        """X,Y coordinates of the u mesh .
-
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
+        """X,Y coordinates of the u mesh.
 
         Size: (nx, ny - 1)
 
@@ -557,15 +554,15 @@ class SpaceDiscretization3D:
         u       u       u       u
         |       |       |       |
          ------- ------- -------
+
+        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._u
 
     @property
     def v(self) -> Mesh3D:
         """X,Y coordinates of the H mesh (center of 'classical' mesh cells).
-
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
 
         Size: (nx - 1, ny)
 
@@ -583,6 +580,9 @@ class SpaceDiscretization3D:
         |       |       |       |
         |       |       |       |
          ---v--- ---v--- ---v---
+
+        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
+        for more details.
         """
         return self._v
 
