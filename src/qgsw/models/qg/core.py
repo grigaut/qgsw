@@ -19,6 +19,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
+from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.sw import SW
 
 if TYPE_CHECKING:
@@ -117,7 +118,7 @@ class QG(SW):
                 "qg approximation, i.e. have shape (...,1,1)"
                 f"got shape shape {h.shape}"
             )
-            raise ValueError(msg)
+            raise InvalidLayersDefinitionError(msg)
         return h
 
     def compute_auxillary_matrices(self) -> None:
