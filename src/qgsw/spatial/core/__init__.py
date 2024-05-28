@@ -1,1 +1,1 @@
-"""Core Spatial Object: Coordinates, Mesh, SpaceDiscretization."""
+"""Core Spatial Object: Coordinates, Grid, SpaceDiscretization."""

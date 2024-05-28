@@ -14,68 +14,13 @@ from qgsw.masks import Masks
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.exceptions import InvalidSavingFileError
 from qgsw.physics import coriolis
+from qgsw.spatial.core import grid_conversion
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
-
-
-def pool_2d(padded_f: torch.Tensor) -> torch.Tensor:
-    """Convolute by summing on 3x3 kernels.
-
-    The Matrix :
-    | 0, 0, 0, 0 |
-    | 0, a, b, 0 |
-    | 0, c, d, 0 |
-    | 0, 0, 0, 0 |
-
-    will return :
-    |  a ,   a+b  ,   a+b  ,  b  |
-    | a+c, a+b+c+d, a+b+c+d, b+c |
-    | a+c, a+b+c+d, a+b+c+d, b+c |
-    |  c ,   c+d  ,   c+d  ,  d  |
-
-    Args:
-        padded_f (torch.Tensor): Tensor to pool.
-
-    Returns:
-        torch.Tensor: Padded tensor.
-    """
-    # average pool padded value
-    f_sum_pooled = F.avg_pool2d(
-        padded_f,
-        (3, 1),
-        stride=(1, 1),
-        padding=(1, 0),
-        divisor_override=1,
-    )
-    return F.avg_pool2d(
-        f_sum_pooled,
-        (1, 3),
-        stride=(1, 1),
-        padding=(0, 1),
-        divisor_override=1,
-    )
-
-
-def replicate_pad(f: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    """Replicate a given pad.
-
-    Args:
-        f (torch.Tensor): Tensor to pad.
-        mask (torch.Tensor): Mask tensor.
-
-    Returns:
-        torch.Tensor: Result
-    """
-    f_ = F.pad(f, (1, 1, 1, 1))
-    mask_ = F.pad(mask, (1, 1, 1, 1))
-    mask_sum = pool_2d(mask_)
-    f_sum = pool_2d(f_)
-    f_out = f_sum / torch.maximum(torch.ones_like(mask_sum), mask_sum)
-    return mask_ * f_ + (1 - mask_) * f_out
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -195,7 +140,7 @@ class Model(metaclass=ABCMeta):
         self._initialize_vars()
 
         self.comp_ke = finite_diff.comp_ke
-        self.interp_TP = finite_diff.interp_TP
+        self.interp_TP = grid_conversion.omega_to_h
         self.compute_diagnostic_variables()
 
         # utils and flux computation functions
@@ -243,7 +188,7 @@ class Model(metaclass=ABCMeta):
         self.f0 = param["f0"]
         self.beta = param.get("beta", 0)
         f = coriolis.compute_beta_plane(
-            mesh_2d=self.space.omega.remove_z_h(),
+            grid_2d=self.space.omega.remove_z_h(),
             f0=self.f0,
             beta=self.beta,
         )
@@ -288,10 +233,9 @@ class Model(metaclass=ABCMeta):
         ## boundary conditions
         self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
         ## Coriolis grids
-        self.f0 = self.f.mean()
-        self.f_ugrid = 0.5 * (self.f[:, :, 1:] + self.f[:, :, :-1])
-        self.f_vgrid = 0.5 * (self.f[:, 1:, :] + self.f[:, :-1, :])
-        self.f_hgrid = finite_diff.interp_TP(self.f)
+        self.f_ugrid = grid_conversion.omega_to_u(self.f)
+        self.f_vgrid = grid_conversion.omega_to_v(self.f)
+        self.f_hgrid = grid_conversion.omega_to_h(self.f)
         self.fstar_ugrid = self.f_ugrid * self.area
         self.fstar_vgrid = self.f_vgrid * self.area
         self.fstar_vgrid = self.f_vgrid * self.area
@@ -497,7 +441,7 @@ class Model(metaclass=ABCMeta):
     def _set_utils_before_compilation(self) -> None:
         """Set utils and flux function without compilation."""
         self.comp_ke = finite_diff.comp_ke
-        self.interp_TP = finite_diff.interp_TP
+        self.interp_TP = grid_conversion.omega_to_h
         self.h_flux_y = lambda h, v: flux.flux(
             h,
             v,
@@ -559,7 +503,7 @@ class Model(metaclass=ABCMeta):
                 trigger_level=2,
             )
             self.comp_ke = torch.compile(finite_diff.comp_ke)
-            self.interp_TP = torch.compile(finite_diff.interp_TP)
+            self.interp_TP = torch.compile(grid_conversion.omega_to_h)
             self.h_flux_y = torch.compile(self.h_flux_y)
             self.h_flux_x = torch.compile(self.h_flux_x)
             self.w_flux_y = torch.compile(self.w_flux_y)
@@ -576,7 +520,10 @@ class Model(metaclass=ABCMeta):
                 finite_diff.comp_ke,
                 (self.u, self.U, self.v, self.V),
             )
-            self.interp_TP = torch.jit.trace(finite_diff.interp_TP, (self.U,))
+            self.interp_TP = torch.jit.trace(
+                grid_conversion.omega_to_h,
+                (self.U,),
+            )
             self.h_flux_y = torch.jit.trace(
                 self.h_flux_y,
                 (self.h, self.V[..., 1:-1]),
@@ -676,12 +623,10 @@ class Model(metaclass=ABCMeta):
         self.k_energy = (
             self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
         )
-        # Expand h grid (1, nl, nx-1, ny-1) by 1 in x and y dimension
-        h_ = replicate_pad(self.h, self.masks.h)
         # Match u grid dimensions (1, nl, nx, ny)
-        self.h_ugrid = 0.5 * (h_[..., 1:, 1:-1] + h_[..., :-1, 1:-1])
+        self.h_ugrid = grid_conversion.h_to_u(self.h, self.masks.h)
         # Match v grid dimension
-        self.h_vgrid = 0.5 * (h_[..., 1:-1, 1:] + h_[..., 1:-1, :-1])
+        self.h_vgrid = grid_conversion.h_to_v(self.h, self.masks.h)
         # Sum h on u grid
         self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
         # Sum h on v grid

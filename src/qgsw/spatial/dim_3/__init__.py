@@ -2,7 +2,7 @@
 
 Warning: Since the first coordinate of the Tensor represents
 the x coordinates, the actual Tensor is a 90° clockwise rotation
-of the intuitive X,Y Mesh.
+of the intuitive X,Y Grid.
 
 Intuitive Representation for x and y values:
 
@@ -82,6 +82,6 @@ x
 
 from qgsw.spatial.core.coordinates import Coordinates3D
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
-from qgsw.spatial.core.mesh import Mesh3D
+from qgsw.spatial.core.grid import Grid3D
 
-__all__ = ["Coordinates3D", "Mesh3D", "SpaceDiscretization3D"]
+__all__ = ["Coordinates3D", "Grid3D", "SpaceDiscretization3D"]

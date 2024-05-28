@@ -64,7 +64,7 @@ mask_land_w = bathy.compute_land_mask_w(space.h.remove_z_h())
 
 # coriolis beta plane
 f = coriolis.compute_beta_plane(
-    mesh_2d=space.omega.remove_z_h(),
+    grid_2d=space.omega.remove_z_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
@@ -131,7 +131,7 @@ uM, vM, hM = 0, 0, 0
 if config.io.log_performance:
     from time import time as cputime
 
-    nmeshpoints = param["nl"] * param["nx"] * param["ny"]
+    ngridpoints = param["nl"] * param["nx"] * param["ny"]
     mperf = 0
     [qg.step() for _ in range(5)]  # warm up
 
@@ -198,7 +198,7 @@ for n in range(1, n_steps + 1):
 
     if config.io.log_performance:
         walltime = cputime()
-        perf = (walltime - walltime0) / (nmeshpoints)
+        perf = (walltime - walltime0) / (ngridpoints)
         mperf += perf
         verbose.display(
             msg=f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf/n:.2e}) s",

@@ -52,7 +52,7 @@ cfl_gravity = 0.5
 perturbation = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
-## Mesh
+## Grid
 space = SpaceDiscretization3D.from_config(config.space, config.model)
 ## Compute Burger Number
 Bu = compute_burger(
