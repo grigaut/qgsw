@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 
 import torch
 
-from qgsw.spatial.core.mesh import Mesh2D, Mesh3D
+from qgsw.spatial.core.grid import Grid2D, Grid3D
 from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
 
@@ -36,7 +36,7 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         return self._magnitude
 
     @abstractmethod
-    def compute_scale(self, mesh_3d: Mesh3D) -> float:
+    def compute_scale(self, grid_3d: Grid3D) -> float:
         """Compute the scale of the perturbation.
 
         The scale refers to the typical size of the perturbation, not its
@@ -44,29 +44,29 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         radius.
 
         Args:
-            mesh_3d (Mesh3D): 3D Mesh.
+            grid_3d (Grid3D): 3D Grid.
 
         Returns:
             float: Perturbation scale.
         """
 
     @abstractmethod
-    def _compute_streamfunction_2d(self, mesh_3d: Mesh2D) -> torch.Tensor:
+    def _compute_streamfunction_2d(self, grid_3d: Grid2D) -> torch.Tensor:
         """Compute the streamfunction for a single layer.
 
         Args:
-            mesh_3d (Mesh2D): Mesh to use for stream function computation.
+            grid_3d (Grid2D): Grid to use for stream function computation.
 
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny) shaped.
         """
 
     @abstractmethod
-    def compute_stream_function(self, mesh_3d: Mesh3D) -> torch.Tensor:
+    def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
         """Compute the stream function induced by the perturbation.
 
         Args:
-            mesh_3d (Mesh3D): 3D Mesh.
+            grid_3d (Grid3D): 3D Grid.
 
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
@@ -75,7 +75,7 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
     def _adjust_stream_function(
         self,
         psi: torch.Tensor,
-        mesh_3d: Mesh3D,
+        grid_3d: Grid3D,
         f0: float,
         Ro: float,  # noqa: N803
     ) -> torch.Tensor:
@@ -83,7 +83,7 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
 
         Args:
             psi (torch.Tensor): Stream function.
-            mesh_3d (Mesh3D): 3D Mesh.
+            grid_3d (Grid3D): 3D Grid.
             f0 (float): Coriolis Parameter.
             Ro (float): Rossby Number.
 
@@ -92,12 +92,12 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         """
         u, v = grad_perp(
             psi,
-            mesh_3d.dx,
-            mesh_3d.dy,
+            grid_3d.dx,
+            grid_3d.dy,
         )
         u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
         # set psi amplitude to have a correct Rossby number
-        return psi * (Ro * f0 * self.compute_scale(mesh_3d) / u_norm_max)
+        return psi * (Ro * f0 * self.compute_scale(grid_3d) / u_norm_max)
 
     def _convert_to_pressure(
         self,
@@ -117,44 +117,44 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
 
     def compute_initial_pressure(
         self,
-        mesh_3d: Mesh3D,
+        grid_3d: Grid3D,
         f0: float,
         Ro: float,  # noqa: N803
     ) -> torch.Tensor:
         """Compute the initial pressure values.
 
         Args:
-            mesh_3d (Mesh3D): 3D Mesh.
+            grid_3d (Grid3D): 3D Grid.
             f0 (float): Coriolis parameter.
             Ro (float): Rossby Number.
 
         Returns:
             torch.Tensor: Pressure values.
         """
-        psi = self.compute_stream_function(mesh_3d=mesh_3d)
-        psi_adjusted = self._adjust_stream_function(psi, mesh_3d, f0, Ro)
+        psi = self.compute_stream_function(grid_3d=grid_3d)
+        psi_adjusted = self._adjust_stream_function(psi, grid_3d, f0, Ro)
         return self._convert_to_pressure(psi=psi_adjusted, f0=f0)
 
 
 class BarotropicPerturbation(_Perturbation):
     """Barotropic Perturbation."""
 
-    def compute_stream_function(self, mesh_3d: Mesh3D) -> torch.Tensor:
+    def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
         """Value of the stream function ψ.
 
         Args:
-            mesh_3d (Mesh3D): 3D Mesh to generate Stream Function on.
+            grid_3d (Grid3D): 3D Grid to generate Stream Function on.
 
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
         psi = torch.ones(
-            (1, mesh_3d.nl, mesh_3d.nx, mesh_3d.ny),
+            (1, grid_3d.nl, grid_3d.nx, grid_3d.ny),
             device=DEVICE,
             dtype=torch.float64,
         )
-        for i in range(mesh_3d.nl):
-            psi_2d = self._compute_streamfunction_2d(mesh_3d.remove_z_h())
+        for i in range(grid_3d.nl):
+            psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
             psi[0, i, ...] = psi_2d
         return psi
 
@@ -162,19 +162,19 @@ class BarotropicPerturbation(_Perturbation):
 class BaroclinicPerturbation(_Perturbation):
     """Baroclinic Perturbation."""
 
-    def compute_stream_function(self, mesh_3d: Mesh3D) -> torch.Tensor:
+    def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
         """Value of the stream function ψ.
 
         Args:
-            mesh_3d (Mesh3D): 3D Mesh to generate Stream Function on.
+            grid_3d (Grid3D): 3D Grid to generate Stream Function on.
 
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
-        psi_2d = self._compute_streamfunction_2d(mesh_3d.remove_z_h())
+        psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
         nx, ny = psi_2d.shape[-2:]
         psi = torch.ones(
-            (1, mesh_3d.nl, nx, ny),
+            (1, grid_3d.nl, nx, ny),
             device=DEVICE,
             dtype=torch.float64,
         )

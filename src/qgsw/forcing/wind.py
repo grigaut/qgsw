@@ -303,7 +303,7 @@ class WindForcing:
     def from_config(
         cls,
         windstress_config: WindStressConfig,
-        mesh_config: SpaceConfig,
+        grid_config: SpaceConfig,
         physics_config: PhysicsConfig,
     ) -> Self:
         """Construct the Wind Forcing given a SpaceConfig object.
@@ -312,7 +312,7 @@ class WindForcing:
 
         Args:
             windstress_config (WindStressConfig): Windstress Configuration
-            mesh_config (SpaceConfig): Space configuration
+            grid_config (SpaceConfig): Space configuration
             physics_config (PhysicsConfig): Physics configuration
 
         Raises:
@@ -333,7 +333,7 @@ class WindForcing:
             )
             raise KeyError(msg)
 
-        space_2d = SpaceDiscretization2D.from_config(mesh_config=mesh_config)
+        space_2d = SpaceDiscretization2D.from_config(grid_config=grid_config)
 
         forcing = wind_forcings[windstress_config.type](
             windstress_config=windstress_config,

@@ -44,9 +44,9 @@ Bu = compute_burger(
     length_scale=perturbation.compute_scale(space.omega),
 )
 
-mesh_2d = space.remove_z_h()
-x, y = mesh_2d.omega.xy
-xc, yc = mesh_2d.h.xy
+grid_2d = space.remove_z_h()
+x, y = grid_2d.omega.xy
+xc, yc = grid_2d.h.xy
 rc = torch.sqrt(xc**2 + yc**2)
 # circular domain mask
 apply_mask = False

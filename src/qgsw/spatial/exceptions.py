@@ -1,4 +1,4 @@
-"""Mesh-related exceptions."""
+"""Grid-related exceptions."""
 
 
 class InvalidLayerNumberError(Exception):

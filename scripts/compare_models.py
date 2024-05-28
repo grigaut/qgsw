@@ -54,7 +54,7 @@ perturbation = Perturbation.from_config(
 
 # Single Layer Set-up
 prefix_1l = config.models[0].prefix
-## Mesh
+## Grid
 space_1l = SpaceDiscretization3D.from_config(config.space, config.models[0])
 ## Compute Burger Number
 Bu_1l = compute_burger(
@@ -111,7 +111,7 @@ dt_1l = min(
 
 # Two Layers Set-up
 prefix_2l = config.models[1].prefix
-## Mesh
+## Grid
 space_2l = SpaceDiscretization3D.from_config(config.space, config.models[1])
 ## Compute Burger Number
 h1 = config.models[1].h[0]
