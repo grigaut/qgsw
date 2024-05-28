@@ -80,7 +80,7 @@ class Configuration:
 
     @cached_property
     def space(self) -> SpaceConfig:
-        """Mesh configuration."""
+        """Grid configuration."""
         return SpaceConfig.parse(self.params)
 
     @cached_property

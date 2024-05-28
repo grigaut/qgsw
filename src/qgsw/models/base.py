@@ -243,7 +243,7 @@ class Model(metaclass=ABCMeta):
         self.f0 = param["f0"]
         self.beta = param.get("beta", 0)
         f = coriolis.compute_beta_plane(
-            mesh_2d=self.space.omega.remove_z_h(),
+            grid_2d=self.space.omega.remove_z_h(),
             f0=self.f0,
             beta=self.beta,
         )
