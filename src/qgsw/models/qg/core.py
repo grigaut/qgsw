@@ -110,15 +110,15 @@ class QG(SW):
         Returns:
             torch.Tensor: H
         """
-        value = super()._validate_layers(h)
-        if value.shape[-2:] != (1, 1):
+        h = super()._validate_layers(h)
+        if h.shape[-2:] != (1, 1):
             msg = (
                 "H must me constant in space for "
                 "qg approximation, i.e. have shape (...,1,1)"
-                f"got shape shape {value.shape}"
+                f"got shape shape {h.shape}"
             )
             raise ValueError(msg)
-        return value
+        return h
 
     def compute_auxillary_matrices(self) -> None:
         """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
