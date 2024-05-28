@@ -26,6 +26,30 @@ u   h   u   h   u   h   u
 u   h   u   h   u   h   u
 |       |       |       |
 ω---v---ω---v---ω---v---ω..   > x
+
+
+Warning: 2DMesh have x coordinate as first coordinate.
+Therefore, the actual matrix correspond to a 90° clockwise
+rotation of the pattern:
+
+ω---u---ω---u---ω---u---ω..   > y
+|       |       |       |
+v   h   v   h   v   h   v
+|       |       |       |
+ω---u---ω---u---ω---u---ω..
+|       |       |       |
+v   h   v   h   v   h   v
+|       |       |       |
+ω---u---ω---u---ω---u---ω..
+|       |       |       |
+v   h   v   h   v   h   v
+|       |       |       |
+ω---u---ω---u---ω---u---ω..
+:       :       :       :
+
+
+v
+x
 """
 
 from __future__ import annotations
@@ -78,6 +102,30 @@ class SpaceDiscretization2D:
     u   h   u   h   u   h   u
     |       |       |       |
     ω---v---ω---v---ω---v---ω..   > x
+
+    Warning: 2DMesh have x coordinate as first coordinate.
+    Therefore, the actual matrix correspond to a 90° clockwise
+    rotation of the pattern:
+
+    ω---u---ω---u---ω---u---ω..   > y
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    :       :       :       :
+
+
+    v
+    x
+
     """
 
     def __init__(
@@ -161,6 +209,29 @@ class SpaceDiscretization2D:
         |       |       |       |
         ω-------ω-------ω-------ω..   > x
 
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+        ω-------ω-------ω-------ω..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        :       :       :       :
+
+
+        v
+        x
+
         See https://agupubs.oFinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -191,6 +262,29 @@ class SpaceDiscretization2D:
         |   h   |   h   |   h   |
         |       |       |       |
          ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -223,6 +317,29 @@ class SpaceDiscretization2D:
         |       |       |       |
          ------- ------- ------- ..   > x
 
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+         ---u--- ---u--- ---u--- ..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        :       :       :       :
+
+
+        v
+        x
+
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -253,6 +370,29 @@ class SpaceDiscretization2D:
         |       |       |       |
         |       |       |       |
          ---v--- ---v--- ---v--- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -442,6 +582,30 @@ class SpaceDiscretization3D:
     u   h   u   h   u   h   u
     |       |       |       |
     ω---v---ω---v---ω---v---ω..   > x
+
+    Warning: 2DMesh have x coordinate as first coordinate.
+    Therefore, the actual matrix correspond to a 90° clockwise
+    rotation of the pattern:
+
+    ω---u---ω---u---ω---u---ω..   > y
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    :       :       :       :
+
+
+    v
+    x
+
     """
 
     def __init__(
@@ -543,6 +707,29 @@ class SpaceDiscretization3D:
         |       |       |       |
         ω-------ω-------ω-------ω..   > x
 
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+        ω-------ω-------ω-------ω..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        :       :       :       :
+
+
+        v
+        x
+
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -573,6 +760,29 @@ class SpaceDiscretization3D:
         |   h   |   h   |   h   |
         |       |       |       |
          ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -605,6 +815,29 @@ class SpaceDiscretization3D:
         |       |       |       |
          ------- ------- ------- ..   > x
 
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+         ---u--- ---u--- ---u--- ..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        :       :       :       :
+
+
+        v
+        x
+
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
         """
@@ -635,6 +868,29 @@ class SpaceDiscretization3D:
         |       |       |       |
         |       |       |       |
          ---v--- ---v--- ---v--- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual matrix correspond to a 90° clockwise
+        rotation of the pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
