@@ -288,7 +288,6 @@ class Model(metaclass=ABCMeta):
         ## boundary conditions
         self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
         ## Coriolis grids
-        self.f0 = self.f.mean()
         self.f_ugrid = 0.5 * (self.f[:, :, 1:] + self.f[:, :, :-1])
         self.f_vgrid = 0.5 * (self.f[:, 1:, :] + self.f[:, :-1, :])
         self.f_hgrid = finite_diff.interp_TP(self.f)
