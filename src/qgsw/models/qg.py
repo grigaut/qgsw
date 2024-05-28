@@ -1,24 +1,28 @@
-# ruff: noqa
-"""
-Pytorch multilayer QG as projected SW, Louis Thiry, 9. oct. 2023.
-  - QG herits from SW class, prognostic variables: u, v, h
-  - DST spectral solver for QG elliptic equation
+"""Pytorch multilayer QG as projected SW, Louis Thiry, 9. oct. 2023.
+
+- QG herits from SW class, prognostic variables: u, v, h
+- DST spectral solver for QG elliptic equation
 """
 
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 import torch
 
+from qgsw import verbose
+from qgsw.models.core.finite_diff import grad_perp
 from qgsw.models.core.helmholtz import (
+    compute_capacitance_matrices,
     compute_laplace_dstI,
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
-    compute_capacitance_matrices,
 )
-from qgsw.models.core.finite_diff import grad_perp
-from qgsw import verbose
-from typing import Any, Union
 from qgsw.models.sw import SW
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class QG(SW):
@@ -55,11 +59,36 @@ class QG(SW):
         - dy_p_ref
     """
 
-    def __init__(self, param):
+    def __init__(self, param: dict[str, Any]) -> None:
+        """Parameters
+
+        param: python dict. with following keys
+            'nx':       int, number of grid points in dimension x
+            'ny':       int, number grid points in dimension y
+            'nl':       nl, number of stacked layer
+            'dx':       float or Tensor (nx, ny), dx metric term
+            'dy':       float or Tensor (nx, ny), dy metric term
+            'H':        Tensor (nl,) or (nl, nx, ny),
+            unperturbed layer thickness
+            'g_prime':  Tensor (nl,), reduced gravities
+            'f':        Tensor (nx, ny), Coriolis parameter
+            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
+            x component
+            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
+            y component
+            'dt':       float > 0., integration time-step
+            'n_ens':    int, number of ensemble member
+            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
+            'dtype':    torch.float32 of torch.float64
+            'slip_coef':    float, 1 for free slip, 0 for no-slip,
+            inbetween for
+                        partial free slip.
+        'bottom_drag_coef': float, linear bottom drag coefficient
+        """
         super().__init__(param)
 
         verbose.display(
-            msg=f"class QG, ignoring barotropic filter",
+            msg="class QG, ignoring barotropic filter",
             trigger_level=2,
         )
 
@@ -91,10 +120,10 @@ class QG(SW):
             raise ValueError(msg)
         return value
 
-    def compute_auxillary_matrices(self):
+    def compute_auxillary_matrices(self) -> None:
         """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
         # A operator
-        H, g_prime = self.H.squeeze(), self.g_prime.squeeze()
+        H, g_prime = self.H.squeeze(), self.g_prime.squeeze()  # noqa: N806
         self.A = torch.zeros((self.nl, self.nl), **self.arr_kwargs)
         if self.nl == 1:
             self.A[0, 0] = 1.0 / (H * g_prime)
@@ -112,36 +141,9 @@ class QG(SW):
             self.A[-1, -1] = 1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
             self.A[-1, -2] = -1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
 
-            # # equivalent computation without for loop
-            # # Invert matrices
-            # H_inv = 1 / H
-            # g_inv = 1 / g_prime
-
-            # # Compute products
-            # hg = H_inv * g_inv
-
-            # # Pad with zeros
-            # hg_shift = H_inv * F.pad(g_inv[1:], (0, 1))
-
-            # # Create diagonal matrices
-            # diag0 = torch.diag_embed(
-            #     input=hg + hg_shift,
-            # )
-            # diag1 = torch.diag_embed(
-            #     input=-hg_shift[:-1],
-            #     offset=1,
-            # )
-            # diag_1 = torch.diag_embed(
-            #     input=-hg[1:],
-            #     offset=-1,
-            # )
-
-            ## Create final matrice
-            # self.A = diag0 + diag1 + diag_1
-
         # layer-to-mode and mode-to-layer matrices
-        lambd_r, R = torch.linalg.eig(self.A)
-        lambd_l, L = torch.linalg.eig(self.A.T)
+        lambd_r, R = torch.linalg.eig(self.A)  # noqa: N806
+        lambd_l, L = torch.linalg.eig(self.A.T)  # noqa: N806
         self.lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
         with np.printoptions(precision=1):
             radius = (
@@ -152,7 +154,7 @@ class QG(SW):
                 msg=f"Rossby deformation Radii (km): {radius}",
                 trigger_level=2,
             )
-        R, L = R.real, L.real
+        R, L = R.real, L.real  # noqa: N806
         # layer to mode
         self.Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T
         # mode to layer
@@ -160,7 +162,7 @@ class QG(SW):
 
         # For Helmholtz equations
         nl, nx, ny = self.nl, self.nx, self.ny
-        laplace_dstI = (
+        laplace_dstI = (  # noqa: N806
             compute_laplace_dstI(nx, ny, self.dx, self.dy, self.arr_kwargs)
             .unsqueeze(0)
             .unsqueeze(0)
@@ -186,7 +188,8 @@ class QG(SW):
         else:
             self.cap_matrices = None
             sol_wgrid = solve_helmholtz_dstI(
-                cst_wgrid[..., 1:-1, 1:-1], self.helmholtz_dstI
+                cst_wgrid[..., 1:-1, 1:-1],
+                self.helmholtz_dstI,
             )
 
         self.homsol_wgrid = cst_wgrid + sol_wgrid * self.f0**2 * self.lambd
@@ -194,18 +197,45 @@ class QG(SW):
         self.homsol_hgrid = self.interp_TP(self.homsol_wgrid)
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
 
-    def _add_wind_forcing(self, du, dv):
+    def _add_wind_forcing(
+        self,
+        du: torch.Tensor,
+        dv: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Add Wind forcing to du and dv.
+
+        Args:
+            du (torch.Tensor): du
+            dv (torch.Tensor): dv
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing
+        """
         du[..., 0, :, :] += self.taux / self.H[0] * self.dx
         dv[..., 0, :, :] += self.tauy / self.H[0] * self.dy
         return du, dv
 
-    def set_physical_uvh(self, u_phys, v_phys, h_phys):
+    def set_physical_uvh(
+        self,
+        u_phys: torch.Tensor,  # noqa: ARG002
+        v_phys: torch.Tensor,  # noqa: ARG002
+        h_phys: torch.Tensor,  # noqa: ARG002
+    ) -> None:
+        """Set the physical u,v and h.
+
+        Args:
+            u_phys (torch.Tensor): useless, for compatibilty reasons only.
+            v_phys (torch.Tensor): useless, for compatibilty reasons only.
+            h_phys (torch.Tensor): useless, for compatibilty reasons only.
+        """
         super().compute_time_derivatives()
         self.u, self.v, self.h = self.project_qg(self.u, self.v, self.h)
         self.compute_diagnostic_variables()
 
-    def G(
-        self, p: torch.Tensor, p_i: Union[None, torch.Tensor] = None
+    def G(  # noqa: N802
+        self,
+        p: torch.Tensor,
+        p_i: None | torch.Tensor = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """G operator.
 
@@ -228,15 +258,17 @@ class QG(SW):
 
         return u, v, h
 
-    def QoG_inv(
-        self, elliptic_rhs: torch.Tensor
+    def QoG_inv(  # noqa: N802
+        self,
+        elliptic_rhs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """(Q o G)^{-1} operator: solve elliptic equation with mass conservation.
+        """(Q o G)^{-1} operator: solve elliptic eq with mass conservation.
 
         More informatiosn: https://gmd.copernicus.org/articles/17/1749/2024/.)
 
         Args:
-            elliptic_rhs (torch.Tensor): Elliptic equation right hand side value (ω-f_0*h/H).
+            elliptic_rhs (torch.Tensor): Elliptic equation right hand side
+            value (ω-f_0*h/H).
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: Quasi-geostrophique pressure,
@@ -244,7 +276,9 @@ class QG(SW):
         """
         # transform to modes
         helmholtz_rhs: torch.Tensor = torch.einsum(
-            "lm,...mxy->...lxy", self.Cl2m, elliptic_rhs
+            "lm,...mxy->...lxy",
+            self.Cl2m,
+            elliptic_rhs,
         )
         if self.cap_matrices is not None:
             p_modes = solve_helmholtz_dstI_cmm(
@@ -263,12 +297,14 @@ class QG(SW):
         p_modes += alpha * self.homsol_wgrid
         # transform back to layers
         p_qg: torch.Tensor = torch.einsum(
-            "lm,...mxy->...lxy", self.Cm2l, p_modes
+            "lm,...mxy->...lxy",
+            self.Cm2l,
+            p_modes,
         )
         p_qg_i = self.interp_TP(p_qg)
         return p_qg, p_qg_i
 
-    def Q(
+    def Q(  # noqa: N802
         self,
         u: torch.Tensor,
         v: torch.Tensor,
@@ -284,20 +320,54 @@ class QG(SW):
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
-        f0, H, area = self.f0, self.H, self.area
+        f0, H, area = self.f0, self.H, self.area  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
-            u[..., 1:-1, :], dim=-1
+            u[..., 1:-1, :],
+            dim=-1,
         )
         # Compute ω-f_0*h/H
-        elliptic_rhs = (omega - f0 * self.interp_TP(h) / H) * (f0 / area)
-        return elliptic_rhs
+        return (omega - f0 * self.interp_TP(h) / H) * (f0 / area)
 
-    def project_qg(self, u, v, h):
-        """QG projector P = G o (Q o G)^{-1} o Q"""
+    def project_qg(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """QG projector P = G o (Q o G)^{-1} o Q.
+
+        Args:
+            u (torch.Tensor): Zonal velocity
+            v (torch.Tensor): Meridional velocity
+            h (torch.Tensor): Layers Thickness
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Quasi geostrophic
+            u,v and h
+        """
         return self.G(*self.QoG_inv(self.Q(u, v, h)))
 
-    def compute_ageostrophic_velocity(self, dt_uvh_qg, dt_uvh_sw) -> None:
+    def compute_ageostrophic_velocity(
+        self,
+        dt_uvh_qg: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        dt_uvh_sw: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+    ) -> None:
+        """Compute ageostrophic variables.
+
+        Computes:
+        - Ageostrophic Zonal Velocity u_a
+        - Ageostrophic Meridional Velocity v_a
+        - Ageostrophic Kinetic Energy k_energy_a
+        - Ageostrophic Vorticity omega_a
+        - Ageostrophic Divergence div_a
+
+        Args:
+            dt_uvh_qg (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
+            after qg projection
+            dt_uvh_sw (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
+            before projection
+        """
         self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / self.f0 / self.dy
         self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / self.f0 / self.dx
         self.k_energy_a = 0.25 * (
@@ -331,11 +401,37 @@ class QG(SW):
         omega = self.interp_TP(self.omega)
         return beta_y + omega - self.f0 * h / self.h_ref
 
-    def compute_diagnostic_variables(self):
+    def compute_diagnostic_variables(self) -> None:
+        """Compute Diagnostic Variables.
+
+        Compute the model's diagnostic variables.
+
+        Computed variables:
+        - Vorticity: omega
+        - Interface heights: eta
+        - Pressure: p
+        - Zonal velocity: U
+        - Meridional velocity: V
+        - Zonal Velocity Momentum: U_m
+        - Meriodional Velocity Momentum: V_m
+        - Kinetic Energy: k_energy
+        - Potential Vorticity: pv
+
+        Compute the result given the prognostic
+        variables self.u, self.v, self.h .
+
+        """
         super().compute_diagnostic_variables()
         self.pv = self.compute_pv(self.h)
 
-    def compute_time_derivatives(self):
+    def compute_time_derivatives(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute the state variables derivatives dt_u, dt_v, dt_h.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
+        """
         dt_uvh_sw = super().compute_time_derivatives()
         dt_uvh_qg = self.project_qg(*dt_uvh_sw)
         self.dt_h = dt_uvh_sw[2]
@@ -362,6 +458,6 @@ class QG(SW):
 
         verbose.display(msg=f"saved u_a,v_a to {output_file}", trigger_level=1)
 
-    def step(self):
+    def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         super().step()

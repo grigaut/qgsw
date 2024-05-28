@@ -41,7 +41,41 @@ class XYH(NamedTuple):
 
 
 class Mesh2D:
-    """2D Mesh."""
+    """2D Mesh.
+
+    Warning: Since the first coordinate of the Tensor represents
+    the x coordinates, the actual Tensor is a 90° clockwise rotation
+    of the intuitive X,Y Mesh.
+
+    Intuitive Rsepresentation for x and y values:
+
+    y                            y
+    ^                            ^
+
+    :     :     :                :     :     :
+    x1----x2----x3..             y3----y3----y3..
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x1----x2----x3..             y2----y2----y2..
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x1----x2----x3..  >x         y1----y1----y1..  >x
+
+    Actual Implementation for x and y values:
+
+    x1----x1----x1..  >y         y1----y2----y3..  >y
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x2----x2----x2..             y1----y2----y3..
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x3----x3----x3..             y1----y2----y3..
+    :     :     :                :     :     :
+
+    v                            v
+    x                            x
+
+    """
 
     def __init__(self, coordinates: Coordinates2D) -> None:
         """Instantiate 2D Mesh.
@@ -101,6 +135,38 @@ class Mesh2D:
         """X and Y meshes.
 
         Both tensors shapes are (nx, ny).
+
+        Warning: Since the first coordinate of the Tensor represents
+        the x coordinates, the actual Tensor is a 90° clockwise rotation
+        of the intuitive X,Y Mesh.
+
+        Intuitive Rsepresentation for x and y values:
+
+        y                            y
+        ^                            ^
+
+        :     :     :                :     :     :
+        x1----x2----x3..             y3----y3----y3..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x1----x2----x3..             y2----y2----y2..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x1----x2----x3..  >x         y1----y1----y1..  >x
+
+        Actual Implementation for x and y values:
+
+        x1----x1----x1..  >y         y1----y2----y3..  >y
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x2----x2----x2..             y1----y2----y3..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x3----x3----x3..             y1----y2----y3..
+        :     :     :                :     :     :
+
+        v                            v
+        x                            x
         """
         return XY(self._x, self._y)
 
@@ -160,6 +226,38 @@ class Mesh3D:
     Warning: the h (layer thickness) coordinates has smaller
     dimension (nl, 1, 1) than z (nl, nx, ny) to account for constant thickness
     layers and speed up calculations.
+
+    Warning: Since the first coordinate of the Tensor represents
+    the x coordinates, the actual Tensor is a 90° clockwise rotation
+    of the intuitive X,Y Mesh.
+
+    Intuitive Representation for x and y values:
+
+    y                            y
+    ^                            ^
+
+    :     :     :                :     :     :
+    x1----x2----x3..             y3----y3----y3..
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x1----x2----x3..             y2----y2----y2..
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x1----x2----x3..  >x         y1----y1----y1..  >x
+
+    Actual Implementation for x and y values:
+
+    x1----x1----x1..  >y         y1----y2----y3..  >y
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x2----x2----x2..             y1----y2----y3..
+    |     |     |                |     |     |
+    |     |     |                |     |     |
+    x3----x3----x3..             y1----y2----y3..
+    :     :     :                :     :     :
+
+    v                            v
+    x                            x
     """
 
     def __init__(self, coordinates: Coordinates3D) -> None:
@@ -233,6 +331,38 @@ class Mesh3D:
         """X,Y,Z meshes.
 
         X,Y and Z tensors all have (nz, nx, ny) shapes.
+
+        Warning: Since the first coordinate of the Tensor represents
+        the x coordinates, the actual Tensor is a 90° clockwise rotation
+        of the intuitive X,Y Mesh.
+
+        Intuitive Representation for x and y values:
+
+        y                            y
+        ^                            ^
+
+        :     :     :                :     :     :
+        x1----x2----x3..             y3----y3----y3..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x1----x2----x3..             y2----y2----y2..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x1----x2----x3..  >x         y1----y1----y1..  >x
+
+        Actual Implementation for x and y values:
+
+        x1----x1----x1..  >y         y1----y2----y3..  >y
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x2----x2----x2..             y1----y2----y3..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x3----x3----x3..             y1----y2----y3..
+        :     :     :                :     :     :
+
+        v                            v
+        x                            x
         """
         return XYZ(self._zx, self._zy, self._z)
 
@@ -242,6 +372,38 @@ class Mesh3D:
 
         X and Y have (nl, nx, ny) shapes and H has (nl,1,1) shape
         (constant thickness layers).
+
+        Warning: Since the first coordinate of the Tensor represents
+        the x coordinates, the actual Tensor is a 90° clockwise rotation
+        of the intuitive X,Y Mesh.
+
+        Intuitive Representation for x and y values:
+
+        y                            y
+        ^                            ^
+
+        :     :     :                :     :     :
+        x1----x2----x3..             y3----y3----y3..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x1----x2----x3..             y2----y2----y2..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x1----x2----x3..  >x         y1----y1----y1..  >x
+
+        Actual Implementation for x and y values:
+
+        x1----x1----x1..  >y         y1----y2----y3..  >y
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x2----x2----x2..             y1----y2----y3..
+        |     |     |                |     |     |
+        |     |     |                |     |     |
+        x3----x3----x3..             y1----y2----y3..
+        :     :     :                :     :     :
+
+        v                            v
+        x                            x
         """
         return XYH(self._hx, self._hy, self._h)
 

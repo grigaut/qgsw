@@ -1,26 +1,26 @@
-# ruff: noqa
-"""
-Shallow-water implementation.
+"""Shallow-water implementation.
+
 Louis Thiry, Nov 2023 for IFREMER.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
 import numpy as np
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.models.base import Model
+from qgsw.models.core import finite_diff
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
-from qgsw.models.base import Model
-
-from qgsw.models.core import finite_diff, flux
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
-    """Pytorch cumsum in the reverse order
+    """Pytorch cumsum in the reverse order.
+
     Example:
     reverse_cumsum(torch.arange(1,4), dim=-1)
     >>> tensor([6, 5, 3])
@@ -28,13 +28,21 @@ def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
 
 
-def inv_reverse_cumsum(x, dim):
-    """Inverse of reverse cumsum function"""
+def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
+    """Inverse of reverse cumsum function.
+
+    Args:
+        x (torch.Tensor): Tensor to perform inverse reverse cumsum on.
+        dim (int): Dimension to perform the inverse reverse cumsum on.
+
+    Returns:
+        torch.Tensor: Inverse Reverse Cumsum
+    """
     return torch.cat([-torch.diff(x, dim=dim), x.narrow(dim, -1, 1)], dim=dim)
 
 
 class SW(Model):
-    """# Implementation of multilayer rotating shallow-water model
+    """# Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .
 
@@ -66,7 +74,7 @@ class SW(Model):
 
     """
 
-    def __init__(self, param: dict[str, Any]):
+    def __init__(self, param: dict[str, Any]) -> None:
         """Parameters
 
         param: python dict. with following keys
@@ -75,16 +83,20 @@ class SW(Model):
             'nl':       nl, number of stacked layer
             'dx':       float or Tensor (nx, ny), dx metric term
             'dy':       float or Tensor (nx, ny), dy metric term
-            'H':        Tensor (nl,) or (nl, nx, ny), unperturbed layer thickness
+            'H':        Tensor (nl,) or (nl, nx, ny),
+            unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
             'f':        Tensor (nx, ny), Coriolis parameter
-            'taux':     float or Tensor (nx-1, ny), top-layer forcing, x component
-            'tauy':     float or Tensor (nx, ny-1), top-layer forcing, y component
+            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
+            x component
+            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
+            y component
             'dt':       float > 0., integration time-step
             'n_ens':    int, number of ensemble member
             'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
             'dtype':    torch.float32 of torch.float64
-            'slip_coef':    float, 1 for free slip, 0 for no-slip, inbetween for
+            'slip_coef':    float, 1 for free slip, 0 for no-slip,
+            inbetween for
                         partial free slip.
             'bottom_drag_coef': float, linear bottom drag coefficient
         """
@@ -134,11 +146,7 @@ class SW(Model):
         self.h = h_.type(self.dtype) * self.masks.h * self.area
         self.compute_diagnostic_variables()
 
-    def compute_time_derivatives(self):
-        dt_u, dt_v, dt_h = super().compute_time_derivatives()
-        return dt_u, dt_v, dt_h
-
-    def step(self):
+    def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
         self.u += self.dt * dt0_u
@@ -213,11 +221,39 @@ class SW(Model):
 
 
 class SWFilterBarotropic(SW):
-    def __init__(self, param: dict[str, Any]):
+    """Shallow Water with Barotropic Filtering."""
+
+    def __init__(self, param: dict[str, Any]) -> None:
+        """Instantiate SWFilterBarotropic.
+
+        param: python dict. with following keys
+            'nx':       int, number of grid points in dimension x
+            'ny':       int, number grid points in dimension y
+            'nl':       nl, number of stacked layer
+            'dx':       float or Tensor (nx, ny), dx metric term
+            'dy':       float or Tensor (nx, ny), dy metric term
+            'H':        Tensor (nl,) or (nl, nx, ny),
+            unperturbed layer thickness
+            'g_prime':  Tensor (nl,), reduced gravities
+            'f':        Tensor (nx, ny), Coriolis parameter
+            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
+            x component
+            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
+            y component
+            'dt':       float > 0., integration time-step
+            'n_ens':    int, number of ensemble member
+            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
+            'dtype':    torch.float32 of torch.float64
+            'slip_coef':    float, 1 for free slip, 0 for no-slip,
+            inbetween for
+                        partial free slip.
+            'bottom_drag_coef': float, linear bottom drag coefficient
+        """
         super().__init__(param)
         self.tau = 2 * self.dt
         self.barotropic_filter_spectral = param.get(
-            "barotropic_filter_spectral", False
+            "barotropic_filter_spectral",
+            False,
         )
         if self.barotropic_filter_spectral:
             verbose.display(
@@ -267,16 +303,33 @@ class SWFilterBarotropic(SW):
             use_compilation=False,
         )
 
-    def filter_barotropic_waves(self, dt_u, dt_v, dt_h):
-        """Inspired from https://doi.org/10.1029/2000JC900089."""
+    def filter_barotropic_waves(
+        self,
+        dt_u: torch.Tensor,
+        dt_v: torch.Tensor,
+        dt_h: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Inspired from https://doi.org/10.1029/2000JC900089.
+
+        Args:
+            dt_u (torch.Tensor): Derivative of prognostic variable u
+            dt_v (torch.Tensor): Derivative of prognostic variable v
+            dt_h (torch.Tensor): Derivative of prognostic variable h
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: filtered dt_u,
+            filtered dt_v, dt_h
+        """
         # compute RHS
         u_star = (self.u + self.dt * dt_u) / self.dx
         v_star = (self.v + self.dt * dt_v) / self.dy
         u_bar_star = (u_star * self.h_tot_ugrid).sum(
-            dim=-3, keepdim=True
+            dim=-3,
+            keepdim=True,
         ) / self.h_tot_ugrid.sum(dim=-3, keepdim=True)
         v_bar_star = (v_star * self.h_tot_vgrid).sum(
-            dim=-3, keepdim=True
+            dim=-3,
+            keepdim=True,
         ) / self.h_tot_vgrid.sum(dim=-3, keepdim=True)
         if self.barotropic_filter_spectral:
             rhs = (
@@ -317,7 +370,14 @@ class SWFilterBarotropic(SW):
 
         return dt_u + filt_u, dt_v + filt_v, dt_h
 
-    def compute_time_derivatives(self):
+    def compute_time_derivatives(
+        self,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute time derivatives of prognostic variables.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]:  dt_u, dt_v, dt_h
+        """
         dt_u, dt_v, dt_h = super().compute_time_derivatives()
         dt_u, dt_v, dt_h = self.filter_barotropic_waves(dt_u, dt_v, dt_h)
         return dt_u, dt_v, dt_h

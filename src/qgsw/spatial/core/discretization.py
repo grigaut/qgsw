@@ -1,26 +1,90 @@
 """Space Discretizations.
 
-Horizontal Grids Sizes:
+Since the first coordinate of the Tensor represents
+the x coordinates, the actual Tensor is a 90° clockwise rotation
+of the intuitive X,Y Mesh.
+
+Intuitive Representation for x and y values:
+
+y                            y
+^                            ^
+
+:     :     :                :     :     :
+x1----x2----x3..             y3----y3----y3..
+|     |     |                |     |     |
+|     |     |                |     |     |
+x1----x2----x3..             y2----y2----y2..
+|     |     |                |     |     |
+|     |     |                |     |     |
+x1----x2----x3..  >x         y1----y1----y1..  >x
+
+Actual Implementation for x and y values:
+
+x1----x1----x1..  >y         y1----y2----y3..  >y
+|     |     |                |     |     |
+|     |     |                |     |     |
+x2----x2----x2..             y1----y2----y3..
+|     |     |                |     |     |
+|     |     |                |     |     |
+x3----x3----x3..             y1----y2----y3..
+:     :     :                :     :     :
+
+v                            v
+x                            x
+
+The Space Discretization uses a staggered grid for:
+- ω : Vorticity
+- h : Layer Thickness Anomaly
+- u : Zonal Velocity
+- v : Meridional Velocity
+
+The Intuitive Representation of this grid is the following:
+
+y
+^
+
+:       :       :       :
+ω---v---ω---v---ω---v---ω..
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω..
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω..
+|       |       |       |
+u   h   u   h   u   h   u
+|       |       |       |
+ω---v---ω---v---ω---v---ω..   > x
+
+While its actual implementation is:
+
+ω---u---ω---u---ω---u---ω..   > y
+|       |       |       |
+v   h   v   h   v   h   v
+|       |       |       |
+ω---u---ω---u---ω---u---ω..
+|       |       |       |
+v   h   v   h   v   h   v
+|       |       |       |
+ω---u---ω---u---ω---u---ω..
+|       |       |       |
+v   h   v   h   v   h   v
+|       |       |       |
+ω---u---ω---u---ω---u---ω..
+:       :       :       :
+
+
+v
+x
+
+Horizontal Grids Relative Sizes:
 - ω : (nx, ny)
 - h : (nx - 1, ny - 1)
 - u : (nx, ny - 1)
 - v : (nx - 1, ny)
 
-
-Grid Patterns:
-ω---v---ω---v---ω---v---ω
-|       |       |       |
-u   h   u   h   u   h   u
-|       |       |       |
-ω---v---ω---v---ω---v---ω
-|       |       |       |
-u   h   u   h   u   h   u
-|       |       |       |
-ω---v---ω---v---ω---v---ω
-|       |       |       |
-u   h   u   h   u   h   u
-|       |       |       |
-ω---v---ω---v---ω---v---ω
 """
 
 from __future__ import annotations
@@ -55,19 +119,48 @@ class SpaceDiscretization2D:
 
 
     Grid Patterns:
-    ω---v---ω---v---ω---v---ω
+
+    y
+    ^
+
+    :       :       :       :
+    ω---v---ω---v---ω---v---ω..
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
-    ω---v---ω---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω..
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
-    ω---v---ω---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω..
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
-    ω---v---ω---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω..   > x
+
+    Warning: 2DMesh have x coordinate as first coordinate.
+    Therefore, the actual pattern implementation corresponds to a
+    90° clockwise rotation of the preceding pattern:
+
+    ω---u---ω---u---ω---u---ω..   > y
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    :       :       :       :
+
+
+    v
+    x
+
     """
 
     def __init__(
@@ -132,19 +225,47 @@ class SpaceDiscretization2D:
         Size: (nx, ny)
 
         Pattern:
-        ω-------ω-------ω-------ω
+
+        y
+        ^
+
+        :       :       :       :
+        ω-------ω-------ω-------ω..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-        ω-------ω-------ω-------ω
+        ω-------ω-------ω-------ω..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-        ω-------ω-------ω-------ω
+        ω-------ω-------ω-------ω..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-        ω-------ω-------ω-------ω
+        ω-------ω-------ω-------ω..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+        ω-------ω-------ω-------ω..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.oFinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -158,19 +279,47 @@ class SpaceDiscretization2D:
         Size: (nx - 1, ny - 1)
 
         Pattern:
-         ------- ------- -------
+
+        y
+        ^
+
+        :       :       :       :
+         ------- ------- ------- ..
         |       |       |       |
         |   h   |   h   |   h   |
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         |   h   |   h   |   h   |
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         |   h   |   h   |   h   |
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -184,19 +333,47 @@ class SpaceDiscretization2D:
         Size: (nx, ny - 1)
 
         Pattern:
-         ------- ------- -------
+
+        y
+        ^
+
+        :       :       :       :
+         ------- ------- ------- ..
         |       |       |       |
         u       u       u       u
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         u       u       u       u
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         u       u       u       u
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ---u--- ---u--- ---u--- ..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -210,19 +387,47 @@ class SpaceDiscretization2D:
         Size: (nx - 1, ny)
 
         Pattern:
-         ---v--- ---v--- ---v---
+
+        y
+        ^
+
+        :       :       :       :
+         ---v--- ---v--- ---v--- ..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-         ---v--- ---v--- ---v---
+         ---v--- ---v--- ---v--- ..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-         ---v--- ---v--- ---v---
+         ---v--- ---v--- ---v--- ..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-         ---v--- ---v--- ---v---
+         ---v--- ---v--- ---v--- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -394,19 +599,48 @@ class SpaceDiscretization3D:
 
 
     Grids Pattern:
-    ω---v---ω---v---ω---v---ω
+
+    y
+    ^
+
+    :       :       :       :
+    ω---v---ω---v---ω---v---ω..
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
-    ω---v---ω---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω..
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
-    ω---v---ω---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω..
     |       |       |       |
     u   h   u   h   u   h   u
     |       |       |       |
-    ω---v---ω---v---ω---v---ω
+    ω---v---ω---v---ω---v---ω..   > x
+
+    Warning: 2DMesh have x coordinate as first coordinate.
+    Therefore, the actual pattern implementation corresponds to a
+    90° clockwise rotation of the preceding pattern:
+
+    ω---u---ω---u---ω---u---ω..   > y
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    |       |       |       |
+    v   h   v   h   v   h   v
+    |       |       |       |
+    ω---u---ω---u---ω---u---ω..
+    :       :       :       :
+
+
+    v
+    x
+
     """
 
     def __init__(
@@ -489,19 +723,47 @@ class SpaceDiscretization3D:
         Size: (nx, ny)
 
         Pattern:
-        ω-------ω-------ω-------ω
+
+        y
+        ^
+
+        :       :       :       :
+        ω-------ω-------ω-------ω..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-        ω-------ω-------ω-------ω
+        ω-------ω-------ω-------ω..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-        ω-------ω-------ω-------ω
+        ω-------ω-------ω-------ω..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-        ω-------ω-------ω-------ω
+        ω-------ω-------ω-------ω..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+        ω-------ω-------ω-------ω..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ω-------ω-------ω-------ω..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -515,19 +777,47 @@ class SpaceDiscretization3D:
         Size: (nx - 1, ny - 1)
 
         Pattern:
-         ------- ------- -------
+
+        y
+        ^
+
+        :       :       :       :
+         ------- ------- ------- ..
         |       |       |       |
         |   h   |   h   |   h   |
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         |   h   |   h   |   h   |
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         |   h   |   h   |   h   |
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   h   |   h   |   h   |
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -541,19 +831,47 @@ class SpaceDiscretization3D:
         Size: (nx, ny - 1)
 
         Pattern:
-         ------- ------- -------
+
+        y
+        ^
+
+        :       :       :       :
+         ------- ------- ------- ..
         |       |       |       |
         u       u       u       u
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         u       u       u       u
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..
         |       |       |       |
         u       u       u       u
         |       |       |       |
-         ------- ------- -------
+         ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ---u--- ---u--- ---u--- ..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+         ---u--- ---u--- ---u--- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
@@ -567,19 +885,47 @@ class SpaceDiscretization3D:
         Size: (nx - 1, ny)
 
         Pattern:
-         ---v--- ---v--- ---v---
+
+        y
+        ^
+
+        :       :       :       :
+         ---v--- ---v--- ---v--- ..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-         ---v--- ---v--- ---v---
+         ---v--- ---v--- ---v--- ..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-         ---v--- ---v--- ---v---
+         ---v--- ---v--- ---v--- ..
         |       |       |       |
         |       |       |       |
         |       |       |       |
-         ---v--- ---v--- ---v---
+         ---v--- ---v--- ---v--- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        v       v       v       v
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
 
         See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
         for more details.
