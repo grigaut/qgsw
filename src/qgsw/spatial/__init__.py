@@ -2,7 +2,7 @@
 
 Warning: Since the first coordinate of the Tensor represents
 the x coordinates, the actual Tensor is a 90° clockwise rotation
-of the intuitive X,Y Mesh.
+of the intuitive X,Y Grid.
 
 Intuitive Representation for x and y values:
 
