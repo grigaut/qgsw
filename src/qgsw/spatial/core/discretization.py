@@ -29,8 +29,8 @@ u   h   u   h   u   h   u
 
 
 Warning: 2DMesh have x coordinate as first coordinate.
-Therefore, the actual matrix correspond to a 90° clockwise
-rotation of the pattern:
+Therefore, the actual pattern implementation corresponds to a
+90° clockwise rotation of the preceding pattern:
 
 ω---u---ω---u---ω---u---ω..   > y
 |       |       |       |
@@ -104,8 +104,8 @@ class SpaceDiscretization2D:
     ω---v---ω---v---ω---v---ω..   > x
 
     Warning: 2DMesh have x coordinate as first coordinate.
-    Therefore, the actual matrix correspond to a 90° clockwise
-    rotation of the pattern:
+    Therefore, the actual pattern implementation corresponds to a
+    90° clockwise rotation of the preceding pattern:
 
     ω---u---ω---u---ω---u---ω..   > y
     |       |       |       |
@@ -210,8 +210,8 @@ class SpaceDiscretization2D:
         ω-------ω-------ω-------ω..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
         ω-------ω-------ω-------ω..   > y
         |       |       |       |
@@ -264,8 +264,8 @@ class SpaceDiscretization2D:
          ------- ------- ------- ..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
          ------- ------- ------- ..   > y
         |       |       |       |
@@ -318,8 +318,8 @@ class SpaceDiscretization2D:
          ------- ------- ------- ..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
          ---u--- ---u--- ---u--- ..   > y
         |       |       |       |
@@ -372,8 +372,8 @@ class SpaceDiscretization2D:
          ---v--- ---v--- ---v--- ..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
          ------- ------- ------- ..   > y
         |       |       |       |
@@ -584,8 +584,8 @@ class SpaceDiscretization3D:
     ω---v---ω---v---ω---v---ω..   > x
 
     Warning: 2DMesh have x coordinate as first coordinate.
-    Therefore, the actual matrix correspond to a 90° clockwise
-    rotation of the pattern:
+    Therefore, the actual pattern implementation corresponds to a
+    90° clockwise rotation of the preceding pattern:
 
     ω---u---ω---u---ω---u---ω..   > y
     |       |       |       |
@@ -708,8 +708,8 @@ class SpaceDiscretization3D:
         ω-------ω-------ω-------ω..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
         ω-------ω-------ω-------ω..   > y
         |       |       |       |
@@ -762,8 +762,8 @@ class SpaceDiscretization3D:
          ------- ------- ------- ..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
          ------- ------- ------- ..   > y
         |       |       |       |
@@ -816,8 +816,8 @@ class SpaceDiscretization3D:
          ------- ------- ------- ..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
          ---u--- ---u--- ---u--- ..   > y
         |       |       |       |
@@ -870,8 +870,8 @@ class SpaceDiscretization3D:
          ---v--- ---v--- ---v--- ..   > x
 
         Warning: 2DMesh have x coordinate as first coordinate.
-        Therefore, the actual matrix correspond to a 90° clockwise
-        rotation of the pattern:
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
 
          ------- ------- ------- ..   > y
         |       |       |       |
