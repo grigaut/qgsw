@@ -16,7 +16,7 @@ from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.base import Model
 
-from qgsw.models.core import finite_diff, flux
+from qgsw.models.core import finite_diff
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
