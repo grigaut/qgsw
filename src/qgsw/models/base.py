@@ -645,6 +645,16 @@ class Model(metaclass=ABCMeta):
     def compute_diagnostic_variables(self) -> None:
         """Compute the model's diagnostic variables.
 
+        Computed variables:
+        - Vorticity: omega
+        - Interface heights: eta
+        - Pressure: p
+        - Zonal velocity: U
+        - Meridional velocity: V
+        - Zonal Velocity Momentum: U_m
+        - Meriodional Velocity Momentum: V_m
+        - Kinetic Energy: k_energy
+
         Compute the result given the prognostic
         variables self.u, self.v, self.h .
         """
@@ -652,7 +662,7 @@ class Model(metaclass=ABCMeta):
         self.omega = self.compute_omega(self.u, self.v)
         # Diagnostic: interface height : physical
         self.eta = reverse_cumsum(self.h / self.area, dim=-3)
-        # Diagnostic: potential vorticity
+        # Diagnostic: pressure values
         self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
         # Diagnostic: zonal velocity
         self.U = self.u / self.dx**2
