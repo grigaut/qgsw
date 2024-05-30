@@ -1,16 +1,17 @@
 # ruff: noqa
-"""
-Velocity-sign biased flux computations.
+"""Velocity-sign biased flux computations.
 Louis Thiry, 2023
 """
 
-import torch.nn.functional as F
-import torch
 from typing import Callable
+
+import torch
+import torch.nn.functional as F
 
 
 def stencil_2pts(
-    q: torch.Tensor, dim: int
+    q: torch.Tensor,
+    dim: int,
 ) -> tuple[
     torch.Tensor,
     torch.Tensor,
@@ -44,7 +45,8 @@ def stencil_2pts(
 
 
 def stencil_4pts(
-    q: torch.Tensor, dim: int
+    q: torch.Tensor,
+    dim: int,
 ) -> tuple[
     torch.Tensor,
     torch.Tensor,
@@ -74,7 +76,8 @@ def stencil_4pts(
         dim (int): Dimension to narrow.
 
     Returns:
-        tuple[ torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor ]: Narrowed tensors.
+        tuple[ torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, ]: All
+        4 narrowed tensors.
     """
     n = q.shape[dim]
     return (
@@ -86,7 +89,8 @@ def stencil_4pts(
 
 
 def stencil_6pts(
-    q: torch.Tensor, dim: int
+    q: torch.Tensor,
+    dim: int,
 ) -> tuple[
     torch.Tensor,
     torch.Tensor,
@@ -121,8 +125,16 @@ def stencil_6pts(
         q (torch.Tensor): Tensor.
         dim (int): Dimension to narrow.
 
+
     Returns:
-        tuple[ torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor ]: Narrowed tensors.
+        tuple[
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+        ]: All 6 ,narrowed tensors.
     """
     n = q.shape[dim]
     return (
@@ -146,7 +158,7 @@ def flux(
     mask_2: torch.Tensor,
     mask_4: torch.Tensor,
     mask_6: torch.Tensor,
-):
+) -> torch.Tensor:
     # positive and negative velocities
     u_pos = F.relu(u)
     u_neg = u - u_pos
@@ -164,7 +176,9 @@ def flux(
     # 4-points reconstruction
     pad = (1, 1, 0, 0) if dim == -1 else (0, 0, 1, 1)
     q_stencil4 = stencil_4pts(q, dim)
+    # Positive velocities: use padded direct stencil
     qi4_pos = F.pad(rec_func_4(*q_stencil4), pad)
+    # Negative velocities: use padded reversed stencil
     qi4_neg = F.pad(rec_func_4(*q_stencil4[::-1]), pad)
 
     if n_points == 4:
@@ -175,13 +189,12 @@ def flux(
     # 6-points reconstruction
     pad = (2, 2, 0, 0) if dim == -1 else (0, 0, 2, 2)
     q_stencil6 = stencil_6pts(q, dim)
+    # Positive velocities: use padded direct stencil
     qi6_pos = F.pad(rec_func_6(*q_stencil6), pad)
+    # Negative velocities: use padded reversed stencil
     qi6_neg = F.pad(rec_func_6(*q_stencil6[::-1]), pad)
 
     if n_points == 6:
         return u_pos * (
             mask_2 * qi2_pos + mask_4 * qi4_pos + mask_6 * qi6_pos
         ) + u_neg * (mask_2 * qi2_neg + mask_4 * qi4_neg + mask_6 * qi6_neg)
-
-    # raise NotImplementedError(f'flux computations implemented for '
-    # f'2, 4, 6 points stencils, got {n_points}')
