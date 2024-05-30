@@ -195,7 +195,9 @@ class QG(SW):
 
         self.homsol_wgrid = cst_wgrid + sol_wgrid * self.f0**2 * self.lambd
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
-        self.homsol_hgrid = self.interp_TP(self.homsol_wgrid)
+        self.homsol_hgrid = self.cell_corners_to_cell_centers(
+            self.homsol_wgrid,
+        )
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
 
     def _add_wind_forcing(
@@ -248,7 +250,7 @@ class QG(SW):
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        p_i = self.interp_TP(p) if p_i is None else p_i
+        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
         dx, dy = self.dx, self.dy
 
         # geostrophic balance
@@ -302,7 +304,7 @@ class QG(SW):
             self.Cm2l,
             p_modes,
         )
-        p_qg_i = self.interp_TP(p_qg)
+        p_qg_i = self.cell_corners_to_cell_centers(p_qg)
         return p_qg, p_qg_i
 
     def Q(  # noqa: N802
@@ -328,7 +330,9 @@ class QG(SW):
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.interp_TP(h) / H) * (f0 / area)
+        return (omega - f0 * self.cell_corners_to_cell_centers(h) / H) * (
+            f0 / area
+        )
 
     def project_qg(
         self,
@@ -398,8 +402,10 @@ class QG(SW):
         Returns:
             torch.Tensor: Potential Vorticity
         """
-        beta_y = self.interp_TP((self.f - self.f0).unsqueeze(0))
-        omega = self.interp_TP(self.omega)
+        beta_y = self.cell_corners_to_cell_centers(
+            (self.f - self.f0).unsqueeze(0),
+        )
+        omega = self.cell_corners_to_cell_centers(self.omega)
         return beta_y + omega - self.f0 * h / self.h_ref
 
     def compute_diagnostic_variables(self) -> None:

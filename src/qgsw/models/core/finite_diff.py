@@ -6,38 +6,6 @@ import torch
 import torch.nn.functional as F
 
 
-def interp_TP(f: torch.Tensor) -> torch.Tensor:
-    """Compute interpolated values from f's cells centers.
-
-    Considering f is the main grid 'the 'o's). Then this function
-    averages on every cell to return a value of f
-    for every inner cell (the 'x's).
-
-    o ------- o ------- o ------- o
-    |         |         |         |
-    |    x    |    x    |    x    |
-    |         |         |         |
-    o ------- o ------- o ------- o
-    |         |         |         |
-    |    x    |    x    |    x    |
-    |         |         |         |
-    o ------- o ------- o ------- o
-    |         |         |         |
-    |    x    |    x    |    x    |
-    |         |         |         |
-    o ------- o ------- o ------- o
-
-    Args:
-        f (torch.Tensor): _description_
-
-    Returns:
-        torch.Tensor: _description_
-    """
-    return 0.25 * (
-        f[..., 1:, 1:] + f[..., 1:, :-1] + f[..., :-1, 1:] + f[..., :-1, :-1]
-    )
-
-
 def comp_ke(
     u: torch.Tensor,
     U: torch.Tensor,

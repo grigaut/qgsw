@@ -140,7 +140,7 @@ class Model(metaclass=ABCMeta):
         self._initialize_vars()
 
         self.comp_ke = finite_diff.comp_ke
-        self.interp_TP = grid_conversion.omega_to_h
+        self.cell_corners_to_cell_centers = grid_conversion.omega_to_h
         self.compute_diagnostic_variables()
 
         # utils and flux computation functions
@@ -441,7 +441,9 @@ class Model(metaclass=ABCMeta):
     def _set_utils_before_compilation(self) -> None:
         """Set utils and flux function without compilation."""
         self.comp_ke = finite_diff.comp_ke
-        self.interp_TP = grid_conversion.cell_corners_to_cell_center
+        self.cell_corners_to_cell_centers = (
+            grid_conversion.cell_corners_to_cell_center
+        )
         self.h_flux_y = lambda h, v: flux.flux(
             h,
             v,
@@ -503,7 +505,9 @@ class Model(metaclass=ABCMeta):
                 trigger_level=2,
             )
             self.comp_ke = torch.compile(finite_diff.comp_ke)
-            self.interp_TP = torch.compile(grid_conversion.omega_to_h)
+            self.cell_corners_to_cell_centers = torch.compile(
+                grid_conversion.omega_to_h,
+            )
             self.h_flux_y = torch.compile(self.h_flux_y)
             self.h_flux_x = torch.compile(self.h_flux_x)
             self.w_flux_y = torch.compile(self.w_flux_y)
@@ -520,7 +524,7 @@ class Model(metaclass=ABCMeta):
                 finite_diff.comp_ke,
                 (self.u, self.U, self.v, self.V),
             )
-            self.interp_TP = torch.jit.trace(
+            self.cell_corners_to_cell_centers = torch.jit.trace(
                 grid_conversion.omega_to_h,
                 (self.U,),
             )
@@ -617,10 +621,10 @@ class Model(metaclass=ABCMeta):
         self.V = self.v / self.dy**2
         # Zonal velocity momentum -> corresponds to the v grid
         # Has no value on the boundary of the v grid
-        self.U_m = self.interp_TP(self.U)
+        self.U_m = self.cell_corners_to_cell_centers(self.U)
         # Meridional velocity momentum -> corresponds to the u grid
         # Has no value on the boundary of the u grid
-        self.V_m = self.interp_TP(self.V)
+        self.V_m = self.cell_corners_to_cell_centers(self.V)
         # Diagnostic: kinetic energy
         self.k_energy = (
             self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
