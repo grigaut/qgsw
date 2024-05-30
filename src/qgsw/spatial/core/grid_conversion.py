@@ -62,6 +62,39 @@ def replicate_pad(f: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return mask_ * f_ + (1 - mask_) * f_out
 
 
+def cell_corners_to_cell_center(corners: torch.Tensor) -> torch.Tensor:
+    """Convert cell corners values to cell centers values.
+
+           Cells corners                            Cells Centers
+
+    x-------x-------x-------x..               ------- ------- ------- ..
+    |       |       |       |                |       |       |       |
+    |       |       |       |                |   x   |   x   |   x   |
+    |       |       |       |                |       |       |       |
+    x-------x-------x-------x..               ------- ------- ------- ..
+    |       |       |       |                |       |       |       |
+    |       |       |       |                |   x   |   x   |   x   |
+    |       |       |       |                |       |       |       |
+    x-------x-------x-------x..               ------- ------- ------- ..
+    |       |       |       |                |       |       |       |
+    |       |       |       |                |   x   |   x   |   x   |
+    |       |       |       |                |       |       |       |
+    x-------x-------x-------x..               ------- ------- ------- ..
+    :       :       :       :                :       :       :       :
+
+    Args:
+        corners (torch.Tensor): Cells corners values
+
+    Returns:
+    torch.Tensor: Cells centers values
+    """
+    top_left = corners[..., :-1, :-1]
+    top_right = corners[..., 1:, :-1]
+    bottom_left = corners[..., :-1, 1:]
+    bottom_right = corners[..., 1:, 1:]
+    return 0.25 * (top_right + top_left + bottom_left + bottom_right)
+
+
 def omega_to_h(omega_grid: torch.Tensor) -> torch.Tensor:
     """Convert omega grid to h grid.
 
@@ -115,11 +148,7 @@ def omega_to_h(omega_grid: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: h grid
     """
-    top_left = omega_grid[..., :-1, :-1]
-    top_right = omega_grid[..., 1:, :-1]
-    bottom_left = omega_grid[..., :-1, 1:]
-    bottom_right = omega_grid[..., 1:, 1:]
-    return 0.25 * (top_right + top_left + bottom_left + bottom_right)
+    return cell_corners_to_cell_center(omega_grid)
 
 
 def omega_to_u(omega_grid: torch.Tensor) -> torch.Tensor:

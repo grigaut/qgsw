@@ -441,7 +441,7 @@ class Model(metaclass=ABCMeta):
     def _set_utils_before_compilation(self) -> None:
         """Set utils and flux function without compilation."""
         self.comp_ke = finite_diff.comp_ke
-        self.interp_TP = grid_conversion.omega_to_h
+        self.interp_TP = grid_conversion.cell_corners_to_cell_center
         self.h_flux_y = lambda h, v: flux.flux(
             h,
             v,
