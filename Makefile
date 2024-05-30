@@ -3,8 +3,8 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 # Virtual Environment Management
-ENVIRONMENT_FILEPATH := environment.yml
-VENV := ${PWD}/.venv
+ENVIRONMENT_FILE := environment.yml
+VENV := .venv
 ifeq ($(OS), Windows_NT)
 	BIN = ${VENV}/Scripts/
 else
@@ -14,8 +14,8 @@ endif
 PYTHON:= ${BIN}/python
 PIP:=${BIN}/pip
 # Important Files
-REQUIREMENTS:=${PWD}/requirements.txt
-DEV_REQUIREMENTS:=${PWD}/requirements-dev.txt
+REQUIREMENTS:=requirements.txt
+DEV_REQUIREMENTS:=requirements-dev.txt
 
 # G5K runs
 # Zip file
@@ -35,16 +35,14 @@ clean:
 	@${CONDA_EXE} env remove --prefix ${VENV}
 
 ${VENV}:
-	@${CONDA_EXE} env create --file ${ENVIRONMENT_FILEPATH} --prefix ${VENV}
+	@${CONDA_EXE} env create --file ${ENVIRONMENT_FILE} --prefix ${VENV}
 
 venv: ${VENV}
 
 install: ${VENV}
-	@${PIP} install -r ${REQUIREMENTS} -f https://download.pytorch.org/whl/cu111/torch_stable.html
 	@${PIP} install -e .
 
 install-dev: ${VENV}
-	@${PIP} install -r ${REQUIREMENTS} -f https://download.pytorch.org/whl/cu111/torch_stable.html
 	@${PIP} install -r ${DEV_REQUIREMENTS}
 	@${PIP} install -e .
 
@@ -59,40 +57,7 @@ g5k-export:
 	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
-	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT}
-	# Export to g5k
-	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
-	# Remove temp files
-	rm -rf ${tmp}
-
-g5k-export-src:
-	# Create temp directory
-	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
-	$(eval ZIP_FILE := ${ZIP_FILE_ROOT}_src.zip)
-	# Zip files
-	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
-	# Export to g5k
-	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
-	# Remove temp files
-	rm -rf ${tmp}
-
-g5k-export-configs:
-	# Create temp directory
-	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
-	$(eval ZIP_FILE := ${ZIP_FILE_ROOT}_configs.zip)
-	# Zip files
-	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
-	# Export to g5k
-	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
-	# Remove temp files
-	rm -rf ${tmp}
-
-g5k-export-scripts:
-	# Create temp directory
-	$(eval tmp := $(shell mktemp --directory --tmpdir=${PWD}))
-	$(eval ZIP_FILE := ${ZIP_FILE_ROOT}_scripts.zip)
-	# Zip files
-	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
+	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT} ${REQUIREMENTS} ${ENVIRONMENT_FILE}
 	# Export to g5k
 	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
 	# Remove temp files
