@@ -615,9 +615,11 @@ class Model(metaclass=ABCMeta):
         self.U = self.u / self.dx**2
         # Diagnostic: meridional velocity
         self.V = self.v / self.dy**2
-        # Zonal velocity momentum
+        # Zonal velocity momentum -> corresponds to the v grid
+        # Has no value on the boundary of the v grid
         self.U_m = self.interp_TP(self.U)
-        # Meridional velocity momentum
+        # Meridional velocity momentum -> corresponds to the u grid
+        # Has no value on the boundary of the u grid
         self.V_m = self.interp_TP(self.V)
         # Diagnostic: kinetic energy
         self.k_energy = (
