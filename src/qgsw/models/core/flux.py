@@ -166,7 +166,9 @@ def flux(
 
     # 2-points reconstruction
     q_stencil2 = stencil_2pts(q, dim)
+    # Positive velocities: use direct stencil
     qi2_pos = rec_func_2(*q_stencil2)
+    # Negative velocities: use reversed stencil
     qi2_neg = rec_func_2(*q_stencil2[::-1])
 
     if n_points == 2:
