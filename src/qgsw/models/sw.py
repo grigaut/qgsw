@@ -166,6 +166,12 @@ class SW(Model):
     def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
+        Use the shallow water momentum equation in rotation frame:
+        ∂_t [u v] + (ω + f)x[u v] = -∇(gη + 0.5[u v]⋅[u v])
+        Therefore:
+        - ∂_t u = (ω + f)v - ∂_x(gη + 0.5(u² + v²))
+        - ∂_t v = - (ω + f)u - ∂_y(gη + 0.5(u² + v²))
+
         Returns:
             tuple[torch.Tensor,torch.Tensor]: u, v advection (∂_t u, ∂_t v).
         """
@@ -185,10 +191,10 @@ class SW(Model):
         dt_u, dt_v = self._add_wind_forcing(dt_u, dt_v)
         dt_u, dt_v = self._add_bottom_drag(dt_u, dt_v)
 
-        return F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u, F.pad(
-            dt_v,
-            (1, 1, 0, 0),
-        ) * self.masks.v
+        return (
+            F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u,
+            F.pad(dt_v, (1, 1, 0, 0)) * self.masks.v,
+        )
 
     def advection_h(self) -> torch.Tensor:
         """Advection RHS for thickness perturbation h.
