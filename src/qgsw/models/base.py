@@ -9,9 +9,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw import reconstruction, verbose
+from qgsw import verbose
 from qgsw.masks import Masks
-from qgsw.models.core import finite_diff, flux
+from qgsw.models.core import finite_diff, flux, reconstruction
 from qgsw.models.exceptions import InvalidSavingFileError
 from qgsw.physics import coriolis
 from qgsw.spatial.core import grid_conversion
