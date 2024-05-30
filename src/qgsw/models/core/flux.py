@@ -18,80 +18,15 @@ def stencil_2pts(
     """Extract 2 pts stencils from q.
 
     Example:
-    If q, shaped (p,n) is :
-
-      q11-------q12---...----q1(n-1)-------q1n
-       |         |              |           |
-       |         |              |           |
-      q21-------q22---...----q2(n-1)-------q2n
-       |         |              |           |
-       |         |              |           |
-      q31-------q32---...----q3(n-1)-------q3n
-       :         :              :           :
-       :         :              :           :
-    q(n-1)1---q(n-1)2---...q(n-1)(n-1)---q(n-1)n
-       |         |              |           |
-       |         |              |           |
-      qp1-------qp2---...----qp(n-1)-------qpn
-
-    Then, with dim = -2, the output is:
+    If q is 2D and dim = -2, the output is:
     (
-      q11-------q12---...----q1(n-1)-------q1n
-       |         |              |           |
-       |         |              |           |
-      q21-------q22---...----q2(n-1)-------q2n
-       |         |              |           |
-       |         |              |           |
-      q31-------q32---...----q3(n-1)-------q3n
-       :         :              :           :
-       :         :              :           :
-    q(p-1)1---q(p-1)2---...q(p-1)(n-1)---q(p-1)n
-
-    ,
-
-      q21-------q22---...----q2(n-1)-------q2n
-       |         |              |           |
-       |         |              |           |
-      q31-------q32---...----q3(n-1)-------q3n
-       :         :              :           :
-       :         :              :           :
-    q(p-1)1---q(p-1)2---...q(p-1)(n-1)---q(p-1)n
-       |         |              |           |
-       |         |              |           |
-      qp1-------qp2---...----qp(n-1)-------qpn
+        q[:-1, :],
+        q[1:, :],
     )
-
-    And, with dim = -2, the output is:
+    If q is 2D and dim = -1, the output is:
     (
-      q11-------q12---...----q1(n-1)
-       |         |              |
-       |         |              |
-      q21-------q22---...----q2(n-1)
-       |         |              |
-       |         |              |
-      q31-------q32---...----q3(n-1)
-       :         :              :
-       :         :              :
-    q(p-1)1---q(p-1)2---...q(p-1)(n-1)
-       |         |              |
-       |         |              |
-      qp1-------qp2---...----qp(n-1)
-
-    ,
-
-      q12---...----q1(n-1)-------q1n
-       |              |           |
-       |              |           |
-      q22---...----q2(n-1)-------q2n
-       |              |           |
-       |              |           |
-      q32---...----q3(n-1)-------q3n
-       :              :           :
-       :              :           :
-    q(p-1)2---...q(p-1)(n-1)---q(p-1)n
-       |              |           |
-       |              |           |
-      qp2---...----qp(n-1)-------qpn
+        q[:, :-1],
+        q[:, 1:],
     )
 
     Args:
@@ -115,8 +50,32 @@ def stencil_4pts(
     torch.Tensor,
     torch.Tensor,
     torch.Tensor,
-    torch.Tensor,
 ]:
+    """Extract 4 pts stencils from q.
+
+    Example:
+    If q is 2D and dim = -2, the output is:
+    (
+        q[:-3, :],
+        q[1:-2, :],
+        q[2:-1, :],
+        q[3:-2, :],
+    )
+    If q is 2D and dim = -1, the output is:
+    (
+        q[:, :-3],
+        q[:, 1:-2],
+        q[:, 2:-1],
+        q[:, 3:-2],
+    )
+
+    Args:
+        q (torch.Tensor): Tensor.
+        dim (int): Dimension to narrow.
+
+    Returns:
+        tuple[ torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor ]: Narrowed tensors.
+    """
     n = q.shape[dim]
     return (
         q.narrow(dim, 0, n - 3),
@@ -135,8 +94,36 @@ def stencil_6pts(
     torch.Tensor,
     torch.Tensor,
     torch.Tensor,
-    torch.Tensor,
 ]:
+    """Extract 6 pts stencils from q.
+
+    Example:
+    If q is 2D and dim = -2, the output is:
+    (
+        q[:-5, :],
+        q[1:-4, :],
+        q[2:-3, :],
+        q[3:-2, :],
+        q[4:-1, :],
+        q[5:, :],
+    )
+    If q is 2D and dim = -1, the output is:
+    (
+        q[:, :-5],
+        q[:, 1:-4],
+        q[:, 2:-3],
+        q[:, 3:-2],
+        q[:, 4:-1],
+        q[:, 5:],
+    )
+
+    Args:
+        q (torch.Tensor): Tensor.
+        dim (int): Dimension to narrow.
+
+    Returns:
+        tuple[ torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor ]: Narrowed tensors.
+    """
     n = q.shape[dim]
     return (
         q.narrow(dim, 0, n - 5),
