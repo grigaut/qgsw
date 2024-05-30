@@ -167,7 +167,7 @@ class SW(Model):
         """Advection RHS for momentum (u, v).
 
         Returns:
-            tuple[torch.Tensor,torch.Tensor]: u, v advection.
+            tuple[torch.Tensor,torch.Tensor]: u, v advection (∂_t u, ∂_t v).
         """
         # Vortex-force + Coriolis
         omega_v_m = self.w_flux_y(self.omega[..., 1:-1, :], self.V_m)
@@ -193,17 +193,22 @@ class SW(Model):
     def advection_h(self) -> torch.Tensor:
         """Advection RHS for thickness perturbation h.
 
-        dt_h = - div(h_tot [u v])
+        ∂_t h = - ∇⋅(h_tot u)
 
+        u = [U V]
         h_tot = h_ref + h
 
         Returns:
-            torch.Tensor: h advection.
+            torch.Tensor: h advection (∂_t h).
         """
         h_tot = self.h_ref + self.h
+        # Compute (h_tot x V)
         h_tot_flux_y = self.h_flux_y(h_tot, self.V[..., 1:-1])
+        # Compute (h_tot x U)
         h_tot_flux_x = self.h_flux_x(h_tot, self.U[..., 1:-1, :])
+        # Compute -∇⋅(h_tot u) = ∂_x (h_tot x U) + ∂_y (h_tot x V)
         div_no_flux = -finite_diff.div_nofluxbc(h_tot_flux_x, h_tot_flux_y)
+        # Apply h mask
         return div_no_flux * self.masks.h
 
     def compute_time_derivatives(
