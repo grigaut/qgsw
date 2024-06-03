@@ -156,7 +156,7 @@ class QG(SW):
                 trigger_level=2,
             )
         R, L = R.real, L.real  # noqa: N806
-        # layer to mode
+        # layer to mode: pseudo inverse of R
         self.Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T
         # mode to layer
         self.Cm2l = R
