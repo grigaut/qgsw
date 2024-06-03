@@ -144,7 +144,7 @@ class QG(SW):
 
         # layer-to-mode and mode-to-layer matrices
         lambd_r, R = torch.linalg.eig(self.A)  # noqa: N806
-        lambd_l, L = torch.linalg.eig(self.A.T)  # noqa: N806
+        _, L = torch.linalg.eig(self.A.T)  # noqa: N806
         self.lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
         with np.printoptions(precision=1):
             radius = (
@@ -156,10 +156,17 @@ class QG(SW):
                 trigger_level=2,
             )
         R, L = R.real, L.real  # noqa: N806
+        # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
         # layer to mode: pseudo inverse of R
         self.Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T
         # mode to layer
         self.Cm2l = R
+
+        # Governing Equation: ∆Ψ - (f_0)² A Ψ = q - βy
+        # With Diagonalization: ∆Ψ - (f_0)² Cm2l @ Λ @ Cl2m Ψ = q - βy
+        # Layer to mode transform: Ψ_m = Cl2m @ Ψ ; q_m = Cl2m @ q
+        # Within Diagonalized Equation: ∆Ψ_m - (f_0)² Λ @ Ψ_m = q_m - βy
+        # In Fourier Space: "(∆ - (f_0)² Λ) @ Ψ_m = q_m - βy"
 
         # For Helmholtz equations
         nl, nx, ny = self.nl, self.nx, self.ny
@@ -168,8 +175,9 @@ class QG(SW):
             .unsqueeze(0)
             .unsqueeze(0)
         )
+        # Compute "(∆ - (f_0)² Λ)" in Fourier Space
         self.helmholtz_dstI = laplace_dstI - self.f0**2 * self.lambd
-
+        # Constant Omega grid
         cst_wgrid = torch.ones((1, nl, nx + 1, ny + 1), **self.arr_kwargs)
         if len(self.masks.psi_irrbound_xids) > 0:
             # Handle Non rectangular geometry
@@ -192,7 +200,7 @@ class QG(SW):
                 cst_wgrid[..., 1:-1, 1:-1],
                 self.helmholtz_dstI,
             )
-
+        # Compute homogenous solution
         self.homsol_wgrid = cst_wgrid + sol_wgrid * self.f0**2 * self.lambd
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
         self.homsol_hgrid = self.cell_corners_to_cell_centers(

@@ -118,7 +118,10 @@ def dstI1D(x: torch.Tensor, norm: str = "ortho") -> torch.Tensor:
 
 
 def dstI2D(x: torch.Tensor, norm: str = "ortho"):
-    """2D DST-I."""
+    """2D DST-I.
+
+    2D Discrete Sine Transform.
+    """
     return dstI1D(dstI1D(x, norm=norm).transpose(-1, -2), norm=norm).transpose(
         -1, -2
     )
@@ -128,7 +131,10 @@ def compute_laplace_dstI(
     nx: int, ny: int, dx: float, dy: float, arr_kwargs
 ) -> torch.Tensor:
     """Type-I discrete sine transform of the usual 5-points
-    discrete laplacian operator on uniformly spaced grid."""
+    discrete laplacian operator on uniformly spaced grid.
+
+    Laplacian in Fourier Space.
+    """
     x, y = torch.meshgrid(
         torch.arange(1, nx, **arr_kwargs),
         torch.arange(1, ny, **arr_kwargs),
@@ -144,7 +150,13 @@ def solve_helmholtz_dstI(
     rhs: torch.Tensor,
     helmholtz_dstI: torch.Tensor,
 ) -> torch.Tensor:
-    """Solves 2D Helmholtz equation with DST-I fast diagonalization."""
+    """Solves 2D Helmholtz equation with DST-I fast diagonalization.
+
+    Steps:
+    - Perform forward DST-I of rhs.
+    - Divide by helmholtz_dstI (in fourier space).
+    - Perform inverse DST-I to com eback to original space.
+    """
     return F.pad(
         dstI2D(dstI2D(rhs.type(helmholtz_dstI.dtype)) / helmholtz_dstI),
         (1, 1, 1, 1),
