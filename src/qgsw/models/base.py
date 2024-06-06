@@ -73,6 +73,9 @@ class Model(metaclass=ABCMeta):
         - dy_p_ref
     """
 
+    dtype = torch.float64
+    device = DEVICE
+
     omega: torch.Tensor
     eta: torch.Tensor
     U: torch.Tensor
@@ -95,8 +98,6 @@ class Model(metaclass=ABCMeta):
             top-layer forcing, y component
             'dt':       float > 0., integration time-step
             'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
             'slip_coef':    float, 1 for free slip, 0 for no-slip,
             inbetween for partial free slip.
             'bottom_drag_coef': float, linear bottom drag coefficient
@@ -111,7 +112,14 @@ class Model(metaclass=ABCMeta):
         ## Time Step
         self.dt = param["dt"]
         ## data device and dtype
-        self._set_array_kwargs(param=param)
+        verbose.display(
+            msg=f"dtype: {self.dtype}.",
+            trigger_level=2,
+        )
+        verbose.display(
+            msg=f"device: {self.device}",
+            trigger_level=2,
+        )
         ## Space
         self._space: SpaceDiscretization3D = param["space"]
         ## Coriolis
@@ -156,24 +164,6 @@ class Model(metaclass=ABCMeta):
         """3D Space Discretization."""
         return self._space
 
-    def _set_array_kwargs(self, param: dict[str, Any]) -> None:
-        """Set the array kwargs.
-
-        Args:
-            param (dict[str, Any]): Parameters dictionnary.
-        """
-        self.device = param["device"]
-        self.dtype = param.get("dtype", torch.float64)
-        self.arr_kwargs = {"dtype": self.dtype, "device": self.device}
-        verbose.display(
-            msg=f"dtype: {self.dtype}.",
-            trigger_level=2,
-        )
-        verbose.display(
-            msg=f"device: {self.device}",
-            trigger_level=2,
-        )
-
     def _set_coriolis_values(self, param: dict[str, Any]) -> None:
         """Set the Coriolis parameter values.
 
@@ -187,14 +177,6 @@ class Model(metaclass=ABCMeta):
             beta=self.beta_plane.beta,
         )
         self.f = f.unsqueeze(0)
-        verbose.display(
-            msg=f"dtype: {self.dtype}.",
-            trigger_level=2,
-        )
-        verbose.display(
-            msg=f"device: {self.device}",
-            trigger_level=2,
-        )
 
     def _set_physical_variables(self, param: dict[str, Any]) -> None:
         """Set physical varibales.
@@ -524,15 +506,18 @@ class Model(metaclass=ABCMeta):
         base_shape = (self.n_ens, self.space.nl)
         self.h = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny),
-            **self.arr_kwargs,
+            dtype=self.dtype,
+            device=self.device,
         )
         self.u = torch.zeros(
             (*base_shape, self.space.nx + 1, self.space.ny),
-            **self.arr_kwargs,
+            dtype=self.dtype,
+            device=self.device,
         )
         self.v = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny + 1),
-            **self.arr_kwargs,
+            dtype=self.dtype,
+            device=self.device,
         )
 
     def compute_omega(self, u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:

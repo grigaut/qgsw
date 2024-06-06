@@ -74,8 +74,6 @@ class QG(SW):
             y component
             'dt':       float > 0., integration time-step
             'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
             'slip_coef':    float, 1 for free slip, 0 for no-slip,
             inbetween for
                         partial free slip.
@@ -131,8 +129,16 @@ class QG(SW):
             torch.Tensor: Stretching Operator
         """
         if self.space.nl == 1:
-            return torch.tensor([[1.0 / (H * g_prime)]], **self.arr_kwargs)
-        A = torch.zeros((self.space.nl, self.space.nl), **self.arr_kwargs)  # noqa: N806
+            return torch.tensor(
+                [[1.0 / (H * g_prime)]],
+                dtype=self.dtype,
+                device=self.device,
+            )
+        A = torch.zeros(  # noqa: N806
+            (self.space.nl, self.space.nl),
+            dtype=self.dtype,
+            device=self.device,
+        )
         A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
         A[0, 1] = -1.0 / (H[0] * g_prime[1])
         for i in range(1, self.space.nl - 1):
@@ -203,7 +209,8 @@ class QG(SW):
                 ny,
                 self.space.dx,
                 self.space.dy,
-                self.arr_kwargs,
+                dtype=self.dtype,
+                device=self.device,
             )
             .unsqueeze(0)
             .unsqueeze(0)
@@ -211,7 +218,11 @@ class QG(SW):
         # Compute "(∆ - (f_0)² Λ)" in Fourier Space
         self.helmholtz_dstI = laplace_dstI - self.beta_plane.f0**2 * self.lambd
         # Constant Omega grid
-        cst_wgrid = torch.ones((1, nl, nx + 1, ny + 1), **self.arr_kwargs)
+        cst_wgrid = torch.ones(
+            (1, nl, nx + 1, ny + 1),
+            dtype=self.dtype,
+            device=self.device,
+        )
         if len(self.masks.psi_irrbound_xids) > 0:
             # Handle Non rectangular geometry
             self.cap_matrices = compute_capacitance_matrices(

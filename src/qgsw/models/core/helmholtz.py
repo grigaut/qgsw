@@ -18,12 +18,12 @@ def compute_laplace_dctII(
     ny: int,
     dx: float,
     dy: float,
-    arr_kwargs,
+    **kwargs,
 ) -> torch.Tensor:
     """DCT-II of standard 5-points laplacian on uniform grid"""
     x, y = torch.meshgrid(
-        torch.arange(nx, **arr_kwargs),
-        torch.arange(ny, **arr_kwargs),
+        torch.arange(nx, **kwargs),
+        torch.arange(ny, **kwargs),
         indexing="ij",
     )
     return (
@@ -128,7 +128,7 @@ def dstI2D(x: torch.Tensor, norm: str = "ortho"):
 
 
 def compute_laplace_dstI(
-    nx: int, ny: int, dx: float, dy: float, arr_kwargs
+    nx: int, ny: int, dx: float, dy: float, **kwargs
 ) -> torch.Tensor:
     """Type-I discrete sine transform of the usual 5-points
     discrete laplacian operator on uniformly spaced grid.
@@ -136,8 +136,8 @@ def compute_laplace_dstI(
     Laplacian in Fourier Space.
     """
     x, y = torch.meshgrid(
-        torch.arange(1, nx, **arr_kwargs),
-        torch.arange(1, ny, **arr_kwargs),
+        torch.arange(1, nx, **kwargs),
+        torch.arange(1, ny, **kwargs),
         indexing="ij",
     )
     return (

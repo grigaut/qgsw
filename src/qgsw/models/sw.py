@@ -81,15 +81,13 @@ class SW(Model):
             'H':        Tensor (nl,) or (nl, nx, ny),
             unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
+            'beta_plane': NamedTuple Representing Beta plane.
             'taux':     float or Tensor (nx-1, ny), top-layer forcing,
             x component
             'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
             y component
             'dt':       float > 0., integration time-step
             'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
             'slip_coef':    float, 1 for free slip, 0 for no-slip,
             inbetween for
                         partial free slip.

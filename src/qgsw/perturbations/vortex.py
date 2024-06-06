@@ -98,7 +98,8 @@ class RankineVortex2D:
             grid_2d.ny - 1,
             grid_2d.dx,
             grid_2d.dy,
-            {"device": DEVICE, "dtype": torch.float64},
+            device=DEVICE,
+            dtype=torch.float64,
         )
         # Solve problem in Fourier space : "ψ = ω/∆"
         psi_hat = helmholtz.dstI2D(vor[1:-1, 1:-1]) / laplacian
