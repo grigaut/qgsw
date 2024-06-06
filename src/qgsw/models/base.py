@@ -113,7 +113,7 @@ class Model(metaclass=ABCMeta):
         ## data device and dtype
         self._set_array_kwargs(param=param)
         ## Space
-        self.space: SpaceDiscretization3D = param["space"]
+        self._space: SpaceDiscretization3D = param["space"]
         ## Coriolis
         self._set_coriolis_values(param=param)
         ## Physical Variables
@@ -150,6 +150,11 @@ class Model(metaclass=ABCMeta):
     def dt(self, value: float) -> None:
         verbose.display(msg=f"dt value set to {value}.", trigger_level=1)
         self._dt = value
+
+    @property
+    def space(self) -> SpaceDiscretization3D:
+        """3D Space Discretization."""
+        return self._space
 
     def _set_array_kwargs(self, param: dict[str, Any]) -> None:
         """Set the array kwargs.
