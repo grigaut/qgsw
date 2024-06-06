@@ -121,35 +121,54 @@ class QG(SW):
             raise InvalidLayersDefinitionError(msg)
         return h
 
-    def compute_auxillary_matrices(self) -> None:
-        """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
-        # A operator
-        H, g_prime = self.H.squeeze(), self.g_prime.squeeze()  # noqa: N806
-        self.A = torch.zeros((self.nl, self.nl), **self.arr_kwargs)
-        if self.nl == 1:
-            self.A[0, 0] = 1.0 / (H * g_prime)
-        else:
-            self.A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (
-                H[0] * g_prime[1]
-            )
-            self.A[0, 1] = -1.0 / (H[0] * g_prime[1])
-            for i in range(1, self.nl - 1):
-                self.A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
-                self.A[i, i] = (
-                    1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
-                )
-                self.A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
-            self.A[-1, -1] = 1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
-            self.A[-1, -2] = -1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
+    def _compute_A(  # noqa: N802
+        self,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute the stretching operator matrix A.
 
+        Args:
+            H (torch.Tensor): Layers reference height.
+            g_prime (torch.Tensor): Reduced gravity values.
+
+        Returns:
+            torch.Tensor: Stretching Operator
+        """
+        if self.nl == 1:
+            return torch.tensor([[1.0 / (H * g_prime)]], **self.arr_kwargs)
+        A = torch.zeros((self.nl, self.nl), **self.arr_kwargs)  # noqa: N806
+        A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
+        A[0, 1] = -1.0 / (H[0] * g_prime[1])
+        for i in range(1, self.nl - 1):
+            A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
+            A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
+            A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
+        A[-1, -1] = 1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
+        A[-1, -2] = -1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
+        return A
+
+    def _compute_layers_to_mode_decomposition_matrices(
+        self,
+        A: torch.Tensor,  # noqa: N803
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute Layers to mode decomposition.
+
+        A = Cm2l @ Λ @ Cl2m
+
+        Args:
+            A (torch.Tensor): Stretching Operator
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Cm2l, Λ, Cl2m
+        """
         # layer-to-mode and mode-to-layer matrices
-        lambd_r, R = torch.linalg.eig(self.A)  # noqa: N806
-        _, L = torch.linalg.eig(self.A.T)  # noqa: N806
-        self.lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
+        lambd_r, R = torch.linalg.eig(A)  # noqa: N806
+        _, L = torch.linalg.eig(A.T)  # noqa: N806
+        lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
         with np.printoptions(precision=1):
             radius = (
-                1e-3
-                / torch.sqrt(self.f0**2 * self.lambd.squeeze()).cpu().numpy()
+                1e-3 / torch.sqrt(self.f0**2 * lambd.squeeze()).cpu().numpy()
             )
             verbose.display(
                 msg=f"Rossby deformation Radii (km): {radius}",
@@ -158,9 +177,19 @@ class QG(SW):
         R, L = R.real, L.real  # noqa: N806
         # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
         # layer to mode: pseudo inverse of R
-        self.Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T
+        Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T  # noqa: N806
         # mode to layer
-        self.Cm2l = R
+        Cm2l = R  # noqa: N806
+        return Cm2l, lambd, Cl2m
+
+    def compute_auxillary_matrices(self) -> None:
+        """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
+        # A operator
+        self.A = self._compute_A(self.H.squeeze(), self.g_prime.squeeze())
+
+        # layer-to-mode and mode-to-layer matrices
+        decomp = self._compute_layers_to_mode_decomposition_matrices(self.A)
+        self.Cm2l, self.lambd, self.Cl2m = decomp
 
         # Governing Equation: ∆Ψ - (f_0)² A Ψ = q - βy
         # With Diagonalization: ∆Ψ - (f_0)² Cm2l @ Λ @ Cl2m Ψ = q - βy
