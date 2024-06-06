@@ -78,11 +78,6 @@ class SW(Model):
         """Parameters
 
         param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
             'H':        Tensor (nl,) or (nl, nx, ny),
             unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
@@ -141,9 +136,9 @@ class SW(Model):
             "Input velocity v incoherent with domain mask, "
             "velocity must be zero out of domain."
         )
-        self.u = u_.type(self.dtype) * self.masks.u * self.dx
-        self.v = v_.type(self.dtype) * self.masks.v * self.dy
-        self.h = h_.type(self.dtype) * self.masks.h * self.area
+        self.u = u_.type(self.dtype) * self.masks.u * self.space.dx
+        self.v = v_.type(self.dtype) * self.masks.v * self.space.dy
+        self.h = h_.type(self.dtype) * self.masks.h * self.space.area
         self.compute_diagnostic_variables()
 
     def step(self) -> None:
@@ -284,10 +279,10 @@ class SWFilterBarotropic(SW):
         self.H_tot = self.H.sum(dim=-3, keepdim=True)
         self.lambd = 1.0 / (self.g * self.dt * self.tau * self.H_tot)
         self.helm_solver = HelmholtzNeumannSolver(
-            self.nx,
-            self.ny,
-            self.dx,
-            self.dy,
+            self.space.nx,
+            self.space.ny,
+            self.space.dx,
+            self.space.dy,
             self.lambd,
             self.dtype,
             self.device,
@@ -300,10 +295,10 @@ class SWFilterBarotropic(SW):
         coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
         lambd = 1.0 / (self.g * self.dt * self.tau)
         self.helm_solver = MG_Helmholtz(
-            self.dx,
-            self.dy,
-            self.nx,
-            self.ny,
+            self.space.dx,
+            self.space.dy,
+            self.space.nx,
+            self.space.ny,
             coef_ugrid=coef_ugrid,
             coef_vgrid=coef_vgrid,
             lambd=lambd,
@@ -332,8 +327,8 @@ class SWFilterBarotropic(SW):
             filtered dt_v, dt_h
         """
         # compute RHS
-        u_star = (self.u + self.dt * dt_u) / self.dx
-        v_star = (self.v + self.dt * dt_v) / self.dy
+        u_star = (self.u + self.dt * dt_u) / self.space.dx
+        v_star = (self.v + self.dt * dt_v) / self.space.dy
         u_bar_star = (u_star * self.h_tot_ugrid).sum(
             dim=-3,
             keepdim=True,
@@ -347,8 +342,8 @@ class SWFilterBarotropic(SW):
                 1.0
                 / (self.g * self.dt * self.tau)
                 * (
-                    torch.diff(u_bar_star, dim=-2) / self.dx
-                    + torch.diff(v_bar_star, dim=-1) / self.dy
+                    torch.diff(u_bar_star, dim=-2) / self.space.dx
+                    + torch.diff(v_bar_star, dim=-1) / self.space.dy
                 )
             )
             w_surf_imp = self.helm_solver.solve(rhs)
@@ -357,9 +352,10 @@ class SWFilterBarotropic(SW):
                 1.0
                 / (self.g * self.dt * self.tau)
                 * (
-                    torch.diff(self.h_tot_ugrid * u_bar_star, dim=-2) / self.dx
+                    torch.diff(self.h_tot_ugrid * u_bar_star, dim=-2)
+                    / self.space.dx
                     + torch.diff(self.h_tot_vgrid * v_bar_star, dim=-1)
-                    / self.dy
+                    / self.space.dy
                 )
             )
             coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]

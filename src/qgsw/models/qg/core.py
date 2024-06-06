@@ -64,11 +64,6 @@ class QG(SW):
         """Parameters
 
         param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
             'H':        Tensor (nl,) or (nl, nx, ny),
             unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
@@ -135,17 +130,17 @@ class QG(SW):
         Returns:
             torch.Tensor: Stretching Operator
         """
-        if self.nl == 1:
+        if self.space.nl == 1:
             return torch.tensor([[1.0 / (H * g_prime)]], **self.arr_kwargs)
-        A = torch.zeros((self.nl, self.nl), **self.arr_kwargs)  # noqa: N806
+        A = torch.zeros((self.space.nl, self.space.nl), **self.arr_kwargs)  # noqa: N806
         A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
         A[0, 1] = -1.0 / (H[0] * g_prime[1])
-        for i in range(1, self.nl - 1):
+        for i in range(1, self.space.nl - 1):
             A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
             A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
             A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
-        A[-1, -1] = 1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
-        A[-1, -2] = -1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
+        A[-1, -1] = 1.0 / (H[self.space.nl - 1] * g_prime[self.space.nl - 1])
+        A[-1, -2] = -1.0 / (H[self.space.nl - 1] * g_prime[self.space.nl - 1])
         return A
 
     def _compute_layers_to_mode_decomposition_matrices(
@@ -165,7 +160,7 @@ class QG(SW):
         # layer-to-mode and mode-to-layer matrices
         lambd_r, R = torch.linalg.eig(A)  # noqa: N806
         _, L = torch.linalg.eig(A.T)  # noqa: N806
-        lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
+        lambd: torch.Tensor = lambd_r.real.reshape((1, self.space.nl, 1, 1))
         with np.printoptions(precision=1):
             radius = (
                 1e-3 / torch.sqrt(self.f0**2 * lambd.squeeze()).cpu().numpy()
@@ -198,9 +193,15 @@ class QG(SW):
         # In Fourier Space: "(∆ - (f_0)² Λ) @ Ψ_m = q_m - βy"
 
         # For Helmholtz equations
-        nl, nx, ny = self.nl, self.nx, self.ny
+        nl, nx, ny = self.space.nl, self.space.nx, self.space.ny
         laplace_dstI = (  # noqa: N806
-            compute_laplace_dstI(nx, ny, self.dx, self.dy, self.arr_kwargs)
+            compute_laplace_dstI(
+                nx,
+                ny,
+                self.space.dx,
+                self.space.dy,
+                self.arr_kwargs,
+            )
             .unsqueeze(0)
             .unsqueeze(0)
         )
@@ -251,8 +252,8 @@ class QG(SW):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing
         """
-        du[..., 0, :, :] += self.taux / self.H[0] * self.dx
-        dv[..., 0, :, :] += self.tauy / self.H[0] * self.dy
+        du[..., 0, :, :] += self.taux / self.H[0] * self.space.dx
+        dv[..., 0, :, :] += self.tauy / self.H[0] * self.space.dy
         return du, dv
 
     def set_physical_uvh(
@@ -288,13 +289,17 @@ class QG(SW):
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
         p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
-        dx, dy = self.dx, self.dy
+        dx, dy = self.space.dx, self.space.dy
 
         # geostrophic balance
         u = -torch.diff(p, dim=-1) / dy / self.f0 * dx
         v = torch.diff(p, dim=-2) / dx / self.f0 * dy
         # h = diag(H)Ap
-        h = self.H * torch.einsum("lm,...mxy->...lxy", self.A, p_i) * self.area
+        h = (
+            self.H
+            * torch.einsum("lm,...mxy->...lxy", self.A, p_i)
+            * self.space.area
+        )
 
         return u, v, h
 
@@ -360,7 +365,7 @@ class QG(SW):
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
-        f0, H, area = self.f0, self.H, self.area  # noqa: N806
+        f0, H, area = self.f0, self.H, self.space.area  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
             u[..., 1:-1, :],
@@ -410,8 +415,8 @@ class QG(SW):
             dt_uvh_sw (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
             before projection
         """
-        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / self.f0 / self.dy
-        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / self.f0 / self.dx
+        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / self.f0 / self.space.dy
+        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / self.f0 / self.space.dx
         self.k_energy_a = 0.25 * (
             self.u_a[..., 1:] ** 2
             + self.u_a[..., :-1] ** 2
@@ -419,12 +424,12 @@ class QG(SW):
             + self.v_a[..., :-1, :] ** 2
         )
         self.omega_a = (
-            torch.diff(self.v_a, dim=-2) / self.dx
-            - torch.diff(self.u_a, dim=-1) / self.dy
+            torch.diff(self.v_a, dim=-2) / self.space.dx
+            - torch.diff(self.u_a, dim=-1) / self.space.dy
         )
         self.div_a = (
-            torch.diff(self.u_a[..., 1:-1], dim=-2) / self.dx
-            + torch.diff(self.v_a[..., 1:-1, :], dim=-1) / self.dy
+            torch.diff(self.u_a[..., 1:-1], dim=-2) / self.space.dx
+            + torch.diff(self.v_a[..., 1:-1, :], dim=-1) / self.space.dy
         )
 
     def compute_pv(

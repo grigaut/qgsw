@@ -86,12 +86,6 @@ class Model(metaclass=ABCMeta):
         """Parameters
 
         param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
-            unperturbed layer thickness
             'g_prime':  Tensor (nl,), reduced gravities
             'f':        Tensor (nx, ny), Coriolis parameter
             'f0':       float, Coriolis Parameter
@@ -120,8 +114,6 @@ class Model(metaclass=ABCMeta):
         self.dt = param["dt"]
         ## data device and dtype
         self._set_array_kwargs(param=param)
-        ## grid
-        self._set_grid(param=param)
         ## Space
         self.space: SpaceDiscretization3D = param["space"]
         ## Coriolis
@@ -202,23 +194,6 @@ class Model(metaclass=ABCMeta):
             trigger_level=2,
         )
 
-    def _set_grid(self, param: dict[str, Any]) -> None:
-        """Set the Grid informations.
-
-        Args:
-            param (dict[str, Any]): Parameters dictionnary.
-        """
-        self.nx: int = param["nx"]  # number of points in the x direction
-        self.ny: int = param["ny"]  # number of point in the y direction
-        self.nl: int = param["nl"]  # number of layers
-        self.dx: float = param["dx"]  # x-step
-        self.dy: float = param["dy"]  # y-step
-        self.area = self.dx * self.dy  # elementary area
-        verbose.display(
-            msg=f"nx, ny, nl =  {self.nx, self.ny, self.nl}",
-            trigger_level=2,
-        )
-
     def _set_physical_variables(self, param: dict[str, Any]) -> None:
         """Set physical varibales.
 
@@ -236,10 +211,10 @@ class Model(metaclass=ABCMeta):
         self.f_ugrid = grid_conversion.omega_to_u(self.f)
         self.f_vgrid = grid_conversion.omega_to_v(self.f)
         self.f_hgrid = grid_conversion.omega_to_h(self.f)
-        self.fstar_ugrid = self.f_ugrid * self.area
-        self.fstar_vgrid = self.f_vgrid * self.area
-        self.fstar_vgrid = self.f_vgrid * self.area
-        self.fstar_hgrid = self.f_hgrid * self.area
+        self.fstar_ugrid = self.f_ugrid * self.space.area
+        self.fstar_vgrid = self.f_vgrid * self.space.area
+        self.fstar_vgrid = self.f_vgrid * self.space.area
+        self.fstar_hgrid = self.f_hgrid * self.space.area
         ## gravity
         self.g_prime: torch.Tensor = param["g_prime"]
         self.g = self.g_prime[0]
@@ -294,8 +269,8 @@ class Model(metaclass=ABCMeta):
                 trigger_level=2,
             )
             mask = torch.ones(
-                self.nx,
-                self.ny,
+                self.space.nx,
+                self.space.ny,
                 dtype=self.dtype,
                 device=self.device,
             )
@@ -304,8 +279,11 @@ class Model(metaclass=ABCMeta):
         mask: torch.Tensor = param[key]
         shape = mask.shape[0], mask.shape[1]
         # Verify shape
-        if shape != (self.nx, self.ny):
-            msg = f"Invalid mask shape {shape}!=({self.nx},{self.ny})"
+        if shape != (self.space.nx, self.space.ny):
+            msg = (
+                "Invalid mask shape "
+                f"{shape}!=({self.space.nx},{self.space.ny})"
+            )
             raise KeyError(msg)
         vals = torch.unique(mask).tolist()
         # Verify mask values
@@ -360,8 +338,11 @@ class Model(metaclass=ABCMeta):
             torch.Tensor: Coriolis parameter value.
         """
         shape = f.shape[0], f.shape[1]
-        if shape != (self.nx + 1, self.ny + 1):
-            msg = f"Invalid f shape {shape=}!=({self.nx},{self.ny})"
+        if shape != (self.space.nx + 1, self.space.ny + 1):
+            msg = (
+                "Invalid f shape "
+                f"{shape=}!=({self.space.nx+1},{self.space.ny+1})"
+            )
             raise KeyError(msg)
         return f.unsqueeze(0)
 
@@ -390,8 +371,11 @@ class Model(metaclass=ABCMeta):
         if (not isinstance(taux, float)) and (not is_tensorx):
             msg = "taux must be a float or a Tensor"
             raise ValueError(msg)
-        if is_tensorx and (taux.shape != (self.nx - 1, self.ny)):
-            msg = f"Tau_x Tensor must be {(self.nx-1, self.ny)}-shaped."
+        if is_tensorx and (taux.shape != (self.space.nx - 1, self.space.ny)):
+            msg = (
+                "Tau_x Tensor must be "
+                f"{(self.space.nx-1, self.space.ny)}-shaped."
+            )
             raise ValueError(msg)
 
         is_tensory = isinstance(tauy, torch.Tensor)
@@ -399,8 +383,11 @@ class Model(metaclass=ABCMeta):
         if (not isinstance(tauy, float)) and (not is_tensory):
             msg = "tauy must be a float or a Tensor"
             raise ValueError(msg)
-        if is_tensory and (tauy.shape != (self.nx, self.ny - 1)):
-            msg = f"Tau_y Tensor must be {(self.nx, self.ny-1)}-shaped."
+        if is_tensory and (tauy.shape != (self.space.nx, self.space.ny - 1)):
+            msg = (
+                "Tau_y Tensor must be "
+                f"{(self.space.nx, self.space.ny-1)}-shaped."
+            )
             raise ValueError(msg)
 
         self.taux = taux
@@ -418,7 +405,7 @@ class Model(metaclass=ABCMeta):
         - self.dx_p_ref
         - self.dy_p_ref
         """
-        self.h_ref = self.H * self.area
+        self.h_ref = self.H * self.space.area
         self.eta_ref = -self.H.sum(dim=-3) + reverse_cumsum(self.H, dim=-3)
         self.p_ref = torch.cumsum(self.g_prime * self.eta_ref, dim=-3)
         if self.h_ref.shape[-2] != 1 and self.h_ref.shape[-1] != 1:
@@ -553,17 +540,17 @@ class Model(metaclass=ABCMeta):
         - v
         - h
         """
-        base_shape = (self.n_ens, self.nl)
+        base_shape = (self.n_ens, self.space.nl)
         self.h = torch.zeros(
-            (*base_shape, self.nx, self.ny),
+            (*base_shape, self.space.nx, self.space.ny),
             **self.arr_kwargs,
         )
         self.u = torch.zeros(
-            (*base_shape, self.nx + 1, self.ny),
+            (*base_shape, self.space.nx + 1, self.space.ny),
             **self.arr_kwargs,
         )
         self.v = torch.zeros(
-            (*base_shape, self.nx, self.ny + 1),
+            (*base_shape, self.space.nx, self.space.ny + 1),
             **self.arr_kwargs,
         )
 
@@ -612,13 +599,13 @@ class Model(metaclass=ABCMeta):
         # Diagnostic: vorticity values
         self.omega = self.compute_omega(self.u, self.v)
         # Diagnostic: interface height : physical
-        self.eta = reverse_cumsum(self.h / self.area, dim=-3)
+        self.eta = reverse_cumsum(self.h / self.space.area, dim=-3)
         # Diagnostic: pressure values
         self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
         # Diagnostic: zonal velocity
-        self.U = self.u / self.dx**2
+        self.U = self.u / self.space.dx**2
         # Diagnostic: meridional velocity
-        self.V = self.v / self.dy**2
+        self.V = self.v / self.space.dy**2
         # Zonal velocity momentum -> corresponds to the v grid
         # Has no value on the boundary of the v grid
         self.U_m = self.cell_corners_to_cell_centers(self.U)
@@ -647,9 +634,9 @@ class Model(metaclass=ABCMeta):
             tuple[np.ndarray, np.ndarray, np.ndarray]
         | tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        u_phys = (self.u / self.dx).to(device=DEVICE)
-        v_phys = (self.v / self.dy).to(device=DEVICE)
-        h_phys = (self.h / self.area).to(device=DEVICE)
+        u_phys = (self.u / self.space.dx).to(device=DEVICE)
+        v_phys = (self.v / self.space.dy).to(device=DEVICE)
+        h_phys = (self.h / self.space.area).to(device=DEVICE)
 
         return (u_phys, v_phys, h_phys)
 
@@ -671,7 +658,7 @@ class Model(metaclass=ABCMeta):
         Returns:
             torch.Tensor: Vorticity
         """
-        return (self.omega / self.area / self.f0).to(device=DEVICE)
+        return (self.omega / self.space.area / self.f0).to(device=DEVICE)
 
     def get_physical_omega_as_ndarray(
         self,
@@ -704,9 +691,11 @@ class Model(metaclass=ABCMeta):
         Returns:
             str: Summary of variables.
         """
-        hl_mean = (self.h / self.area).mean((-1, -2)).squeeze().cpu().numpy()
+        hl_mean = (self.h / self.space.area).mean((-1, -2))
         eta = self.eta
-        u, v, h = self.u / self.dx, self.v / self.dy, self.h / self.area
+        u = self.u / self.space.dx
+        v = self.v / self.space.dy
+        h = self.h / self.space.area
         with np.printoptions(precision=2):
             eta_surface = eta[:, 0].min().to(device=DEVICE).item()
             return (
@@ -714,7 +703,7 @@ class Model(metaclass=ABCMeta):
                 f"{u.abs().max().to(device=DEVICE).item():.5E}, "
                 f"v: {v.mean().to(device=DEVICE).item():+.5E}, "
                 f"{v.abs().max().to(device=DEVICE).item():.5E}, "
-                f"hl_mean: {hl_mean}, "
+                f"hl_mean: {hl_mean.squeeze().cpu().numpy()}, "
                 f"h min: {h.min().to(device=DEVICE).item():.5E}, "
                 f"max: {h.max().to(device=DEVICE).item():.5E}, "
                 f"eta_sur min: {eta_surface:+.5f}, "
@@ -755,10 +744,12 @@ class Model(metaclass=ABCMeta):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing.
         """
-        h_ugrid = (self.h_tot_ugrid) / self.area
-        h_vgrid = (self.h_tot_vgrid) / self.area
-        du[..., 0, :, :] += self.taux / h_ugrid[..., 0, 1:-1, :] * self.dx
-        dv[..., 0, :, :] += self.tauy / h_vgrid[..., 0, :, 1:-1] * self.dy
+        h_ugrid = self.h_tot_ugrid / self.space.area
+        h_vgrid = self.h_tot_vgrid / self.space.area
+        du_wind = self.taux / h_ugrid[..., 0, 1:-1, :] * self.space.dx
+        dv_wind = self.tauy / h_vgrid[..., 0, :, 1:-1] * self.space.dy
+        du[..., 0, :, :] += du_wind
+        dv[..., 0, :, :] += dv_wind
         return du, dv
 
     def _add_bottom_drag(
