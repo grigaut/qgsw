@@ -69,11 +69,6 @@ verbose.display(
 )
 ## Set model parameters
 params_1l = {
-    "nx": config.space.nx,
-    "ny": config.space.ny,
-    "nl": config.models[0].nl,
-    "dx": config.space.dx,
-    "dy": config.space.dy,
     "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
     "f0": config.physics.f0,
     "beta": config.physics.beta,
@@ -130,11 +125,6 @@ verbose.display(
 )
 ## Set model parameters
 params_2l = {
-    "nx": config.space.nx,
-    "ny": config.space.ny,
-    "nl": config.models[1].nl,
-    "dx": config.space.dx,
-    "dy": config.space.dy,
     "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
     "f0": config.physics.f0,
     "beta": config.physics.beta,
@@ -186,7 +176,7 @@ t = 0
 qg_1l.compute_diagnostic_variables()
 qg_1l.compute_time_derivatives()
 
-w_0_1l = qg_1l.omega.squeeze() / qg_1l.dx / qg_1l.dy
+w_0_1l = qg_1l.omega.squeeze() / qg_1l.space.dx / qg_1l.space.dy
 
 
 tau_1l = 1.0 / torch.sqrt(w_0_1l.pow(2).mean()).to(device=DEVICE).item()
@@ -198,7 +188,7 @@ verbose.display(
 qg_2l.compute_diagnostic_variables()
 qg_2l.compute_time_derivatives()
 
-w_0_2l = qg_2l.omega.squeeze() / qg_2l.dx / qg_2l.dy
+w_0_2l = qg_2l.omega.squeeze() / qg_2l.space.dx / qg_2l.space.dy
 
 
 tau_2l = 1.0 / torch.sqrt(w_0_2l.pow(2).mean()).to(device=DEVICE).item()

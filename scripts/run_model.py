@@ -65,13 +65,10 @@ verbose.display(
     msg=f"Burger Number: {Bu:.2f}",
     trigger_level=1,
 )
+
+
 ## Set model parameters
 params = {
-    "nx": config.space.nx,
-    "ny": config.space.ny,
-    "nl": config.model.nl,
-    "dx": config.space.dx,
-    "dy": config.space.dy,
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "f0": config.physics.f0,
     "beta": config.physics.beta,
@@ -86,7 +83,9 @@ params = {
     "slip_coef": config.physics.slip_coef,
     "dt": 0.0,
 }
+
 model = QG(params)
+
 p0 = perturbation.compute_initial_pressure(space.omega, config.physics.f0, Ro)
 u0, v0, h0 = model.G(p0)
 
@@ -115,7 +114,7 @@ t = 0
 model.compute_diagnostic_variables()
 model.compute_time_derivatives()
 
-w_0 = model.omega.squeeze() / model.dx / model.dy
+w_0 = model.omega.squeeze() / model.space.dx / model.space.dy
 
 
 tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(device=DEVICE).item()
