@@ -163,7 +163,10 @@ class QG(SW):
         lambd: torch.Tensor = lambd_r.real.reshape((1, self.space.nl, 1, 1))
         with np.printoptions(precision=1):
             radius = (
-                1e-3 / torch.sqrt(self.f0**2 * lambd.squeeze()).cpu().numpy()
+                1e-3
+                / torch.sqrt(self.beta_plane.f0**2 * lambd.squeeze())
+                .cpu()
+                .numpy()
             )
             verbose.display(
                 msg=f"Rossby deformation Radii (km): {radius}",
@@ -206,7 +209,7 @@ class QG(SW):
             .unsqueeze(0)
         )
         # Compute "(∆ - (f_0)² Λ)" in Fourier Space
-        self.helmholtz_dstI = laplace_dstI - self.f0**2 * self.lambd
+        self.helmholtz_dstI = laplace_dstI - self.beta_plane.f0**2 * self.lambd
         # Constant Omega grid
         cst_wgrid = torch.ones((1, nl, nx + 1, ny + 1), **self.arr_kwargs)
         if len(self.masks.psi_irrbound_xids) > 0:
@@ -231,7 +234,9 @@ class QG(SW):
                 self.helmholtz_dstI,
             )
         # Compute homogenous solution
-        self.homsol_wgrid = cst_wgrid + sol_wgrid * self.f0**2 * self.lambd
+        self.homsol_wgrid = (
+            cst_wgrid + sol_wgrid * self.beta_plane.f0**2 * self.lambd
+        )
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
         self.homsol_hgrid = self.cell_corners_to_cell_centers(
             self.homsol_wgrid,
@@ -292,8 +297,8 @@ class QG(SW):
         dx, dy = self.space.dx, self.space.dy
 
         # geostrophic balance
-        u = -torch.diff(p, dim=-1) / dy / self.f0 * dx
-        v = torch.diff(p, dim=-2) / dx / self.f0 * dy
+        u = -torch.diff(p, dim=-1) / dy / self.beta_plane.f0 * dx
+        v = torch.diff(p, dim=-2) / dx / self.beta_plane.f0 * dy
         # h = diag(H)Ap
         h = (
             self.H
@@ -365,7 +370,7 @@ class QG(SW):
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
-        f0, H, area = self.f0, self.H, self.space.area  # noqa: N806
+        f0, H, area = self.beta_plane.f0, self.H, self.space.area  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
             u[..., 1:-1, :],
@@ -415,8 +420,9 @@ class QG(SW):
             dt_uvh_sw (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
             before projection
         """
-        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / self.f0 / self.space.dy
-        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / self.f0 / self.space.dx
+        f0 = self.beta_plane.f0
+        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / f0 / self.space.dy
+        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / f0 / self.space.dx
         self.k_energy_a = 0.25 * (
             self.u_a[..., 1:] ** 2
             + self.u_a[..., :-1] ** 2
@@ -445,10 +451,10 @@ class QG(SW):
             torch.Tensor: Potential Vorticity
         """
         beta_y = self.cell_corners_to_cell_centers(
-            (self.f - self.f0).unsqueeze(0),
+            (self.f - self.beta_plane.f0).unsqueeze(0),
         )
         omega = self.cell_corners_to_cell_centers(self.omega)
-        return beta_y + omega - self.f0 * h / self.h_ref
+        return beta_y + omega - self.beta_plane.f0 * h / self.h_ref
 
     def compute_diagnostic_variables(self) -> None:
         """Compute Diagnostic Variables.

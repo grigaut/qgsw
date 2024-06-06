@@ -10,6 +10,7 @@ from qgsw import verbose
 from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
+from qgsw.physics.coriolis.beta_plane import BetaPlane
 
 
 class PhysicsConfig(_Config):
@@ -33,6 +34,14 @@ class PhysicsConfig(_Config):
         return self.params[self._rho]
 
     @property
+    def beta_plane(self) -> BetaPlane:
+        """Beta Plane."""
+        return BetaPlane(
+            f0=self.f0,
+            beta=self.beta,
+        )
+
+    @property
     def f0(self) -> float:
         """Coriolis Parameter."""
         return self.params[self._coriolis_param]
@@ -50,7 +59,7 @@ class PhysicsConfig(_Config):
                 msg="Bottom drag coefficient inferred using f0.",
                 trigger_level=1,
             )
-            return 0.5 * self.f0 * 2.0 / 2600  # Source ?
+            return 0.5 * self.beta_plane.f0 * 2.0 / 2600  # Source ?
         return self.params[self._bottom_drag]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:

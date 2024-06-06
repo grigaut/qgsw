@@ -1,12 +1,25 @@
 """Beta-Plane compuations."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, NamedTuple
+
 import torch
 
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.spatial.conversion import deg_to_m_lat, deg_to_rad, km_to_m
-from qgsw.spatial.core.grid import Grid2D
 from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
 from qgsw.spatial.units.exceptions import UnitError
+
+if TYPE_CHECKING:
+    from qgsw.spatial.core.grid import Grid2D
+
+
+class BetaPlane(NamedTuple):
+    """Beta Plane : f  = f0 + βy."""
+
+    f0: float
+    beta: float
 
 
 def compute_entire_beta_plane(

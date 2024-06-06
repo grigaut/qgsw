@@ -87,9 +87,7 @@ class Model(metaclass=ABCMeta):
 
         param: python dict. with following keys
             'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
-            'f0':       float, Coriolis Parameter
-            'beta':     float, Rossby Parameter
+            'beta_plane': NamedTuple Representing Beta plane.
             'space':    SpaceDiscretization3D, space discretization
             'taux':     float or Tensor (nx-1, ny),
             top-layer forcing, x component
@@ -177,14 +175,13 @@ class Model(metaclass=ABCMeta):
         Args:
             param (dict[str, Any]): Parameters dictionnary.
         """
-        self.f0 = param["f0"]
-        self.beta = param.get("beta", 0)
+        self.beta_plane: coriolis.BetaPlane = param["beta_plane"]
         f = coriolis.compute_beta_plane(
             grid_2d=self.space.omega.remove_z_h(),
-            f0=self.f0,
-            beta=self.beta,
+            f0=self.beta_plane.f0,
+            beta=self.beta_plane.beta,
         )
-        self.f = self._validate_coriolis_param(f)
+        self.f = f.unsqueeze(0)
         verbose.display(
             msg=f"dtype: {self.dtype}.",
             trigger_level=2,
@@ -324,27 +321,6 @@ class Model(metaclass=ABCMeta):
             trigger_level=2,
         )
         return value
-
-    def _validate_coriolis_param(
-        self,
-        f: torch.Tensor,
-    ) -> torch.Tensor:
-        """Validate f (Coriolis parameter) value.
-
-        Args:
-            f (torch.Tensor): Coriolis Parameter dict.
-
-        Returns:
-            torch.Tensor: Coriolis parameter value.
-        """
-        shape = f.shape[0], f.shape[1]
-        if shape != (self.space.nx + 1, self.space.ny + 1):
-            msg = (
-                "Invalid f shape "
-                f"{shape=}!=({self.space.nx+1},{self.space.ny+1})"
-            )
-            raise KeyError(msg)
-        return f.unsqueeze(0)
 
     def set_wind_forcing(
         self,
@@ -658,7 +634,8 @@ class Model(metaclass=ABCMeta):
         Returns:
             torch.Tensor: Vorticity
         """
-        return (self.omega / self.space.area / self.f0).to(device=DEVICE)
+        vorticity = self.omega / self.space.area / self.beta_plane.f0
+        return vorticity.to(device=DEVICE)
 
     def get_physical_omega_as_ndarray(
         self,
