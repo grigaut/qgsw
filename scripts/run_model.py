@@ -75,8 +75,6 @@ params = {
     "taux": taux,
     "tauy": tauy,
     "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "mask": torch.ones_like(space.h.remove_z_h().xy.x),
-    "compile": True,
     "slip_coef": config.physics.slip_coef,
     "dt": 0.0,
 }

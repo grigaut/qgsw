@@ -75,9 +75,7 @@ params_1l = {
     "taux": taux,
     "tauy": tauy,
     "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "mask": torch.ones_like(space_1l.h.remove_z_h().xy.x),
-    "compile": True,
-    "slip_coef": 1.0,
+    "slip_coef": config.physics.slip_coef,
     "dt": 0.0,
 }
 qg_1l = QG(params_1l)
@@ -128,9 +126,7 @@ params_2l = {
     "taux": taux,
     "tauy": tauy,
     "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "mask": torch.ones_like(space_2l.h.remove_z_h().xy.x),
-    "compile": True,
-    "slip_coef": 1.0,
+    "slip_coef": config.physics.slip_coef,
     "dt": 0.0,
 }
 qg_2l = QG(params_2l)
