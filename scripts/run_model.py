@@ -70,8 +70,7 @@ verbose.display(
 ## Set model parameters
 params = {
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
-    "f0": config.physics.f0,
-    "beta": config.physics.beta,
+    "beta_plane": config.physics.beta_plane,
     "space": space,
     "taux": taux,
     "tauy": tauy,
