@@ -66,16 +66,12 @@ verbose.display(
     trigger_level=1,
 )
 
-
 ## Set model parameters
-params = {
-    "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
-    "beta_plane": config.physics.beta_plane,
-    "space": space,
-    "n_ens": 1,
-}
-
-model = QG(params)
+model = QG(
+    space_3d=space,
+    g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+    beta_plane=config.physics.beta_plane,
+)
 model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coef
 model.set_wind_forcing(taux, tauy)

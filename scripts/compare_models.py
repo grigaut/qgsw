@@ -18,12 +18,6 @@ from qgsw.run_summary import RunSummary
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 
-msg = (
-    "Major Changes Added Since last use of this scripts."
-    "Consider Verify its content."
-)
-raise NotImplementedError(msg)
-
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
@@ -74,14 +68,11 @@ verbose.display(
     trigger_level=1,
 )
 ## Set model parameters
-params_1l = {
-    "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
-    "beta_plane": config.physics.beta_plane,
-    "space": space_1l,
-    "n_ens": 1,
-}
-qg_1l = QG(params_1l)
-
+qg_1l = QG(
+    space_3d=space_1l,
+    g_prime=config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
+    beta_plane=config.physics.beta_plane,
+)
 qg_1l.slip_coef = config.physics.slip_coef
 qg_1l.bottom_drag_coef = config.physics.bottom_drag_coef
 qg_1l.set_wind_forcing(taux, tauy)
@@ -125,13 +116,11 @@ verbose.display(
     trigger_level=1,
 )
 ## Set model parameters
-params_2l = {
-    "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
-    "beta_plane": config.physics.beta_plane,
-    "space": space_2l,
-    "n_ens": 1,
-}
-qg_2l = QG(params_2l)
+qg_2l = QG(
+    space_3d=space_2l,
+    g_prime=config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
+    beta_plane=config.physics.beta_plane,
+)
 qg_2l.slip_coef = config.physics.slip_coef
 qg_2l.bottom_drag_coef = config.physics.bottom_drag_coef
 qg_2l.set_wind_forcing(taux, tauy)
@@ -157,13 +146,18 @@ dt_2l = min(
 # Instantiate Models
 dt = min(dt_1l, dt_2l)
 qg_1l.dt = dt
-qg_1l.u = torch.clone(u0_1l)
-qg_1l.v = torch.clone(v0_1l)
-qg_1l.h = torch.clone(h0_1l)
+qg_1l.set_uvh(
+    u=torch.clone(u0_1l),
+    v=torch.clone(v0_1l),
+    h=torch.clone(h0_1l),
+)
+
 qg_2l.dt = dt
-qg_2l.u = torch.clone(u0_2l)
-qg_2l.v = torch.clone(v0_2l)
-qg_2l.h = torch.clone(h0_2l)
+qg_2l.set_uvh(
+    u=torch.clone(u0_2l),
+    v=torch.clone(v0_2l),
+    h=torch.clone(h0_2l),
+)
 
 ## time params
 t = 0
