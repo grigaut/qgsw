@@ -19,7 +19,9 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
-from qgsw.models.exceptions import InvalidLayersDefinitionError
+from qgsw.models.exceptions import (
+    InvalidModelParameterError,
+)
 from qgsw.models.sw import SW
 
 if TYPE_CHECKING:
@@ -92,7 +94,7 @@ class QG(SW):
         # precompile functions
         self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
 
-    def _validate_layers(self, h: torch.Tensor) -> torch.Tensor:
+    def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.
 
         Args:
@@ -104,15 +106,14 @@ class QG(SW):
         Returns:
             torch.Tensor: H
         """
-        h = super()._validate_layers(h)
         if h.shape[-2:] != (1, 1):
             msg = (
                 "H must me constant in space for "
                 "qg approximation, i.e. have shape (...,1,1)"
                 f"got shape shape {h.shape}"
             )
-            raise InvalidLayersDefinitionError(msg)
-        return h
+            raise InvalidModelParameterError(msg)
+        super()._set_H(h)
 
     def _compute_A(  # noqa: N802
         self,

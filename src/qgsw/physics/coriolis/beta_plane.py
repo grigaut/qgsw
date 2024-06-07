@@ -21,6 +21,14 @@ class BetaPlane(NamedTuple):
     f0: float
     beta: float
 
+    def compute_over_grid(self, grid_2d: Grid2D) -> torch.Tensor:
+        """Compute Coriolis Values over a given grid."""
+        return compute_beta_plane(
+            grid_2d=grid_2d,
+            f0=self.f0,
+            beta=self.beta,
+        )
+
 
 def compute_entire_beta_plane(
     grid_2d: Grid2D,

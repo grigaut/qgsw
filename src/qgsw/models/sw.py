@@ -16,6 +16,7 @@ from qgsw.models.base import Model
 from qgsw.models.core import finite_diff
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
+from qgsw.models.exceptions import IncoherentWithMaskError
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -103,6 +104,12 @@ class SW(Model):
     ) -> None:
         """Set state variables from physical variables.
 
+        As a reminder, the physical variables u_phys, v_phys, h_phys
+        are linked to the state variable u,v,h through:
+        - u = u_phys * dx
+        - v = v_phys * dy
+        - h = h_phys * dx * dy
+
         Args:
             u_phys (torch.Tensor|np.ndarray): Physical U.
             v_phys (torch.Tensor|np.ndarray): Physical V.
@@ -126,14 +133,19 @@ class SW(Model):
         u_ = u_.to(self.device)
         v_ = u_.to(self.device)
         h_ = u_.to(self.device)
-        assert u_ * self.masks.u == u_, (
-            "Input velocity u incoherent with domain mask, "
-            "velocity must be zero out of domain."
-        )
-        assert v_ * self.masks.v == v_, (
-            "Input velocity v incoherent with domain mask, "
-            "velocity must be zero out of domain."
-        )
+        if not (u_ * self.masks.u == u_).all():
+            msg = (
+                "Input velocity u incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
+
+        if not (v_ * self.masks.v == v_).all():
+            msg = (
+                "Input velocity v incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
         self.u = u_.type(self.dtype) * self.masks.u * self.space.dx
         self.v = v_.type(self.dtype) * self.masks.v * self.space.dy
         self.h = h_.type(self.dtype) * self.masks.h * self.space.area

@@ -12,14 +12,18 @@ import torch.nn.functional as F  # noqa: N812
 from qgsw import verbose
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff, flux, reconstruction
-from qgsw.models.exceptions import InvalidSavingFileError
-from qgsw.physics import coriolis
+from qgsw.models.exceptions import (
+    IncoherentWithMaskError,
+    InvalidModelParameterError,
+    InvalidSavingFileError,
+)
 from qgsw.spatial.core import grid_conversion
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from qgsw.physics import coriolis
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
@@ -75,6 +79,13 @@ class Model(metaclass=ABCMeta):
 
     dtype = torch.float64
     device = DEVICE
+    _dt: float | None = None
+    _slip_coef = 0.0
+    _bottom_drag = 0.0
+    _taux: torch.Tensor | None = None
+    _tauy: torch.Tensor | None = None
+    _n_ens: int = 1
+    _masks: Masks | None = None
 
     omega: torch.Tensor
     eta: torch.Tensor
@@ -109,8 +120,14 @@ class Model(metaclass=ABCMeta):
         )
 
         # Set up
-        ## Time Step
-        self.dt = param["dt"]
+        ## Space
+        self._space: SpaceDiscretization3D = param["space"]
+        # h
+        self._set_H(self.space.h.xyh.h)
+        ## gravity
+        self._set_g_prime(param["g_prime"])
+        # Number of ensemble
+        self.n_ens = param.get("n_ens", self._n_ens)
         ## data device and dtype
         verbose.display(
             msg=f"dtype: {self.dtype}.",
@@ -120,19 +137,10 @@ class Model(metaclass=ABCMeta):
             msg=f"device: {self.device}",
             trigger_level=2,
         )
-        ## Space
-        self._space: SpaceDiscretization3D = param["space"]
         ## Coriolis
-        self._set_coriolis_values(param=param)
-        ## Physical Variables
-        self._set_physical_variables(param=param)
-        ## Forcing
-        self._set_forcings(param=param)
+        self._set_coriolis(param["beta_plane"])
         ## Topography and Ref values
         self._set_ref_variables()
-
-        # ensemble
-        self.n_ens = param.get("n_ens", 1)
 
         # initialize variables
         self._initialize_vars()
@@ -155,42 +163,134 @@ class Model(metaclass=ABCMeta):
         return self._dt
 
     @dt.setter
-    def dt(self, value: float) -> None:
-        verbose.display(msg=f"dt value set to {value}.", trigger_level=1)
-        self._dt = value
+    def dt(self, dt: float) -> None:
+        if dt <= 0:
+            msg = "Timestep must be greater than 0."
+            raise InvalidModelParameterError(msg)
+        verbose.display(msg=f"dt value set to {dt}.", trigger_level=1)
+        self._dt = dt
 
     @property
     def space(self) -> SpaceDiscretization3D:
         """3D Space Discretization."""
         return self._space
 
-    def _set_coriolis_values(self, param: dict[str, Any]) -> None:
-        """Set the Coriolis parameter values.
+    @property
+    def slip_coef(self) -> float:
+        """Slip coefficient."""
+        return self._slip_coef
 
-        Args:
-            param (dict[str, Any]): Parameters dictionnary.
-        """
-        self.beta_plane: coriolis.BetaPlane = param["beta_plane"]
-        f = coriolis.compute_beta_plane(
-            grid_2d=self.space.omega.remove_z_h(),
-            f0=self.beta_plane.f0,
-            beta=self.beta_plane.beta,
+    @slip_coef.setter
+    def slip_coef(self, slip_coefficient: float) -> None:
+        # Verify value in [0,1]
+        if (slip_coefficient < 0) or (slip_coefficient > 1):
+            msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
+            raise InvalidModelParameterError(msg)
+        cl_type = (
+            "Free-"
+            if slip_coefficient == 1
+            else ("No-" if slip_coefficient == 0 else "Partial free-")
         )
-        self.f = f.unsqueeze(0)
+        verbose.display(
+            msg=f"{cl_type}slip boundary condition",
+            trigger_level=2,
+        )
+        self._slip_coef = slip_coefficient
 
-    def _set_physical_variables(self, param: dict[str, Any]) -> None:
-        """Set physical varibales.
+    @property
+    def bottom_drag_coef(self) -> float:
+        """Bottom drag coefficient."""
+        return self._bottom_drag
+
+    @bottom_drag_coef.setter
+    def bottom_drag_coef(self, bottom_drag: float) -> None:
+        self._bottom_drag = bottom_drag
+
+    @property
+    def n_ens(self) -> int:
+        """Number of ensembles."""
+        return self._n_ens
+
+    @n_ens.setter
+    def n_ens(self, n_ens: int) -> None:
+        if not isinstance(n_ens, int):
+            msg = "n_ens must be an integer."
+            raise InvalidModelParameterError(msg)
+        if n_ens <= 0:
+            msg = "n_ens must be greater than 1."
+            raise InvalidModelParameterError(msg)
+        self._n_ens = n_ens
+
+    @property
+    def masks(self) -> Masks:
+        """Masks."""
+        if self._masks is None:
+            mask = torch.ones(
+                self.space.nx,
+                self.space.ny,
+                dtype=self.dtype,
+                device=self.device,
+            )
+            self._masks = Masks(mask)
+        return self._masks
+
+    @masks.setter
+    def masks(self, mask: torch.Tensor) -> None:
+        shape = mask.shape[0], mask.shape[1]
+        # Verify shape
+        if shape != (self.space.nx, self.space.ny):
+            msg = (
+                "Invalid mask shape "
+                f"{shape}!=({self.space.nx},{self.space.ny})"
+            )
+            raise InvalidModelParameterError(msg)
+        vals = torch.unique(mask).tolist()
+        # Verify mask values
+        if not all(v in [0, 1] for v in vals) or vals == [0]:
+            msg = f"Invalid mask with non-binary values : {vals}"
+            raise InvalidModelParameterError(msg)
+        verbose.display(
+            msg=(
+                f"{'Non-trivial' if len(vals)==2 else 'Trivial'}"  # noqa: PLR2004
+                " mask provided"
+            ),
+            trigger_level=2,
+        )
+        self._masks = Masks(mask)
+
+    @property
+    def beta_plane(self) -> coriolis.BetaPlane:
+        """Beta Plane parmaters."""
+        return self._beta_plane
+
+    @property
+    def H(self) -> torch.Tensor:  # noqa: N802
+        """Layers thickness."""
+        return self._h
+
+    @property
+    def g_prime(self) -> torch.Tensor:
+        """Reduced Gravity."""
+        return self._g_prime
+
+    @property
+    def g(self) -> float:
+        """Reduced gravity in top layer."""
+        return self.g_prime[0]
+
+    def _set_coriolis(
+        self,
+        beta_plane: coriolis.BetaPlane,
+    ) -> None:
+        """Set Coriolis Grids.
 
         Args:
-            param (dict[str,Any]): Parameters dictionnary.
+            beta_plane (coriolis.BetaPlane): Coriolis values.
         """
-        # Validate parameters values and shapes.
-        ## H
-        self.H = self._validate_layers(self.space.h.xyh.h)
-        ## optional mask
-        self.masks = self._validate_mask(param=param, key="mask")
-        ## boundary conditions
-        self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
+        # Coriolis values
+        self._beta_plane = beta_plane
+        f = self.beta_plane.compute_over_grid(self.space.omega.remove_z_h())
+        self.f = f.unsqueeze(0)
         ## Coriolis grids
         self.f_ugrid = grid_conversion.omega_to_u(self.f)
         self.f_vgrid = grid_conversion.omega_to_v(self.f)
@@ -199,33 +299,15 @@ class Model(metaclass=ABCMeta):
         self.fstar_vgrid = self.f_vgrid * self.space.area
         self.fstar_vgrid = self.f_vgrid * self.space.area
         self.fstar_hgrid = self.f_hgrid * self.space.area
-        ## gravity
-        self.g_prime: torch.Tensor = param["g_prime"]
-        self.g = self.g_prime[0]
 
-    def _set_forcings(self, param: dict[str, Any]) -> None:
-        """Set forcing.
-
-        Args:
-            param (dict[str, Any]): Parameters dictionnary.
-        """
-        # Top layer forcing
-        taux, tauy = param["taux"], param["tauy"]
-        self.set_wind_forcing(taux, tauy)
-        # Bottom layer forcing
-        self.bottom_drag_coef = param["bottom_drag_coef"]
-
-    def _validate_layers(
+    def _set_H(  # noqa: N802
         self,
         h: torch.Tensor,
-    ) -> torch.Tensor:
+    ) -> None:
         """Validate H (unperturbed layer thickness) input value.
 
         Args:
             h (torch.Tensor): Layers Thickness.
-
-        Returns:
-            torch.Tensor: H
         """
         if len(h.shape) < 3:  # noqa: PLR2004
             msg = (
@@ -233,8 +315,22 @@ class Model(metaclass=ABCMeta):
                 "with nx=1 or ny=1 if H does not vary "
                 f"in x or y direction, got shape {h.shape}."
             )
-            raise KeyError(msg)
-        return h
+            raise InvalidModelParameterError(msg)
+        self._h = h
+
+    def _set_g_prime(self, g_prime: torch.Tensor) -> None:
+        """Set g_rpime values.
+
+        Args:
+            g_prime (torch.Tensor): g_prime.
+        """
+        if g_prime.shape != self.H.shape:
+            msg = (
+                f"Inconsistent shapes for g_prime ({g_prime.shape}) "
+                f"and H ({self.H.shape})"
+            )
+            raise InvalidModelParameterError(msg)
+        self._g_prime = g_prime
 
     def _validate_mask(self, param: dict[str, Any], key: str) -> Masks:
         """Validate Mask value.
@@ -282,32 +378,6 @@ class Model(metaclass=ABCMeta):
             trigger_level=2,
         )
         return Masks(mask)
-
-    def _validate_slip_coef(self, param: dict[str, Any], key: str) -> float:
-        """Valide slip coeffciient value.
-
-        Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for slip coefficient.
-
-        Returns:
-            float: Slip coefficient value.
-        """
-        value = param.get(key, 1.0)
-        # Verify value in [0,1]
-        if (value < 0) or (value > 1):
-            msg = f"slip coefficient must be in [0, 1], got {value}"
-            raise KeyError(msg)
-        cl_type = (
-            "Free-"
-            if value == 1
-            else ("No-" if value == 0 else "Partial free-")
-        )
-        verbose.display(
-            msg=f"{cl_type}slip boundary condition",
-            trigger_level=2,
-        )
-        return value
 
     def set_wind_forcing(
         self,
@@ -498,6 +568,8 @@ class Model(metaclass=ABCMeta):
     def _initialize_vars(self) -> None:
         """Initialize variables.
 
+        Create Empty variables.
+
         Concerned variables:
         - u
         - v
@@ -651,6 +723,45 @@ class Model(metaclass=ABCMeta):
             v_phys (torch.Tensor|np.ndarray): Physical V.
             h_phys (torch.Tensor|np.ndarray): Physical H.
         """
+
+    def set_uvh(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+    ) -> None:
+        """Set u,v,h value from state variables.
+
+        Warning: the expected values are not physical values but state values.
+        The variables correspond to the actual self.u, self.v, self.h
+        of the model.
+
+        Args:
+            u (torch.Tensor): State variable u.
+            v (torch.Tensor): State variable v.
+            h (torch.Tensor): State variable h.
+        """
+        u = u.to(self.device)
+        v = v.to(self.device)
+        h = h.to(self.device)
+
+        if not (u * self.masks.u == u).all():
+            msg = (
+                "Input velocity u incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
+
+        if not (v * self.masks.v == v).all():
+            msg = (
+                "Input velocity v incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
+        self.u = u.type(self.dtype) * self.masks.u
+        self.v = v.type(self.dtype) * self.masks.v
+        self.h = h.type(self.dtype) * self.masks.h
+        self.compute_diagnostic_variables()
 
     def get_print_info(self) -> str:
         """Returns a string with summary of current variables.
