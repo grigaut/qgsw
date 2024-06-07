@@ -12,14 +12,18 @@ import torch.nn.functional as F  # noqa: N812
 from qgsw import verbose
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff, flux, reconstruction
-from qgsw.models.exceptions import InvalidSavingFileError
-from qgsw.physics import coriolis
+from qgsw.models.exceptions import (
+    IncoherentWithMaskError,
+    InvalidModelParameterError,
+    InvalidSavingFileError,
+)
 from qgsw.spatial.core import grid_conversion
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
@@ -73,6 +77,16 @@ class Model(metaclass=ABCMeta):
         - dy_p_ref
     """
 
+    dtype = torch.float64
+    device = DEVICE
+    _dt: float | None = None
+    _slip_coef = 0.0
+    _bottom_drag = 0.0
+    _taux: torch.Tensor | float = 0.0
+    _tauy: torch.Tensor | float = 0.0
+    _n_ens: int = 1
+    _masks: Masks | None = None
+
     omega: torch.Tensor
     eta: torch.Tensor
     U: torch.Tensor
@@ -82,33 +96,24 @@ class Model(metaclass=ABCMeta):
     h_tot_ugrid: torch.Tensor
     h_tot_vgrid: torch.Tensor
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Parameters
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """Model Instantiation.
 
-        param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
-            unperturbed layer thickness
-            'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
-            'f0':       float, Coriolis Parameter
-            'beta':     float, Rossby Parameter
-            'space':    SpaceDiscretization3D, space discretization
-            'taux':     float or Tensor (nx-1, ny),
-            top-layer forcing, x component
-            'tauy':     float or Tensor (nx, ny-1),
-            top-layer forcing, y component
-            'dt':       float > 0., integration time-step
-            'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for partial free slip.
-            'bottom_drag_coef': float, linear bottom drag coefficient
-            if True
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
         verbose.display(
             msg=f"Creating {self.__class__.__name__} model...",
@@ -116,25 +121,27 @@ class Model(metaclass=ABCMeta):
         )
 
         # Set up
-        ## Time Step
-        self.dt = param["dt"]
-        ## data device and dtype
-        self._set_array_kwargs(param=param)
-        ## grid
-        self._set_grid(param=param)
         ## Space
-        self.space: SpaceDiscretization3D = param["space"]
+        self._space = space_3d
+        # h
+        self._set_H(space_3d.h.xyh.h)
+        ## gravity
+        self._set_g_prime(g_prime)
+        # Number of ensemble
+        self.n_ens = n_ens
+        ## data device and dtype
+        verbose.display(
+            msg=f"dtype: {self.dtype}.",
+            trigger_level=2,
+        )
+        verbose.display(
+            msg=f"device: {self.device}",
+            trigger_level=2,
+        )
         ## Coriolis
-        self._set_coriolis_values(param=param)
-        ## Physical Variables
-        self._set_physical_variables(param=param)
-        ## Forcing
-        self._set_forcings(param=param)
+        self._set_coriolis(beta_plane)
         ## Topography and Ref values
         self._set_ref_variables()
-
-        # ensemble
-        self.n_ens = param.get("n_ens", 1)
 
         # initialize variables
         self._initialize_vars()
@@ -146,10 +153,25 @@ class Model(metaclass=ABCMeta):
         # utils and flux computation functions
         self._set_utils_before_compilation()
         # precompile torch functions
-        if param.get("compile", True):
+        if with_compile:
             self._set_utils_with_compilation()
         else:
             verbose.display(msg="No compilation", trigger_level=2)
+
+    @property
+    def u(self) -> torch.Tensor:
+        """State Variable u: Zonal Speed."""
+        return self._u
+
+    @property
+    def v(self) -> torch.Tensor:
+        """State Variable v: Meridional Speed."""
+        return self._v
+
+    @property
+    def h(self) -> torch.Tensor:
+        """State Variable h: Layers Thickness."""
+        return self._h
 
     @property
     def dt(self) -> float:
@@ -157,116 +179,188 @@ class Model(metaclass=ABCMeta):
         return self._dt
 
     @dt.setter
-    def dt(self, value: float) -> None:
-        verbose.display(msg=f"dt value set to {value}.", trigger_level=1)
-        self._dt = value
+    def dt(self, dt: float) -> None:
+        if dt <= 0:
+            msg = "Timestep must be greater than 0."
+            raise InvalidModelParameterError(msg)
+        verbose.display(msg=f"dt value set to {dt}.", trigger_level=1)
+        self._dt = dt
 
-    def _set_array_kwargs(self, param: dict[str, Any]) -> None:
-        """Set the array kwargs.
+    @property
+    def space(self) -> SpaceDiscretization3D:
+        """3D Space Discretization."""
+        return self._space
+
+    @property
+    def slip_coef(self) -> float:
+        """Slip coefficient."""
+        return self._slip_coef
+
+    @slip_coef.setter
+    def slip_coef(self, slip_coefficient: float) -> None:
+        # Verify value in [0,1]
+        if (slip_coefficient < 0) or (slip_coefficient > 1):
+            msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
+            raise InvalidModelParameterError(msg)
+        cl_type = (
+            "Free-"
+            if slip_coefficient == 1
+            else ("No-" if slip_coefficient == 0 else "Partial free-")
+        )
+        verbose.display(
+            msg=f"{cl_type}slip boundary condition",
+            trigger_level=2,
+        )
+        self._slip_coef = slip_coefficient
+
+    @property
+    def bottom_drag_coef(self) -> float:
+        """Bottom drag coefficient."""
+        return self._bottom_drag
+
+    @bottom_drag_coef.setter
+    def bottom_drag_coef(self, bottom_drag: float) -> None:
+        self._bottom_drag = bottom_drag
+
+    @property
+    def n_ens(self) -> int:
+        """Number of ensembles."""
+        return self._n_ens
+
+    @n_ens.setter
+    def n_ens(self, n_ens: int) -> None:
+        if not isinstance(n_ens, int):
+            msg = "n_ens must be an integer."
+            raise InvalidModelParameterError(msg)
+        if n_ens <= 0:
+            msg = "n_ens must be greater than 1."
+            raise InvalidModelParameterError(msg)
+        self._n_ens = n_ens
+
+    @property
+    def masks(self) -> Masks:
+        """Masks."""
+        if self._masks is None:
+            mask = torch.ones(
+                self.space.nx,
+                self.space.ny,
+                dtype=self.dtype,
+                device=self.device,
+            )
+            self._masks = Masks(mask)
+        return self._masks
+
+    @masks.setter
+    def masks(self, mask: torch.Tensor) -> None:
+        shape = mask.shape[0], mask.shape[1]
+        # Verify shape
+        if shape != (self.space.nx, self.space.ny):
+            msg = (
+                "Invalid mask shape "
+                f"{shape}!=({self.space.nx},{self.space.ny})"
+            )
+            raise InvalidModelParameterError(msg)
+        vals = torch.unique(mask).tolist()
+        # Verify mask values
+        if not all(v in [0, 1] for v in vals) or vals == [0]:
+            msg = f"Invalid mask with non-binary values : {vals}"
+            raise InvalidModelParameterError(msg)
+        verbose.display(
+            msg=(
+                f"{'Non-trivial' if len(vals)==2 else 'Trivial'}"  # noqa: PLR2004
+                " mask provided"
+            ),
+            trigger_level=2,
+        )
+        self._masks = Masks(mask)
+
+    @property
+    def taux(self) -> torch.Tensor | float:
+        """Tau x."""
+        return self._taux
+
+    @taux.setter
+    def taux(self, taux: torch.Tensor | float) -> None:
+        is_tensorx = isinstance(taux, torch.Tensor)
+        if (not isinstance(taux, float)) and (not is_tensorx):
+            msg = "taux must be a float or a Tensor"
+            raise InvalidModelParameterError(msg)
+        if is_tensorx and (taux.shape != (self.space.nx - 1, self.space.ny)):
+            msg = (
+                "Tau_x Tensor must be "
+                f"{(self.space.nx-1, self.space.ny)}-shaped."
+            )
+            raise InvalidModelParameterError(msg)
+        self._taux = taux
+
+    @property
+    def tauy(self) -> torch.Tensor | float:
+        """Tau y."""
+        return self._tauy
+
+    @tauy.setter
+    def tauy(self, tauy: torch.Tensor | float) -> None:
+        is_tensory = isinstance(tauy, torch.Tensor)
+        if (not isinstance(tauy, float)) and (not is_tensory):
+            msg = "tauy must be a float or a Tensor"
+            raise InvalidModelParameterError(msg)
+        if is_tensory and (tauy.shape != (self.space.nx, self.space.ny - 1)):
+            msg = (
+                "Tau_y Tensor must be "
+                f"{(self.space.nx, self.space.ny-1)}-shaped."
+            )
+            raise InvalidModelParameterError(msg)
+        self._tauy = tauy
+
+    @property
+    def beta_plane(self) -> BetaPlane:
+        """Beta Plane parmaters."""
+        return self._beta_plane
+
+    @property
+    def H(self) -> torch.Tensor:  # noqa: N802
+        """Layers thickness."""
+        return self._H
+
+    @property
+    def g_prime(self) -> torch.Tensor:
+        """Reduced Gravity."""
+        return self._g_prime
+
+    @property
+    def g(self) -> float:
+        """Reduced gravity in top layer."""
+        return self.g_prime[0]
+
+    def _set_coriolis(
+        self,
+        beta_plane: BetaPlane,
+    ) -> None:
+        """Set Coriolis Grids.
 
         Args:
-            param (dict[str, Any]): Parameters dictionnary.
+            beta_plane (coriolis.BetaPlane): Coriolis values.
         """
-        self.device = param["device"]
-        self.dtype = param.get("dtype", torch.float64)
-        self.arr_kwargs = {"dtype": self.dtype, "device": self.device}
-        verbose.display(
-            msg=f"dtype: {self.dtype}.",
-            trigger_level=2,
-        )
-        verbose.display(
-            msg=f"device: {self.device}",
-            trigger_level=2,
-        )
-
-    def _set_coriolis_values(self, param: dict[str, Any]) -> None:
-        """Set the Coriolis parameter values.
-
-        Args:
-            param (dict[str, Any]): Parameters dictionnary.
-        """
-        self.f0 = param["f0"]
-        self.beta = param.get("beta", 0)
-        f = coriolis.compute_beta_plane(
-            grid_2d=self.space.omega.remove_z_h(),
-            f0=self.f0,
-            beta=self.beta,
-        )
-        self.f = self._validate_coriolis_param(f)
-        verbose.display(
-            msg=f"dtype: {self.dtype}.",
-            trigger_level=2,
-        )
-        verbose.display(
-            msg=f"device: {self.device}",
-            trigger_level=2,
-        )
-
-    def _set_grid(self, param: dict[str, Any]) -> None:
-        """Set the Grid informations.
-
-        Args:
-            param (dict[str, Any]): Parameters dictionnary.
-        """
-        self.nx: int = param["nx"]  # number of points in the x direction
-        self.ny: int = param["ny"]  # number of point in the y direction
-        self.nl: int = param["nl"]  # number of layers
-        self.dx: float = param["dx"]  # x-step
-        self.dy: float = param["dy"]  # y-step
-        self.area = self.dx * self.dy  # elementary area
-        verbose.display(
-            msg=f"nx, ny, nl =  {self.nx, self.ny, self.nl}",
-            trigger_level=2,
-        )
-
-    def _set_physical_variables(self, param: dict[str, Any]) -> None:
-        """Set physical varibales.
-
-        Args:
-            param (dict[str,Any]): Parameters dictionnary.
-        """
-        # Validate parameters values and shapes.
-        ## H
-        self.H = self._validate_layers(self.space.h.xyh.h)
-        ## optional mask
-        self.masks = self._validate_mask(param=param, key="mask")
-        ## boundary conditions
-        self.slip_coef = self._validate_slip_coef(param=param, key="slip_coef")
+        # Coriolis values
+        self._beta_plane = beta_plane
+        f = self.beta_plane.compute_over_grid(self.space.omega.remove_z_h())
+        self.f = f.unsqueeze(0)
         ## Coriolis grids
         self.f_ugrid = grid_conversion.omega_to_u(self.f)
         self.f_vgrid = grid_conversion.omega_to_v(self.f)
         self.f_hgrid = grid_conversion.omega_to_h(self.f)
-        self.fstar_ugrid = self.f_ugrid * self.area
-        self.fstar_vgrid = self.f_vgrid * self.area
-        self.fstar_vgrid = self.f_vgrid * self.area
-        self.fstar_hgrid = self.f_hgrid * self.area
-        ## gravity
-        self.g_prime: torch.Tensor = param["g_prime"]
-        self.g = self.g_prime[0]
+        self.fstar_ugrid = self.f_ugrid * self.space.area
+        self.fstar_vgrid = self.f_vgrid * self.space.area
+        self.fstar_hgrid = self.f_hgrid * self.space.area
 
-    def _set_forcings(self, param: dict[str, Any]) -> None:
-        """Set forcing.
-
-        Args:
-            param (dict[str, Any]): Parameters dictionnary.
-        """
-        # Top layer forcing
-        taux, tauy = param["taux"], param["tauy"]
-        self.set_wind_forcing(taux, tauy)
-        # Bottom layer forcing
-        self.bottom_drag_coef = param["bottom_drag_coef"]
-
-    def _validate_layers(
+    def _set_H(  # noqa: N802
         self,
         h: torch.Tensor,
-    ) -> torch.Tensor:
+    ) -> None:
         """Validate H (unperturbed layer thickness) input value.
 
         Args:
             h (torch.Tensor): Layers Thickness.
-
-        Returns:
-            torch.Tensor: H
         """
         if len(h.shape) < 3:  # noqa: PLR2004
             msg = (
@@ -274,8 +368,22 @@ class Model(metaclass=ABCMeta):
                 "with nx=1 or ny=1 if H does not vary "
                 f"in x or y direction, got shape {h.shape}."
             )
-            raise KeyError(msg)
-        return h
+            raise InvalidModelParameterError(msg)
+        self._H = h
+
+    def _set_g_prime(self, g_prime: torch.Tensor) -> None:
+        """Set g_rpime values.
+
+        Args:
+            g_prime (torch.Tensor): g_prime.
+        """
+        if g_prime.shape != self.H.shape:
+            msg = (
+                f"Inconsistent shapes for g_prime ({g_prime.shape}) "
+                f"and H ({self.H.shape})"
+            )
+            raise InvalidModelParameterError(msg)
+        self._g_prime = g_prime
 
     def _validate_mask(self, param: dict[str, Any], key: str) -> Masks:
         """Validate Mask value.
@@ -294,8 +402,8 @@ class Model(metaclass=ABCMeta):
                 trigger_level=2,
             )
             mask = torch.ones(
-                self.nx,
-                self.ny,
+                self.space.nx,
+                self.space.ny,
                 dtype=self.dtype,
                 device=self.device,
             )
@@ -304,8 +412,11 @@ class Model(metaclass=ABCMeta):
         mask: torch.Tensor = param[key]
         shape = mask.shape[0], mask.shape[1]
         # Verify shape
-        if shape != (self.nx, self.ny):
-            msg = f"Invalid mask shape {shape}!=({self.nx},{self.ny})"
+        if shape != (self.space.nx, self.space.ny):
+            msg = (
+                "Invalid mask shape "
+                f"{shape}!=({self.space.nx},{self.space.ny})"
+            )
             raise KeyError(msg)
         vals = torch.unique(mask).tolist()
         # Verify mask values
@@ -321,50 +432,6 @@ class Model(metaclass=ABCMeta):
         )
         return Masks(mask)
 
-    def _validate_slip_coef(self, param: dict[str, Any], key: str) -> float:
-        """Valide slip coeffciient value.
-
-        Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Key for slip coefficient.
-
-        Returns:
-            float: Slip coefficient value.
-        """
-        value = param.get(key, 1.0)
-        # Verify value in [0,1]
-        if (value < 0) or (value > 1):
-            msg = f"slip coefficient must be in [0, 1], got {value}"
-            raise KeyError(msg)
-        cl_type = (
-            "Free-"
-            if value == 1
-            else ("No-" if value == 0 else "Partial free-")
-        )
-        verbose.display(
-            msg=f"{cl_type}slip boundary condition",
-            trigger_level=2,
-        )
-        return value
-
-    def _validate_coriolis_param(
-        self,
-        f: torch.Tensor,
-    ) -> torch.Tensor:
-        """Validate f (Coriolis parameter) value.
-
-        Args:
-            f (torch.Tensor): Coriolis Parameter dict.
-
-        Returns:
-            torch.Tensor: Coriolis parameter value.
-        """
-        shape = f.shape[0], f.shape[1]
-        if shape != (self.nx + 1, self.ny + 1):
-            msg = f"Invalid f shape {shape=}!=({self.nx},{self.ny})"
-            raise KeyError(msg)
-        return f.unsqueeze(0)
-
     def set_wind_forcing(
         self,
         taux: float | torch.Tensor,
@@ -377,32 +444,8 @@ class Model(metaclass=ABCMeta):
 
         Args:
             taux (float | torch.Tensor): Taux value.
-            tauy (float | torch.Tensor): Tauy value
-
-        Raises:
-            ValueError: If taux is not a float nor a Tensor.
-            ValueError: If taux if a wrongly-shaped Tensor.
-            ValueError: If tauy is not a float nor a Tensor.
-            ValueError: If tauy if a wrongly-shaped Tensor.
+            tauy (float | torch.Tensor): Tauy value.
         """
-        is_tensorx = isinstance(taux, torch.Tensor)
-
-        if (not isinstance(taux, float)) and (not is_tensorx):
-            msg = "taux must be a float or a Tensor"
-            raise ValueError(msg)
-        if is_tensorx and (taux.shape != (self.nx - 1, self.ny)):
-            msg = f"Tau_x Tensor must be {(self.nx-1, self.ny)}-shaped."
-            raise ValueError(msg)
-
-        is_tensory = isinstance(tauy, torch.Tensor)
-
-        if (not isinstance(tauy, float)) and (not is_tensory):
-            msg = "tauy must be a float or a Tensor"
-            raise ValueError(msg)
-        if is_tensory and (tauy.shape != (self.nx, self.ny - 1)):
-            msg = f"Tau_y Tensor must be {(self.nx, self.ny-1)}-shaped."
-            raise ValueError(msg)
-
         self.taux = taux
         self.tauy = tauy
 
@@ -418,7 +461,7 @@ class Model(metaclass=ABCMeta):
         - self.dx_p_ref
         - self.dy_p_ref
         """
-        self.h_ref = self.H * self.area
+        self.h_ref = self.H * self.space.area
         self.eta_ref = -self.H.sum(dim=-3) + reverse_cumsum(self.H, dim=-3)
         self.p_ref = torch.cumsum(self.g_prime * self.eta_ref, dim=-3)
         if self.h_ref.shape[-2] != 1 and self.h_ref.shape[-1] != 1:
@@ -548,23 +591,28 @@ class Model(metaclass=ABCMeta):
     def _initialize_vars(self) -> None:
         """Initialize variables.
 
+        Create Empty variables.
+
         Concerned variables:
         - u
         - v
         - h
         """
-        base_shape = (self.n_ens, self.nl)
-        self.h = torch.zeros(
-            (*base_shape, self.nx, self.ny),
-            **self.arr_kwargs,
+        base_shape = (self.n_ens, self.space.nl)
+        self._h = torch.zeros(
+            (*base_shape, self.space.nx, self.space.ny),
+            dtype=self.dtype,
+            device=self.device,
         )
-        self.u = torch.zeros(
-            (*base_shape, self.nx + 1, self.ny),
-            **self.arr_kwargs,
+        self._u = torch.zeros(
+            (*base_shape, self.space.nx + 1, self.space.ny),
+            dtype=self.dtype,
+            device=self.device,
         )
-        self.v = torch.zeros(
-            (*base_shape, self.nx, self.ny + 1),
-            **self.arr_kwargs,
+        self._v = torch.zeros(
+            (*base_shape, self.space.nx, self.space.ny + 1),
+            dtype=self.dtype,
+            device=self.device,
         )
 
     def compute_omega(self, u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
@@ -612,13 +660,13 @@ class Model(metaclass=ABCMeta):
         # Diagnostic: vorticity values
         self.omega = self.compute_omega(self.u, self.v)
         # Diagnostic: interface height : physical
-        self.eta = reverse_cumsum(self.h / self.area, dim=-3)
+        self.eta = reverse_cumsum(self.h / self.space.area, dim=-3)
         # Diagnostic: pressure values
         self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
         # Diagnostic: zonal velocity
-        self.U = self.u / self.dx**2
+        self.U = self.u / self.space.dx**2
         # Diagnostic: meridional velocity
-        self.V = self.v / self.dy**2
+        self.V = self.v / self.space.dy**2
         # Zonal velocity momentum -> corresponds to the v grid
         # Has no value on the boundary of the v grid
         self.U_m = self.cell_corners_to_cell_centers(self.U)
@@ -647,9 +695,9 @@ class Model(metaclass=ABCMeta):
             tuple[np.ndarray, np.ndarray, np.ndarray]
         | tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        u_phys = (self.u / self.dx).to(device=DEVICE)
-        v_phys = (self.v / self.dy).to(device=DEVICE)
-        h_phys = (self.h / self.area).to(device=DEVICE)
+        u_phys = (self.u / self.space.dx).to(device=DEVICE)
+        v_phys = (self.v / self.space.dy).to(device=DEVICE)
+        h_phys = (self.h / self.space.area).to(device=DEVICE)
 
         return (u_phys, v_phys, h_phys)
 
@@ -671,7 +719,8 @@ class Model(metaclass=ABCMeta):
         Returns:
             torch.Tensor: Vorticity
         """
-        return (self.omega / self.area / self.f0).to(device=DEVICE)
+        vorticity = self.omega / self.space.area / self.beta_plane.f0
+        return vorticity.to(device=DEVICE)
 
     def get_physical_omega_as_ndarray(
         self,
@@ -698,15 +747,56 @@ class Model(metaclass=ABCMeta):
             h_phys (torch.Tensor|np.ndarray): Physical H.
         """
 
+    def set_uvh(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+    ) -> None:
+        """Set u,v,h value from state variables.
+
+        Warning: the expected values are not physical values but state values.
+        The variables correspond to the actual self.u, self.v, self.h
+        of the model.
+
+        Args:
+            u (torch.Tensor): State variable u.
+            v (torch.Tensor): State variable v.
+            h (torch.Tensor): State variable h.
+        """
+        u = u.to(self.device)
+        v = v.to(self.device)
+        h = h.to(self.device)
+
+        if not (u * self.masks.u == u).all():
+            msg = (
+                "Input velocity u incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
+
+        if not (v * self.masks.v == v).all():
+            msg = (
+                "Input velocity v incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
+        self._u = u.type(self.dtype) * self.masks.u
+        self._v = v.type(self.dtype) * self.masks.v
+        self._h = h.type(self.dtype) * self.masks.h
+        self.compute_diagnostic_variables()
+
     def get_print_info(self) -> str:
         """Returns a string with summary of current variables.
 
         Returns:
             str: Summary of variables.
         """
-        hl_mean = (self.h / self.area).mean((-1, -2)).squeeze().cpu().numpy()
+        hl_mean = (self.h / self.space.area).mean((-1, -2))
         eta = self.eta
-        u, v, h = self.u / self.dx, self.v / self.dy, self.h / self.area
+        u = self.u / self.space.dx
+        v = self.v / self.space.dy
+        h = self.h / self.space.area
         with np.printoptions(precision=2):
             eta_surface = eta[:, 0].min().to(device=DEVICE).item()
             return (
@@ -714,7 +804,7 @@ class Model(metaclass=ABCMeta):
                 f"{u.abs().max().to(device=DEVICE).item():.5E}, "
                 f"v: {v.mean().to(device=DEVICE).item():+.5E}, "
                 f"{v.abs().max().to(device=DEVICE).item():.5E}, "
-                f"hl_mean: {hl_mean}, "
+                f"hl_mean: {hl_mean.squeeze().cpu().numpy()}, "
                 f"h min: {h.min().to(device=DEVICE).item():.5E}, "
                 f"max: {h.max().to(device=DEVICE).item():.5E}, "
                 f"eta_sur min: {eta_surface:+.5f}, "
@@ -755,10 +845,12 @@ class Model(metaclass=ABCMeta):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing.
         """
-        h_ugrid = (self.h_tot_ugrid) / self.area
-        h_vgrid = (self.h_tot_vgrid) / self.area
-        du[..., 0, :, :] += self.taux / h_ugrid[..., 0, 1:-1, :] * self.dx
-        dv[..., 0, :, :] += self.tauy / h_vgrid[..., 0, :, 1:-1] * self.dy
+        h_ugrid = self.h_tot_ugrid / self.space.area
+        h_vgrid = self.h_tot_vgrid / self.space.area
+        du_wind = self.taux / h_ugrid[..., 0, 1:-1, :] * self.space.dx
+        dv_wind = self.tauy / h_vgrid[..., 0, :, 1:-1] * self.space.dy
+        du[..., 0, :, :] += du_wind
+        dv[..., 0, :, :] += dv_wind
         return du, dv
 
     def _add_bottom_drag(

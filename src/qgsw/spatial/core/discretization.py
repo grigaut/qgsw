@@ -186,32 +186,37 @@ class SpaceDiscretization2D:
     @property
     def nx(self) -> int:
         """Number of points on the x direction."""
-        return self.omega.nx
+        return self.h.nx
 
     @property
     def ny(self) -> int:
         """Number of points on the y direction."""
-        return self.omega.ny
+        return self.h.ny
 
     @property
     def lx(self) -> int:
         """Total length in the x direction (in meters)."""
-        return self.omega.lx
+        return self.h.lx
 
     @property
     def ly(self) -> int:
         """Total length in the y direction (in meters)."""
-        return self.omega.ly
+        return self.h.ly
 
     @property
     def dx(self) -> float:
         """Dx."""
-        return self.omega.dx
+        return self.h.dx
 
     @property
     def dy(self) -> float:
         """Dy."""
-        return self.omega.dy
+        return self.h.dy
+
+    @property
+    def area(self) -> float:
+        """Elementary area surface."""
+        return self.dx * self.dy
 
     @property
     def xy_unit(self) -> Unit:
@@ -470,7 +475,7 @@ class SpaceDiscretization2D:
         Returns:
             SpaceDiscretization3D: 3D Grids.
         """
-        omega_3d = self.omega.add_h(h=h)
+        omega_3d = self.h.add_h(h=h)
         h_3d = self._h.add_h(h=h)
         u_3d = self._u.add_h(h=h)
         v_3d = self._v.add_h(h=h)
@@ -490,7 +495,7 @@ class SpaceDiscretization2D:
         Returns:
             SpaceDiscretization3D: 3D Grid.
         """
-        omega_3d = self.omega.add_z(z=z)
+        omega_3d = self.h.add_z(z=z)
         h_3d = self._h.add_z(z=z)
         u_3d = self._u.add_z(z=z)
         v_3d = self._v.add_z(z=z)
@@ -679,42 +684,47 @@ class SpaceDiscretization3D:
     @property
     def nx(self) -> int:
         """Number of points on the x direction."""
-        return self.omega.nx
+        return self.h.nx
 
     @property
     def ny(self) -> int:
         """Number of points on the y direction."""
-        return self.omega.ny
+        return self.h.ny
 
     @property
     def nl(self) -> int:
         """Number of layers."""
-        return self.omega.nl
+        return self.h.nl
 
     @property
     def lx(self) -> int:
         """Total length in the x direction (in meters)."""
-        return self.omega.lx
+        return self.h.lx
 
     @property
     def ly(self) -> int:
         """Total length in the y direction (in meters)."""
-        return self.omega.ly
+        return self.h.ly
 
     @property
     def lz(self) -> int:
         """Total length in the z direction (in meters)."""
-        return self.omega.lz
+        return self.h.lz
 
     @property
     def dx(self) -> float:
         """dx."""  # noqa: D403
-        return self.omega.dx
+        return self.h.dx
 
     @property
     def dy(self) -> float:
         """dy."""  # noqa: D403
-        return self.omega.dy
+        return self.h.dy
+
+    @property
+    def area(self) -> float:
+        """Elementary area surface."""
+        return self.dx * self.dy
 
     @property
     def omega(self) -> Grid3D:

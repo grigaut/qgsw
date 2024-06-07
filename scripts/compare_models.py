@@ -68,27 +68,14 @@ verbose.display(
     trigger_level=1,
 )
 ## Set model parameters
-params_1l = {
-    "nx": config.space.nx,
-    "ny": config.space.ny,
-    "nl": config.models[0].nl,
-    "dx": config.space.dx,
-    "dy": config.space.dy,
-    "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
-    "f0": config.physics.f0,
-    "beta": config.physics.beta,
-    "space": space_1l,
-    "taux": taux,
-    "tauy": tauy,
-    "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "device": DEVICE,
-    "dtype": torch.float64,
-    "mask": torch.ones_like(space_1l.h.remove_z_h().xy.x),
-    "compile": True,
-    "slip_coef": 1.0,
-    "dt": 0.0,
-}
-qg_1l = QG(params_1l)
+qg_1l = QG(
+    space_3d=space_1l,
+    g_prime=config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
+    beta_plane=config.physics.beta_plane,
+)
+qg_1l.slip_coef = config.physics.slip_coef
+qg_1l.bottom_drag_coef = config.physics.bottom_drag_coef
+qg_1l.set_wind_forcing(taux, tauy)
 p0_1l = perturbation.compute_initial_pressure(
     space_1l.omega,
     config.physics.f0,
@@ -129,27 +116,14 @@ verbose.display(
     trigger_level=1,
 )
 ## Set model parameters
-params_2l = {
-    "nx": config.space.nx,
-    "ny": config.space.ny,
-    "nl": config.models[1].nl,
-    "dx": config.space.dx,
-    "dy": config.space.dy,
-    "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
-    "f0": config.physics.f0,
-    "beta": config.physics.beta,
-    "space": space_2l,
-    "taux": taux,
-    "tauy": tauy,
-    "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "device": DEVICE,
-    "dtype": torch.float64,
-    "mask": torch.ones_like(space_2l.h.remove_z_h().xy.x),
-    "compile": True,
-    "slip_coef": 1.0,
-    "dt": 0.0,
-}
-qg_2l = QG(params_2l)
+qg_2l = QG(
+    space_3d=space_2l,
+    g_prime=config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
+    beta_plane=config.physics.beta_plane,
+)
+qg_2l.slip_coef = config.physics.slip_coef
+qg_2l.bottom_drag_coef = config.physics.bottom_drag_coef
+qg_2l.set_wind_forcing(taux, tauy)
 p0_2l = perturbation.compute_initial_pressure(
     space_2l.omega,
     config.physics.f0,
@@ -172,13 +146,18 @@ dt_2l = min(
 # Instantiate Models
 dt = min(dt_1l, dt_2l)
 qg_1l.dt = dt
-qg_1l.u = torch.clone(u0_1l)
-qg_1l.v = torch.clone(v0_1l)
-qg_1l.h = torch.clone(h0_1l)
+qg_1l.set_uvh(
+    u=torch.clone(u0_1l),
+    v=torch.clone(v0_1l),
+    h=torch.clone(h0_1l),
+)
+
 qg_2l.dt = dt
-qg_2l.u = torch.clone(u0_2l)
-qg_2l.v = torch.clone(v0_2l)
-qg_2l.h = torch.clone(h0_2l)
+qg_2l.set_uvh(
+    u=torch.clone(u0_2l),
+    v=torch.clone(v0_2l),
+    h=torch.clone(h0_2l),
+)
 
 ## time params
 t = 0
@@ -186,7 +165,7 @@ t = 0
 qg_1l.compute_diagnostic_variables()
 qg_1l.compute_time_derivatives()
 
-w_0_1l = qg_1l.omega.squeeze() / qg_1l.dx / qg_1l.dy
+w_0_1l = qg_1l.omega.squeeze() / qg_1l.space.dx / qg_1l.space.dy
 
 
 tau_1l = 1.0 / torch.sqrt(w_0_1l.pow(2).mean()).to(device=DEVICE).item()
@@ -198,7 +177,7 @@ verbose.display(
 qg_2l.compute_diagnostic_variables()
 qg_2l.compute_time_derivatives()
 
-w_0_2l = qg_2l.omega.squeeze() / qg_2l.dx / qg_2l.dy
+w_0_2l = qg_2l.omega.squeeze() / qg_2l.space.dx / qg_2l.space.dy
 
 
 tau_2l = 1.0 / torch.sqrt(w_0_2l.pow(2).mean()).to(device=DEVICE).item()

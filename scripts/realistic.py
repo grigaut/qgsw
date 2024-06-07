@@ -17,6 +17,12 @@ from qgsw.specs import DEVICE
 from qgsw import verbose
 from qgsw.configs import Configuration
 
+msg = (
+    "Major Changes Added Since last use of this scripts."
+    "Consider Verify its content."
+)
+raise NotImplementedError(msg)
+
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 

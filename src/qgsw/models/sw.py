@@ -5,7 +5,7 @@ Louis Thiry, Nov 2023 for IFREMER.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -16,6 +16,11 @@ from qgsw.models.base import Model
 from qgsw.models.core import finite_diff
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
+from qgsw.models.exceptions import IncoherentWithMaskError
+
+if TYPE_CHECKING:
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -74,33 +79,32 @@ class SW(Model):
 
     """
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Parameters
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """SW Model Instantiation.
 
-        param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
-            'H':        Tensor (nl,) or (nl, nx, ny),
-            unperturbed layer thickness
-            'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
-            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
-            x component
-            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
-            y component
-            'dt':       float > 0., integration time-step
-            'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for
-                        partial free slip.
-            'bottom_drag_coef': float, linear bottom drag coefficient
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
-        super().__init__(param)
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            n_ens=n_ens,
+            with_compile=with_compile,
+        )
 
     def set_physical_uvh(
         self,
@@ -109,6 +113,12 @@ class SW(Model):
         h_phys: torch.Tensor | np.ndarray,
     ) -> None:
         """Set state variables from physical variables.
+
+        As a reminder, the physical variables u_phys, v_phys, h_phys
+        are linked to the state variable u,v,h through:
+        - u = u_phys * dx
+        - v = v_phys * dy
+        - h = h_phys * dx * dy
 
         Args:
             u_phys (torch.Tensor|np.ndarray): Physical U.
@@ -133,35 +143,40 @@ class SW(Model):
         u_ = u_.to(self.device)
         v_ = u_.to(self.device)
         h_ = u_.to(self.device)
-        assert u_ * self.masks.u == u_, (
-            "Input velocity u incoherent with domain mask, "
-            "velocity must be zero out of domain."
-        )
-        assert v_ * self.masks.v == v_, (
-            "Input velocity v incoherent with domain mask, "
-            "velocity must be zero out of domain."
-        )
-        self.u = u_.type(self.dtype) * self.masks.u * self.dx
-        self.v = v_.type(self.dtype) * self.masks.v * self.dy
-        self.h = h_.type(self.dtype) * self.masks.h * self.area
+        if not (u_ * self.masks.u == u_).all():
+            msg = (
+                "Input velocity u incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
+
+        if not (v_ * self.masks.v == v_).all():
+            msg = (
+                "Input velocity v incoherent with domain mask, "
+                "velocity must be zero out of domain."
+            )
+            raise IncoherentWithMaskError(msg)
+        self._u = u_.type(self.dtype) * self.masks.u * self.space.dx
+        self._v = v_.type(self.dtype) * self.masks.v * self.space.dy
+        self._h = h_.type(self.dtype) * self.masks.h * self.space.area
         self.compute_diagnostic_variables()
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
-        self.u += self.dt * dt0_u
-        self.v += self.dt * dt0_v
-        self.h += self.dt * dt0_h
+        self._u += self.dt * dt0_u
+        self._v += self.dt * dt0_v
+        self._h += self.dt * dt0_h
 
         dt1_u, dt1_v, dt1_h = self.compute_time_derivatives()
-        self.u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
-        self.v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
-        self.h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
+        self._u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
+        self._v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
+        self._h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
 
         dt2_u, dt2_v, dt2_h = self.compute_time_derivatives()
-        self.u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
-        self.v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
-        self.h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
+        self._u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
+        self._v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
+        self._h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
 
     def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
@@ -234,39 +249,49 @@ class SW(Model):
 class SWFilterBarotropic(SW):
     """Shallow Water with Barotropic Filtering."""
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Instantiate SWFilterBarotropic.
+    _barotropic_filter = False
 
-        param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
-            'H':        Tensor (nl,) or (nl, nx, ny),
-            unperturbed layer thickness
-            'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
-            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
-            x component
-            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
-            y component
-            'dt':       float > 0., integration time-step
-            'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for
-                        partial free slip.
-            'bottom_drag_coef': float, linear bottom drag coefficient
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """SWFilterBarotropic Model Instantiation.
+
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
-        super().__init__(param)
-        self.tau = 2 * self.dt
-        self.barotropic_filter_spectral = param.get(
-            "barotropic_filter_spectral",
-            False,
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            n_ens=n_ens,
+            with_compile=with_compile,
         )
-        if self.barotropic_filter_spectral:
+
+    @property
+    def tau(self) -> float:
+        """Tau value."""
+        return 2 * self.dt
+
+    @property
+    def barotropic_filter_spectral(self) -> bool:
+        """Barotropic filter boolean."""
+        return self._barotropic_filter
+
+    @barotropic_filter_spectral.setter
+    def barotropic_filter_spectral(self, barotropic_filter: bool) -> None:
+        self._barotropic_filter = barotropic_filter
+        if barotropic_filter:
             verbose.display(
                 msg="Using barotropic filter in spectral approximation.",
                 trigger_level=2,
@@ -281,14 +306,14 @@ class SWFilterBarotropic(SW):
 
     def _set_barotropic_filter_spectral(self) -> None:
         """Set Helmoltz Solver for barotropic and spectral."""
-        self.H_tot = self.H.sum(dim=-3, keepdim=True)
-        self.lambd = 1.0 / (self.g * self.dt * self.tau * self.H_tot)
+        H_tot = self.H.sum(dim=-3, keepdim=True)  # noqa: N806
+        lambd = 1.0 / (self.g * self.dt * self.tau * H_tot)
         self.helm_solver = HelmholtzNeumannSolver(
-            self.nx,
-            self.ny,
-            self.dx,
-            self.dy,
-            self.lambd,
+            self.space.nx,
+            self.space.ny,
+            self.space.dx,
+            self.space.dy,
+            lambd,
             self.dtype,
             self.device,
             mask=self.masks.h[0, 0],
@@ -300,10 +325,10 @@ class SWFilterBarotropic(SW):
         coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
         lambd = 1.0 / (self.g * self.dt * self.tau)
         self.helm_solver = MG_Helmholtz(
-            self.dx,
-            self.dy,
-            self.nx,
-            self.ny,
+            self.space.dx,
+            self.space.dy,
+            self.space.nx,
+            self.space.ny,
             coef_ugrid=coef_ugrid,
             coef_vgrid=coef_vgrid,
             lambd=lambd,
@@ -332,8 +357,8 @@ class SWFilterBarotropic(SW):
             filtered dt_v, dt_h
         """
         # compute RHS
-        u_star = (self.u + self.dt * dt_u) / self.dx
-        v_star = (self.v + self.dt * dt_v) / self.dy
+        u_star = (self.u + self.dt * dt_u) / self.space.dx
+        v_star = (self.v + self.dt * dt_v) / self.space.dy
         u_bar_star = (u_star * self.h_tot_ugrid).sum(
             dim=-3,
             keepdim=True,
@@ -347,8 +372,8 @@ class SWFilterBarotropic(SW):
                 1.0
                 / (self.g * self.dt * self.tau)
                 * (
-                    torch.diff(u_bar_star, dim=-2) / self.dx
-                    + torch.diff(v_bar_star, dim=-1) / self.dy
+                    torch.diff(u_bar_star, dim=-2) / self.space.dx
+                    + torch.diff(v_bar_star, dim=-1) / self.space.dy
                 )
             )
             w_surf_imp = self.helm_solver.solve(rhs)
@@ -357,9 +382,10 @@ class SWFilterBarotropic(SW):
                 1.0
                 / (self.g * self.dt * self.tau)
                 * (
-                    torch.diff(self.h_tot_ugrid * u_bar_star, dim=-2) / self.dx
+                    torch.diff(self.h_tot_ugrid * u_bar_star, dim=-2)
+                    / self.space.dx
                     + torch.diff(self.h_tot_vgrid * v_bar_star, dim=-1)
-                    / self.dy
+                    / self.space.dy
                 )
             )
             coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]

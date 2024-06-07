@@ -16,7 +16,7 @@ class QGColinearSublayer(QG):
 
     _supported_layers_nb: int = 2
 
-    def _validate_layers(self, h: torch.Tensor) -> torch.Tensor:
+    def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.
 
         Args:
@@ -28,8 +28,8 @@ class QGColinearSublayer(QG):
         Returns:
             torch.Tensor: H
         """
-        h = super()._validate_layers(h)
-        if self.nl != self._supported_layers_nb:
+        h = super()._set_H(h)
+        if self.space.nl != self._supported_layers_nb:
             msg = (
                 "QGColinearSublayer can only support"
                 f"{self._supported_layers_nb} layers."
