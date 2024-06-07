@@ -229,6 +229,8 @@ class SW(Model):
 class SWFilterBarotropic(SW):
     """Shallow Water with Barotropic Filtering."""
 
+    _barotropic_filter = False
+
     def __init__(self, param: dict[str, Any]) -> None:
         """Instantiate SWFilterBarotropic.
 
@@ -256,12 +258,21 @@ class SWFilterBarotropic(SW):
             'bottom_drag_coef': float, linear bottom drag coefficient
         """
         super().__init__(param)
-        self.tau = 2 * self.dt
-        self.barotropic_filter_spectral = param.get(
-            "barotropic_filter_spectral",
-            False,
-        )
-        if self.barotropic_filter_spectral:
+
+    @property
+    def tau(self) -> float:
+        """Tau value."""
+        return 2 * self.dt
+
+    @property
+    def barotropic_filter_spectral(self) -> bool:
+        """Barotropic filter boolean."""
+        return self._barotropic_filter
+
+    @barotropic_filter_spectral.setter
+    def barotropic_filter_spectral(self, barotropic_filter: bool) -> None:
+        self._barotropic_filter = barotropic_filter
+        if barotropic_filter:
             verbose.display(
                 msg="Using barotropic filter in spectral approximation.",
                 trigger_level=2,
@@ -276,14 +287,14 @@ class SWFilterBarotropic(SW):
 
     def _set_barotropic_filter_spectral(self) -> None:
         """Set Helmoltz Solver for barotropic and spectral."""
-        self.H_tot = self.H.sum(dim=-3, keepdim=True)
-        self.lambd = 1.0 / (self.g * self.dt * self.tau * self.H_tot)
+        H_tot = self.H.sum(dim=-3, keepdim=True)  # noqa: N806
+        lambd = 1.0 / (self.g * self.dt * self.tau * H_tot)
         self.helm_solver = HelmholtzNeumannSolver(
             self.space.nx,
             self.space.ny,
             self.space.dx,
             self.space.dy,
-            self.lambd,
+            lambd,
             self.dtype,
             self.device,
             mask=self.masks.h[0, 0],
