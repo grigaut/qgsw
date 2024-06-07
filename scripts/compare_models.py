@@ -18,6 +18,12 @@ from qgsw.run_summary import RunSummary
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 
+msg = (
+    "Major Changes Added Since last use of this scripts."
+    "Consider Verify its content."
+)
+raise NotImplementedError(msg)
+
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
