@@ -72,6 +72,7 @@ params = {
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "beta_plane": config.physics.beta_plane,
     "space": space,
+    "n_ens": 1,
 }
 
 model = QG(params)

@@ -72,6 +72,7 @@ params_1l = {
     "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
     "beta_plane": config.physics.beta_plane,
     "space": space_1l,
+    "n_ens": 1,
 }
 qg_1l = QG(params_1l)
 
@@ -122,6 +123,7 @@ params_2l = {
     "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
     "beta_plane": config.physics.beta_plane,
     "space": space_2l,
+    "n_ens": 1,
 }
 qg_2l = QG(params_2l)
 qg_2l.slip_coef = config.physics.slip_coef
