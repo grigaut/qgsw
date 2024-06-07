@@ -5,7 +5,7 @@ Louis Thiry, Nov 2023 for IFREMER.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -17,6 +17,10 @@ from qgsw.models.core import finite_diff
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.exceptions import IncoherentWithMaskError
+
+if TYPE_CHECKING:
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -75,16 +79,32 @@ class SW(Model):
 
     """
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Parameters
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """SW Model Instantiation.
 
-        param: python dict. with following keys
-            'space':    SpaceDiscretization3D, space discretization
-            'g_prime':  Tensor (nl,), reduced gravities
-            'beta_plane': NamedTuple Representing Beta plane.
-            'n_ens':    int, number of ensemble member
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
-        super().__init__(param)
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            n_ens=n_ens,
+            with_compile=with_compile,
+        )
 
     def set_physical_uvh(
         self,
@@ -231,33 +251,32 @@ class SWFilterBarotropic(SW):
 
     _barotropic_filter = False
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Instantiate SWFilterBarotropic.
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """SWFilterBarotropic Model Instantiation.
 
-        param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
-            'H':        Tensor (nl,) or (nl, nx, ny),
-            unperturbed layer thickness
-            'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
-            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
-            x component
-            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
-            y component
-            'dt':       float > 0., integration time-step
-            'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for
-                        partial free slip.
-            'bottom_drag_coef': float, linear bottom drag coefficient
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
-        super().__init__(param)
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            n_ens=n_ens,
+            with_compile=with_compile,
+        )
 
     @property
     def tau(self) -> float:

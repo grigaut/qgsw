@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -26,6 +26,9 @@ from qgsw.models.sw import SW
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
 class QG(SW):
@@ -62,16 +65,32 @@ class QG(SW):
         - dy_p_ref
     """
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Parameters
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """SW Model Instantiation.
 
-        param: python dict. with following keys
-            'space':    SpaceDiscretization3D, space discretization
-            'g_prime':  Tensor (nl,), reduced gravities
-            'beta_plane': NamedTuple Representing Beta plane.
-            'n_ens':    int, number of ensemble member
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
-        super().__init__(param)
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            n_ens=n_ens,
+            with_compile=with_compile,
+        )
 
         verbose.display(
             msg="class QG, ignoring barotropic filter",

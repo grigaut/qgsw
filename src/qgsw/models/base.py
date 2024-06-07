@@ -23,7 +23,7 @@ from qgsw.specs import DEVICE
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qgsw.physics import coriolis
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
@@ -96,14 +96,24 @@ class Model(metaclass=ABCMeta):
     h_tot_ugrid: torch.Tensor
     h_tot_vgrid: torch.Tensor
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Parameters
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """Model Instantiation.
 
-        param: python dict. with following keys
-            'space':    SpaceDiscretization3D, space discretization
-            'g_prime':  Tensor (nl,), reduced gravities
-            'beta_plane': NamedTuple Representing Beta plane.
-            'n_ens':    int, number of ensemble member
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
         verbose.display(
             msg=f"Creating {self.__class__.__name__} model...",
@@ -112,13 +122,13 @@ class Model(metaclass=ABCMeta):
 
         # Set up
         ## Space
-        self._space: SpaceDiscretization3D = param["space"]
+        self._space = space_3d
         # h
-        self._set_H(self.space.h.xyh.h)
+        self._set_H(space_3d.h.xyh.h)
         ## gravity
-        self._set_g_prime(param["g_prime"])
+        self._set_g_prime(g_prime)
         # Number of ensemble
-        self.n_ens = param.get("n_ens", self._n_ens)
+        self.n_ens = n_ens
         ## data device and dtype
         verbose.display(
             msg=f"dtype: {self.dtype}.",
@@ -129,7 +139,7 @@ class Model(metaclass=ABCMeta):
             trigger_level=2,
         )
         ## Coriolis
-        self._set_coriolis(param["beta_plane"])
+        self._set_coriolis(beta_plane)
         ## Topography and Ref values
         self._set_ref_variables()
 
@@ -143,7 +153,7 @@ class Model(metaclass=ABCMeta):
         # utils and flux computation functions
         self._set_utils_before_compilation()
         # precompile torch functions
-        if param.get("compile", True):
+        if with_compile:
             self._set_utils_with_compilation()
         else:
             verbose.display(msg="No compilation", trigger_level=2)
@@ -303,7 +313,7 @@ class Model(metaclass=ABCMeta):
         self._tauy = tauy
 
     @property
-    def beta_plane(self) -> coriolis.BetaPlane:
+    def beta_plane(self) -> BetaPlane:
         """Beta Plane parmaters."""
         return self._beta_plane
 
@@ -324,7 +334,7 @@ class Model(metaclass=ABCMeta):
 
     def _set_coriolis(
         self,
-        beta_plane: coriolis.BetaPlane,
+        beta_plane: BetaPlane,
     ) -> None:
         """Set Coriolis Grids.
 
