@@ -72,13 +72,12 @@ params_1l = {
     "g_prime": config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
     "beta_plane": config.physics.beta_plane,
     "space": space_1l,
-    "taux": taux,
-    "tauy": tauy,
-    "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "slip_coef": config.physics.slip_coef,
-    "dt": 0.0,
 }
 qg_1l = QG(params_1l)
+
+qg_1l.slip_coef = config.physics.slip_coef
+qg_1l.bottom_drag_coef = config.physics.bottom_drag_coef
+qg_1l.set_wind_forcing(taux, tauy)
 p0_1l = perturbation.compute_initial_pressure(
     space_1l.omega,
     config.physics.f0,
@@ -123,13 +122,11 @@ params_2l = {
     "g_prime": config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
     "beta_plane": config.physics.beta_plane,
     "space": space_2l,
-    "taux": taux,
-    "tauy": tauy,
-    "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "slip_coef": config.physics.slip_coef,
-    "dt": 0.0,
 }
 qg_2l = QG(params_2l)
+qg_2l.slip_coef = config.physics.slip_coef
+qg_2l.bottom_drag_coef = config.physics.bottom_drag_coef
+qg_2l.set_wind_forcing(taux, tauy)
 p0_2l = perturbation.compute_initial_pressure(
     space_2l.omega,
     config.physics.f0,

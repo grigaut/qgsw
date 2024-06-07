@@ -72,15 +72,12 @@ params = {
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "beta_plane": config.physics.beta_plane,
     "space": space,
-    "taux": taux,
-    "tauy": tauy,
-    "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "slip_coef": config.physics.slip_coef,
-    "dt": 0.0,
 }
 
 model = QG(params)
-
+model.slip_coef = config.physics.slip_coef
+model.bottom_drag_coef = config.physics.bottom_drag_coef
+model.set_wind_forcing(taux, tauy)
 p0 = perturbation.compute_initial_pressure(space.omega, config.physics.f0, Ro)
 u0, v0, h0 = model.G(p0)
 
@@ -99,9 +96,11 @@ dt = min(
 
 # Instantiate Model
 model.dt = dt
-model.u = torch.clone(u0)
-model.v = torch.clone(v0)
-model.h = torch.clone(h0)
+model.set_uvh(
+    u=torch.clone(u0),
+    v=torch.clone(v0),
+    h=torch.clone(h0),
+)
 
 ## time params
 t = 0
