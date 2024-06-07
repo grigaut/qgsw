@@ -82,8 +82,8 @@ class Model(metaclass=ABCMeta):
     _dt: float | None = None
     _slip_coef = 0.0
     _bottom_drag = 0.0
-    _taux: torch.Tensor | None = None
-    _tauy: torch.Tensor | None = None
+    _taux: torch.Tensor | float = 0.0
+    _tauy: torch.Tensor | float = 0.0
     _n_ens: int = 1
     _masks: Masks | None = None
 
@@ -265,6 +265,44 @@ class Model(metaclass=ABCMeta):
         self._masks = Masks(mask)
 
     @property
+    def taux(self) -> torch.Tensor | float:
+        """Tau x."""
+        return self._taux
+
+    @taux.setter
+    def taux(self, taux: torch.Tensor | float) -> None:
+        is_tensorx = isinstance(taux, torch.Tensor)
+        if (not isinstance(taux, float)) and (not is_tensorx):
+            msg = "taux must be a float or a Tensor"
+            raise InvalidModelParameterError(msg)
+        if is_tensorx and (taux.shape != (self.space.nx - 1, self.space.ny)):
+            msg = (
+                "Tau_x Tensor must be "
+                f"{(self.space.nx-1, self.space.ny)}-shaped."
+            )
+            raise InvalidModelParameterError(msg)
+        self._taux = taux
+
+    @property
+    def tauy(self) -> torch.Tensor | float:
+        """Tau y."""
+        return self._tauy
+
+    @tauy.setter
+    def tauy(self, tauy: torch.Tensor | float) -> None:
+        is_tensory = isinstance(tauy, torch.Tensor)
+        if (not isinstance(tauy, float)) and (not is_tensory):
+            msg = "tauy must be a float or a Tensor"
+            raise InvalidModelParameterError(msg)
+        if is_tensory and (tauy.shape != (self.space.nx, self.space.ny - 1)):
+            msg = (
+                "Tau_y Tensor must be "
+                f"{(self.space.nx, self.space.ny-1)}-shaped."
+            )
+            raise InvalidModelParameterError(msg)
+        self._tauy = tauy
+
+    @property
     def beta_plane(self) -> coriolis.BetaPlane:
         """Beta Plane parmaters."""
         return self._beta_plane
@@ -396,38 +434,8 @@ class Model(metaclass=ABCMeta):
 
         Args:
             taux (float | torch.Tensor): Taux value.
-            tauy (float | torch.Tensor): Tauy value
-
-        Raises:
-            ValueError: If taux is not a float nor a Tensor.
-            ValueError: If taux if a wrongly-shaped Tensor.
-            ValueError: If tauy is not a float nor a Tensor.
-            ValueError: If tauy if a wrongly-shaped Tensor.
+            tauy (float | torch.Tensor): Tauy value.
         """
-        is_tensorx = isinstance(taux, torch.Tensor)
-
-        if (not isinstance(taux, float)) and (not is_tensorx):
-            msg = "taux must be a float or a Tensor"
-            raise ValueError(msg)
-        if is_tensorx and (taux.shape != (self.space.nx - 1, self.space.ny)):
-            msg = (
-                "Tau_x Tensor must be "
-                f"{(self.space.nx-1, self.space.ny)}-shaped."
-            )
-            raise ValueError(msg)
-
-        is_tensory = isinstance(tauy, torch.Tensor)
-
-        if (not isinstance(tauy, float)) and (not is_tensory):
-            msg = "tauy must be a float or a Tensor"
-            raise ValueError(msg)
-        if is_tensory and (tauy.shape != (self.space.nx, self.space.ny - 1)):
-            msg = (
-                "Tau_y Tensor must be "
-                f"{(self.space.nx, self.space.ny-1)}-shaped."
-            )
-            raise ValueError(msg)
-
         self.taux = taux
         self.tauy = tauy
 
