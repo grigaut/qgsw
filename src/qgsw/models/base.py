@@ -297,7 +297,6 @@ class Model(metaclass=ABCMeta):
         self.f_hgrid = grid_conversion.omega_to_h(self.f)
         self.fstar_ugrid = self.f_ugrid * self.space.area
         self.fstar_vgrid = self.f_vgrid * self.space.area
-        self.fstar_vgrid = self.f_vgrid * self.space.area
         self.fstar_hgrid = self.f_hgrid * self.space.area
 
     def _set_H(  # noqa: N802
