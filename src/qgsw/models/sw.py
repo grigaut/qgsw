@@ -79,20 +79,10 @@ class SW(Model):
         """Parameters
 
         param: python dict. with following keys
-            'H':        Tensor (nl,) or (nl, nx, ny),
-            unperturbed layer thickness
+            'space':    SpaceDiscretization3D, space discretization
             'g_prime':  Tensor (nl,), reduced gravities
             'beta_plane': NamedTuple Representing Beta plane.
-            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
-            x component
-            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
-            y component
-            'dt':       float > 0., integration time-step
             'n_ens':    int, number of ensemble member
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for
-                        partial free slip.
-            'bottom_drag_coef': float, linear bottom drag coefficient
         """
         super().__init__(param)
 
@@ -146,27 +136,27 @@ class SW(Model):
                 "velocity must be zero out of domain."
             )
             raise IncoherentWithMaskError(msg)
-        self.u = u_.type(self.dtype) * self.masks.u * self.space.dx
-        self.v = v_.type(self.dtype) * self.masks.v * self.space.dy
-        self.h = h_.type(self.dtype) * self.masks.h * self.space.area
+        self._u = u_.type(self.dtype) * self.masks.u * self.space.dx
+        self._v = v_.type(self.dtype) * self.masks.v * self.space.dy
+        self._h = h_.type(self.dtype) * self.masks.h * self.space.area
         self.compute_diagnostic_variables()
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
-        self.u += self.dt * dt0_u
-        self.v += self.dt * dt0_v
-        self.h += self.dt * dt0_h
+        self._u += self.dt * dt0_u
+        self._v += self.dt * dt0_v
+        self._h += self.dt * dt0_h
 
         dt1_u, dt1_v, dt1_h = self.compute_time_derivatives()
-        self.u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
-        self.v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
-        self.h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
+        self._u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
+        self._v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
+        self._h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
 
         dt2_u, dt2_v, dt2_h = self.compute_time_derivatives()
-        self.u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
-        self.v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
-        self.h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
+        self._u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
+        self._v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
+        self._h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
 
     def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).

@@ -66,20 +66,10 @@ class QG(SW):
         """Parameters
 
         param: python dict. with following keys
-            'H':        Tensor (nl,) or (nl, nx, ny),
-            unperturbed layer thickness
+            'space':    SpaceDiscretization3D, space discretization
             'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
-            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
-            x component
-            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
-            y component
-            'dt':       float > 0., integration time-step
+            'beta_plane': NamedTuple Representing Beta plane.
             'n_ens':    int, number of ensemble member
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for
-                        partial free slip.
-        'bottom_drag_coef': float, linear bottom drag coefficient
         """
         super().__init__(param)
 

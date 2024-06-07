@@ -100,19 +100,10 @@ class Model(metaclass=ABCMeta):
         """Parameters
 
         param: python dict. with following keys
+            'space':    SpaceDiscretization3D, space discretization
             'g_prime':  Tensor (nl,), reduced gravities
             'beta_plane': NamedTuple Representing Beta plane.
-            'space':    SpaceDiscretization3D, space discretization
-            'taux':     float or Tensor (nx-1, ny),
-            top-layer forcing, x component
-            'tauy':     float or Tensor (nx, ny-1),
-            top-layer forcing, y component
-            'dt':       float > 0., integration time-step
             'n_ens':    int, number of ensemble member
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for partial free slip.
-            'bottom_drag_coef': float, linear bottom drag coefficient
-            if True
         """
         verbose.display(
             msg=f"Creating {self.__class__.__name__} model...",
