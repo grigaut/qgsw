@@ -158,6 +158,21 @@ class Model(metaclass=ABCMeta):
             verbose.display(msg="No compilation", trigger_level=2)
 
     @property
+    def u(self) -> torch.Tensor:
+        """State Variable u: Zonal Speed."""
+        return self._u
+
+    @property
+    def v(self) -> torch.Tensor:
+        """State Variable v: Meridional Speed."""
+        return self._v
+
+    @property
+    def h(self) -> torch.Tensor:
+        """State Variable h: Layers Thickness."""
+        return self._h
+
+    @property
     def dt(self) -> float:
         """Timestep value."""
         return self._dt
@@ -266,7 +281,7 @@ class Model(metaclass=ABCMeta):
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
         """Layers thickness."""
-        return self._h
+        return self._H
 
     @property
     def g_prime(self) -> torch.Tensor:
@@ -315,7 +330,7 @@ class Model(metaclass=ABCMeta):
                 f"in x or y direction, got shape {h.shape}."
             )
             raise InvalidModelParameterError(msg)
-        self._h = h
+        self._H = h
 
     def _set_g_prime(self, g_prime: torch.Tensor) -> None:
         """Set g_rpime values.
@@ -575,17 +590,17 @@ class Model(metaclass=ABCMeta):
         - h
         """
         base_shape = (self.n_ens, self.space.nl)
-        self.h = torch.zeros(
+        self._h = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny),
             dtype=self.dtype,
             device=self.device,
         )
-        self.u = torch.zeros(
+        self._u = torch.zeros(
             (*base_shape, self.space.nx + 1, self.space.ny),
             dtype=self.dtype,
             device=self.device,
         )
-        self.v = torch.zeros(
+        self._v = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny + 1),
             dtype=self.dtype,
             device=self.device,
@@ -757,9 +772,9 @@ class Model(metaclass=ABCMeta):
                 "velocity must be zero out of domain."
             )
             raise IncoherentWithMaskError(msg)
-        self.u = u.type(self.dtype) * self.masks.u
-        self.v = v.type(self.dtype) * self.masks.v
-        self.h = h.type(self.dtype) * self.masks.h
+        self._u = u.type(self.dtype) * self.masks.u
+        self._v = v.type(self.dtype) * self.masks.v
+        self._h = h.type(self.dtype) * self.masks.h
         self.compute_diagnostic_variables()
 
     def get_print_info(self) -> str:
