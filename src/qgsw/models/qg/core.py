@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -19,10 +19,16 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
+from qgsw.models.exceptions import (
+    InvalidModelParameterError,
+)
 from qgsw.models.sw import SW
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
 class QG(SW):
@@ -59,33 +65,32 @@ class QG(SW):
         - dy_p_ref
     """
 
-    def __init__(self, param: dict[str, Any]) -> None:
-        """Parameters
+    def __init__(
+        self,
+        *,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        n_ens: int = 1,
+        with_compile: bool = True,
+    ) -> None:
+        """SW Model Instantiation.
 
-        param: python dict. with following keys
-            'nx':       int, number of grid points in dimension x
-            'ny':       int, number grid points in dimension y
-            'nl':       nl, number of stacked layer
-            'dx':       float or Tensor (nx, ny), dx metric term
-            'dy':       float or Tensor (nx, ny), dy metric term
-            'H':        Tensor (nl,) or (nl, nx, ny),
-            unperturbed layer thickness
-            'g_prime':  Tensor (nl,), reduced gravities
-            'f':        Tensor (nx, ny), Coriolis parameter
-            'taux':     float or Tensor (nx-1, ny), top-layer forcing,
-            x component
-            'tauy':     float or Tensor (nx, ny-1), top-layer forcing,
-            y component
-            'dt':       float > 0., integration time-step
-            'n_ens':    int, number of ensemble member
-            'device':   'str', torch devicee e.g. 'cpu', 'cuda', 'cuda:0'
-            'dtype':    torch.float32 of torch.float64
-            'slip_coef':    float, 1 for free slip, 0 for no-slip,
-            inbetween for
-                        partial free slip.
-        'bottom_drag_coef': float, linear bottom drag coefficient
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            with_compile (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
         """
-        super().__init__(param)
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            n_ens=n_ens,
+            with_compile=with_compile,
+        )
 
         verbose.display(
             msg="class QG, ignoring barotropic filter",
@@ -98,7 +103,7 @@ class QG(SW):
         # precompile functions
         self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
 
-    def _validate_layers(self, h: torch.Tensor) -> torch.Tensor:
+    def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.
 
         Args:
@@ -110,66 +115,124 @@ class QG(SW):
         Returns:
             torch.Tensor: H
         """
-        value = super()._validate_layers(h)
-        if value.shape[-2:] != (1, 1):
+        if h.shape[-2:] != (1, 1):
             msg = (
                 "H must me constant in space for "
                 "qg approximation, i.e. have shape (...,1,1)"
-                f"got shape shape {value.shape}"
+                f"got shape shape {h.shape}"
             )
-            raise ValueError(msg)
-        return value
+            raise InvalidModelParameterError(msg)
+        super()._set_H(h)
 
-    def compute_auxillary_matrices(self) -> None:
-        """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
-        # A operator
-        H, g_prime = self.H.squeeze(), self.g_prime.squeeze()  # noqa: N806
-        self.A = torch.zeros((self.nl, self.nl), **self.arr_kwargs)
-        if self.nl == 1:
-            self.A[0, 0] = 1.0 / (H * g_prime)
-        else:
-            self.A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (
-                H[0] * g_prime[1]
+    def _compute_A(  # noqa: N802
+        self,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute the stretching operator matrix A.
+
+        Args:
+            H (torch.Tensor): Layers reference height.
+            g_prime (torch.Tensor): Reduced gravity values.
+
+        Returns:
+            torch.Tensor: Stretching Operator
+        """
+        if self.space.nl == 1:
+            return torch.tensor(
+                [[1.0 / (H * g_prime)]],
+                dtype=self.dtype,
+                device=self.device,
             )
-            self.A[0, 1] = -1.0 / (H[0] * g_prime[1])
-            for i in range(1, self.nl - 1):
-                self.A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
-                self.A[i, i] = (
-                    1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
-                )
-                self.A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
-            self.A[-1, -1] = 1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
-            self.A[-1, -2] = -1.0 / (H[self.nl - 1] * g_prime[self.nl - 1])
+        A = torch.zeros(  # noqa: N806
+            (self.space.nl, self.space.nl),
+            dtype=self.dtype,
+            device=self.device,
+        )
+        A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
+        A[0, 1] = -1.0 / (H[0] * g_prime[1])
+        for i in range(1, self.space.nl - 1):
+            A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
+            A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
+            A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
+        A[-1, -1] = 1.0 / (H[self.space.nl - 1] * g_prime[self.space.nl - 1])
+        A[-1, -2] = -1.0 / (H[self.space.nl - 1] * g_prime[self.space.nl - 1])
+        return A
 
+    def _compute_layers_to_mode_decomposition_matrices(
+        self,
+        A: torch.Tensor,  # noqa: N803
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute Layers to mode decomposition.
+
+        A = Cm2l @ Λ @ Cl2m
+
+        Args:
+            A (torch.Tensor): Stretching Operator
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Cm2l, Λ, Cl2m
+        """
         # layer-to-mode and mode-to-layer matrices
-        lambd_r, R = torch.linalg.eig(self.A)  # noqa: N806
-        lambd_l, L = torch.linalg.eig(self.A.T)  # noqa: N806
-        self.lambd: torch.Tensor = lambd_r.real.reshape((1, self.nl, 1, 1))
+        lambd_r, R = torch.linalg.eig(A)  # noqa: N806
+        _, L = torch.linalg.eig(A.T)  # noqa: N806
+        lambd: torch.Tensor = lambd_r.real.reshape((1, self.space.nl, 1, 1))
         with np.printoptions(precision=1):
             radius = (
                 1e-3
-                / torch.sqrt(self.f0**2 * self.lambd.squeeze()).cpu().numpy()
+                / torch.sqrt(self.beta_plane.f0**2 * lambd.squeeze())
+                .cpu()
+                .numpy()
             )
             verbose.display(
                 msg=f"Rossby deformation Radii (km): {radius}",
                 trigger_level=2,
             )
         R, L = R.real, L.real  # noqa: N806
-        # layer to mode
-        self.Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T
+        # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
+        # layer to mode: pseudo inverse of R
+        Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T  # noqa: N806
         # mode to layer
-        self.Cm2l = R
+        Cm2l = R  # noqa: N806
+        return Cm2l, lambd, Cl2m
+
+    def compute_auxillary_matrices(self) -> None:
+        """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
+        # A operator
+        self.A = self._compute_A(self.H.squeeze(), self.g_prime.squeeze())
+
+        # layer-to-mode and mode-to-layer matrices
+        decomp = self._compute_layers_to_mode_decomposition_matrices(self.A)
+        self.Cm2l, self.lambd, self.Cl2m = decomp
+
+        # Governing Equation: ∆Ψ - (f_0)² A Ψ = q - βy
+        # With Diagonalization: ∆Ψ - (f_0)² Cm2l @ Λ @ Cl2m Ψ = q - βy
+        # Layer to mode transform: Ψ_m = Cl2m @ Ψ ; q_m = Cl2m @ q
+        # Within Diagonalized Equation: ∆Ψ_m - (f_0)² Λ @ Ψ_m = q_m - βy
+        # In Fourier Space: "(∆ - (f_0)² Λ) @ Ψ_m = q_m - βy"
 
         # For Helmholtz equations
-        nl, nx, ny = self.nl, self.nx, self.ny
+        nl, nx, ny = self.space.nl, self.space.nx, self.space.ny
         laplace_dstI = (  # noqa: N806
-            compute_laplace_dstI(nx, ny, self.dx, self.dy, self.arr_kwargs)
+            compute_laplace_dstI(
+                nx,
+                ny,
+                self.space.dx,
+                self.space.dy,
+                dtype=self.dtype,
+                device=self.device,
+            )
             .unsqueeze(0)
             .unsqueeze(0)
         )
-        self.helmholtz_dstI = laplace_dstI - self.f0**2 * self.lambd
-
-        cst_wgrid = torch.ones((1, nl, nx + 1, ny + 1), **self.arr_kwargs)
+        # Compute "(∆ - (f_0)² Λ)" in Fourier Space
+        self.helmholtz_dstI = laplace_dstI - self.beta_plane.f0**2 * self.lambd
+        # Constant Omega grid
+        cst_wgrid = torch.ones(
+            (1, nl, nx + 1, ny + 1),
+            dtype=self.dtype,
+            device=self.device,
+        )
         if len(self.masks.psi_irrbound_xids) > 0:
             # Handle Non rectangular geometry
             self.cap_matrices = compute_capacitance_matrices(
@@ -191,10 +254,14 @@ class QG(SW):
                 cst_wgrid[..., 1:-1, 1:-1],
                 self.helmholtz_dstI,
             )
-
-        self.homsol_wgrid = cst_wgrid + sol_wgrid * self.f0**2 * self.lambd
+        # Compute homogenous solution
+        self.homsol_wgrid = (
+            cst_wgrid + sol_wgrid * self.beta_plane.f0**2 * self.lambd
+        )
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
-        self.homsol_hgrid = self.interp_TP(self.homsol_wgrid)
+        self.homsol_hgrid = self.cell_corners_to_cell_centers(
+            self.homsol_wgrid,
+        )
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
 
     def _add_wind_forcing(
@@ -211,8 +278,8 @@ class QG(SW):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing
         """
-        du[..., 0, :, :] += self.taux / self.H[0] * self.dx
-        dv[..., 0, :, :] += self.tauy / self.H[0] * self.dy
+        du[..., 0, :, :] += self.taux / self.H[0] * self.space.dx
+        dv[..., 0, :, :] += self.tauy / self.H[0] * self.space.dy
         return du, dv
 
     def set_physical_uvh(
@@ -247,14 +314,18 @@ class QG(SW):
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        p_i = self.interp_TP(p) if p_i is None else p_i
-        dx, dy = self.dx, self.dy
+        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
+        dx, dy = self.space.dx, self.space.dy
 
         # geostrophic balance
-        u = -torch.diff(p, dim=-1) / dy / self.f0 * dx
-        v = torch.diff(p, dim=-2) / dx / self.f0 * dy
+        u = -torch.diff(p, dim=-1) / dy / self.beta_plane.f0 * dx
+        v = torch.diff(p, dim=-2) / dx / self.beta_plane.f0 * dy
         # h = diag(H)Ap
-        h = self.H * torch.einsum("lm,...mxy->...lxy", self.A, p_i) * self.area
+        h = (
+            self.H
+            * torch.einsum("lm,...mxy->...lxy", self.A, p_i)
+            * self.space.area
+        )
 
         return u, v, h
 
@@ -301,7 +372,7 @@ class QG(SW):
             self.Cm2l,
             p_modes,
         )
-        p_qg_i = self.interp_TP(p_qg)
+        p_qg_i = self.cell_corners_to_cell_centers(p_qg)
         return p_qg, p_qg_i
 
     def Q(  # noqa: N802
@@ -320,14 +391,16 @@ class QG(SW):
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
-        f0, H, area = self.f0, self.H, self.area  # noqa: N806
+        f0, H, area = self.beta_plane.f0, self.H, self.space.area  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
             u[..., 1:-1, :],
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.interp_TP(h) / H) * (f0 / area)
+        return (omega - f0 * self.cell_corners_to_cell_centers(h) / H) * (
+            f0 / area
+        )
 
     def project_qg(
         self,
@@ -368,8 +441,9 @@ class QG(SW):
             dt_uvh_sw (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
             before projection
         """
-        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / self.f0 / self.dy
-        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / self.f0 / self.dx
+        f0 = self.beta_plane.f0
+        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / f0 / self.space.dy
+        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / f0 / self.space.dx
         self.k_energy_a = 0.25 * (
             self.u_a[..., 1:] ** 2
             + self.u_a[..., :-1] ** 2
@@ -377,12 +451,12 @@ class QG(SW):
             + self.v_a[..., :-1, :] ** 2
         )
         self.omega_a = (
-            torch.diff(self.v_a, dim=-2) / self.dx
-            - torch.diff(self.u_a, dim=-1) / self.dy
+            torch.diff(self.v_a, dim=-2) / self.space.dx
+            - torch.diff(self.u_a, dim=-1) / self.space.dy
         )
         self.div_a = (
-            torch.diff(self.u_a[..., 1:-1], dim=-2) / self.dx
-            + torch.diff(self.v_a[..., 1:-1, :], dim=-1) / self.dy
+            torch.diff(self.u_a[..., 1:-1], dim=-2) / self.space.dx
+            + torch.diff(self.v_a[..., 1:-1, :], dim=-1) / self.space.dy
         )
 
     def compute_pv(
@@ -397,9 +471,11 @@ class QG(SW):
         Returns:
             torch.Tensor: Potential Vorticity
         """
-        beta_y = self.interp_TP((self.f - self.f0).unsqueeze(0))
-        omega = self.interp_TP(self.omega)
-        return beta_y + omega - self.f0 * h / self.h_ref
+        beta_y = self.cell_corners_to_cell_centers(
+            (self.f - self.beta_plane.f0).unsqueeze(0),
+        )
+        omega = self.cell_corners_to_cell_centers(self.omega)
+        return beta_y + omega - self.beta_plane.f0 * h / self.h_ref
 
     def compute_diagnostic_variables(self) -> None:
         """Compute Diagnostic Variables.

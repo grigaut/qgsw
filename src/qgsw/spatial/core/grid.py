@@ -113,12 +113,12 @@ class Grid2D:
     @property
     def dx(self) -> float:
         """Dx."""
-        return self.lx / self.nx
+        return self.lx / (self.nx - 1)
 
     @property
     def dy(self) -> float:
         """Dy."""
-        return self.ly / self.ny
+        return self.ly / (self.ny - 1)
 
     @property
     def xy_unit(self) -> Unit:
@@ -319,12 +319,12 @@ class Grid3D:
     @property
     def dx(self) -> float:
         """dx."""  # noqa: D403
-        return self.lx / self.nx
+        return self.lx / (self.nx - 1)
 
     @property
     def dy(self) -> float:
         """dy."""  # noqa: D403
-        return self.ly / self.ny
+        return self.ly / (self.ny - 1)
 
     @property
     def xyz(self) -> XYZ:
