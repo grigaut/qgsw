@@ -688,12 +688,11 @@ class Model(metaclass=ABCMeta):
 
     def get_physical_uvh(
         self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Get physical variables u_phys, v_phys, h_phys from state variables.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]
-        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
         u_phys = (self.u / self.space.dx).to(device=DEVICE)
         v_phys = (self.v / self.space.dy).to(device=DEVICE)
@@ -724,7 +723,7 @@ class Model(metaclass=ABCMeta):
 
     def get_physical_omega_as_ndarray(
         self,
-    ) -> torch.Tensor:
+    ) -> np.ndarray:
         """Get physical vorticity.
 
         Returns:
