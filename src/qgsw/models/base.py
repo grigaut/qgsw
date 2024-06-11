@@ -17,6 +17,7 @@ from qgsw.models.exceptions import (
     InvalidModelParameterError,
     InvalidSavingFileError,
 )
+from qgsw.models.variables import UVH
 from qgsw.spatial.core import grid_conversion
 from qgsw.specs import DEVICE
 
@@ -148,7 +149,7 @@ class Model(metaclass=ABCMeta):
 
         self.comp_ke = finite_diff.comp_ke
         self.cell_corners_to_cell_centers = grid_conversion.omega_to_h
-        self.compute_diagnostic_variables()
+        self.compute_diagnostic_variables(self.uvh)
 
         # utils and flux computation functions
         self._set_utils_before_compilation()
@@ -161,17 +162,17 @@ class Model(metaclass=ABCMeta):
     @property
     def u(self) -> torch.Tensor:
         """State Variable u: Zonal Speed."""
-        return self._u
+        return self.uvh.u
 
     @property
     def v(self) -> torch.Tensor:
         """State Variable v: Meridional Speed."""
-        return self._v
+        return self.uvh.v
 
     @property
     def h(self) -> torch.Tensor:
         """State Variable h: Layers Thickness."""
-        return self._h
+        return self.uvh.h
 
     @property
     def dt(self) -> float:
@@ -599,36 +600,36 @@ class Model(metaclass=ABCMeta):
         - h
         """
         base_shape = (self.n_ens, self.space.nl)
-        self._h = torch.zeros(
+        h = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny),
             dtype=self.dtype,
             device=self.device,
         )
-        self._u = torch.zeros(
+        u = torch.zeros(
             (*base_shape, self.space.nx + 1, self.space.ny),
             dtype=self.dtype,
             device=self.device,
         )
-        self._v = torch.zeros(
+        v = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny + 1),
             dtype=self.dtype,
             device=self.device,
         )
+        self.uvh = UVH(u, v, h)
 
-    def compute_omega(self, u: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+    def compute_omega(self, uvh: UVH) -> torch.Tensor:
         """Pad u, v using boundary conditions.
 
         Possible boundary conditions: free-slip, partial free-slip, no-slip.
 
         Args:
-            u (torch.Tensor): Prognostic zonal velocity.
-            v (torch.Tensor): Prognostic meridional velocity.
+            uvh (UVH): Prognostic variables.
 
         Returns:
             torch.Tensor: result
         """
-        u_ = F.pad(u, (1, 1, 0, 0))
-        v_ = F.pad(v, (0, 0, 1, 1))
+        u_ = F.pad(uvh.u, (1, 1, 0, 0))
+        v_ = F.pad(uvh.v, (0, 0, 1, 1))
         dx_v = torch.diff(v_, dim=-2)
         dy_u = torch.diff(u_, dim=-1)
         curl_uv = dx_v - dy_u
@@ -641,8 +642,11 @@ class Model(metaclass=ABCMeta):
         )
         return omega
 
-    def compute_diagnostic_variables(self) -> None:
+    def compute_diagnostic_variables(self, uvh: UVH) -> None:
         """Compute the model's diagnostic variables.
+
+        Args:
+            uvh (UVH): Prognostic variables.
 
         Computed variables:
         - Vorticity: omega
@@ -658,15 +662,15 @@ class Model(metaclass=ABCMeta):
         variables self.u, self.v, self.h .
         """
         # Diagnostic: vorticity values
-        self.omega = self.compute_omega(self.u, self.v)
+        self.omega = self.compute_omega(uvh)
         # Diagnostic: interface height : physical
         self.eta = reverse_cumsum(self.h / self.space.area, dim=-3)
         # Diagnostic: pressure values
         self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
         # Diagnostic: zonal velocity
-        self.U = self.u / self.space.dx**2
+        self.U = uvh.u / self.space.dx**2
         # Diagnostic: meridional velocity
-        self.V = self.v / self.space.dy**2
+        self.V = uvh.v / self.space.dy**2
         # Zonal velocity momentum -> corresponds to the v grid
         # Has no value on the boundary of the v grid
         self.U_m = self.cell_corners_to_cell_centers(self.U)
@@ -675,12 +679,12 @@ class Model(metaclass=ABCMeta):
         self.V_m = self.cell_corners_to_cell_centers(self.V)
         # Diagnostic: kinetic energy
         self.k_energy = (
-            self.comp_ke(self.u, self.U, self.v, self.V) * self.masks.h
+            self.comp_ke(uvh.u, self.U, uvh.v, self.V) * self.masks.h
         )
         # Match u grid dimensions (1, nl, nx, ny)
-        self.h_ugrid = grid_conversion.h_to_u(self.h, self.masks.h)
+        self.h_ugrid = grid_conversion.h_to_u(uvh.h, self.masks.h)
         # Match v grid dimension
-        self.h_vgrid = grid_conversion.h_to_v(self.h, self.masks.h)
+        self.h_vgrid = grid_conversion.h_to_v(uvh.h, self.masks.h)
         # Sum h on u grid
         self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
         # Sum h on v grid
@@ -688,12 +692,11 @@ class Model(metaclass=ABCMeta):
 
     def get_physical_uvh(
         self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Get physical variables u_phys, v_phys, h_phys from state variables.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]
-        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
         u_phys = (self.u / self.space.dx).to(device=DEVICE)
         v_phys = (self.v / self.space.dy).to(device=DEVICE)
@@ -724,7 +727,7 @@ class Model(metaclass=ABCMeta):
 
     def get_physical_omega_as_ndarray(
         self,
-    ) -> torch.Tensor:
+    ) -> np.ndarray:
         """Get physical vorticity.
 
         Returns:
@@ -781,10 +784,11 @@ class Model(metaclass=ABCMeta):
                 "velocity must be zero out of domain."
             )
             raise IncoherentWithMaskError(msg)
-        self._u = u.type(self.dtype) * self.masks.u
-        self._v = v.type(self.dtype) * self.masks.v
-        self._h = h.type(self.dtype) * self.masks.h
-        self.compute_diagnostic_variables()
+        u = u.type(self.dtype) * self.masks.u
+        v = v.type(self.dtype) * self.masks.v
+        h = h.type(self.dtype) * self.masks.h
+        self.uvh = UVH(u, v, h)
+        self.compute_diagnostic_variables(self.uvh)
 
     def get_print_info(self) -> str:
         """Returns a string with summary of current variables.
@@ -824,7 +828,10 @@ class Model(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def advection_momentum(
+        self,
+        h: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
         Returns:
@@ -874,11 +881,15 @@ class Model(metaclass=ABCMeta):
     @abstractmethod
     def compute_time_derivatives(
         self,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        uvh: UVH,
+    ) -> UVH:
         """Compute the state variables derivatives dt_u, dt_v, dt_h.
 
+        Args:
+            uvh (UVH): u,v and h.
+
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
+            UVH: dt_u, dt_v, dt_h
         """
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
@@ -928,5 +939,16 @@ class Model(metaclass=ABCMeta):
         verbose.display(msg=f"saved ω to {output_file}", trigger_level=1)
 
     @abstractmethod
+    def update(self, uvh: UVH) -> UVH:
+        """Update prognostic variables.
+
+        Args:
+            uvh (UVH): u,v and h.
+
+        Returns:
+            UVH: update prognostic variables.
+        """
+
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
+        self.uvh = self.update(self.uvh)

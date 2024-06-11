@@ -1121,3 +1121,22 @@ class SpaceDiscretization3D:
             u_grid=u_grid,
             v_grid=v_grid,
         )
+
+
+def keep_top_layer(space: SpaceDiscretization3D) -> SpaceDiscretization3D:
+    """Keep Only Top Layer.
+
+    Args:
+        space (SpaceDiscretization3D): Original Space.
+
+    Returns:
+        SpaceDiscretization3D: Top Layer.
+    """
+    return SpaceDiscretization3D.from_tensors(
+        x_unit=space.omega.xy_unit,
+        y_unit=space.omega.xy_unit,
+        zh_unit=space.omega.zh_unit,
+        x=space.omega.xyh.x[0, :, 0],
+        y=space.omega.xyh.y[0, 0, :],
+        h=space.omega.xyh.h[0, 0, 0].unsqueeze(0),
+    )
