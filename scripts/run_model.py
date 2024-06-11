@@ -102,8 +102,8 @@ model.set_uvh(
 ## time params
 t = 0
 
-model.compute_diagnostic_variables()
-model.compute_time_derivatives()
+model.compute_diagnostic_variables(model.uvh)
+model.compute_time_derivatives(model.uvh)
 
 w_0 = model.omega.squeeze() / model.space.dx / model.space.dy
 

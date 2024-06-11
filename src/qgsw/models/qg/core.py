@@ -23,6 +23,7 @@ from qgsw.models.exceptions import (
     InvalidModelParameterError,
 )
 from qgsw.models.sw import SW
+from qgsw.models.variables import UVH
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -303,7 +304,7 @@ class QG(SW):
         self,
         p: torch.Tensor,
         p_i: None | torch.Tensor = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> UVH:
         """G operator.
 
         Args:
@@ -312,7 +313,7 @@ class QG(SW):
              ("middle of grid cell"). Defaults to None.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
+            UVH: u, v and h
         """
         p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
         dx, dy = self.space.dx, self.space.dy
@@ -327,7 +328,7 @@ class QG(SW):
             * self.space.area
         )
 
-        return u, v, h
+        return UVH(u, v, h)
 
     def QoG_inv(  # noqa: N802
         self,
@@ -377,54 +378,45 @@ class QG(SW):
 
     def Q(  # noqa: N802
         self,
-        u: torch.Tensor,
-        v: torch.Tensor,
-        h: torch.Tensor,
+        uvh: UVH,
     ) -> torch.Tensor:
         """Q operator: compute elliptic equation r.h.s.
 
         Args:
-            u (torch.Tensor): Zonal speed.
-            v (torch.Tensor): Meridional Speed.
-            h (torch.Tensor): Layer  thickness.
+            uvh (UVH): u,v and h.
 
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
         f0, H, area = self.beta_plane.f0, self.H, self.space.area  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
-        omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
-            u[..., 1:-1, :],
+        omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
+            uvh.u[..., 1:-1, :],
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.cell_corners_to_cell_centers(h) / H) * (
+        return (omega - f0 * self.cell_corners_to_cell_centers(uvh.h) / H) * (
             f0 / area
         )
 
     def project_qg(
         self,
-        u: torch.Tensor,
-        v: torch.Tensor,
-        h: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        uvh: UVH,
+    ) -> UVH:
         """QG projector P = G o (Q o G)^{-1} o Q.
 
         Args:
-            u (torch.Tensor): Zonal velocity
-            v (torch.Tensor): Meridional velocity
-            h (torch.Tensor): Layers Thickness
+            uvh (UVH): u,v and h.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Quasi geostrophic
-            u,v and h
+            UVH: Quasi geostrophic u,v and h
         """
-        return self.G(*self.QoG_inv(self.Q(u, v, h)))
+        return self.G(*self.QoG_inv(self.Q(uvh)))
 
     def compute_ageostrophic_velocity(
         self,
-        dt_uvh_qg: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-        dt_uvh_sw: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        dt_uvh_qg: UVH,
+        dt_uvh_sw: UVH,
     ) -> None:
         """Compute ageostrophic variables.
 
@@ -436,14 +428,12 @@ class QG(SW):
         - Ageostrophic Divergence div_a
 
         Args:
-            dt_uvh_qg (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
-            after qg projection
-            dt_uvh_sw (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
-            before projection
+            dt_uvh_qg (UVH): u,v,h after qg projection
+            dt_uvh_sw (UVH): u,v,h before projection
         """
         f0 = self.beta_plane.f0
-        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / f0 / self.space.dy
-        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / f0 / self.space.dx
+        self.u_a = -(dt_uvh_qg.v - dt_uvh_sw.v) / f0 / self.space.dy
+        self.v_a = (dt_uvh_qg.u - dt_uvh_sw.u) / f0 / self.space.dx
         self.k_energy_a = 0.25 * (
             self.u_a[..., 1:] ** 2
             + self.u_a[..., :-1] ** 2
@@ -477,7 +467,7 @@ class QG(SW):
         omega = self.cell_corners_to_cell_centers(self.omega)
         return beta_y + omega - self.beta_plane.f0 * h / self.h_ref
 
-    def compute_diagnostic_variables(self) -> None:
+    def compute_diagnostic_variables(self, uvh: UVH) -> None:
         """Compute Diagnostic Variables.
 
         Compute the model's diagnostic variables.
@@ -494,25 +484,31 @@ class QG(SW):
         - Potential Vorticity: pv
 
         Compute the result given the prognostic
-        variables self.u, self.v, self.h .
+        variables u, v, h .
 
+        Args:
+            uvh (UVH): u,v and h.
         """
-        super().compute_diagnostic_variables()
-        self.pv = self.compute_pv(self.h)
+        super().compute_diagnostic_variables(uvh)
+        self.pv = self.compute_pv(uvh.h)
 
     def compute_time_derivatives(
         self,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        uvh: UVH,
+    ) -> UVH:
         """Compute the state variables derivatives dt_u, dt_v, dt_h.
 
+        Args:
+            uvh (UVH): u,v and h.
+
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
+            UVH: dt_u, dt_v, dt_h
         """
-        dt_uvh_sw = super().compute_time_derivatives()
-        dt_uvh_qg = self.project_qg(*dt_uvh_sw)
-        self.dt_h = dt_uvh_sw[2]
-        self.P_dt_h = dt_uvh_qg[2]
-        self.P2_dt_h = self.project_qg(*dt_uvh_qg)[2]
+        dt_uvh_sw = super().compute_time_derivatives(uvh)
+        dt_uvh_qg = self.project_qg(dt_uvh_sw)
+        self.dt_h = dt_uvh_sw.h
+        self.P_dt_h = dt_uvh_qg.h
+        self.P2_dt_h = self.project_qg(dt_uvh_qg).h
 
         self.compute_ageostrophic_velocity(dt_uvh_qg, dt_uvh_sw)
 
@@ -534,6 +530,13 @@ class QG(SW):
 
         verbose.display(msg=f"saved u_a,v_a to {output_file}", trigger_level=1)
 
-    def step(self) -> None:
-        """Performs one step time-integration with RK3-SSP scheme."""
-        super().step()
+    def update(self, uvh: UVH) -> UVH:
+        """Performs one step time-integration with RK3-SSP scheme.
+
+        Args:
+            uvh (UVH): u,v and h.
+
+        Return:
+            UVH: updated prognostic variables.
+        """
+        return super().update(uvh)

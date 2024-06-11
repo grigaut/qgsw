@@ -17,6 +17,7 @@ from qgsw.models.core import finite_diff
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.exceptions import IncoherentWithMaskError
+from qgsw.models.variables import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -156,27 +157,28 @@ class SW(Model):
                 "velocity must be zero out of domain."
             )
             raise IncoherentWithMaskError(msg)
-        self._u = u_.type(self.dtype) * self.masks.u * self.space.dx
-        self._v = v_.type(self.dtype) * self.masks.v * self.space.dy
-        self._h = h_.type(self.dtype) * self.masks.h * self.space.area
-        self.compute_diagnostic_variables()
+        u = u_.type(self.dtype) * self.masks.u * self.space.dx
+        v = v_.type(self.dtype) * self.masks.v * self.space.dy
+        h = h_.type(self.dtype) * self.masks.h * self.space.area
+        self.uvh = UVH(u, v, h)
+        self.compute_diagnostic_variables(self.uvh)
 
-    def step(self) -> None:
-        """Performs one step time-integration with RK3-SSP scheme."""
-        dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
-        self._u += self.dt * dt0_u
-        self._v += self.dt * dt0_v
-        self._h += self.dt * dt0_h
+    def update(self, uvh: UVH) -> None:
+        """Performs one step time-integration with RK3-SSP scheme.
 
-        dt1_u, dt1_v, dt1_h = self.compute_time_derivatives()
-        self._u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
-        self._v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
-        self._h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
+        Agrs:
+            uvh (UVH): u,v and h.
+        """
+        dt0_uvh = self.compute_time_derivatives(uvh)
+        uvh += self.dt * dt0_uvh
 
-        dt2_u, dt2_v, dt2_h = self.compute_time_derivatives()
-        self._u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
-        self._v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
-        self._h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
+        dt1_uvh = self.compute_time_derivatives(uvh)
+        uvh += (self.dt / 4) * (dt1_uvh - 3 * dt0_uvh)
+
+        dt2_uvh = self.compute_time_derivatives(uvh)
+        uvh += (self.dt / 12) * (8 * dt2_uvh - dt1_uvh - dt0_uvh)
+
+        return uvh
 
     def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
@@ -211,7 +213,7 @@ class SW(Model):
             F.pad(dt_v, (1, 1, 0, 0)) * self.masks.v,
         )
 
-    def advection_h(self) -> torch.Tensor:
+    def advection_h(self, h: torch.Tensor) -> torch.Tensor:
         """Advection RHS for thickness perturbation h.
 
         ∂_t h = - ∇⋅(h_tot u)
@@ -219,10 +221,13 @@ class SW(Model):
         u = [U V]
         h_tot = h_ref + h
 
+        Agrs:
+            h (torch.Tensor): layer Thickness perturbation
+
         Returns:
             torch.Tensor: h advection (∂_t h).
         """
-        h_tot = self.h_ref + self.h
+        h_tot = self.h_ref + h
         # Compute (h_tot x V)
         h_tot_flux_y = self.h_flux_y(h_tot, self.V[..., 1:-1])
         # Compute (h_tot x U)
@@ -234,16 +239,24 @@ class SW(Model):
 
     def compute_time_derivatives(
         self,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        uvh: UVH,
+    ) -> UVH:
         """Compute the state variables derivatives dt_u, dt_v, dt_h.
 
+        Args:
+            uvh (UVH): u,v and h.
+
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
+            UVH: dt_u, dt_v, dt_h
         """
-        self.compute_diagnostic_variables()
-        dt_h = self.advection_h()
+        self.compute_diagnostic_variables(uvh)
+        dt_h = self.advection_h(uvh.h)
         dt_u, dt_v = self.advection_momentum()
-        return dt_u, dt_v, dt_h
+        return UVH(
+            dt_u,
+            dt_v,
+            dt_h,
+        )
 
 
 class SWFilterBarotropic(SW):
