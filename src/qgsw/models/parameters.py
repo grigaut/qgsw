@@ -44,11 +44,6 @@ class ModelParamChecker:
             beta_plane (BetaPlane): Beta Plane.
             n_ens (int, optional): Number of ensembles. Defaults to 1.
         """
-        verbose.display(
-            msg=f"Creating {self.__class__.__name__} model...",
-            trigger_level=1,
-        )
-
         # Set up
         verbose.display(
             msg=f"dtype: {self.dtype}.",
