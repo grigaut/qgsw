@@ -146,7 +146,7 @@ class Model(metaclass=ABCMeta):
         self._set_ref_variables()
 
         # initialize variables
-        self._initialize_vars()
+        self.uvh = self._initialize_vars()
 
         self._set_utils(optimize)
         self._set_fluxes(optimize)
@@ -499,7 +499,7 @@ class Model(metaclass=ABCMeta):
         """
         self._fluxes = flux.Fluxes(masks=self.masks, optimize=optimize)
 
-    def _initialize_vars(self) -> None:
+    def _initialize_vars(self) -> UVH:
         """Initialize variables.
 
         Create Empty variables.
@@ -525,7 +525,7 @@ class Model(metaclass=ABCMeta):
             dtype=self.dtype,
             device=self.device,
         )
-        self.uvh = UVH(u, v, h)
+        return UVH(u, v, h)
 
     def compute_omega(self, uvh: UVH) -> torch.Tensor:
         """Pad u, v using boundary conditions.
