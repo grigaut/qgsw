@@ -123,6 +123,14 @@ class Model(metaclass=ABCMeta):
         )
 
         # Set up
+        verbose.display(
+            msg=f"dtype: {self.dtype}.",
+            trigger_level=2,
+        )
+        verbose.display(
+            msg=f"device: {self.device}",
+            trigger_level=2,
+        )
         ## Space
         self._space = space_3d
         # h
@@ -132,14 +140,6 @@ class Model(metaclass=ABCMeta):
         # Number of ensemble
         self.n_ens = n_ens
         ## data device and dtype
-        verbose.display(
-            msg=f"dtype: {self.dtype}.",
-            trigger_level=2,
-        )
-        verbose.display(
-            msg=f"device: {self.device}",
-            trigger_level=2,
-        )
         ## Coriolis
         self._set_coriolis(beta_plane)
         ## Topography and Ref values
