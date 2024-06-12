@@ -13,7 +13,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.models.base import Model
-from qgsw.models.core import finite_diff
+from qgsw.models.core import finite_diff, schemes
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.exceptions import IncoherentWithMaskError
@@ -169,16 +169,7 @@ class SW(Model):
         Agrs:
             uvh (UVH): u,v and h.
         """
-        dt0_uvh = self.compute_time_derivatives(uvh)
-        uvh += self.dt * dt0_uvh
-
-        dt1_uvh = self.compute_time_derivatives(uvh)
-        uvh += (self.dt / 4) * (dt1_uvh - 3 * dt0_uvh)
-
-        dt2_uvh = self.compute_time_derivatives(uvh)
-        uvh += (self.dt / 12) * (8 * dt2_uvh - dt1_uvh - dt0_uvh)
-
-        return uvh
+        return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
 
     def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
