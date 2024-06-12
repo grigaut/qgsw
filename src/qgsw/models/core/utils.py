@@ -32,9 +32,6 @@ class OptimizableFunction:
             Any: Function output.
         """
         self._core = torch.jit.trace(self._func, args)
-        from icecream import ic
-
-        ic()
         return self._core(*args)
 
     def __call__(self, *args: P.args) -> Any:  # noqa: ANN401
