@@ -7,22 +7,28 @@ from typing import Any, Callable
 import torch
 from typing_extensions import ParamSpec
 
+from qgsw import verbose
+
 P = ParamSpec("P")
 
 
 class OptimizableFunction:
     """Optimize functions."""
 
-    def __init__(self, function: Callable) -> None:
+    def __init__(self, func: Callable) -> None:
         """Instantiate the OptimizableFunction.
 
         Args:
-            function (Callable): Function to optimize.
+            func (Callable): Function to optimize.
         """
         if torch.__version__[0] == "2":
-            self._core = torch.compile(function)
+            verbose.display(
+                f"Compiling {func.__name__} using torch.compile.",
+                trigger_level=2,
+            )
+            self._core = torch.compile(func)
         else:
-            self._func = function
+            self._func = func
             self._core = self._trace
 
     def _trace(self, *args: P.args) -> Any:  # noqa: ANN401
@@ -31,6 +37,10 @@ class OptimizableFunction:
         Returns:
             Any: Function output.
         """
+        verbose.display(
+            f"Tracing {self._func.__name__} using torch.jit.trace.",
+            trigger_level=2,
+        )
         self._core = torch.jit.trace(self._func, args)
         return self._core(*args)
 
