@@ -19,6 +19,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
+from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.exceptions import (
     InvalidModelParameterError,
 )
@@ -102,7 +103,7 @@ class QG(SW):
         self.compute_auxillary_matrices()
 
         # precompile functions
-        self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
+        self.grad_perp = OptimizableFunction(grad_perp)
 
     def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.

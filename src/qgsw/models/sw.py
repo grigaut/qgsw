@@ -193,8 +193,8 @@ class SW(Model):
             tuple[torch.Tensor,torch.Tensor]: u, v advection (∂_t u, ∂_t v).
         """
         # Vortex-force + Coriolis
-        omega_v_m = self.w_flux_y(self.omega[..., 1:-1, :], self.V_m)
-        omega_u_m = self.w_flux_x(self.omega[..., 1:-1], self.U_m)
+        omega_v_m = self._fluxes.w_y(self.omega[..., 1:-1, :], self.V_m)
+        omega_u_m = self._fluxes.w_x(self.omega[..., 1:-1], self.U_m)
 
         dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * self.V_m
         dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * self.U_m)
@@ -229,9 +229,9 @@ class SW(Model):
         """
         h_tot = self.h_ref + h
         # Compute (h_tot x V)
-        h_tot_flux_y = self.h_flux_y(h_tot, self.V[..., 1:-1])
+        h_tot_flux_y = self._fluxes.h_y(h_tot, self.V[..., 1:-1])
         # Compute (h_tot x U)
-        h_tot_flux_x = self.h_flux_x(h_tot, self.U[..., 1:-1, :])
+        h_tot_flux_x = self._fluxes.h_x(h_tot, self.U[..., 1:-1, :])
         # Compute -∇⋅(h_tot u) = ∂_x (h_tot x U) + ∂_y (h_tot x V)
         div_no_flux = -finite_diff.div_nofluxbc(h_tot_flux_x, h_tot_flux_y)
         # Apply h mask

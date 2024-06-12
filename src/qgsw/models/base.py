@@ -11,7 +11,8 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.masks import Masks
-from qgsw.models.core import finite_diff, flux, reconstruction
+from qgsw.models.core import finite_diff, flux
+from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.exceptions import (
     IncoherentWithMaskError,
     InvalidModelParameterError,
@@ -147,17 +148,8 @@ class Model(metaclass=ABCMeta):
         # initialize variables
         self._initialize_vars()
 
-        self.comp_ke = finite_diff.comp_ke
-        self.cell_corners_to_cell_centers = grid_conversion.omega_to_h
-        self.compute_diagnostic_variables(self.uvh)
-
-        # utils and flux computation functions
-        self._set_utils_before_compilation()
-        # precompile torch functions
-        if optimize:
-            self._set_utils_with_compilation()
-        else:
-            verbose.display(msg="No compilation", trigger_level=2)
+        self._set_utils(optimize)
+        self._set_fluxes(optimize)
 
     @property
     def u(self) -> torch.Tensor:
@@ -482,112 +474,30 @@ class Model(metaclass=ABCMeta):
             self.dx_p_ref = 0.0
             self.dy_p_ref = 0.0
 
-    def _set_utils_before_compilation(self) -> None:
-        """Set utils and flux function without compilation."""
-        self.comp_ke = finite_diff.comp_ke
-        self.cell_corners_to_cell_centers = (
-            grid_conversion.cell_corners_to_cell_center
-        )
-        self.h_flux_y = lambda h, v: flux.flux(
-            h,
-            v,
-            dim=-1,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=self.masks.v_sten_hy_eq2[..., 1:-1],
-            mask_4=self.masks.v_sten_hy_eq4[..., 1:-1],
-            mask_6=self.masks.v_sten_hy_gt6[..., 1:-1],
-        )
-        self.h_flux_x = lambda h, u: flux.flux(
-            h,
-            u,
-            dim=-2,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=self.masks.u_sten_hx_eq2[..., 1:-1, :],
-            mask_4=self.masks.u_sten_hx_eq4[..., 1:-1, :],
-            mask_6=self.masks.u_sten_hx_gt6[..., 1:-1, :],
-        )
+    def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
+        """Set utils functions.
 
-        self.w_flux_y = lambda w, v_ugrid: flux.flux(
-            w,
-            v_ugrid,
-            dim=-1,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=self.masks.u_sten_wy_eq2[..., 1:-1, :],
-            mask_4=self.masks.u_sten_wy_eq4[..., 1:-1, :],
-            mask_6=self.masks.u_sten_wy_gt4[..., 1:-1, :],
-        )
-        self.w_flux_x = lambda w, u_vgrid: flux.flux(
-            w,
-            u_vgrid,
-            dim=-2,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=self.masks.v_sten_wx_eq2[..., 1:-1],
-            mask_4=self.masks.v_sten_wx_eq4[..., 1:-1],
-            mask_6=self.masks.v_sten_wx_gt6[..., 1:-1],
-        )
-
-    def _set_utils_with_compilation(self) -> None:
-        """Set utils and flux function for compilation."""
-        if torch.__version__[0] == "2":
-            verbose.display(
-                msg=(
-                    f"torch version {torch.__version__} >= 2.0, "
-                    "using torch.compile for compilation."
-                ),
-                trigger_level=2,
+        Args:
+            optimize (bool): Whether to optimize the function.
+        """
+        if optimize:
+            self.comp_ke = OptimizableFunction(finite_diff.comp_ke)
+            self.cell_corners_to_cell_centers = OptimizableFunction(
+                grid_conversion.cell_corners_to_cell_center,
             )
-            self.comp_ke = torch.compile(finite_diff.comp_ke)
-            self.cell_corners_to_cell_centers = torch.compile(
-                grid_conversion.omega_to_h,
-            )
-            self.h_flux_y = torch.compile(self.h_flux_y)
-            self.h_flux_x = torch.compile(self.h_flux_x)
-            self.w_flux_y = torch.compile(self.w_flux_y)
-            self.w_flux_x = torch.compile(self.w_flux_x)
         else:
-            verbose.display(
-                msg=(
-                    f"torch version {torch.__version__} < 2.0, "
-                    "using torch.jit.trace for compilation."
-                ),
-                trigger_level=2,
+            self.comp_ke = finite_diff.comp_ke
+            self.cell_corners_to_cell_centers = (
+                grid_conversion.cell_corners_to_cell_center
             )
-            self.comp_ke = torch.jit.trace(
-                finite_diff.comp_ke,
-                (self.u, self.U, self.v, self.V),
-            )
-            self.cell_corners_to_cell_centers = torch.jit.trace(
-                grid_conversion.omega_to_h,
-                (self.U,),
-            )
-            self.h_flux_y = torch.jit.trace(
-                self.h_flux_y,
-                (self.h, self.V[..., 1:-1]),
-            )
-            self.h_flux_x = torch.jit.trace(
-                self.h_flux_x,
-                (self.h, self.U[..., 1:-1, :]),
-            )
-            self.w_flux_y = torch.jit.trace(
-                self.w_flux_y,
-                (self.omega[..., 1:-1, :], self.V_m),
-            )
-            self.w_flux_x = torch.jit.trace(
-                self.w_flux_x,
-                (self.omega[..., 1:-1], self.U_m),
-            )
+
+    def _set_fluxes(self, optimize: bool) -> None:  # noqa: FBT001
+        """Set fluxes.
+
+        Args:
+            optimize (bool): Whether to optimize the fluxes.
+        """
+        self._fluxes = flux.Fluxes(masks=self.masks, optimize=optimize)
 
     def _initialize_vars(self) -> None:
         """Initialize variables.
