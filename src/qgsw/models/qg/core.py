@@ -266,24 +266,6 @@ class QG(SW):
         )
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
 
-    def _add_wind_forcing(
-        self,
-        du: torch.Tensor,
-        dv: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Add Wind forcing to du and dv.
-
-        Args:
-            du (torch.Tensor): du
-            dv (torch.Tensor): dv
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing
-        """
-        du[..., 0, :, :] += self.taux / self.H[0] * self.space.dx
-        dv[..., 0, :, :] += self.tauy / self.H[0] * self.space.dy
-        return du, dv
-
     def set_physical_uvh(
         self,
         u_phys: torch.Tensor,  # noqa: ARG002
