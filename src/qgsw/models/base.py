@@ -5,7 +5,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
-import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
@@ -14,15 +13,15 @@ from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.exceptions import (
     IncoherentWithMaskError,
-    InvalidSavingFileError,
 )
+from qgsw.models.io import ModelResultsRetriever
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.variables import UVH
 from qgsw.spatial.core import grid_conversion
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    import numpy as np
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
@@ -45,7 +44,7 @@ def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
 
 
-class Model(ModelParamChecker, metaclass=ABCMeta):
+class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     """Base class for models.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -115,12 +114,14 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
             msg=f"Creating {self.__class__.__name__} model...",
             trigger_level=1,
         )
-        super().__init__(
+        ModelParamChecker.__init__(
+            self,
             space_3d=space_3d,
             g_prime=g_prime,
             beta_plane=beta_plane,
             n_ens=n_ens,
         )
+        ModelResultsRetriever.__init__(self)
         self._compute_coriolis()
         ## Topography and Ref values
         self._set_ref_variables()
@@ -340,51 +341,6 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         # Sum h on v grid
         self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
-    def get_physical_uvh(
-        self,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Get physical variables u_phys, v_phys, h_phys from state variables.
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
-        """
-        u_phys = (self.u / self.space.dx).to(device=DEVICE)
-        v_phys = (self.v / self.space.dy).to(device=DEVICE)
-        h_phys = (self.h / self.space.area).to(device=DEVICE)
-
-        return (u_phys, v_phys, h_phys)
-
-    def get_physical_uvh_as_ndarray(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Get physical variables u_phys, v_phys, h_phys from state variables.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: u, v and h
-        """
-        return (e.cpu().numpy() for e in self.get_physical_uvh())
-
-    def get_physical_omega(
-        self,
-    ) -> torch.Tensor:
-        """Get physical vorticity.
-
-        Returns:
-            torch.Tensor: Vorticity
-        """
-        vorticity = self.omega / self.space.area / self.beta_plane.f0
-        return vorticity.to(device=DEVICE)
-
-    def get_physical_omega_as_ndarray(
-        self,
-    ) -> np.ndarray:
-        """Get physical vorticity.
-
-        Returns:
-            np.ndarray: Vorticity
-        """
-        return self.get_physical_omega().cpu().numpy()
-
     @abstractmethod
     def set_physical_uvh(
         self,
@@ -439,31 +395,6 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         h = h.type(self.dtype) * self.masks.h
         self.uvh = UVH(u, v, h)
         self.compute_diagnostic_variables(self.uvh)
-
-    def get_print_info(self) -> str:
-        """Returns a string with summary of current variables.
-
-        Returns:
-            str: Summary of variables.
-        """
-        hl_mean = (self.h / self.space.area).mean((-1, -2))
-        eta = self.eta
-        u = self.u / self.space.dx
-        v = self.v / self.space.dy
-        h = self.h / self.space.area
-        with np.printoptions(precision=2):
-            eta_surface = eta[:, 0].min().to(device=DEVICE).item()
-            return (
-                f"u: {u.mean().to(device=DEVICE).item():+.5E}, "
-                f"{u.abs().max().to(device=DEVICE).item():.5E}, "
-                f"v: {v.mean().to(device=DEVICE).item():+.5E}, "
-                f"{v.abs().max().to(device=DEVICE).item():.5E}, "
-                f"hl_mean: {hl_mean.squeeze().cpu().numpy()}, "
-                f"h min: {h.min().to(device=DEVICE).item():.5E}, "
-                f"max: {h.max().to(device=DEVICE).item():.5E}, "
-                f"eta_sur min: {eta_surface:+.5f}, "
-                f"max: {eta[:,0].max().to(device=DEVICE).item():.5f}"
-            )
 
     @abstractmethod
     def advection_h(self) -> torch.Tensor:
@@ -541,52 +472,6 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         Returns:
             UVH: dt_u, dt_v, dt_h
         """
-
-    def _raise_if_invalid_savefile(self, output_file: Path) -> None:
-        """Raise and error if the saving file is invalid.
-
-        Args:
-            output_file (Path): Output file.
-
-        Raises:
-            InvalidSavingFileError: if the saving file extension is not .npz.
-        """
-        if output_file.suffix != ".npz":
-            msg = "Variables are expected to be saved in an .npz file."
-            raise InvalidSavingFileError(msg)
-
-    def save_uvh(self, output_file: Path) -> None:
-        """Save U, V and H values.
-
-        Args:
-            output_file (Path): File to save value in (.npz).
-        """
-        self._raise_if_invalid_savefile(output_file=output_file)
-
-        u, v, h = self.get_physical_uvh_as_ndarray()
-
-        np.savez(
-            output_file,
-            u=u.astype("float32"),
-            v=v.astype("float32"),
-            h=h.astype("float32"),
-        )
-
-        verbose.display(msg=f"saved u,v,h to {output_file}", trigger_level=1)
-
-    def save_omega(self, output_file: Path) -> None:
-        """Save vorticity values.
-
-        Args:
-            output_file (Path): File to save value in (.npz).
-        """
-        self._raise_if_invalid_savefile(output_file=output_file)
-
-        omega = self.get_physical_omega_as_ndarray()
-
-        np.savez(output_file, omega=omega.astype("float32"))
-
-        verbose.display(msg=f"saved ω to {output_file}", trigger_level=1)
 
     @abstractmethod
     def update(self, uvh: UVH) -> UVH:
