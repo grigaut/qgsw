@@ -64,22 +64,18 @@ class ModelParamChecker:
         self.n_ens = n_ens
 
     @property
+    def space(self) -> SpaceDiscretization3D:
+        """3D Space Discretization."""
+        return self._space
+
+    @property
     def dt(self) -> float:
         """Timestep value."""
         return self._dt
 
     @dt.setter
     def dt(self, dt: float) -> None:
-        if dt <= 0:
-            msg = "Timestep must be greater than 0."
-            raise InvalidModelParameterError(msg)
-        verbose.display(msg=f"dt value set to {dt}.", trigger_level=1)
-        self._dt = dt
-
-    @property
-    def space(self) -> SpaceDiscretization3D:
-        """3D Space Discretization."""
-        return self._space
+        self._set_dt(dt)
 
     @property
     def slip_coef(self) -> float:
@@ -88,20 +84,7 @@ class ModelParamChecker:
 
     @slip_coef.setter
     def slip_coef(self, slip_coefficient: float) -> None:
-        # Verify value in [0,1]
-        if (slip_coefficient < 0) or (slip_coefficient > 1):
-            msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
-            raise InvalidModelParameterError(msg)
-        cl_type = (
-            "Free-"
-            if slip_coefficient == 1
-            else ("No-" if slip_coefficient == 0 else "Partial free-")
-        )
-        verbose.display(
-            msg=f"{cl_type}slip boundary condition",
-            trigger_level=2,
-        )
-        self._slip_coef = slip_coefficient
+        self._set_slip_coef(slip_coefficient)
 
     @property
     def bottom_drag_coef(self) -> float:
@@ -110,7 +93,7 @@ class ModelParamChecker:
 
     @bottom_drag_coef.setter
     def bottom_drag_coef(self, bottom_drag: float) -> None:
-        self._bottom_drag = bottom_drag
+        self._set_bottom_drag(bottom_drag)
 
     @property
     def n_ens(self) -> int:
@@ -119,13 +102,7 @@ class ModelParamChecker:
 
     @n_ens.setter
     def n_ens(self, n_ens: int) -> None:
-        if not isinstance(n_ens, int):
-            msg = "n_ens must be an integer."
-            raise InvalidModelParameterError(msg)
-        if n_ens <= 0:
-            msg = "n_ens must be greater than 1."
-            raise InvalidModelParameterError(msg)
-        self._n_ens = n_ens
+        self._set_n_ens(n_ens)
 
     @property
     def masks(self) -> Masks:
@@ -142,27 +119,7 @@ class ModelParamChecker:
 
     @masks.setter
     def masks(self, mask: torch.Tensor) -> None:
-        shape = mask.shape[0], mask.shape[1]
-        # Verify shape
-        if shape != (self.space.nx, self.space.ny):
-            msg = (
-                "Invalid mask shape "
-                f"{shape}!=({self.space.nx},{self.space.ny})"
-            )
-            raise InvalidModelParameterError(msg)
-        vals = torch.unique(mask).tolist()
-        # Verify mask values
-        if not all(v in [0, 1] for v in vals) or vals == [0]:
-            msg = f"Invalid mask with non-binary values : {vals}"
-            raise InvalidModelParameterError(msg)
-        verbose.display(
-            msg=(
-                f"{'Non-trivial' if len(vals)==2 else 'Trivial'}"  # noqa: PLR2004
-                " mask provided"
-            ),
-            trigger_level=2,
-        )
-        self._masks = Masks(mask)
+        self._set_masks(mask)
 
     @property
     def beta_plane(self) -> BetaPlane:
@@ -194,6 +151,94 @@ class ModelParamChecker:
         """Tau y."""
         return self._tauy
 
+    def _set_dt(self, dt: float) -> None:
+        """TimeStep Setter.
+
+        Args:
+            dt (float): Timestep (s)
+
+        Raises:
+            InvalidModelParameterError: If the timestep is negative.
+        """
+        if dt <= 0:
+            msg = "Timestep must be greater than 0."
+            raise InvalidModelParameterError(msg)
+        self._dt = dt
+        verbose.display(f"dt set to {self.dt}", trigger_level=1)
+
+    def _set_slip_coef(self, slip_coefficient: float) -> None:
+        """Set the slip coefficient.
+
+        Args:
+            slip_coefficient (float): Slip coefficient.
+
+        Raises:
+            InvalidModelParameterError: If the lsip coef is not in [0,1]
+        """
+        # Verify value in [0,1]
+        if (slip_coefficient < 0) or (slip_coefficient > 1):
+            msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
+            raise InvalidModelParameterError(msg)
+        self._clip_coef = slip_coefficient
+
+    def _set_bottom_drag(self, bottom_drag: float) -> None:
+        """Set th ebottom drag coefficient.
+
+        Args:
+            bottom_drag (float): Bottom drag coefficient.
+        """
+        self._bottom_drag = bottom_drag
+
+    def _set_n_ens(self, n_ens: int) -> None:
+        """Set the number of ensembles.
+
+        Args:
+            n_ens (int): Number of ensembles.
+
+        Raises:
+            InvalidModelParameterError: If the number of instance is not an int
+            InvalidModelParameterError: If the number of ensemble is negative.
+        """
+        if not isinstance(n_ens, int):
+            msg = "n_ens must be an integer."
+            raise InvalidModelParameterError(msg)
+        if n_ens <= 0:
+            msg = "n_ens must be greater than 1."
+            raise InvalidModelParameterError(msg)
+        self._n_ens = n_ens
+
+    def _set_masks(self, mask: torch.Tensor) -> None:
+        """Set the masks.
+
+        Args:
+            mask (torch.Tensor): Mask tensor.
+
+        Raises:
+            InvalidModelParameterError: If the mask has incorrect shape.
+            InvalidModelParameterError: If the mask is not inly 1s and 0s.
+        """
+        shape = mask.shape[0], mask.shape[1]
+        # Verify shape
+        if shape != (self.space.nx, self.space.ny):
+            msg = (
+                "Invalid mask shape "
+                f"{shape}!=({self.space.nx},{self.space.ny})"
+            )
+            raise InvalidModelParameterError(msg)
+        vals = torch.unique(mask).tolist()
+        # Verify mask values
+        if not all(v in [0, 1] for v in vals) or vals == [0]:
+            msg = f"Invalid mask with non-binary values : {vals}"
+            raise InvalidModelParameterError(msg)
+        verbose.display(
+            msg=(
+                f"{'Non-trivial' if len(vals)==2 else 'Trivial'}"  # noqa: PLR2004
+                " mask provided"
+            ),
+            trigger_level=2,
+        )
+        self._masks = Masks(mask)
+
     def _set_H(  # noqa: N802
         self,
         h: torch.Tensor,
@@ -213,7 +258,7 @@ class ModelParamChecker:
         self._H = h
 
     def _set_g_prime(self, g_prime: torch.Tensor) -> None:
-        """Set g_rpime values.
+        """Set g_prime values.
 
         Args:
             g_prime (torch.Tensor): g_prime.
