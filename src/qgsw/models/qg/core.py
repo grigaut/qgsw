@@ -73,7 +73,7 @@ class QG(SW):
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         n_ens: int = 1,
-        with_compile: bool = True,
+        optimize: bool = True,
     ) -> None:
         """SW Model Instantiation.
 
@@ -82,7 +82,7 @@ class QG(SW):
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
             n_ens (int, optional): Number of ensembles. Defaults to 1.
-            with_compile (bool, optional): Whether to precompile functions or
+            optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         super().__init__(
@@ -90,7 +90,7 @@ class QG(SW):
             g_prime=g_prime,
             beta_plane=beta_plane,
             n_ens=n_ens,
-            with_compile=with_compile,
+            optimize=optimize,
         )
 
         verbose.display(

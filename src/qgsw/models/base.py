@@ -104,7 +104,7 @@ class Model(metaclass=ABCMeta):
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         n_ens: int = 1,
-        with_compile: bool = True,
+        optimize: bool = True,
     ) -> None:
         """Model Instantiation.
 
@@ -113,7 +113,7 @@ class Model(metaclass=ABCMeta):
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
             n_ens (int, optional): Number of ensembles. Defaults to 1.
-            with_compile (bool, optional): Whether to precompile functions or
+            optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         verbose.display(
@@ -154,7 +154,7 @@ class Model(metaclass=ABCMeta):
         # utils and flux computation functions
         self._set_utils_before_compilation()
         # precompile torch functions
-        if with_compile:
+        if optimize:
             self._set_utils_with_compilation()
         else:
             verbose.display(msg="No compilation", trigger_level=2)
