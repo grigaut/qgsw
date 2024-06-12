@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -377,53 +377,6 @@ class Model(metaclass=ABCMeta):
             )
             raise InvalidModelParameterError(msg)
         self._g_prime = g_prime
-
-    def _validate_mask(self, param: dict[str, Any], key: str) -> Masks:
-        """Validate Mask value.
-
-        Args:
-            param (dict[str, Any]): Parameters dict.
-            key (str): Mask key.
-
-        Returns:
-            Masks: Mask.
-        """
-        # If 'mask' key does not exist
-        if key not in param:
-            verbose.display(
-                msg="No mask provided, domain assumed to be rectangular",
-                trigger_level=2,
-            )
-            mask = torch.ones(
-                self.space.nx,
-                self.space.ny,
-                dtype=self.dtype,
-                device=self.device,
-            )
-            return Masks(mask)
-
-        mask: torch.Tensor = param[key]
-        shape = mask.shape[0], mask.shape[1]
-        # Verify shape
-        if shape != (self.space.nx, self.space.ny):
-            msg = (
-                "Invalid mask shape "
-                f"{shape}!=({self.space.nx},{self.space.ny})"
-            )
-            raise KeyError(msg)
-        vals = torch.unique(mask).tolist()
-        # Verify mask values
-        if not all(v in [0, 1] for v in vals) or vals == [0]:
-            msg = f"Invalid mask with non-binary values : {vals}"
-            raise KeyError(msg)
-        verbose.display(
-            msg=(
-                f"{'Non-trivial' if len(vals)==2 else 'Trivial'}"  # noqa: PLR2004
-                " mask provided"
-            ),
-            trigger_level=2,
-        )
-        return Masks(mask)
 
     def set_wind_forcing(
         self,
