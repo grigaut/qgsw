@@ -294,12 +294,10 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         - Pressure: p
         - Zonal velocity: U
         - Meridional velocity: V
-        - Zonal Velocity Momentum: U_m
-        - Meriodional Velocity Momentum: V_m
         - Kinetic Energy: k_energy
 
         Compute the result given the prognostic
-        variables self.u, self.v, self.h .
+        variables u,v and h.
         """
         # Diagnostic: vorticity values
         self.omega = self.compute_omega(uvh)
@@ -311,24 +309,10 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         self.U = uvh.u / self.space.dx**2
         # Diagnostic: meridional velocity
         self.V = uvh.v / self.space.dy**2
-        # Zonal velocity momentum -> corresponds to the v grid
-        # Has no value on the boundary of the v grid
-        self.U_m = self.cell_corners_to_cell_centers(self.U)
-        # Meridional velocity momentum -> corresponds to the u grid
-        # Has no value on the boundary of the u grid
-        self.V_m = self.cell_corners_to_cell_centers(self.V)
         # Diagnostic: kinetic energy
         self.k_energy = (
             self.comp_ke(uvh.u, self.U, uvh.v, self.V) * self.masks.h
         )
-        # Match u grid dimensions (1, nl, nx, ny)
-        self.h_ugrid = grid_conversion.h_to_u(uvh.h, self.masks.h)
-        # Match v grid dimension
-        self.h_vgrid = grid_conversion.h_to_v(uvh.h, self.masks.h)
-        # Sum h on u grid
-        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
-        # Sum h on v grid
-        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
     @abstractmethod
     def set_physical_uvh(
@@ -384,31 +368,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         h = h.type(self.dtype) * self.masks.h
         self.uvh = UVH(u, v, h)
         self.compute_diagnostic_variables(self.uvh)
-
-    @abstractmethod
-    def advection_h(self, h: torch.Tensor) -> torch.Tensor:
-        """Advection RHS for thickness perturbation h.
-
-        dt_h = - div(h_tot [u v])
-
-        h_tot = h_ref + h
-
-        Args:
-            h (torch.Tensor): layer Thickness perturbation
-
-        Returns:
-            torch.Tensor: h advection.
-        """
-
-    @abstractmethod
-    def advection_momentum(
-        self,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Advection RHS for momentum (u, v).
-
-        Returns:
-            tuple[torch.Tensor,torch.Tensor]: u, v advection.
-        """
 
     @abstractmethod
     def compute_time_derivatives(

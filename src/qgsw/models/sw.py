@@ -215,6 +215,39 @@ class SW(Model):
         self.uvh = UVH(u, v, h)
         self.compute_diagnostic_variables(self.uvh)
 
+    def compute_diagnostic_variables(self, uvh: UVH) -> None:
+        """Compute the model's diagnostic variables.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Computed variables:
+        - Vorticity: omega
+        - Interface heights: eta
+        - Pressure: p
+        - Zonal velocity: U
+        - Meridional velocity: V
+        - Kinetic Energy: k_energy
+
+        Compute the result given the prognostic
+        variables u,v and h.
+        """
+        super().compute_diagnostic_variables(uvh)
+        # Zonal velocity -> corresponds to the v grid
+        # Has no value on the boundary of the v grid
+        self.U_m = self.cell_corners_to_cell_centers(self.U)
+        # Meridional velocity -> corresponds to the u grid
+        # Has no value on the boundary of the u grid
+        self.V_m = self.cell_corners_to_cell_centers(self.V)
+        # Match u grid dimensions (1, nl, nx, ny)
+        self.h_ugrid = grid_conversion.h_to_u(uvh.h, self.masks.h)
+        # Match v grid dimension
+        self.h_vgrid = grid_conversion.h_to_v(uvh.h, self.masks.h)
+        # Sum h on u grid
+        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
+        # Sum h on v grid
+        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
+
     def update(self, uvh: UVH) -> None:
         """Performs one step time-integration with RK3-SSP scheme.
 
