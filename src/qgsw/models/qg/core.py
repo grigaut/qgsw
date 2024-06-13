@@ -1,130 +1,109 @@
-"""Pytorch multilayer QG as projected SW, Louis Thiry, 9. oct. 2023.
-
-- QG herits from SW class, prognostic variables: u, v, h
-- DST spectral solver for QG elliptic equation
-"""
+"""Quasi Geostrophic Model."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import torch
 
-from qgsw import verbose
-from qgsw.models.core.finite_diff import grad_perp
+from qgsw.models.base import Model
+from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
     compute_capacitance_matrices,
     compute_laplace_dstI,
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
-from qgsw.models.exceptions import (
-    InvalidModelParameterError,
-)
 from qgsw.models.sw import SW
+from qgsw.models.variables import UVH
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
-class QG(SW):
-    """Multilayer quasi-geostrophic model as projected SW.
-
-    Following https://doi.org/10.1029/2021MS002663 .
-
-    Physical Variables are :
-        - u_phys: Zonal velocity
-        - v_phys: Meridional Velocity
-        - h_phys: layers thickness
-
-    Prognostic Variables are linked to physical variables through:
-        - u = u_phys x dx
-        - v = v_phys x dy
-        - h = h_phys x dx x dy
-
-    Diagnostic variables are:
-        - U = u_phys / dx
-        - V = v_phys / dx
-        - omega = omega_phys x dx x dy    (rel. vorticity)
-        - eta = eta_phys                  (interface height)
-        - p = p_phys                      (hydrostratic pressure)
-        - k_energy = k_energy_phys        (kinetic energy)
-        - pv = pv_phys                    (potential vorticity)
-
-    References variables are denoted with the subscript _ref:
-        - h_ref
-        - eta_ref
-        - p_ref
-        - h_ref_ugrid
-        - h_ref_vgrid
-        - dx_p_ref
-        - dy_p_ref
-    """
+class QG(Model):
+    """Quasi Geostrophic Model."""
 
     def __init__(
         self,
-        *,
         space_3d: SpaceDiscretization3D,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        n_ens: int = 1,
-        with_compile: bool = True,
+        optimize: bool = True,  # noqa: FBT002, FBT001
     ) -> None:
-        """SW Model Instantiation.
+        """QG Model Instantiation.
 
         Args:
             space_3d (SpaceDiscretization3D): Space Discretization
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
-            n_ens (int, optional): Number of ensembles. Defaults to 1.
-            with_compile (bool, optional): Whether to precompile functions or
+            optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         super().__init__(
             space_3d=space_3d,
             g_prime=g_prime,
             beta_plane=beta_plane,
-            n_ens=n_ens,
-            with_compile=with_compile,
+            optimize=optimize,
         )
+        self._core = self._init_core_model(optimize=optimize)
+        self.A = self.compute_A(space_3d.h.xyh.h[:, 0, 0], g_prime[:, 0, 0])
+        decomposition = self.compute_layers_to_mode_decomposition(self.A)
+        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        self.set_helmholtz_solver(self.lambd)
 
-        verbose.display(
-            msg="class QG, ignoring barotropic filter",
-            trigger_level=2,
-        )
+    @property
+    def sw(self) -> SW:
+        """Core Shallow Water Model."""
+        return self._core
 
-        # init matrices for elliptic equation
-        self.compute_auxillary_matrices()
-
-        # precompile functions
-        self.grad_perp = torch.jit.trace(grad_perp, (self.p,))  # ?
-
-    def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
-        """Perform additional validation over H.
+    def _set_bottom_drag(self, bottom_drag: float) -> None:
+        """Set the bottom drag coefficient.
 
         Args:
-            h (torch.Tensor): Layers thickness.
-
-        Raises:
-            ValueError: if H is not constant in space
-
-        Returns:
-            torch.Tensor: H
+            bottom_drag (float): Bottom drag coefficient.
         """
-        if h.shape[-2:] != (1, 1):
-            msg = (
-                "H must me constant in space for "
-                "qg approximation, i.e. have shape (...,1,1)"
-                f"got shape shape {h.shape}"
-            )
-            raise InvalidModelParameterError(msg)
-        super()._set_H(h)
+        self.sw.bottom_drag_coef = bottom_drag
+        return super()._set_bottom_drag(bottom_drag)
 
-    def _compute_A(  # noqa: N802
+    def _set_slip_coef(self, slip_coefficient: float) -> None:
+        """Set the slip coefficient.
+
+        Args:
+            slip_coefficient (float): Slip coefficient.
+        """
+        self.sw.slip_coef = slip_coefficient
+        return super()._set_slip_coef(slip_coefficient)
+
+    def _set_dt(self, dt: float) -> None:
+        """TimeStep Setter.
+
+        Args:
+        dt (float): Timestep (s)
+        """
+        self.sw.dt = dt
+        return super()._set_dt(dt)
+
+    def _set_masks(self, mask: torch.Tensor) -> None:
+        """Set the masks.
+
+        Args:
+        mask (torch.Tensor): Mask tensor.
+        """
+        self.sw.masks = mask
+        return super()._set_masks(mask)
+
+    def _set_n_ens(self, n_ens: int) -> None:
+        """Set the number of ensembles.
+
+        Args:
+        n_ens (int): Number of ensembles.
+        """
+        self.sw.n_ens = n_ens
+        return super()._set_n_ens(n_ens)
+
+    def compute_A(  # noqa: N802
         self,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
@@ -138,29 +117,30 @@ class QG(SW):
         Returns:
             torch.Tensor: Stretching Operator
         """
-        if self.space.nl == 1:
+        nl = H.shape[0]
+        if nl == 1:
             return torch.tensor(
                 [[1.0 / (H * g_prime)]],
                 dtype=self.dtype,
                 device=self.device,
             )
         A = torch.zeros(  # noqa: N806
-            (self.space.nl, self.space.nl),
+            (nl, nl),
             dtype=self.dtype,
             device=self.device,
         )
         A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
         A[0, 1] = -1.0 / (H[0] * g_prime[1])
-        for i in range(1, self.space.nl - 1):
+        for i in range(1, nl - 1):
             A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
             A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
             A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
-        A[-1, -1] = 1.0 / (H[self.space.nl - 1] * g_prime[self.space.nl - 1])
-        A[-1, -2] = -1.0 / (H[self.space.nl - 1] * g_prime[self.space.nl - 1])
+        A[-1, -1] = 1.0 / (H[nl - 1] * g_prime[nl - 1])
+        A[-1, -2] = -1.0 / (H[nl - 1] * g_prime[nl - 1])
         return A
 
-    def _compute_layers_to_mode_decomposition_matrices(
-        self,
+    @staticmethod
+    def compute_layers_to_mode_decomposition(
         A: torch.Tensor,  # noqa: N803
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Compute Layers to mode decomposition.
@@ -176,18 +156,7 @@ class QG(SW):
         # layer-to-mode and mode-to-layer matrices
         lambd_r, R = torch.linalg.eig(A)  # noqa: N806
         _, L = torch.linalg.eig(A.T)  # noqa: N806
-        lambd: torch.Tensor = lambd_r.real.reshape((1, self.space.nl, 1, 1))
-        with np.printoptions(precision=1):
-            radius = (
-                1e-3
-                / torch.sqrt(self.beta_plane.f0**2 * lambd.squeeze())
-                .cpu()
-                .numpy()
-            )
-            verbose.display(
-                msg=f"Rossby deformation Radii (km): {radius}",
-                trigger_level=2,
-            )
+        lambd: torch.Tensor = lambd_r.real.reshape((1, A.shape[0], 1, 1))
         R, L = R.real, L.real  # noqa: N806
         # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
         # layer to mode: pseudo inverse of R
@@ -196,23 +165,14 @@ class QG(SW):
         Cm2l = R  # noqa: N806
         return Cm2l, lambd, Cl2m
 
-    def compute_auxillary_matrices(self) -> None:
-        """More informations on the process here : https://gmd.copernicus.org/articles/17/1749/2024/."""
-        # A operator
-        self.A = self._compute_A(self.H.squeeze(), self.g_prime.squeeze())
+    def set_helmholtz_solver(self, lambd: torch.Tensor) -> None:
+        """Set the Helmholtz Solver.
 
-        # layer-to-mode and mode-to-layer matrices
-        decomp = self._compute_layers_to_mode_decomposition_matrices(self.A)
-        self.Cm2l, self.lambd, self.Cl2m = decomp
-
-        # Governing Equation: ∆Ψ - (f_0)² A Ψ = q - βy
-        # With Diagonalization: ∆Ψ - (f_0)² Cm2l @ Λ @ Cl2m Ψ = q - βy
-        # Layer to mode transform: Ψ_m = Cl2m @ Ψ ; q_m = Cl2m @ q
-        # Within Diagonalized Equation: ∆Ψ_m - (f_0)² Λ @ Ψ_m = q_m - βy
-        # In Fourier Space: "(∆ - (f_0)² Λ) @ Ψ_m = q_m - βy"
-
+        Args:
+            lambd (torch.Tensor): Matrix A's eigenvalues.
+        """
         # For Helmholtz equations
-        nl, nx, ny = self.space.nl, self.space.nx, self.space.ny
+        nl, nx, ny = lambd.shape[1], self.space.nx, self.space.ny
         laplace_dstI = (  # noqa: N806
             compute_laplace_dstI(
                 nx,
@@ -226,7 +186,7 @@ class QG(SW):
             .unsqueeze(0)
         )
         # Compute "(∆ - (f_0)² Λ)" in Fourier Space
-        self.helmholtz_dstI = laplace_dstI - self.beta_plane.f0**2 * self.lambd
+        self.helmholtz_dstI = laplace_dstI - self.beta_plane.f0**2 * lambd
         # Constant Omega grid
         cst_wgrid = torch.ones(
             (1, nl, nx + 1, ny + 1),
@@ -256,31 +216,13 @@ class QG(SW):
             )
         # Compute homogenous solution
         self.homsol_wgrid = (
-            cst_wgrid + sol_wgrid * self.beta_plane.f0**2 * self.lambd
+            cst_wgrid + sol_wgrid * self.beta_plane.f0**2 * lambd
         )
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
         self.homsol_hgrid = self.cell_corners_to_cell_centers(
             self.homsol_wgrid,
         )
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
-
-    def _add_wind_forcing(
-        self,
-        du: torch.Tensor,
-        dv: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Add Wind forcing to du and dv.
-
-        Args:
-            du (torch.Tensor): du
-            dv (torch.Tensor): dv
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing
-        """
-        du[..., 0, :, :] += self.taux / self.H[0] * self.space.dx
-        dv[..., 0, :, :] += self.tauy / self.H[0] * self.space.dy
-        return du, dv
 
     def set_physical_uvh(
         self,
@@ -296,14 +238,33 @@ class QG(SW):
             h_phys (torch.Tensor): useless, for compatibilty reasons only.
         """
         super().compute_time_derivatives()
-        self.u, self.v, self.h = self.project_qg(self.u, self.v, self.h)
-        self.compute_diagnostic_variables()
+        self.uvh = self.project(self.u, self.v, self.h)
+
+    def set_uvh(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+    ) -> None:
+        """Set u,v,h value from prognostic variables.
+
+        Warning: the expected values are not physical values but prognostic
+        values. The variables correspond to the actual self.u, self.v, self.h
+        of the model.
+
+        Args:
+            u (torch.Tensor): State variable u.
+            v (torch.Tensor): State variable v.
+            h (torch.Tensor): State variable h.
+        """
+        self.sw.set_uvh(u, v, h)
+        super().set_uvh(u, v, h)
 
     def G(  # noqa: N802
         self,
         p: torch.Tensor,
-        p_i: None | torch.Tensor = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        p_i: torch.Tensor | None = None,
+    ) -> UVH:
         """G operator.
 
         Args:
@@ -312,7 +273,7 @@ class QG(SW):
              ("middle of grid cell"). Defaults to None.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
+            UVH: u, v and h
         """
         p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
         dx, dy = self.space.dx, self.space.dy
@@ -327,7 +288,7 @@ class QG(SW):
             * self.space.area
         )
 
-        return u, v, h
+        return UVH(u, v, h)
 
     def QoG_inv(  # noqa: N802
         self,
@@ -377,163 +338,76 @@ class QG(SW):
 
     def Q(  # noqa: N802
         self,
-        u: torch.Tensor,
-        v: torch.Tensor,
-        h: torch.Tensor,
+        uvh: UVH,
     ) -> torch.Tensor:
         """Q operator: compute elliptic equation r.h.s.
 
         Args:
-            u (torch.Tensor): Zonal speed.
-            v (torch.Tensor): Meridional Speed.
-            h (torch.Tensor): Layer  thickness.
+            uvh (UVH): u,v and h.
 
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
         f0, H, area = self.beta_plane.f0, self.H, self.space.area  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
-        omega = torch.diff(v[..., 1:-1], dim=-2) - torch.diff(
-            u[..., 1:-1, :],
+        omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
+            uvh.u[..., 1:-1, :],
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.cell_corners_to_cell_centers(h) / H) * (
+        return (omega - f0 * self.cell_corners_to_cell_centers(uvh.h) / H) * (
             f0 / area
         )
 
-    def project_qg(
+    def project(
         self,
-        u: torch.Tensor,
-        v: torch.Tensor,
-        h: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        uvh: UVH,
+    ) -> UVH:
         """QG projector P = G o (Q o G)^{-1} o Q.
 
         Args:
-            u (torch.Tensor): Zonal velocity
-            v (torch.Tensor): Meridional velocity
-            h (torch.Tensor): Layers Thickness
+            uvh (UVH): u,v and h.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Quasi geostrophic
-            u,v and h
+            UVH: Quasi geostrophic u,v and h
         """
-        return self.G(*self.QoG_inv(self.Q(u, v, h)))
+        return self.G(*self.QoG_inv(self.Q(uvh)))
 
-    def compute_ageostrophic_velocity(
-        self,
-        dt_uvh_qg: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-        dt_uvh_sw: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-    ) -> None:
-        """Compute ageostrophic variables.
-
-        Computes:
-        - Ageostrophic Zonal Velocity u_a
-        - Ageostrophic Meridional Velocity v_a
-        - Ageostrophic Kinetic Energy k_energy_a
-        - Ageostrophic Vorticity omega_a
-        - Ageostrophic Divergence div_a
+    def _init_core_model(self, optimize: bool) -> SW:  # noqa: FBT001
+        """Initialize the core Shallow Water model.
 
         Args:
-            dt_uvh_qg (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
-            after qg projection
-            dt_uvh_sw (tuple[torch.Tensor, torch.Tensor, torch.Tensor]): u,v,h
-            before projection
-        """
-        f0 = self.beta_plane.f0
-        self.u_a = -(dt_uvh_qg[1] - dt_uvh_sw[1]) / f0 / self.space.dy
-        self.v_a = (dt_uvh_qg[0] - dt_uvh_sw[0]) / f0 / self.space.dx
-        self.k_energy_a = 0.25 * (
-            self.u_a[..., 1:] ** 2
-            + self.u_a[..., :-1] ** 2
-            + self.v_a[..., 1:, :] ** 2
-            + self.v_a[..., :-1, :] ** 2
-        )
-        self.omega_a = (
-            torch.diff(self.v_a, dim=-2) / self.space.dx
-            - torch.diff(self.u_a, dim=-1) / self.space.dy
-        )
-        self.div_a = (
-            torch.diff(self.u_a[..., 1:-1], dim=-2) / self.space.dx
-            + torch.diff(self.v_a[..., 1:-1, :], dim=-1) / self.space.dy
-        )
-
-    def compute_pv(
-        self,
-        h: torch.Tensor,
-    ) -> torch.Tensor:
-        """Compute Shallow Water Potential Vorticty.
-
-        Args:
-            h (torch.Tensor): Prognostic layer thickness perturbation.
+            optimize (bool): Wehether to optimize the model functions or not.
 
         Returns:
-            torch.Tensor: Potential Vorticity
+            SW: Core model.
         """
-        beta_y = self.cell_corners_to_cell_centers(
-            (self.f - self.beta_plane.f0).unsqueeze(0),
+        return SW(
+            space_3d=self._space,
+            g_prime=self._g_prime,
+            beta_plane=self._beta_plane,
+            optimize=optimize,
         )
-        omega = self.cell_corners_to_cell_centers(self.omega)
-        return beta_y + omega - self.beta_plane.f0 * h / self.h_ref
 
-    def compute_diagnostic_variables(self) -> None:
-        """Compute Diagnostic Variables.
-
-        Compute the model's diagnostic variables.
-
-        Computed variables:
-        - Vorticity: omega
-        - Interface heights: eta
-        - Pressure: p
-        - Zonal velocity: U
-        - Meridional velocity: V
-        - Zonal Velocity Momentum: U_m
-        - Meriodional Velocity Momentum: V_m
-        - Kinetic Energy: k_energy
-        - Potential Vorticity: pv
-
-        Compute the result given the prognostic
-        variables self.u, self.v, self.h .
-
-        """
-        super().compute_diagnostic_variables()
-        self.pv = self.compute_pv(self.h)
-
-    def compute_time_derivatives(
-        self,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Compute the state variables derivatives dt_u, dt_v, dt_h.
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
-        """
-        dt_uvh_sw = super().compute_time_derivatives()
-        dt_uvh_qg = self.project_qg(*dt_uvh_sw)
-        self.dt_h = dt_uvh_sw[2]
-        self.P_dt_h = dt_uvh_qg[2]
-        self.P2_dt_h = self.project_qg(*dt_uvh_qg)[2]
-
-        self.compute_ageostrophic_velocity(dt_uvh_qg, dt_uvh_sw)
-
-        return dt_uvh_qg
-
-    def save_uv_ageostrophic(self, output_file: Path) -> None:
-        """Save U ageostrophic and V ageostrophic to a given file.
+    def compute_time_derivatives(self, uvh: UVH) -> UVH:
+        """Compute the prognostic variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            output_file (Path): File to save value in (.npz).
+            uvh (UVH): u,v and h.
+
+        Returns:
+            UVH: dt_u, dt_v, dt_h
         """
-        self._raise_if_invalid_savefile(output_file=output_file)
+        dt_uvh_sw = self._core.compute_time_derivatives(uvh)
+        return self.project(dt_uvh_sw)
 
-        np.savez(
-            output_file,
-            u=self.u_a.cpu().numpy().astype("float32"),
-            v=self.v_a.cpu().numpy().astype("float32"),
-        )
+    def update(self, uvh: UVH) -> UVH:
+        """Update prognostic variables.
 
-        verbose.display(msg=f"saved u_a,v_a to {output_file}", trigger_level=1)
+        Args:
+            uvh (UVH): u,v and h.
 
-    def step(self) -> None:
-        """Performs one step time-integration with RK3-SSP scheme."""
-        super().step()
+        Returns:
+            UVH: update prognostic variables.
+        """
+        return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)

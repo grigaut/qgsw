@@ -13,10 +13,12 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.models.base import Model
-from qgsw.models.core import finite_diff
+from qgsw.models.core import finite_diff, schemes
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.exceptions import IncoherentWithMaskError
+from qgsw.models.variables import UVH
+from qgsw.spatial.core import grid_conversion
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -85,8 +87,7 @@ class SW(Model):
         space_3d: SpaceDiscretization3D,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        n_ens: int = 1,
-        with_compile: bool = True,
+        optimize: bool = True,
     ) -> None:
         """SW Model Instantiation.
 
@@ -95,16 +96,68 @@ class SW(Model):
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
             n_ens (int, optional): Number of ensembles. Defaults to 1.
-            with_compile (bool, optional): Whether to precompile functions or
+            optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         super().__init__(
             space_3d=space_3d,
             g_prime=g_prime,
             beta_plane=beta_plane,
-            n_ens=n_ens,
-            with_compile=with_compile,
+            optimize=optimize,
         )
+
+    def _compute_coriolis(self) -> None:
+        """Set Coriolis Related Grids."""
+        super()._compute_coriolis()
+        ## Coriolis grids
+        self.f_ugrid = grid_conversion.omega_to_u(self.f)
+        self.f_vgrid = grid_conversion.omega_to_v(self.f)
+        self.f_hgrid = grid_conversion.omega_to_h(self.f)
+        self.fstar_ugrid = self.f_ugrid * self.space.area
+        self.fstar_vgrid = self.f_vgrid * self.space.area
+        self.fstar_hgrid = self.f_hgrid * self.space.area
+
+    def _add_wind_forcing(
+        self,
+        du: torch.Tensor,
+        dv: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Add wind forcing to the derivatives du, dv.
+
+        Args:
+            du (torch.Tensor): du
+            dv (torch.Tensor): dv
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing.
+        """
+        h_ugrid = self.h_tot_ugrid / self.space.area
+        h_vgrid = self.h_tot_vgrid / self.space.area
+        du_wind = self.taux / h_ugrid[..., 0, 1:-1, :] * self.space.dx
+        dv_wind = self.tauy / h_vgrid[..., 0, :, 1:-1] * self.space.dy
+        du[..., 0, :, :] += du_wind
+        dv[..., 0, :, :] += dv_wind
+        return du, dv
+
+    def _add_bottom_drag(
+        self,
+        uvh: UVH,
+        du: torch.Tensor,
+        dv: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Add bottom drag to the derivatives du, dv.
+
+        Args:
+            uvh (UVH): u,v and h.
+            du (torch.Tensor): du
+            dv (torch.Tensor): dv
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: du, dv with botoom drag forcing.
+        """
+        du[..., -1, :, :] += -self.bottom_drag_coef * uvh.u[..., -1, 1:-1, :]
+        dv[..., -1, :, :] += -self.bottom_drag_coef * uvh.v[..., -1, :, 1:-1]
+        return du, dv
 
     def set_physical_uvh(
         self,
@@ -156,29 +209,57 @@ class SW(Model):
                 "velocity must be zero out of domain."
             )
             raise IncoherentWithMaskError(msg)
-        self._u = u_.type(self.dtype) * self.masks.u * self.space.dx
-        self._v = v_.type(self.dtype) * self.masks.v * self.space.dy
-        self._h = h_.type(self.dtype) * self.masks.h * self.space.area
-        self.compute_diagnostic_variables()
+        u = u_.type(self.dtype) * self.masks.u * self.space.dx
+        v = v_.type(self.dtype) * self.masks.v * self.space.dy
+        h = h_.type(self.dtype) * self.masks.h * self.space.area
+        self.uvh = UVH(u, v, h)
+        self.compute_diagnostic_variables(self.uvh)
 
-    def step(self) -> None:
-        """Performs one step time-integration with RK3-SSP scheme."""
-        dt0_u, dt0_v, dt0_h = self.compute_time_derivatives()
-        self._u += self.dt * dt0_u
-        self._v += self.dt * dt0_v
-        self._h += self.dt * dt0_h
+    def compute_diagnostic_variables(self, uvh: UVH) -> None:
+        """Compute the model's diagnostic variables.
 
-        dt1_u, dt1_v, dt1_h = self.compute_time_derivatives()
-        self._u += (self.dt / 4) * (dt1_u - 3 * dt0_u)
-        self._v += (self.dt / 4) * (dt1_v - 3 * dt0_v)
-        self._h += (self.dt / 4) * (dt1_h - 3 * dt0_h)
+        Args:
+            uvh (UVH): Prognostic variables.
 
-        dt2_u, dt2_v, dt2_h = self.compute_time_derivatives()
-        self._u += (self.dt / 12) * (8 * dt2_u - dt1_u - dt0_u)
-        self._v += (self.dt / 12) * (8 * dt2_v - dt1_v - dt0_v)
-        self._h += (self.dt / 12) * (8 * dt2_h - dt1_h - dt0_h)
+        Computed variables:
+        - Vorticity: omega
+        - Interface heights: eta
+        - Pressure: p
+        - Zonal velocity: U
+        - Meridional velocity: V
+        - Kinetic Energy: k_energy
 
-    def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
+        Compute the result given the prognostic
+        variables u,v and h.
+        """
+        super().compute_diagnostic_variables(uvh)
+        # Zonal velocity -> corresponds to the v grid
+        # Has no value on the boundary of the v grid
+        self.U_m = self.cell_corners_to_cell_centers(self.U)
+        # Meridional velocity -> corresponds to the u grid
+        # Has no value on the boundary of the u grid
+        self.V_m = self.cell_corners_to_cell_centers(self.V)
+        # Match u grid dimensions (1, nl, nx, ny)
+        self.h_ugrid = grid_conversion.h_to_u(uvh.h, self.masks.h)
+        # Match v grid dimension
+        self.h_vgrid = grid_conversion.h_to_v(uvh.h, self.masks.h)
+        # Sum h on u grid
+        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
+        # Sum h on v grid
+        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
+
+    def update(self, uvh: UVH) -> None:
+        """Performs one step time-integration with RK3-SSP scheme.
+
+        Agrs:
+            uvh (UVH): u,v and h.
+        """
+        return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
+
+    def advection_momentum(
+        self,
+        uvh: UVH,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
         Use the shallow water momentum equation in rotation frame:
@@ -191,8 +272,8 @@ class SW(Model):
             tuple[torch.Tensor,torch.Tensor]: u, v advection (∂_t u, ∂_t v).
         """
         # Vortex-force + Coriolis
-        omega_v_m = self.w_flux_y(self.omega[..., 1:-1, :], self.V_m)
-        omega_u_m = self.w_flux_x(self.omega[..., 1:-1], self.U_m)
+        omega_v_m = self._fluxes.w_y(self.omega[..., 1:-1, :], self.V_m)
+        omega_u_m = self._fluxes.w_x(self.omega[..., 1:-1], self.U_m)
 
         dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * self.V_m
         dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * self.U_m)
@@ -204,14 +285,14 @@ class SW(Model):
 
         # wind forcing and bottom drag
         dt_u, dt_v = self._add_wind_forcing(dt_u, dt_v)
-        dt_u, dt_v = self._add_bottom_drag(dt_u, dt_v)
+        dt_u, dt_v = self._add_bottom_drag(uvh, dt_u, dt_v)
 
         return (
             F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u,
             F.pad(dt_v, (1, 1, 0, 0)) * self.masks.v,
         )
 
-    def advection_h(self) -> torch.Tensor:
+    def advection_h(self, h: torch.Tensor) -> torch.Tensor:
         """Advection RHS for thickness perturbation h.
 
         ∂_t h = - ∇⋅(h_tot u)
@@ -219,14 +300,17 @@ class SW(Model):
         u = [U V]
         h_tot = h_ref + h
 
+        Args:
+            h (torch.Tensor): layer Thickness perturbation
+
         Returns:
             torch.Tensor: h advection (∂_t h).
         """
-        h_tot = self.h_ref + self.h
+        h_tot = self.h_ref + h
         # Compute (h_tot x V)
-        h_tot_flux_y = self.h_flux_y(h_tot, self.V[..., 1:-1])
+        h_tot_flux_y = self._fluxes.h_y(h_tot, self.V[..., 1:-1])
         # Compute (h_tot x U)
-        h_tot_flux_x = self.h_flux_x(h_tot, self.U[..., 1:-1, :])
+        h_tot_flux_x = self._fluxes.h_x(h_tot, self.U[..., 1:-1, :])
         # Compute -∇⋅(h_tot u) = ∂_x (h_tot x U) + ∂_y (h_tot x V)
         div_no_flux = -finite_diff.div_nofluxbc(h_tot_flux_x, h_tot_flux_y)
         # Apply h mask
@@ -234,16 +318,24 @@ class SW(Model):
 
     def compute_time_derivatives(
         self,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        uvh: UVH,
+    ) -> UVH:
         """Compute the state variables derivatives dt_u, dt_v, dt_h.
 
+        Args:
+            uvh (UVH): u,v and h.
+
         Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: dt_u, dt_v, dt_h
+            UVH: dt_u, dt_v, dt_h
         """
-        self.compute_diagnostic_variables()
-        dt_h = self.advection_h()
-        dt_u, dt_v = self.advection_momentum()
-        return dt_u, dt_v, dt_h
+        self.compute_diagnostic_variables(uvh)
+        dt_h = self.advection_h(uvh.h)
+        dt_u, dt_v = self.advection_momentum(uvh)
+        return UVH(
+            dt_u,
+            dt_v,
+            dt_h,
+        )
 
 
 class SWFilterBarotropic(SW):
@@ -258,7 +350,7 @@ class SWFilterBarotropic(SW):
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         n_ens: int = 1,
-        with_compile: bool = True,
+        optimize: bool = True,
     ) -> None:
         """SWFilterBarotropic Model Instantiation.
 
@@ -267,7 +359,7 @@ class SWFilterBarotropic(SW):
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
             n_ens (int, optional): Number of ensembles. Defaults to 1.
-            with_compile (bool, optional): Whether to precompile functions or
+            optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         super().__init__(
@@ -275,7 +367,7 @@ class SWFilterBarotropic(SW):
             g_prime=g_prime,
             beta_plane=beta_plane,
             n_ens=n_ens,
-            with_compile=with_compile,
+            optimize=optimize,
         )
 
     @property

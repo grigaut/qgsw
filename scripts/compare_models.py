@@ -7,10 +7,12 @@ from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import QG
+from qgsw.models.qg.colinear_sublayer import (
+    QGColinearSublayerStreamFunction,
+)
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
-    SecondLayerVorticityAxes,
     SurfaceVorticityAxes,
     VorticityComparisonFigure,
 )
@@ -33,8 +35,14 @@ if config.io.results.save:
     save_file = config.io.results.directory.joinpath("_summary.toml")
     summary.to_file(save_file)
 
-if config.models[0].type != "QG" or config.models[1].type != "QG":
-    msg = "Unsupported model type, possible values are: QG."
+possible_models = ["QG", "QGColinearSublayerStreamFunction"]
+
+supported_1 = config.models[0].type in possible_models
+supported_2 = config.models[1].type in possible_models
+supported_3 = config.models[2].type in possible_models
+
+if not all([supported_1, supported_2, supported_3]):
+    msg = f"Unsupported model type, possible values are: {possible_models}."
     raise ValueError(msg)
 
 # Common Set-up
@@ -53,140 +61,197 @@ perturbation = Perturbation.from_config(
 )
 
 # Single Layer Set-up
-prefix_1l = config.models[0].prefix
+prefix_1 = config.models[0].prefix
 ## Grid
-space_1l = SpaceDiscretization3D.from_config(config.space, config.models[0])
+space_1 = SpaceDiscretization3D.from_config(config.space, config.models[0])
 ## Compute Burger Number
-Bu_1l = compute_burger(
+Bu_1 = compute_burger(
     g=config.models[0].g_prime[0],
     h_scale=config.models[0].h[0],
     f0=config.physics.f0,
-    length_scale=perturbation.compute_scale(space_1l.omega),
+    length_scale=perturbation.compute_scale(space_1.omega),
 )
 verbose.display(
-    msg=f"Single-Layer Burger Number: {Bu_1l:.2f}",
+    msg=f"Single-Layer Burger Number: {Bu_1:.2f}",
     trigger_level=1,
 )
 ## Set model parameters
-qg_1l = QG(
-    space_3d=space_1l,
+qg_1 = QG(
+    space_3d=space_1,
     g_prime=config.models[0].g_prime.unsqueeze(1).unsqueeze(1),
     beta_plane=config.physics.beta_plane,
 )
-qg_1l.slip_coef = config.physics.slip_coef
-qg_1l.bottom_drag_coef = config.physics.bottom_drag_coef
-qg_1l.set_wind_forcing(taux, tauy)
-p0_1l = perturbation.compute_initial_pressure(
-    space_1l.omega,
+qg_1.slip_coef = config.physics.slip_coef
+qg_1.bottom_drag_coef = config.physics.bottom_drag_coef
+qg_1.set_wind_forcing(taux, tauy)
+p0_1 = perturbation.compute_initial_pressure(
+    space_1.omega,
     config.physics.f0,
     Ro,
 )
-u0_1l, v0_1l, h0_1l = qg_1l.G(p0_1l)
+u0_1, v0_1, h0_1 = qg_1.G(p0_1)
 
 ## Max speed
-u_max_1l, v_max_1l, c_1l = (
-    torch.abs(u0_1l).max().item() / config.space.dx,
-    torch.abs(v0_1l).max().item() / config.space.dy,
+u_max_1, v_max_1, c_1 = (
+    torch.abs(u0_1).max().item() / config.space.dx,
+    torch.abs(v0_1).max().item() / config.space.dy,
     torch.sqrt(config.models[0].g_prime[0] * config.models[0].h.sum()),
 )
 ## Timestep
-dt_1l = min(
-    cfl_adv * config.space.dx / u_max_1l,
-    cfl_adv * config.space.dy / v_max_1l,
-    cfl_gravity * config.space.dx / c_1l,
+dt_1 = min(
+    cfl_adv * config.space.dx / u_max_1,
+    cfl_adv * config.space.dy / v_max_1,
+    cfl_gravity * config.space.dx / c_1,
 )
 
 # Two Layers Set-up
-prefix_2l = config.models[1].prefix
+prefix_2 = config.models[1].prefix
 ## Grid
-space_2l = SpaceDiscretization3D.from_config(config.space, config.models[1])
+space_2 = SpaceDiscretization3D.from_config(config.space, config.models[1])
 ## Compute Burger Number
 h1 = config.models[1].h[0]
 h2 = config.models[1].h[1]
 h_eq = (h1 * h2) / (h1 + h2)
 
-Bu_2l = compute_burger(
+Bu_2 = compute_burger(
     g=config.models[1].g_prime[0],
     h_scale=h_eq,
     f0=config.physics.f0,
-    length_scale=perturbation.compute_scale(space_2l.omega),
+    length_scale=perturbation.compute_scale(space_2.omega),
 )
 verbose.display(
-    msg=f"Multi-Layers Burger Number: {Bu_2l:.2f}",
+    msg=f"Colinear-Layers Burger Number: {Bu_2:.2f}",
     trigger_level=1,
 )
 ## Set model parameters
-qg_2l = QG(
-    space_3d=space_2l,
+qg_2 = QGColinearSublayerStreamFunction(
+    space_3d=space_2,
     g_prime=config.models[1].g_prime.unsqueeze(1).unsqueeze(1),
     beta_plane=config.physics.beta_plane,
 )
-qg_2l.slip_coef = config.physics.slip_coef
-qg_2l.bottom_drag_coef = config.physics.bottom_drag_coef
-qg_2l.set_wind_forcing(taux, tauy)
-p0_2l = perturbation.compute_initial_pressure(
-    space_2l.omega,
+qg_2.slip_coef = config.physics.slip_coef
+qg_2.bottom_drag_coef = config.physics.bottom_drag_coef
+qg_2.set_wind_forcing(taux, tauy)
+p0_2 = perturbation.compute_initial_pressure(
+    space_2.omega,
     config.physics.f0,
     Ro,
 )
-u0_2l, v0_2l, h0_2l = qg_2l.G(p0_2l)
+u0_2, v0_2, h0_2 = qg_2.G(p0_2)
 ## Max Speed
-u_max_2l, v_max_2l, c_2l = (
-    torch.abs(u0_2l).max().item() / config.space.dx,
-    torch.abs(v0_2l).max().item() / config.space.dy,
+u_max_2, v_max_2, c_2 = (
+    torch.abs(u0_2).max().item() / config.space.dx,
+    torch.abs(v0_2).max().item() / config.space.dy,
     torch.sqrt(config.models[1].g_prime[0] * config.models[1].h.sum()),
 )
 ## Timestep
-dt_2l = min(
-    cfl_adv * config.space.dx / u_max_2l,
-    cfl_adv * config.space.dy / v_max_2l,
-    cfl_gravity * config.space.dx / c_2l,
+dt_2 = min(
+    cfl_adv * config.space.dx / u_max_2,
+    cfl_adv * config.space.dy / v_max_2,
+    cfl_gravity * config.space.dx / c_2,
+)
+
+# Two Layers Set-up
+prefix_3 = config.models[2].prefix
+## Grid
+space_3 = SpaceDiscretization3D.from_config(config.space, config.models[2])
+## Compute Burger Number
+h1 = config.models[2].h[0]
+h2 = config.models[2].h[1]
+h_eq = (h1 * h2) / (h1 + h2)
+
+Bu_3 = compute_burger(
+    g=config.models[2].g_prime[0],
+    h_scale=h_eq,
+    f0=config.physics.f0,
+    length_scale=perturbation.compute_scale(space_3.omega),
+)
+verbose.display(
+    msg=f"Two-Layers Burger Number: {Bu_3:.2f}",
+    trigger_level=1,
+)
+## Set model parameters
+qg_3 = QGColinearSublayerStreamFunction(
+    space_3d=space_3,
+    g_prime=config.models[2].g_prime.unsqueeze(1).unsqueeze(1),
+    beta_plane=config.physics.beta_plane,
+)
+qg_3.slip_coef = config.physics.slip_coef
+qg_3.bottom_drag_coef = config.physics.bottom_drag_coef
+qg_3.set_wind_forcing(taux, tauy)
+p0_3 = perturbation.compute_initial_pressure(
+    space_3.omega,
+    config.physics.f0,
+    Ro,
+)
+u0_3, v0_3, h0_3 = qg_3.G(p0_3)
+## Max Speed
+u_max_3, v_max_3, c_3 = (
+    torch.abs(u0_3).max().item() / config.space.dx,
+    torch.abs(v0_3).max().item() / config.space.dy,
+    torch.sqrt(config.models[2].g_prime[0] * config.models[2].h.sum()),
+)
+## Timestep
+dt_3 = min(
+    cfl_adv * config.space.dx / u_max_3,
+    cfl_adv * config.space.dy / v_max_3,
+    cfl_gravity * config.space.dx / c_3,
 )
 
 # Instantiate Models
-dt = min(dt_1l, dt_2l)
-qg_1l.dt = dt
-qg_1l.set_uvh(
-    u=torch.clone(u0_1l),
-    v=torch.clone(v0_1l),
-    h=torch.clone(h0_1l),
+dt = min(dt_1, dt_2, dt_3)
+qg_1.dt = dt
+qg_1.set_uvh(
+    u=torch.clone(u0_1),
+    v=torch.clone(v0_1),
+    h=torch.clone(h0_1),
 )
 
-qg_2l.dt = dt
-qg_2l.set_uvh(
-    u=torch.clone(u0_2l),
-    v=torch.clone(v0_2l),
-    h=torch.clone(h0_2l),
+qg_2.dt = dt
+qg_2.set_uvh(
+    u=torch.clone(u0_2),
+    v=torch.clone(v0_2),
+    h=torch.clone(h0_2),
+)
+
+qg_3.dt = dt
+qg_3.set_uvh(
+    u=torch.clone(u0_3),
+    v=torch.clone(v0_3),
+    h=torch.clone(h0_3),
 )
 
 ## time params
 t = 0
 
-qg_1l.compute_diagnostic_variables()
-qg_1l.compute_time_derivatives()
-
-w_0_1l = qg_1l.omega.squeeze() / qg_1l.space.dx / qg_1l.space.dy
+w_0_1 = qg_1.omega.squeeze() / qg_1.space.dx / qg_1.space.dy
 
 
-tau_1l = 1.0 / torch.sqrt(w_0_1l.pow(2).mean()).to(device=DEVICE).item()
+tau_1 = 1.0 / torch.sqrt(w_0_1.pow(2).mean()).to(device=DEVICE).item()
 verbose.display(
-    msg=f"tau (single layer) = {tau_1l *config.physics.f0:.2f} f0-1",
+    msg=f"tau (single layer) = {tau_1 *config.physics.f0:.2f} f0-1",
     trigger_level=1,
 )
 
-qg_2l.compute_diagnostic_variables()
-qg_2l.compute_time_derivatives()
-
-w_0_2l = qg_2l.omega.squeeze() / qg_2l.space.dx / qg_2l.space.dy
+w_0_2 = qg_2.omega.squeeze() / qg_2.space.dx / qg_2.space.dy
 
 
-tau_2l = 1.0 / torch.sqrt(w_0_2l.pow(2).mean()).to(device=DEVICE).item()
+tau_2 = 1.0 / torch.sqrt(w_0_2.pow(2).mean()).to(device=DEVICE).item()
 verbose.display(
-    msg=f"tau (multi layer) = {tau_2l *config.physics.f0:.2f} f0-1",
+    msg=f"tau (colinear layer) = {tau_2 *config.physics.f0:.2f} f0-1",
     trigger_level=1,
 )
 
-tau = max(tau_1l, tau_2l)
+w_0_3 = qg_3.omega.squeeze() / qg_3.space.dx / qg_3.space.dy
+
+
+tau_3 = 1.0 / torch.sqrt(w_0_3.pow(2).mean()).to(device=DEVICE).item()
+verbose.display(
+    msg=f"tau (two layers) = {tau_3 *config.physics.f0:.2f} f0-1",
+    trigger_level=1,
+)
+
+tau = max(tau_1, tau_2, tau_3)
 verbose.display(
     msg=f"tau = {tau *config.physics.f0:.2f} f0-1",
     trigger_level=1,
@@ -207,23 +272,23 @@ verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
 # Instantiate Figures
-qg_1l_axes = SurfaceVorticityAxes.from_kwargs()
-qg_1l_axes.set_title(r"$\omega_{QG-1L-TOP}$")
-qg_2l_top_axes = SurfaceVorticityAxes.from_kwargs()
-qg_2l_top_axes.set_title(r"$\omega_{QG-ML-TOP}$")
-qg_2l_inf_axes = SecondLayerVorticityAxes.from_kwargs()
-qg_2l_inf_axes.set_title(r"$\omega_{QG-ML-INF}$")
-plot = VorticityComparisonFigure(qg_1l_axes, qg_2l_top_axes, qg_2l_inf_axes)
+qg_1_axes = SurfaceVorticityAxes.from_kwargs()
+qg_1_axes.set_title(r"$\omega_{QG-1L-TOP}$")
+qg_2_top_axes = SurfaceVorticityAxes.from_kwargs()
+qg_2_top_axes.set_title(r"$\omega_{QG-CL-TOP}$")
+qg_3_top_axes = SurfaceVorticityAxes.from_kwargs()
+qg_3_top_axes.set_title(r"$\omega_{QG-2L-TOP}$")
+plot = VorticityComparisonFigure(qg_1_axes, qg_2_top_axes, qg_3_top_axes)
 
 summary.register_start()
 # Start runs
 for n in range(n_steps + 1):
     if plots_required and (n % freq_plot == 0 or n == n_steps):
         plot.figure.suptitle(
-            f"Ro={Ro:.2f}, Bu_1l={Bu_1l:.2f}, Bu_2l={Bu_2l:.2f},"
-            f" t={t/tau:.2f}$\\tau$",
+            f"Ro={Ro:.2f}, Bu_1={Bu_1:.2f}, Bu_2={Bu_2:.2f},"
+            f"Bu_3={Bu_3:.2f}, t={t/tau:.2f}$\\tau$",
         )
-        plot.update_with_models(qg_1l, qg_2l, qg_2l)
+        plot.update_with_models(qg_1, qg_2, qg_3)
         if config.io.plots.show:
             plot.show()
         if config.io.plots.save:
@@ -233,19 +298,25 @@ for n in range(n_steps + 1):
 
     if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
-        qg_1l.save_omega(directory.joinpath(f"{prefix_1l}{n}.npz"))
-        qg_2l.save_omega(directory.joinpath(f"{prefix_2l}{n}.npz"))
-    qg_1l.step()
-    qg_2l.step()
+        qg_1.save_omega(directory.joinpath(f"{prefix_1}{n}.npz"))
+        qg_2.save_omega(directory.joinpath(f"{prefix_2}{n}.npz"))
+        qg_3.save_omega(directory.joinpath(f"{prefix_3}{n}.npz"))
+    qg_1.step()
+    qg_2.step()
+    qg_3.step()
     t += dt
 
     if (freq_log > 0 and n % freq_log == 0) or (n == n_steps):
         verbose.display(
-            msg=f"QG-1l: n={n:05d}, {qg_1l.get_print_info()}",
+            msg=f"QG-1L: n={n:05d}, {qg_1.get_print_info()}",
             trigger_level=1,
         )
         verbose.display(
-            msg=f"QG_ML: n={n:05d}, {qg_2l.get_print_info()}",
+            msg=f"QG-CL: n={n:05d}, {qg_2.get_print_info()}",
+            trigger_level=1,
+        )
+        verbose.display(
+            msg=f"QG-2L: n={n:05d}, {qg_3.get_print_info()}",
             trigger_level=1,
         )
         summary.register_step(n)
