@@ -41,7 +41,6 @@ class ModelParamChecker:
             space_3d (SpaceDiscretization3D): Space Discretization
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
-            n_ens (int, optional): Number of ensembles. Defaults to 1.
         """
         # Set up
         verbose.display(
@@ -260,10 +259,10 @@ class ModelParamChecker:
         Args:
             g_prime (torch.Tensor): g_prime.
         """
-        if g_prime.shape != self.H.shape:
+        if g_prime.shape != self._H.shape:
             msg = (
                 f"Inconsistent shapes for g_prime ({g_prime.shape}) "
-                f"and H ({self.H.shape})"
+                f"and H ({self._H.shape})"
             )
             raise InvalidModelParameterError(msg)
         self._g_prime = g_prime
