@@ -367,7 +367,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         v = v.type(self.dtype) * self.masks.v
         h = h.type(self.dtype) * self.masks.h
         self.uvh = UVH(u, v, h)
-        self.compute_diagnostic_variables(self.uvh)
 
     @abstractmethod
     def compute_time_derivatives(
