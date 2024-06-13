@@ -386,12 +386,15 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         self.compute_diagnostic_variables(self.uvh)
 
     @abstractmethod
-    def advection_h(self) -> torch.Tensor:
+    def advection_h(self, h: torch.Tensor) -> torch.Tensor:
         """Advection RHS for thickness perturbation h.
 
         dt_h = - div(h_tot [u v])
 
         h_tot = h_ref + h
+
+        Args:
+            h (torch.Tensor): layer Thickness perturbation
 
         Returns:
             torch.Tensor: h advection.
@@ -400,7 +403,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     @abstractmethod
     def advection_momentum(
         self,
-        h: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
