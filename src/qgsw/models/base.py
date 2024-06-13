@@ -408,46 +408,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
             tuple[torch.Tensor,torch.Tensor]: u, v advection.
         """
 
-    def _add_wind_forcing(
-        self,
-        du: torch.Tensor,
-        dv: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Add wind forcing to the derivatives du, dv.
-
-        Args:
-            du (torch.Tensor): du
-            dv (torch.Tensor): dv
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing.
-        """
-        h_ugrid = self.h_tot_ugrid / self.space.area
-        h_vgrid = self.h_tot_vgrid / self.space.area
-        du_wind = self.taux / h_ugrid[..., 0, 1:-1, :] * self.space.dx
-        dv_wind = self.tauy / h_vgrid[..., 0, :, 1:-1] * self.space.dy
-        du[..., 0, :, :] += du_wind
-        dv[..., 0, :, :] += dv_wind
-        return du, dv
-
-    def _add_bottom_drag(
-        self,
-        du: torch.Tensor,
-        dv: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Add bottom drag to the derivatives du, dv.
-
-        Args:
-            du (torch.Tensor): du
-            dv (torch.Tensor): dv
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: du, dv with botoom drag forcing.
-        """
-        du[..., -1, :, :] += -self.bottom_drag_coef * self.u[..., -1, 1:-1, :]
-        dv[..., -1, :, :] += -self.bottom_drag_coef * self.v[..., -1, :, 1:-1]
-        return du, dv
-
     @abstractmethod
     def compute_time_derivatives(
         self,
