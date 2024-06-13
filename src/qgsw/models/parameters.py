@@ -34,7 +34,6 @@ class ModelParamChecker:
         space_3d: SpaceDiscretization3D,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        n_ens: int = 1,
     ) -> None:
         """Model Instantiation.
 
@@ -60,8 +59,6 @@ class ModelParamChecker:
         self._set_H(space_3d.h.xyh.h)
         ## gravity
         self._set_g_prime(g_prime)
-        # Number of ensemble
-        self.n_ens = n_ens
 
     @property
     def space(self) -> SpaceDiscretization3D:

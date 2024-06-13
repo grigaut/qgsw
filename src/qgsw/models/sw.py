@@ -87,7 +87,6 @@ class SW(Model):
         space_3d: SpaceDiscretization3D,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        n_ens: int = 1,
         optimize: bool = True,
     ) -> None:
         """SW Model Instantiation.
@@ -104,7 +103,6 @@ class SW(Model):
             space_3d=space_3d,
             g_prime=g_prime,
             beta_plane=beta_plane,
-            n_ens=n_ens,
             optimize=optimize,
         )
 
@@ -143,20 +141,22 @@ class SW(Model):
 
     def _add_bottom_drag(
         self,
+        uvh: UVH,
         du: torch.Tensor,
         dv: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Add bottom drag to the derivatives du, dv.
 
         Args:
+            uvh (UVH): u,v and h.
             du (torch.Tensor): du
             dv (torch.Tensor): dv
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with botoom drag forcing.
         """
-        du[..., -1, :, :] += -self.bottom_drag_coef * self.u[..., -1, 1:-1, :]
-        dv[..., -1, :, :] += -self.bottom_drag_coef * self.v[..., -1, :, 1:-1]
+        du[..., -1, :, :] += -self.bottom_drag_coef * uvh.u[..., -1, 1:-1, :]
+        dv[..., -1, :, :] += -self.bottom_drag_coef * uvh.v[..., -1, :, 1:-1]
         return du, dv
 
     def set_physical_uvh(
@@ -256,7 +256,10 @@ class SW(Model):
         """
         return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
 
-    def advection_momentum(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def advection_momentum(
+        self,
+        uvh: UVH,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
         Use the shallow water momentum equation in rotation frame:
@@ -282,7 +285,7 @@ class SW(Model):
 
         # wind forcing and bottom drag
         dt_u, dt_v = self._add_wind_forcing(dt_u, dt_v)
-        dt_u, dt_v = self._add_bottom_drag(dt_u, dt_v)
+        dt_u, dt_v = self._add_bottom_drag(uvh, dt_u, dt_v)
 
         return (
             F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u,
@@ -327,7 +330,7 @@ class SW(Model):
         """
         self.compute_diagnostic_variables(uvh)
         dt_h = self.advection_h(uvh.h)
-        dt_u, dt_v = self.advection_momentum()
+        dt_u, dt_v = self.advection_momentum(uvh)
         return UVH(
             dt_u,
             dt_v,

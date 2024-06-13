@@ -97,7 +97,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         space_3d: SpaceDiscretization3D,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        n_ens: int = 1,
         optimize: bool = True,
     ) -> None:
         """Model Instantiation.
@@ -119,7 +118,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
             space_3d=space_3d,
             g_prime=g_prime,
             beta_plane=beta_plane,
-            n_ens=n_ens,
         )
         ModelResultsRetriever.__init__(self)
         self._compute_coriolis()
@@ -302,7 +300,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         # Diagnostic: vorticity values
         self.omega = self.compute_omega(uvh)
         # Diagnostic: interface height : physical
-        self.eta = reverse_cumsum(self.h / self.space.area, dim=-3)
+        self.eta = reverse_cumsum(uvh.h / self.space.area, dim=-3)
         # Diagnostic: pressure values
         self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
         # Diagnostic: zonal velocity
@@ -367,6 +365,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         v = v.type(self.dtype) * self.masks.v
         h = h.type(self.dtype) * self.masks.h
         self.uvh = UVH(u, v, h)
+        self.compute_diagnostic_variables(self.uvh)
 
     @abstractmethod
     def compute_time_derivatives(
@@ -396,3 +395,4 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self.uvh = self.update(self.uvh)
+        self.compute_diagnostic_variables(self.uvh)
