@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import torch
-from icecream import ic
 
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.qg.core import QG
@@ -77,7 +76,6 @@ class QGColinearSublayerStreamFunction(QG):
             )
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
-        ic(self.H, self.H.shape)
 
     def _init_core_model(self, optimize: bool) -> SW:  # noqa: FBT001
         """Initialize the core Shallow Water model.
