@@ -150,21 +150,10 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     def _compute_coriolis(
         self,
     ) -> None:
-        """Set Coriolis Grids.
-
-        Args:
-            beta_plane (coriolis.BetaPlane): Coriolis values.
-        """
+        """Set Coriolis Values."""
         # Coriolis values
         f = self.beta_plane.compute_over_grid(self.space.omega.remove_z_h())
         self.f = f.unsqueeze(0)
-        ## Coriolis grids
-        self.f_ugrid = grid_conversion.omega_to_u(self.f)
-        self.f_vgrid = grid_conversion.omega_to_v(self.f)
-        self.f_hgrid = grid_conversion.omega_to_h(self.f)
-        self.fstar_ugrid = self.f_ugrid * self.space.area
-        self.fstar_vgrid = self.f_vgrid * self.space.area
-        self.fstar_hgrid = self.f_hgrid * self.space.area
 
     def set_wind_forcing(
         self,

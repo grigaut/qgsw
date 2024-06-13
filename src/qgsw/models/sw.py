@@ -18,6 +18,7 @@ from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.exceptions import IncoherentWithMaskError
 from qgsw.models.variables import UVH
+from qgsw.spatial.core import grid_conversion
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -106,6 +107,17 @@ class SW(Model):
             n_ens=n_ens,
             optimize=optimize,
         )
+
+    def _compute_coriolis(self) -> None:
+        """Set Coriolis Related Grids."""
+        super()._compute_coriolis()
+        ## Coriolis grids
+        self.f_ugrid = grid_conversion.omega_to_u(self.f)
+        self.f_vgrid = grid_conversion.omega_to_v(self.f)
+        self.f_hgrid = grid_conversion.omega_to_h(self.f)
+        self.fstar_ugrid = self.f_ugrid * self.space.area
+        self.fstar_vgrid = self.f_vgrid * self.space.area
+        self.fstar_hgrid = self.f_hgrid * self.space.area
 
     def set_physical_uvh(
         self,
