@@ -264,7 +264,7 @@ class SW(Model):
         u = [U V]
         h_tot = h_ref + h
 
-        Agrs:
+        Args:
             h (torch.Tensor): layer Thickness perturbation
 
         Returns:
