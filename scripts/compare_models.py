@@ -162,9 +162,6 @@ qg_2l.set_uvh(
 ## time params
 t = 0
 
-qg_1l.compute_diagnostic_variables()
-qg_1l.compute_time_derivatives()
-
 w_0_1l = qg_1l.omega.squeeze() / qg_1l.space.dx / qg_1l.space.dy
 
 
@@ -173,9 +170,6 @@ verbose.display(
     msg=f"tau (single layer) = {tau_1l *config.physics.f0:.2f} f0-1",
     trigger_level=1,
 )
-
-qg_2l.compute_diagnostic_variables()
-qg_2l.compute_time_derivatives()
 
 w_0_2l = qg_2l.omega.squeeze() / qg_2l.space.dx / qg_2l.space.dy
 
