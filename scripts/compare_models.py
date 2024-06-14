@@ -17,6 +17,7 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
+from qgsw.spatial.core.discretization import keep_top_layer
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 
@@ -133,7 +134,7 @@ qg_2.slip_coef = config.physics.slip_coef
 qg_2.bottom_drag_coef = config.physics.bottom_drag_coef
 qg_2.set_wind_forcing(taux, tauy)
 p0_2 = perturbation.compute_initial_pressure(
-    space_2.omega,
+    keep_top_layer(space_2).omega,
     config.physics.f0,
     Ro,
 )
