@@ -14,13 +14,14 @@ from qgsw.utils.sorting import sort_files
 
 load_dotenv()
 
+display_sublayer = False
+
 storage = Path(os.environ["G5K_IMPORT_STORAGE"])
 folder = storage.parent.joinpath("imports")
 
 summary = RunSummary.from_file(folder.joinpath("_summary.toml"))
 config = summary.configuration
 tau = summary.total_steps / config.simulation.duration
-
 axes = []
 nbs = []
 files = []
@@ -32,7 +33,7 @@ for model in config.models:
     nb, fs = sort_files(results, model.prefix, ".npz")
     nbs.append(nb)
     files.append(fs)
-    if model.nl > 1:
+    if display_sublayer and model.nl > 1:
         ax = SecondLayerVorticityAxes.from_kwargs()
         ax.set_title(r"$\omega_{INF}$" + f"-{model.prefix}")
         axes.append(ax)
