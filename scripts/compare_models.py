@@ -171,7 +171,7 @@ verbose.display(
     trigger_level=1,
 )
 ## Set model parameters
-qg_3 = QGColinearSublayerStreamFunction(
+qg_3 = QG(
     space_3d=space_3,
     g_prime=config.models[2].g_prime.unsqueeze(1).unsqueeze(1),
     beta_plane=config.physics.beta_plane,
