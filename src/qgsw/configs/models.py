@@ -67,11 +67,6 @@ class ModelConfig(_Config):
         )
 
     @property
-    def nl(self) -> int:
-        """Number of layers."""
-        return self._nl
-
-    @property
     def prefix(self) -> int:
         """Prefix."""
         return self.params[self._prefix]
@@ -97,6 +92,5 @@ class ModelConfig(_Config):
                 f"g' 's shape ({g_prime_shape}) don't match."
             )
             raise ConfigError(msg)
-        self._nl = h_shape
 
         return super()._validate_params(params)
