@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
@@ -16,7 +17,7 @@ from qgsw.plots.vorticity import (
 )
 from qgsw.run_summary import RunSummary
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
-from qgsw.specs import DEVICE
+from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
@@ -43,9 +44,6 @@ wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 taux, tauy = wind.compute()
 ## Rossby
 Ro = 0.1
-
-cfl_adv = 0.5
-cfl_gravity = 0.5
 
 # Model Set-up
 ## Vortex
@@ -76,27 +74,19 @@ model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coef
 model.set_wind_forcing(taux, tauy)
 p0 = perturbation.compute_initial_pressure(space.omega, config.physics.f0, Ro)
-u0, v0, h0 = model.G(p0)
+uvh0 = model.G(p0)
 
-## Max speed
-u_max, v_max, c = (
-    torch.abs(u0).max().item() / config.space.dx,
-    torch.abs(v0).max().item() / config.space.dy,
-    torch.sqrt(config.model.g_prime[0] * config.model.h.sum()),
-)
-## Timestep
-dt = min(
-    cfl_adv * config.space.dx / u_max,
-    cfl_adv * config.space.dy / v_max,
-    cfl_gravity * config.space.dx / c,
-)
+if np.isnan(config.simulation.dt):
+    dt = time_params.compute_dt(uvh0, model.space, model.g_prime, model.H)
+else:
+    dt = config.simulation.dt
 
 # Instantiate Model
 model.dt = dt
 model.set_uvh(
-    u=torch.clone(u0),
-    v=torch.clone(v0),
-    h=torch.clone(h0),
+    u=torch.clone(uvh0.u),
+    v=torch.clone(uvh0.v),
+    h=torch.clone(uvh0.h),
 )
 
 ## time params
@@ -105,10 +95,10 @@ t = 0
 model.compute_diagnostic_variables(model.uvh)
 model.compute_time_derivatives(model.uvh)
 
-w_0 = model.omega.squeeze() / model.space.dx / model.space.dy
-
-
-tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(device=DEVICE).item()
+if np.isnan(config.simulation.tau):
+    tau = time_params.compute_tau(model.omega, model.space)
+else:
+    tau = config.simulation.tau
 verbose.display(
     msg=f"tau = {tau *config.physics.f0:.2f} f0⁻¹",
     trigger_level=1,

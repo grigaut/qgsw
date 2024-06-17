@@ -20,7 +20,8 @@ bottom_drag_coefficient = 0
 
 [simulation]
 duration = 8 # units of Tau
-dt = nan # dt is automatically computed
+tau = nan # in f0⁻¹, if nan: Tau is automatically computed
+dt = nan # in s, if nan: dt is automatically computed
 
 [[models]]
 name = "One Layer"
