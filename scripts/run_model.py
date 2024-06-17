@@ -98,7 +98,7 @@ model.compute_time_derivatives(model.uvh)
 if np.isnan(config.simulation.tau):
     tau = time_params.compute_tau(model.omega, model.space)
 else:
-    tau = config.simulation.tau
+    tau = config.simulation.tau / config.physics.f0
 verbose.display(
     msg=f"tau = {tau *config.physics.f0:.2f} f0⁻¹",
     trigger_level=1,
