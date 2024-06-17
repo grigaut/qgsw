@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
@@ -19,7 +20,7 @@ from qgsw.plots.vorticity import (
 from qgsw.run_summary import RunSummary
 from qgsw.spatial.core.discretization import keep_top_layer
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
-from qgsw.specs import DEVICE
+from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
@@ -52,9 +53,6 @@ wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 taux, tauy = wind.compute()
 ## Rossby
 Ro = 0.1
-
-cfl_adv = 0.5
-cfl_gravity = 0.5
 
 ## Perturbation
 perturbation = Perturbation.from_config(
@@ -90,20 +88,7 @@ p0_1 = perturbation.compute_initial_pressure(
     config.physics.f0,
     Ro,
 )
-u0_1, v0_1, h0_1 = qg_1.G(p0_1)
-
-## Max speed
-u_max_1, v_max_1, c_1 = (
-    torch.abs(u0_1).max().item() / config.space.dx,
-    torch.abs(v0_1).max().item() / config.space.dy,
-    torch.sqrt(config.models[0].g_prime[0] * config.models[0].h.sum()),
-)
-## Timestep
-dt_1 = min(
-    cfl_adv * config.space.dx / u_max_1,
-    cfl_adv * config.space.dy / v_max_1,
-    cfl_gravity * config.space.dx / c_1,
-)
+uvh0_1 = qg_1.G(p0_1)
 
 # Two Layers Set-up
 prefix_2 = config.models[1].prefix
@@ -138,19 +123,7 @@ p0_2 = perturbation.compute_initial_pressure(
     config.physics.f0,
     Ro,
 )
-u0_2, v0_2, h0_2 = qg_2.G(p0_2)
-## Max Speed
-u_max_2, v_max_2, c_2 = (
-    torch.abs(u0_2).max().item() / config.space.dx,
-    torch.abs(v0_2).max().item() / config.space.dy,
-    torch.sqrt(config.models[1].g_prime[0] * config.models[1].h.sum()),
-)
-## Timestep
-dt_2 = min(
-    cfl_adv * config.space.dx / u_max_2,
-    cfl_adv * config.space.dy / v_max_2,
-    cfl_gravity * config.space.dx / c_2,
-)
+uvh0_2 = qg_2.G(p0_2)
 
 # Two Layers Set-up
 prefix_3 = config.models[2].prefix
@@ -185,74 +158,61 @@ p0_3 = perturbation.compute_initial_pressure(
     config.physics.f0,
     Ro,
 )
-u0_3, v0_3, h0_3 = qg_3.G(p0_3)
-## Max Speed
-u_max_3, v_max_3, c_3 = (
-    torch.abs(u0_3).max().item() / config.space.dx,
-    torch.abs(v0_3).max().item() / config.space.dy,
-    torch.sqrt(config.models[2].g_prime[0] * config.models[2].h.sum()),
-)
-## Timestep
-dt_3 = min(
-    cfl_adv * config.space.dx / u_max_3,
-    cfl_adv * config.space.dy / v_max_3,
-    cfl_gravity * config.space.dx / c_3,
-)
+uvh0_3 = qg_3.G(p0_3)
+
+if np.isnan(config.simulation.dt):
+    dt_1 = time_params.compute_dt(uvh0_1, qg_1.space, qg_1.g_prime, qg_1.H)
+    dt_2 = time_params.compute_dt(uvh0_2, qg_2.space, qg_2.g_prime, qg_2.H)
+    dt_3 = time_params.compute_dt(uvh0_3, qg_3.space, qg_3.g_prime, qg_3.H)
+    dt = min(dt_1, dt_2, dt_3)
+else:
+    dt = config.simulation.dt
 
 # Instantiate Models
-dt = min(dt_1, dt_2, dt_3)
 qg_1.dt = dt
 qg_1.set_uvh(
-    u=torch.clone(u0_1),
-    v=torch.clone(v0_1),
-    h=torch.clone(h0_1),
+    u=torch.clone(uvh0_1.u),
+    v=torch.clone(uvh0_1.v),
+    h=torch.clone(uvh0_1.h),
 )
 
 qg_2.dt = dt
 qg_2.set_uvh(
-    u=torch.clone(u0_2),
-    v=torch.clone(v0_2),
-    h=torch.clone(h0_2),
+    u=torch.clone(uvh0_2.u),
+    v=torch.clone(uvh0_2.v),
+    h=torch.clone(uvh0_2.h),
 )
 
 qg_3.dt = dt
 qg_3.set_uvh(
-    u=torch.clone(u0_3),
-    v=torch.clone(v0_3),
-    h=torch.clone(h0_3),
+    u=torch.clone(uvh0_3.u),
+    v=torch.clone(uvh0_3.v),
+    h=torch.clone(uvh0_3.h),
 )
 
 ## time params
 t = 0
 
-w_0_1 = qg_1.omega.squeeze() / qg_1.space.dx / qg_1.space.dy
+if np.isnan(config.simulation.tau):
+    tau_1 = time_params.compute_tau(qg_1.omega, qg_1.space)
+    verbose.display(
+        msg=f"tau (single layer) = {tau_1 *config.physics.f0:.2f} f0-1",
+        trigger_level=1,
+    )
+    tau_2 = time_params.compute_tau(qg_2.omega, qg_2.space)
+    verbose.display(
+        msg=f"tau (colinear layer) = {tau_2 *config.physics.f0:.2f} f0-1",
+        trigger_level=1,
+    )
+    tau_3 = time_params.compute_tau(qg_3.omega, qg_3.space)
+    verbose.display(
+        msg=f"tau (two layers) = {tau_3 *config.physics.f0:.2f} f0-1",
+        trigger_level=1,
+    )
+    tau = max(tau_1, tau_2, tau_3)
+else:
+    tau = config.simulation.tau / config.physics.f0
 
-
-tau_1 = 1.0 / torch.sqrt(w_0_1.pow(2).mean()).to(device=DEVICE).item()
-verbose.display(
-    msg=f"tau (single layer) = {tau_1 *config.physics.f0:.2f} f0-1",
-    trigger_level=1,
-)
-
-w_0_2 = qg_2.omega.squeeze() / qg_2.space.dx / qg_2.space.dy
-
-
-tau_2 = 1.0 / torch.sqrt(w_0_2.pow(2).mean()).to(device=DEVICE).item()
-verbose.display(
-    msg=f"tau (colinear layer) = {tau_2 *config.physics.f0:.2f} f0-1",
-    trigger_level=1,
-)
-
-w_0_3 = qg_3.omega.squeeze() / qg_3.space.dx / qg_3.space.dy
-
-
-tau_3 = 1.0 / torch.sqrt(w_0_3.pow(2).mean()).to(device=DEVICE).item()
-verbose.display(
-    msg=f"tau (two layers) = {tau_3 *config.physics.f0:.2f} f0-1",
-    trigger_level=1,
-)
-
-tau = max(tau_1, tau_2, tau_3)
 verbose.display(
     msg=f"tau = {tau *config.physics.f0:.2f} f0-1",
     trigger_level=1,
