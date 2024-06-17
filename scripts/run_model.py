@@ -110,7 +110,7 @@ freq_save = int(t_end / config.io.results.quantity / dt) + 1
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
 
-summary.register_steps(t_end=t_end, dt=dt.cpu().item(), n_steps=n_steps)
+summary.register_steps(t_end=t_end, dt=dt, n_steps=n_steps)
 
 plots_required = config.io.plots.save or config.io.plots.show
 
