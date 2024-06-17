@@ -46,6 +46,7 @@ MODELS = {
     "layers": "h",
     "reduced gravity": "g_prime",
     "prefix": "prefix",
+    "colinearity coef": "colinearity coef",
 }
 
 OUTPUT = {

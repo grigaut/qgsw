@@ -20,6 +20,7 @@ class ModelConfig(_Config):
     _h: str = keys.MODELS["layers"]
     _g_prime: str = keys.MODELS["reduced gravity"]
     _prefix: str = keys.MODELS["prefix"]
+    _alpha: str = keys.MODELS["colinearity coef"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate ModelConfig.
@@ -70,6 +71,11 @@ class ModelConfig(_Config):
     def prefix(self) -> int:
         """Prefix."""
         return self.params[self._prefix]
+
+    @property
+    def colinearity_coef(self) -> float:
+        """Colinearity Coefficient, only relevant for modified QG models."""
+        return self.params[self.colinearity_coef]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate that H and g' shapes match.
