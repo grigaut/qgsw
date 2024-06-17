@@ -1,0 +1,9 @@
+folders = [
+    "output/g5k/one_layer",
+    "output/g5k/two_layers"
+]
+display_sublayer = false
+[snapshots]
+save = true
+folder = "output/snapshots"
+saved_nb = 10
