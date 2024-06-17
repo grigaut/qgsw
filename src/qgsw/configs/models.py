@@ -1,6 +1,6 @@
 """Model Configuration."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 import torch
 
@@ -13,6 +13,10 @@ from qgsw.specs import DEVICE
 class ModelConfig(_Config):
     """Model configuration."""
 
+    _colinearity_allowed: ClassVar[list[str]] = [
+        "QGColinearSublayerStreamFunction",
+    ]
+
     section: str = keys.MODELS["section"]
     section_several: str = keys.MODELS["section several"]
     _type: str = keys.MODELS["type"]
@@ -20,6 +24,7 @@ class ModelConfig(_Config):
     _h: str = keys.MODELS["layers"]
     _g_prime: str = keys.MODELS["reduced gravity"]
     _prefix: str = keys.MODELS["prefix"]
+    _alpha: str = keys.MODELS["colinearity coef"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate ModelConfig.
@@ -47,8 +52,9 @@ class ModelConfig(_Config):
     @property
     def h(self) -> torch.Tensor:
         """Values of layers thickness (h)."""
+        nl = len(self.params[self._h])
         h = torch.zeros(
-            size=(self.nl, 1, 1),
+            size=(nl, 1, 1),
             dtype=torch.float64,
             device=DEVICE,
         )
@@ -67,14 +73,23 @@ class ModelConfig(_Config):
         )
 
     @property
-    def nl(self) -> int:
-        """Number of layers."""
-        return self._nl
-
-    @property
     def prefix(self) -> int:
         """Prefix."""
         return self.params[self._prefix]
+
+    @property
+    def colinearity_coef(self) -> float:
+        """Colinearity Coefficient, only relevant for modified QG models."""
+        return self._get_alpha()
+
+    def _get_alpha(self) -> float:
+        if self.type not in self._colinearity_allowed:
+            msg = (
+                "The colinearity coefficient is only relevant "
+                f"for the following models: {self._colinearity_allowed}."
+            )
+            raise AttributeError(msg)
+        return self.params[self._alpha]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate that H and g' shapes match.
@@ -97,6 +112,5 @@ class ModelConfig(_Config):
                 f"g' 's shape ({g_prime_shape}) don't match."
             )
             raise ConfigError(msg)
-        self._nl = h_shape
 
         return super()._validate_params(params)

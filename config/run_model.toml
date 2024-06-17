@@ -35,6 +35,7 @@ g_prime = [
     10.0,
     5e-2
 ]
+colinearity_coef = 0.1 # Only relevant for modifiedd QG models
 
 [space]
 nx = 24
