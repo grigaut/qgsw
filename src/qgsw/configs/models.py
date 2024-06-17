@@ -1,6 +1,6 @@
 """Model Configuration."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 import torch
 
@@ -12,6 +12,10 @@ from qgsw.specs import DEVICE
 
 class ModelConfig(_Config):
     """Model configuration."""
+
+    _colinearity_allowed: ClassVar[list[str]] = [
+        "QGColinearSublayerStreamFunction",
+    ]
 
     section: str = keys.MODELS["section"]
     section_several: str = keys.MODELS["section several"]
@@ -75,7 +79,16 @@ class ModelConfig(_Config):
     @property
     def colinearity_coef(self) -> float:
         """Colinearity Coefficient, only relevant for modified QG models."""
-        return self.params[self.colinearity_coef]
+        return self._get_alpha()
+
+    def _get_alpha(self) -> float:
+        if self._type not in self._colinearity_allowed:
+            msg = (
+                "The colinearity coefficient is only relevant "
+                f"for the following models: {self._colinearity_allowed}"
+            )
+            raise AttributeError(msg)
+        return self.params[self._alpha]
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate that H and g' shapes match.
