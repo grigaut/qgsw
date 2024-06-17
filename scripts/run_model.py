@@ -7,7 +7,7 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.models import QG
+from qgsw.models import QG, QGColinearSublayerStreamFunction
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
@@ -34,7 +34,9 @@ if config.io.results.save:
     save_file = config.io.results.directory.joinpath("_summary.toml")
     summary.to_file(save_file)
 
-if config.model.type != "QG":
+supported_models = ["QG", "QGColinearSublayerStreamFunction"]
+
+if config.model.type not in supported_models:
     msg = "Unsupported model type, possible values are: QG."
     raise ValueError(msg)
 
@@ -65,11 +67,19 @@ verbose.display(
 )
 
 ## Set model parameters
-model = QG(
-    space_3d=space,
-    g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-    beta_plane=config.physics.beta_plane,
-)
+if config.model.type == "QG":
+    model = QG(
+        space_3d=space,
+        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+        beta_plane=config.physics.beta_plane,
+    )
+elif config.model.type == "QGColinearSublayerStreamFunction":
+    model = QGColinearSublayerStreamFunction(
+        space_3d=space,
+        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+        beta_plane=config.physics.beta_plane,
+    )
+    model.alpha = config.model.colinearity_coef
 model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coef
 model.set_wind_forcing(taux, tauy)
