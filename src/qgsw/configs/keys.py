@@ -82,6 +82,7 @@ SIMULATION = {
     "section": "simulation",
     "duration": "duration",
     "timestep": "dt",
+    "tau": "tau",
 }
 
 WINDSTRESS = {
