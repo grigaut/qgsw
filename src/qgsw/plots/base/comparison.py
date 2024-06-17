@@ -6,6 +6,7 @@ from abc import ABCMeta
 from typing import TYPE_CHECKING, Generic
 
 import matplotlib.pyplot as plt
+import numpy as np
 from typing_extensions import ParamSpec
 
 from qgsw.plots.base.axes import AxesManager
@@ -17,7 +18,6 @@ from qgsw.plots.exceptions import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
@@ -41,7 +41,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         self._axes_ms = axes_managers
         self._figure, axes = self._create_figure_axes()
         self._figure.canvas.manager.set_window_title("comparison")
-        self._axes: np.ndarray = axes.flatten()
+        self._axes: np.ndarray = axes.reshape((-1,))
         self._set_axes()
 
     def _raise_if_inconsistent_length(self, elements_nb: int) -> None:
@@ -69,11 +69,14 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         """
         ncols = min(self._axes_nb, self._n_cols)
         nrows = (self._axes_nb - 1) // self._n_cols + 1
-        return plt.subplots(
+        fig, axes = plt.subplots(
             nrows=nrows,
             ncols=ncols,
             figsize=(6 * ncols, 6 * nrows),
         )
+        if nrows == 1 and ncols == 1:
+            axes = np.array([axes])
+        return fig, axes
 
     def _set_axes(self) -> None:
         """Set the Axes within the Axes Managers."""
