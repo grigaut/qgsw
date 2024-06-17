@@ -52,8 +52,9 @@ class ModelConfig(_Config):
     @property
     def h(self) -> torch.Tensor:
         """Values of layers thickness (h)."""
+        nl = len(self.params[self._h])
         h = torch.zeros(
-            size=(self.nl, 1, 1),
+            size=(nl, 1, 1),
             dtype=torch.float64,
             device=DEVICE,
         )
@@ -82,10 +83,10 @@ class ModelConfig(_Config):
         return self._get_alpha()
 
     def _get_alpha(self) -> float:
-        if self._type not in self._colinearity_allowed:
+        if self.type not in self._colinearity_allowed:
             msg = (
                 "The colinearity coefficient is only relevant "
-                f"for the following models: {self._colinearity_allowed}"
+                f"for the following models: {self._colinearity_allowed}."
             )
             raise AttributeError(msg)
         return self.params[self._alpha]
