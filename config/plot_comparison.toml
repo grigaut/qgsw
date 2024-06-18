@@ -1,9 +1,20 @@
 folders = [
-    "output/g5k/one_layer",
-    "output/g5k/two_layers"
+    "output/g5k/one_layer_baroclinic_100km",
+    "output/g5k/alpha_0_05",
+    "output/g5k/two_layers_baroclinic_100km",
+    "output/g5k/one_layer_baroclinic_100km",
+    "output/g5k/alpha_0_1",
+    "output/g5k/two_layers_baroclinic_100km",
+    "output/g5k/one_layer_baroclinic_100km",
+    "output/g5k/alpha_0_25",
+    "output/g5k/two_layers_baroclinic_100km",
+    "output/g5k/one_layer_baroclinic_100km",
+    "output/g5k/alpha_0_5",
+    "output/g5k/two_layers_baroclinic_100km",
 ]
 display_sublayer = false
+common_colorbar = false
 [snapshots]
-save = true
+save = false
 folder = "output/snapshots"
-saved_nb = 10
+saved_nb = 25

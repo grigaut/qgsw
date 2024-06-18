@@ -87,7 +87,7 @@ for run in runs:
 # Prepare Plot
 plot = VorticityComparisonFigure(
     *axes,
-    common_cbar=False,
+    common_cbar=config["common_colorbar"],
 )
 
 steps = min(len(f) for f in files)
