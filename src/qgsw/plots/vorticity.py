@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
     from qgsw.models.base import Model
 
-
 P = ParamSpec("P")
 
 
@@ -91,7 +90,38 @@ class VorticityAxesContent(BaseAxesContent):
         """Axes Image."""
         return self._axesim
 
+    def is_array_valid(self, array: np.ndarray) -> bool:
+        """Whether the array is valid ofr the plot.
+
+        Args:
+            array (np.ndarray): Array to check.
+
+        Returns:
+            bool: True if the array is valid, False otherwise.
+        """
+        return array.shape[1] > self._layer_nb
+
+    def _empty(self, ax: Axes) -> Axes:
+        """Set an empty Axes.
+
+        Args:
+            ax (Axes): Axes to set.
+
+        Returns:
+            Axes: Empty axes.
+        """
+        ax.clear()
+        return ax.text(0.25, 0.5, f"NO DATA FOR LAYER {self._layer_nb}")
+
     def _center_cbar(self, data: np.ndarray) -> dict[str, Any]:
+        """Center the colorbar values.
+
+        Args:
+            data (np.ndarray): Data to plot.
+
+        Returns:
+            dict[str, Any]: New imshow kwargs.
+        """
         if ("vmin" in self._kwargs) or ("vmax" in self._kwargs):
             return self._kwargs
         max_value = np.abs(data).max()
@@ -117,7 +147,7 @@ class VorticityAxesContent(BaseAxesContent):
         return ax
 
     def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
-        """Format input data.
+        """Format input array.
 
         Args:
             array (np.ndarray): Input array (1,nl,nx,ny).
@@ -133,29 +163,27 @@ class VorticityAxesContent(BaseAxesContent):
             raise InvalidLayerNumberError(msg)
         return array[0, self._layer_nb]
 
-    def retrieve_data_from_model(self, model: Model) -> np.ndarray:
-        """Retrieve data from a model.
+    def retrieve_array_from_model(self, model: Model) -> np.ndarray:
+        """Retrieve array from a model.
 
         Args:
             model (Model): Model model.
 
         Returns:
-            np.ndarray: Retrieved data (nx,ny).
+            np.ndarray: Retrieved array (1,nl,nx,ny).
         """
-        omega = model.get_physical_omega_as_ndarray()
-        return self.retrieve_data_from_array(omega)
+        return model.get_physical_omega_as_ndarray()
 
-    def retrieve_data_from_file(self, filepath: Path) -> np.ndarray:
-        """Retrieve relevant from a given file.
+    def retrieve_array_from_file(self, filepath: Path) -> np.ndarray:
+        """Retrieve relevant array from a given file.
 
         Args:
             filepath (Path): File to retrieve data from.
 
         Returns:
-            np.ndarray: Retrieved data (nx,ny).
+            np.ndarray: Retrieved data (1,nl,nx,ny).
         """
-        omega = np.load(file=filepath)["omega"]
-        return self.retrieve_data_from_array(omega)
+        return np.load(file=filepath)["omega"]
 
     def update(self, ax: Axes, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
         """Update Axes content.
