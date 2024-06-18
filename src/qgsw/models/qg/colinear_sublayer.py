@@ -46,6 +46,7 @@ class QGColinearSublayerStreamFunction(QG):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self._set_alpha(alpha)
         super().__init__(
             space_3d=space_3d,
             g_prime=g_prime,
@@ -53,16 +54,11 @@ class QGColinearSublayerStreamFunction(QG):
             optimize=optimize,
         )
         self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
-        self._alpha = alpha
 
     @property
     def alpha(self) -> float:
         """Colinearity coefficient."""
         return self._alpha
-
-    @alpha.setter
-    def alpha(self, alpha: float) -> float:
-        self._set_alpha(alpha)
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
@@ -147,6 +143,9 @@ class QGColinearSublayerStreamFunction(QG):
             dtype=self.dtype,
             device=self.device,
         )
+        from icecream import ic
+
+        ic(self.alpha)
         # Select top row from matrix product
         return (A @ layers_coefs)[0, ...].unsqueeze(0).unsqueeze(0)
 
