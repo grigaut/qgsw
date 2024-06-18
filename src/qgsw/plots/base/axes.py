@@ -104,6 +104,17 @@ class BaseAxesContent(metaclass=ABCMeta):
         self._kwargs = kwargs
 
     @abstractmethod
+    def is_array_valid(self, array: np.ndarray) -> bool:
+        """Whether the array is valid ofr the plot.
+
+        Args:
+            array (np.ndarray): Array to check.
+
+        Returns:
+            bool: True if the array is valid, False otherwise.
+        """
+
+    @abstractmethod
     def _update(self, ax: Axes, data: np.ndarray) -> Axes:
         """Update ax content using data from a np.ndarray.
 
@@ -113,6 +124,17 @@ class BaseAxesContent(metaclass=ABCMeta):
 
         Returns:
             Axes: Updated axes.
+        """
+
+    @abstractmethod
+    def _empty(self, ax: Axes) -> Axes:
+        """Set an empty Axes.
+
+        Args:
+            ax (Axes): Axes to set.
+
+        Returns:
+            Axes: Empty axes.
         """
 
     def update(self, ax: Axes, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
@@ -129,6 +151,24 @@ class BaseAxesContent(metaclass=ABCMeta):
         self._kwargs = self._kwargs | kwargs
         return self._update(ax=ax, data=data)
 
+    def update_empty(
+        self,
+        ax: Axes,
+        **kwargs: P.kwargs,
+    ) -> Axes:
+        """Update ax content using data from a np.ndarray.
+
+        Args:
+            ax (Axes): Axes to update the content of.
+            data (np.ndarray): Data to use for content update.
+            **kwargs: Additional arguments to give to the plotting function.
+
+        Returns:
+            Axes: Updated axes.
+        """
+        self._kwargs = self._kwargs | kwargs
+        return self._empty(ax=ax)
+
     @abstractmethod
     def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
         """Retrieve relevant data from a given array.
@@ -141,7 +181,7 @@ class BaseAxesContent(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def retrieve_data_from_model(self, model: Model) -> np.ndarray:
+    def retrieve_array_from_model(self, model: Model) -> np.ndarray:
         """Retrieve relevant from a given model.
 
         Args:
@@ -152,7 +192,7 @@ class BaseAxesContent(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def retrieve_data_from_file(self, file: Path) -> np.ndarray:
+    def retrieve_array_from_file(self, file: Path) -> np.ndarray:
         """Retrieve relevant from a given file.
 
         Args:
@@ -245,19 +285,22 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         if self._ax is not None:
             self.ax = self._context.reload_axes(self._ax)
 
-    def update(self, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
+    def update(self, array: np.ndarray, **kwargs: P.kwargs) -> Axes:
         """Update the Axes content.
 
         Args:
-            data (np.ndarray): Data to use for update.
+            array (np.ndarray): Data to use for update.
             **kwargs: Additional arguments to give to the plotting function.
 
         Returns:
             Axes: Updated Axes.
         """
-        return self._content.update(ax=self._ax, data=data, **kwargs)
+        if self._content.is_array_valid(array):
+            data = self._content.retrieve_data_from_array(array)
+            return self._content.update(ax=self._ax, data=data, **kwargs)
+        return self._content.update_empty(ax=self._ax, **kwargs)
 
-    def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
+    def retrieve_array(self, array: np.ndarray) -> np.ndarray:
         """Retrieve data from a given np.ndarray.
 
         Args:
@@ -268,7 +311,7 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         """
         return self._content.retrieve_data_from_array(array=array)
 
-    def retrieve_data_from_model(self, model: Model) -> np.ndarray:
+    def retrieve_array_from_model(self, model: Model) -> np.ndarray:
         """Retrieve data from a given Model.
 
         Args:
@@ -277,9 +320,9 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         Returns:
             np.ndarray: Loaded dat from the model.
         """
-        return self._content.retrieve_data_from_model(model=model)
+        return self._content.retrieve_array_from_model(model=model)
 
-    def retrieve_data_from_file(self, file: Path) -> np.ndarray:
+    def retrieve_array_from_file(self, file: Path) -> np.ndarray:
         """Retrieve data from a given npz file.
 
         Args:
@@ -288,7 +331,7 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         Returns:
             np.ndarray: Loaded data.
         """
-        return self._content.retrieve_data_from_file(filepath=file)
+        return self._content.retrieve_array_from_file(filepath=file)
 
     @classmethod
     @abstractmethod

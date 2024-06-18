@@ -97,18 +97,14 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
     ) -> None:
         """Update the Figure."""
         self._raise_if_inconsistent_length(len(arrays))
-        datas = [
-            self._axes_ms[i].retrieve_data_from_array(arrays[i])
-            for i in range(len(arrays))
-        ]
-        self._update(*datas, **kwargs)
+        self._update(*arrays, **kwargs)
 
     def update_with_files(self, *files: Path, **kwargs: P.kwargs) -> None:
         """Update the plot given some NPZ files."""
         self._raise_if_inconsistent_length(len(files))
 
         datas = [
-            self._axes_ms[i].retrieve_data_from_file(files[i])
+            self._axes_ms[i].retrieve_array_from_file(files[i])
             for i in range(len(files))
         ]
         self._update(*datas, **kwargs)
@@ -117,8 +113,8 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         """Update the plot given some models."""
         self._raise_if_inconsistent_length(len(models))
 
-        datas = [
-            self._axes_ms[i].retrieve_data_from_model(models[i])
+        arrays = [
+            self._axes_ms[i].retrieve_array_from_model(models[i])
             for i in range(len(models))
         ]
-        self._update(*datas, **kwargs)
+        self._update(*arrays, **kwargs)
