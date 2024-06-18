@@ -54,11 +54,7 @@ if len(np.unique([run.summary.total_steps for run in runs])) != 1:
 
 # Prepare folders for saving
 if save:
-    run_names = [r.summary.configuration.io.name_sc for r in runs]
-    save_folder = "_".join(run_names)
-    snapshots_folder = Path(config["snapshots"]["folder"]).joinpath(
-        save_folder,
-    )
+    snapshots_folder = Path(config["snapshots"]["folder"])
     if not snapshots_folder.is_dir():
         snapshots_folder.mkdir(parents=True)
 
