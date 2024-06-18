@@ -16,6 +16,7 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
+from qgsw.spatial.core.discretization import keep_top_layer
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.utils import time_params
 
@@ -73,6 +74,11 @@ if config.model.type == "QG":
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
     )
+    p0 = perturbation.compute_initial_pressure(
+        space.omega,
+        config.physics.f0,
+        Ro,
+    )
 elif config.model.type == "QGColinearSublayerStreamFunction":
     model = QGColinearSublayerStreamFunction(
         space_3d=space,
@@ -80,10 +86,14 @@ elif config.model.type == "QGColinearSublayerStreamFunction":
         beta_plane=config.physics.beta_plane,
     )
     model.alpha = config.model.colinearity_coef
+    p0 = perturbation.compute_initial_pressure(
+        keep_top_layer(space).omega,
+        config.physics.f0,
+        Ro,
+    )
 model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coef
 model.set_wind_forcing(taux, tauy)
-p0 = perturbation.compute_initial_pressure(space.omega, config.physics.f0, Ro)
 uvh0 = model.G(p0)
 
 if np.isnan(config.simulation.dt):
