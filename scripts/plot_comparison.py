@@ -106,7 +106,7 @@ for i in range(steps):
     plot.figure.suptitle(f"Time: {(nbs[0][i]) * dt :.2f} s")
     plot.show()
     # Save Files
-    if save and i % freq_save == 0 or (i == steps - 1):
+    if save and ((i % freq_save == 0) or (i == steps - 1)):
         name = f"snapshot_{nbs[0][i]}.png"
         file = snapshots_folder.joinpath(name)
         plot.savefig(file)
