@@ -143,9 +143,6 @@ class QGColinearSublayerStreamFunction(QG):
             dtype=self.dtype,
             device=self.device,
         )
-        from icecream import ic
-
-        ic(self.alpha)
         # Select top row from matrix product
         return (A @ layers_coefs)[0, ...].unsqueeze(0).unsqueeze(0)
 
