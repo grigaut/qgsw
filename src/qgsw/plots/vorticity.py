@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from typing_extensions import ParamSpec, Self
 
 from qgsw.plots.base.axes import (
@@ -141,9 +142,9 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             Axes: Updated Axes.
         """
+        ax.cla()
         axesim = ax.imshow(data, **self._center_cbar(data))
-        self.remove_colorbar()
-        self.add_colorbar(ax=ax, axesim=axesim)
+        self.update_colorbar(ax=ax, axesim=axesim)
         return ax
 
     def retrieve_data_from_array(self, array: np.ndarray) -> np.ndarray:
@@ -204,9 +205,25 @@ class VorticityAxesContent(BaseAxesContent):
             self._cbar.remove()
             self._has_cbar = False
 
-    def add_colorbar(self, ax: Axes, axesim: AxesImage) -> None:
+    def update_colorbar(self, ax: Axes, axesim: AxesImage) -> None:
         """Remove the colorbar."""
-        self._cbar = ax.figure.colorbar(axesim, label=r"$\omega / f_0$")
+        if self._has_cbar:
+            self._cbar = ax.figure.colorbar(
+                axesim,
+                cax=self._cbar.ax,
+                label=r"$\omega / f_0$",
+            )
+        else:
+            cbar_ax = make_axes_locatable(ax).append_axes(
+                "right",
+                size="5%",
+                pad=0.05,
+            )
+            self._cbar = ax.figure.colorbar(
+                axesim,
+                cax=cbar_ax,
+                label=r"$\omega / f_0$",
+            )
         self._has_cbar = True
         self._axesim = axesim
 
