@@ -74,6 +74,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             ncols=ncols,
             figsize=(6 * ncols, 6 * nrows),
         )
+        fig.tight_layout(pad=6)
         if nrows == 1 and ncols == 1:
             axes = np.array([axes])
         return fig, axes
