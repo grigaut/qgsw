@@ -6,10 +6,8 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.exceptions import (
-    InvalidLayersDefinitionError,
-    InvalidModelParameterError,
-)
+from qgsw.models.exceptions import InvalidLayersDefinitionError
+from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
 from qgsw.models.sw import SW
 from qgsw.models.variables import UVH
@@ -33,7 +31,7 @@ class QGColinearSublayerStreamFunction(QG):
         space_3d: SpaceDiscretization3D,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        alpha: float = _alpha,
+        alpha: float | Coefficient = _alpha,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         """Colinear Sublayer Stream Function.
@@ -53,12 +51,17 @@ class QGColinearSublayerStreamFunction(QG):
             beta_plane=beta_plane,
             optimize=optimize,
         )
+        self.alpha.reset_steps()
         self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
 
     @property
-    def alpha(self) -> float:
+    def alpha(self) -> Coefficient:
         """Colinearity coefficient."""
         return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: float | Coefficient) -> None:
+        return self._set_alpha(alpha)
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
@@ -95,13 +98,9 @@ class QGColinearSublayerStreamFunction(QG):
 
         Args:
             alpha (float): Colinearity Coefficient.
-
-        Raises:
-            InvalidModelParameterError: If α < 0 or α > 1
-        """  # noqa: RUF002
-        if alpha < 0 or alpha > 1:
-            msg = f"α must be between 0 and 1. Given value: {alpha}."  # noqa: RUF001
-            raise InvalidModelParameterError(msg)
+        """
+        if isinstance(alpha, (int, float)):
+            self._alpha = ConstantCoefficient(alpha)
         self._alpha = alpha
 
     def _init_core_model(self, optimize: bool) -> SW:  # noqa: FBT001
@@ -139,7 +138,7 @@ class QGColinearSublayerStreamFunction(QG):
         A = super().compute_A(H, g_prime)  # noqa: N806
         # Create layers coefficients vector [1, α]  # noqa: RUF003
         layers_coefs = torch.tensor(
-            [1, self.alpha],
+            [1, self.alpha.next_value()],
             dtype=self.dtype,
             device=self.device,
         )
@@ -165,3 +164,12 @@ class QGColinearSublayerStreamFunction(QG):
             * self.space.area
         )
         return UVH(uvh.u, uvh.v, h)
+
+    def step(self) -> None:
+        """Performs one step time-integration with RK3-SSP scheme."""
+        if not self.alpha.isconstant:
+            self.A = self.compute_A(
+                self._H[:, 0, 0],
+                self._g_prime[:, 0, 0],
+            )
+        return super().step()

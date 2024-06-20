@@ -125,10 +125,25 @@ def compute_coefficients(
     return np.array(coefs)
 
 
-class Coefficient(meta=ABCMeta):
+class Coefficient(metaclass=ABCMeta):
     """Base class for the coefficient."""
 
-    _step = -1
+    _dt: float
+    _step = 0
+    _constant = False
+
+    @property
+    def isconstant(self) -> bool:
+        """Whether the coefficient is constant."""
+        return self._constant
+
+    def __repr__(self) -> str:
+        """Self representation.
+
+        Returns:
+            str: String value of the current parameter.
+        """
+        return self.at_step(self._step).__repr__()
 
     @abstractmethod
     def at_step(self, step: int) -> float:
@@ -141,7 +156,6 @@ class Coefficient(meta=ABCMeta):
             float: Coefficient value.
         """
 
-    @abstractmethod
     def at_time(self, time: float) -> float:
         """Compute the coefficient at a given time.
 
@@ -151,10 +165,11 @@ class Coefficient(meta=ABCMeta):
         Returns:
             float: Coefficient value.
         """
+        return self.at_step(time / self._dt)
 
     def reset_steps(self) -> None:
         """Reset steps numbers."""
-        self._step = -1
+        self._step = 0
 
     def next_value(self) -> float:
         """Next coefficient value.
@@ -164,12 +179,15 @@ class Coefficient(meta=ABCMeta):
         Returns:
             float: coefficient value.
         """
+        alpha = self.at_step(self._step)
         self._step += 1
-        return self.at_step(self._step)
+        return alpha
 
 
 class ConstantCoefficient(Coefficient):
     """Constant Coefficient."""
+
+    _constant = True
 
     def __init__(self, value: float) -> None:
         """Instantiate the coefficient.
@@ -211,14 +229,14 @@ class ChangingCoefficient(Coefficient):
     def __init__(
         self,
         coefficients: np.ndarray,
-        steps: list[int],
+        steps: np.ndarray,
         dt: float,
     ) -> None:
         """Instantiate ChangingCoefficient.
 
         Args:
             coefficients (np.ndarray): Coefficients values.
-            steps (list[int]): Steps.
+            steps (np.ndarray): Steps.
             dt (float): Timestep (in seconds).
         """
         self._coefs = coefficients
@@ -236,13 +254,13 @@ class ChangingCoefficient(Coefficient):
 
     def _interpolate_coefs(
         self,
-        steps: list[int],
+        steps: np.ndarray,
         coefficients: np.ndarray,
     ) -> interpolate.interp1d:
         """Interpolate coefficients using steps.
 
         Args:
-            steps (list[int]): Steps.
+            steps (np.ndarray): Steps.
             coefficients (np.ndarray): Coefficients.
 
         Returns:
@@ -272,7 +290,7 @@ class ChangingCoefficient(Coefficient):
         Returns:
             np.ndarray: Filtering kernel.
         """
-        x = np.linspace(-1, 1, int(self._))
+        x = np.linspace(-1, 1, int(self.kernel_width))
         kernel = (
             1
             / (self.sigma * np.sqrt(2 * np.pi))
@@ -289,18 +307,7 @@ class ChangingCoefficient(Coefficient):
         Returns:
             float: Coefficient value.
         """
-        return self._coef_interpolation(step)
-
-    def at_time(self, time: int) -> float:
-        """Compute the coefficient at a given time.
-
-        Args:
-            time (int): Time at which to compute the coefficient.
-
-        Returns:
-            float: Coefficient value.
-        """
-        return self._coef_interpolation(time / self._dt)
+        return float(self._coef_interpolation(step))
 
     def adjust_kernel_width(self, Ro: float, f0: float) -> None:  # noqa: N803
         """Adjust the kernle width based on physicial parameters.
@@ -325,18 +332,18 @@ class ChangingCoefficient(Coefficient):
         )
 
     @classmethod
-    def from_files(
+    def from_model_files(
         cls,
         files: list[Path],
-        steps: list[int],
+        steps: np.ndarray,
         dt: float,
         field: str = "omega",
     ) -> Self:
-        """Instantiate coeffciient from a list of files.
+        """Instantiate the coefficient from a list of files.
 
         Args:
             files (list[Path]): Files to use.
-            steps (list[int]): Steps values.
+            steps (np.ndarray): Steps values.
             dt (float): Timesetp value (in seconds).
             field (str, optional): Field to consider. Defaults to "omega".
 
@@ -346,5 +353,31 @@ class ChangingCoefficient(Coefficient):
         return cls(
             compute_coefficients(files, field=field),
             steps=steps,
+            dt=dt,
+        )
+
+    @classmethod
+    def from_file(
+        cls,
+        file: Path,
+        dt: float,
+        coefs_field: str = "alpha",
+        steps_fields: str = "steps",
+    ) -> Self:
+        """Instantiate the coefficient a file of values and steps.
+
+        Args:
+            file (Path): File to laod.
+            dt (float): Timestep value (in seconds).
+            coefs_field (str, optional): Field for coefs. Defaults to "alpha".
+            steps_fields (str, optional): Field for steps. Defaults to "steps".
+
+        Returns:
+            Self: Coefficient.
+        """
+        data = np.load(file)
+        return cls(
+            data[coefs_field],
+            data[steps_fields],
             dt=dt,
         )
