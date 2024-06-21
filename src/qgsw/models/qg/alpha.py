@@ -17,8 +17,9 @@ from qgsw.utils.type_switch import TypeSwitch
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qgsw.configs.alpha import ColinearityCoefficientConfig
+    from matplotlib.axes import Axes
 
+    from qgsw.configs.alpha import ColinearityCoefficientConfig
 ABOVE_ZERO_THRESHOLD = 1e-5
 
 
@@ -139,14 +140,14 @@ def compute_coefficients(
 
 def extract_coefficients_from_run(
     folder: Path,
-) -> tuple[np.ndarray, np.ndarray, float]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Extract the coeffcient values from a run folder.
 
     Args:
         folder (Path): Run folder.
 
     Returns:
-        tuple[np.ndarray, np.ndarray, float]: Steps, coefficient values, dt.
+        tuple[np.ndarray, np.ndarray]: Times, coefficient values.
     """
     run = RunSummary.from_file(folder.joinpath("_summary.toml"))
     dt = run.configuration.simulation.dt
@@ -156,37 +157,30 @@ def extract_coefficients_from_run(
         suffix=".npz",
     )
     coefficients = compute_coefficients(files, field="omega")
-    return np.array(steps), coefficients, dt
+    return np.array(steps) * dt, coefficients
 
 
 def save_coefficients(
     file: Path,
-    steps: np.ndarray,
+    times: np.ndarray,
     coefficients: np.ndarray,
-    dt: float,
 ) -> None:
     """Save coeffciients in a .npz file.
 
     Args:
         file (Path): File to save in.
-        steps (np.ndarray): Steps.
+        times (np.ndarray): Steps.
         coefficients (np.ndarray): Coefficients.
         dt (float): Dt.
     """
-    np.savez(file, steps=steps, alpha=coefficients, dt=dt)
+    np.savez(file, times=times, alpha=coefficients)
 
 
 class Coefficient(TypeSwitch, metaclass=ABCMeta):
     """Base class for the coefficient."""
 
-    _dt: float
-    _step = 0
+    _time = 0
     _constant = False
-
-    @property
-    def dt(self) -> float:
-        """Timestep."""
-        return self._dt
 
     @property
     def isconstant(self) -> bool:
@@ -199,19 +193,9 @@ class Coefficient(TypeSwitch, metaclass=ABCMeta):
         Returns:
             str: String value of the current parameter.
         """
-        return f"{self.type}: {self.at_current_step().__repr__()}"
+        return f"{self.type}: {self.at_current_time().__repr__()}"
 
     @abstractmethod
-    def at_step(self, step: int) -> float:
-        """Compute the coefficient at a given step.
-
-        Args:
-            step (int): Step at which to compute the coefficient.
-
-        Returns:
-            float: Coefficient value.
-        """
-
     def at_time(self, time: float) -> float:
         """Compute the coefficient at a given time.
 
@@ -223,11 +207,11 @@ class Coefficient(TypeSwitch, metaclass=ABCMeta):
         """
         return self.at_step(time / self._dt)
 
-    def reset_steps(self) -> None:
-        """Reset steps numbers."""
-        self._step = 0
+    def reset_time(self) -> None:
+        """Reset time."""
+        self._time = 0
 
-    def next_step(self) -> float:
+    def next_time(self, dt: float) -> float:
         """Next coefficient value.
 
         Automatically keep tracks of steps.
@@ -235,25 +219,25 @@ class Coefficient(TypeSwitch, metaclass=ABCMeta):
         Returns:
             float: coefficient value.
         """
-        alpha = self.at_step(self._step)
-        self.to_step(self._step + 1)
+        alpha = self.at_time(self._time)
+        self.to_time(self._time + dt)
         return alpha
 
-    def at_current_step(self) -> float:
-        """Value at current step.
+    def at_current_time(self) -> float:
+        """Value at current time.
 
         Returns:
             float: Coefficient value
         """
-        return self.at_step(self._step)
+        return self.at_time(self._time)
 
-    def to_step(self, step: int) -> None:
-        """Change registered step value.
+    def to_time(self, time: float) -> None:
+        """Change registered time value.
 
         Args:
-            step (int): Step to move to.
+            time (float): Time to move to.
         """
-        self._step = step
+        self._time = time
 
 
 class ConstantCoefficient(Coefficient):
@@ -269,17 +253,6 @@ class ConstantCoefficient(Coefficient):
             value (float): Coefficient constant value.
         """
         self._value = value
-
-    def at_step(self, step: int) -> float:  # noqa: ARG002
-        """Compute the coefficient at a given step.
-
-        Args:
-            step (int): Step at which to compute the coefficient.
-
-        Returns:
-            float: Coefficient value.
-        """
-        return self._value
 
     def at_time(self, time: float) -> float:  # noqa: ARG002
         """Compute the coefficient at a given time.
@@ -303,21 +276,19 @@ class ChangingCoefficient(Coefficient):
     def __init__(
         self,
         coefficients: np.ndarray,
-        steps: np.ndarray,
-        dt: float,
+        times: np.ndarray,
     ) -> None:
         """Instantiate ChangingCoefficient.
 
         Args:
             coefficients (np.ndarray): Coefficients values.
-            steps (np.ndarray): Steps.
+            times (np.ndarray): Times.
             dt (float): Timestep (in seconds).
         """
         self._coefs = coefficients
-        self._steps = steps
-        self._dt = dt
+        self._times = times
         self._coef_interpolation = self._interpolate_coefs(
-            self._steps,
+            self._times,
             self._coefs,
         )
 
@@ -328,20 +299,20 @@ class ChangingCoefficient(Coefficient):
 
     def _interpolate_coefs(
         self,
-        steps: np.ndarray,
+        times: np.ndarray,
         coefficients: np.ndarray,
     ) -> interpolate.interp1d:
-        """Interpolate coefficients using steps.
+        """Interpolate coefficients using times.
 
         Args:
-            steps (np.ndarray): Steps.
+            times (np.ndarray): Steps.
             coefficients (np.ndarray): Coefficients.
 
         Returns:
             interpolate.interp1d: Interpolator.
         """
         smoothed_coefs = self._smooth(coefficients)
-        return interpolate.interp1d(steps, y=smoothed_coefs)
+        return interpolate.interp1d(times, y=smoothed_coefs)
 
     def _smooth(self, coefficients: np.ndarray) -> np.ndarray:
         """Smooth coefficients using a gaussian kernel.
@@ -372,16 +343,16 @@ class ChangingCoefficient(Coefficient):
         )
         return kernel / np.sum(kernel)
 
-    def at_step(self, step: int) -> float:
-        """Compute the coefficient at a given step.
+    def at_time(self, time: int) -> float:
+        """Compute the coefficient at a given time.
 
         Args:
-            step (int): Step at which to compute the coefficient.
+            time (int): Step at which to compute the coefficient.
 
         Returns:
             float: Coefficient value.
         """
-        return float(self._coef_interpolation(step))
+        return float(self._coef_interpolation(time))
 
     def adjust_kernel_width(self, Ro: float, f0: float) -> None:  # noqa: N803
         """Adjust the kernle width based on physicial parameters.
@@ -393,30 +364,30 @@ class ChangingCoefficient(Coefficient):
         Raises:
             ValueError: If steps have uneven spacing.
         """
-        steps_spacing = self._steps[:-1][1:] - self._steps[:-1][:-1]
-        if len(np.unique(steps_spacing)) != 1:
+        dt = self._times[:-1][1:] - self._times[:-1][:-1]
+        if len(np.unique(dt)) != 1:
             msg = "Unable to retrieve steps spacing."
             raise ValueError(msg)
         returning_time = 1 / (Ro * f0)
-        returning_steps = returning_time / self._dt
-        self._kernel_width = returning_steps // steps_spacing[0] + 1
+        self._kernel_width = returning_time // dt[0] + 1
         self._coef_interpolation = self._interpolate_coefs(
-            self._steps,
+            self._times,
             self._coefs,
         )
 
     def show(self) -> None:
         """Show the coefficient evolution."""
+        ax: Axes
         _, ax = plt.subplots(figsize=(6, 6))
         ax.plot(
-            self._steps,
+            self._times,
             self._smooth(self._coefs),
             c="blue",
             label="All Steps.",
         )
         ax.scatter(
-            self._step,
-            self.at_step(self._step),
+            self._time,
+            self.at_time(self._time),
             c="red",
             label="Current Step.",
         )
@@ -444,8 +415,7 @@ class ChangingCoefficient(Coefficient):
         """
         return cls(
             compute_coefficients(files, field=field),
-            steps=steps,
-            dt=dt,
+            times=steps * dt,
         )
 
     @classmethod
@@ -453,15 +423,14 @@ class ChangingCoefficient(Coefficient):
         cls,
         file: Path,
         coefs_field: str = "alpha",
-        steps_field: str = "steps",
-        dt_field: float = "dt",
+        times_field: str = "times",
     ) -> Self:
-        """Instantiate the coefficient a file of values and steps.
+        """Instantiate the coefficient a file of values and times.
 
         Args:
             file (Path): File to laod.
             coefs_field (str, optional): Field for coefs. Defaults to "alpha".
-            steps_field (str, optional): Field for steps. Defaults to "steps".
+            times_field (str, optional): Field for times. Defaults to "times".
             dt_field (str, optional): Field for dt. Defaults to "dt".
 
         Returns:
@@ -470,8 +439,7 @@ class ChangingCoefficient(Coefficient):
         data = np.load(file)
         return cls(
             data[coefs_field],
-            data[steps_field],
-            dt=float(data[dt_field]),
+            data[times_field],
         )
 
     @classmethod
@@ -487,11 +455,10 @@ class ChangingCoefficient(Coefficient):
         Returns:
             Self: Coefficient.
         """
-        steps, coefficients, dt = extract_coefficients_from_run(folder)
+        times, coefficients = extract_coefficients_from_run(folder)
         return cls(
             coefficients,
-            steps,
-            dt,
+            times,
         )
 
 

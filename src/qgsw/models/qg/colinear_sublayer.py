@@ -7,10 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw.models.base import Model
-from qgsw.models.exceptions import (
-    InvalidLayersDefinitionError,
-    InvalidModelParameterError,
-)
+from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
 from qgsw.models.sw import SW
@@ -73,7 +70,7 @@ class QGColinearSublayerStreamFunction(QG):
     @property
     def alpha(self) -> float:
         """Alpha value."""
-        return self.coefficient.at_current_step()
+        return self.coefficient.at_current_time()
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
@@ -84,15 +81,6 @@ class QGColinearSublayerStreamFunction(QG):
     def g_prime(self) -> torch.Tensor:
         """Reduced Gravity."""
         return self._g_prime[0, ...].unsqueeze(0)
-
-    def _set_dt(self, dt: float) -> None:
-        if (not self.coefficient.isconstant) and (self.coefficient.dt != dt):
-            msg = (
-                "Changing Coefficients must match model's timestep."
-                f"Coefficient dt: {self.coefficient.dt} - Model dt: {dt}"
-            )
-            raise InvalidModelParameterError(msg)
-        return super()._set_dt(dt)
 
     def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.
@@ -198,6 +186,6 @@ class QGColinearSublayerStreamFunction(QG):
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         if not self.coefficient.isconstant:
-            self.coefficient.next_step()
+            self.coefficient.next_time(self.dt)
             self._update_A()
         return super().step()
