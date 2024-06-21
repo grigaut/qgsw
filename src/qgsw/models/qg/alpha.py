@@ -12,9 +12,12 @@ from typing_extensions import Self
 
 from qgsw.run_summary import RunSummary
 from qgsw.utils.sorting import sort_files
+from qgsw.utils.type_switch import TypeSwitch
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from qgsw.configs.alpha import ColinearityCoefficientConfig
 
 ABOVE_ZERO_THRESHOLD = 1e-5
 
@@ -173,7 +176,7 @@ def save_coefficients(
     np.savez(file, steps=steps, alpha=coefficients, dt=dt)
 
 
-class Coefficient(metaclass=ABCMeta):
+class Coefficient(TypeSwitch, metaclass=ABCMeta):
     """Base class for the coefficient."""
 
     _dt: float
@@ -196,7 +199,7 @@ class Coefficient(metaclass=ABCMeta):
         Returns:
             str: String value of the current parameter.
         """
-        return self.at_step(self._step).__repr__()
+        return f"{self.type}: {self.at_current_step().__repr__()}"
 
     @abstractmethod
     def at_step(self, step: int) -> float:
@@ -256,6 +259,7 @@ class Coefficient(metaclass=ABCMeta):
 class ConstantCoefficient(Coefficient):
     """Constant Coefficient."""
 
+    _type = "constant"
     _constant = True
 
     def __init__(self, value: float) -> None:
@@ -292,6 +296,7 @@ class ConstantCoefficient(Coefficient):
 class ChangingCoefficient(Coefficient):
     """Changing coefficient."""
 
+    _type = "changing"
     sigma = 0.25
     _kernel_width = 30
 
@@ -488,3 +493,35 @@ class ChangingCoefficient(Coefficient):
             steps,
             dt,
         )
+
+
+def coefficient_from_config(
+    coef_config: ColinearityCoefficientConfig,
+) -> Coefficient:
+    """Create Coefficient from configuration.
+
+    Args:
+        coef_config (ColinearityCoefficientConfig): Coefficient Configuration.
+
+    Raises:
+        KeyError: If the coeffciient type is not recognized/
+
+    Returns:
+        Coefficient: Coefficient.
+    """
+    possible_coefs = [
+        ConstantCoefficient.get_type(),
+        ChangingCoefficient.get_type(),
+    ]
+    if coef_config.type not in possible_coefs:
+        msg = (
+            "Unrecognized perturbation type. "
+            f"Possible values are {possible_coefs}"
+        )
+        raise KeyError(msg)
+
+    if coef_config.type == ConstantCoefficient.get_type():
+        coef = ConstantCoefficient(value=coef_config.value)
+    if coef_config.type == ChangingCoefficient.get_type():
+        coef = ChangingCoefficient.from_file(coef_config.source_file)
+    return coef
