@@ -11,3 +11,7 @@ class ConfigSaveError(Exception):
 
 class UnexpectedFieldError(Exception):
     """Raised when trying to access an unexpected configuration field."""
+
+
+class UnauthorizedAttributeError(Exception):
+    """raised when trying to access unauthorized attribute."""
