@@ -177,7 +177,7 @@ class Coefficient(metaclass=ABCMeta):
         """Reset steps numbers."""
         self._step = 0
 
-    def next_value(self) -> float:
+    def next_step(self) -> float:
         """Next coefficient value.
 
         Automatically keep tracks of steps.
@@ -186,8 +186,24 @@ class Coefficient(metaclass=ABCMeta):
             float: coefficient value.
         """
         alpha = self.at_step(self._step)
-        self._step += 1
+        self.to_step(self._step + 1)
         return alpha
+
+    def at_current_step(self) -> float:
+        """Value at current step.
+
+        Returns:
+            float: Coefficient value
+        """
+        return self.at_step(self._step)
+
+    def to_step(self, step: int) -> None:
+        """Change registered step value.
+
+        Args:
+            step (int): Step to move to.
+        """
+        self._step = step
 
 
 class ConstantCoefficient(Coefficient):
@@ -340,7 +356,19 @@ class ChangingCoefficient(Coefficient):
     def show(self) -> None:
         """Show the coefficient evolution."""
         _, ax = plt.subplots(figsize=(6, 6))
-        ax.plot(self._steps, self._smooth(self._coefs))
+        ax.plot(
+            self._steps,
+            self._smooth(self._coefs),
+            c="blue",
+            label="All Steps.",
+        )
+        ax.scatter(
+            self._step,
+            self.at_step(self._step),
+            c="red",
+            label="Current Step.",
+        )
+        plt.legend()
         plt.show()
 
     @classmethod
