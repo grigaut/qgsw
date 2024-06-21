@@ -85,6 +85,15 @@ class QGColinearSublayerStreamFunction(QG):
         """Reduced Gravity."""
         return self._g_prime[0, ...].unsqueeze(0)
 
+    def _set_dt(self, dt: float) -> None:
+        if (not self.coefficient.isconstant) and (self.coefficient.dt != dt):
+            msg = (
+                "Changing Coefficients must match model's timestep."
+                f"Coefficient dt: {self.coefficient.dt} - Model dt: {dt}"
+            )
+            raise InvalidModelParameterError(msg)
+        return super()._set_dt(dt)
+
     def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.
 
@@ -115,12 +124,6 @@ class QGColinearSublayerStreamFunction(QG):
             self._coefficient = ConstantCoefficient(coefficient)
         else:
             self._coefficient = coefficient
-            if (not coefficient.isconstant) and (coefficient.dt != self.dt):
-                msg = (
-                    "Changing Coefficients must match model's timestep."
-                    f"Model dt: {self.dt} - Coefficient dt: {coefficient.dt}"
-                )
-                raise InvalidModelParameterError(msg)
         self._update_A()
 
     def _update_A(self) -> None:  # noqa: N802
