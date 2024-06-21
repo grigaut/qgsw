@@ -8,6 +8,7 @@ from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import QG, QGColinearSublayerStreamFunction
+from qgsw.models.qg.alpha import coefficient_from_config
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
@@ -84,7 +85,7 @@ elif config.model.type == "QGColinearSublayerStreamFunction":
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
-        coefficient=config.model.colinearity_coef,
+        coefficient=coefficient_from_config(config.model.colinearity_coef),
     )
     p0 = perturbation.compute_initial_pressure(
         keep_top_layer(space).omega,
