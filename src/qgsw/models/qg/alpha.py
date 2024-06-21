@@ -10,6 +10,9 @@ from matplotlib import pyplot as plt
 from scipy import interpolate
 from typing_extensions import Self
 
+from qgsw.run_summary import RunSummary
+from qgsw.utils.sorting import sort_files
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -131,12 +134,56 @@ def compute_coefficients(
     return np.array(coefs)
 
 
+def extract_coefficients_from_run(
+    folder: Path,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Extract the coeffcient values from a run folder.
+
+    Args:
+        folder (Path): Run folder.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, float]: Steps, coefficient values, dt.
+    """
+    run = RunSummary.from_file(folder.joinpath("_summary.toml"))
+    dt = run.configuration.simulation.dt
+    steps, files = sort_files(
+        folder.rglob("*.npz"),
+        prefix=run.configuration.model.prefix,
+        suffix=".npz",
+    )
+    coefficients = compute_coefficients(files, field="omega")
+    return np.array(steps), coefficients, dt
+
+
+def save_coefficients(
+    file: Path,
+    steps: np.ndarray,
+    coefficients: np.ndarray,
+    dt: float,
+) -> None:
+    """Save coeffciients in a .npz file.
+
+    Args:
+        file (Path): File to save in.
+        steps (np.ndarray): Steps.
+        coefficients (np.ndarray): Coefficients.
+        dt (float): Dt.
+    """
+    np.savez(file, steps=steps, alpha=coefficients, dt=dt)
+
+
 class Coefficient(metaclass=ABCMeta):
     """Base class for the coefficient."""
 
     _dt: float
     _step = 0
     _constant = False
+
+    @property
+    def dt(self) -> float:
+        """Timestep."""
+        return self._dt
 
     @property
     def isconstant(self) -> bool:
@@ -400,17 +447,17 @@ class ChangingCoefficient(Coefficient):
     def from_file(
         cls,
         file: Path,
-        dt: float,
         coefs_field: str = "alpha",
-        steps_fields: str = "steps",
+        steps_field: str = "steps",
+        dt_field: float = "dt",
     ) -> Self:
         """Instantiate the coefficient a file of values and steps.
 
         Args:
             file (Path): File to laod.
-            dt (float): Timestep value (in seconds).
             coefs_field (str, optional): Field for coefs. Defaults to "alpha".
-            steps_fields (str, optional): Field for steps. Defaults to "steps".
+            steps_field (str, optional): Field for steps. Defaults to "steps".
+            dt_field (str, optional): Field for dt. Defaults to "dt".
 
         Returns:
             Self: Coefficient.
@@ -418,6 +465,26 @@ class ChangingCoefficient(Coefficient):
         data = np.load(file)
         return cls(
             data[coefs_field],
-            data[steps_fields],
-            dt=dt,
+            data[steps_field],
+            dt=float(data[dt_field]),
+        )
+
+    @classmethod
+    def from_run(
+        cls,
+        folder: Path,
+    ) -> Self:
+        """Instantiate the coefficients from a run folder.
+
+        Args:
+            folder (Path): Folder of the run output.
+
+        Returns:
+            Self: Coefficient.
+        """
+        steps, coefficients, dt = extract_coefficients_from_run(folder)
+        return cls(
+            coefficients,
+            steps,
+            dt,
         )
