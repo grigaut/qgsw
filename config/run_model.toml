@@ -20,13 +20,13 @@ bottom_drag_coefficient = 0
 
 [simulation]
 duration = 8 # units of Tau
-tau = nan # in f0⁻¹, if nan: Tau is automatically computed
-dt = nan # in s, if nan: dt is automatically computed
+tau = 28 # in f0⁻¹, if nan: Tau is automatically computed
+dt = 26 # in s, if nan: dt is automatically computed
 
 [model]
 name = "Two Layers"
 prefix = "two_layers_"
-type = "QG"
+type = "QGColinearSublayerStreamFunction"
 h = [
     200,
     800

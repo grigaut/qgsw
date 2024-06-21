@@ -84,7 +84,7 @@ elif config.model.type == "QGColinearSublayerStreamFunction":
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
-        alpha=config.model.colinearity_coef,
+        coefficient=config.model.colinearity_coef,
     )
     p0 = perturbation.compute_initial_pressure(
         keep_top_layer(space).omega,
