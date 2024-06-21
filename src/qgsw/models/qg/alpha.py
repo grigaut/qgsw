@@ -1,11 +1,17 @@
 """Compute Colinearity Coefficient."""
 
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy import interpolate
 from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 ABOVE_ZERO_THRESHOLD = 1e-5
 
@@ -330,6 +336,12 @@ class ChangingCoefficient(Coefficient):
             self._steps,
             self._coefs,
         )
+
+    def show(self) -> None:
+        """Show the coefficient evolution."""
+        _, ax = plt.subplots(figsize=(6, 6))
+        ax.plot(self._steps, self._smooth(self._coefs))
+        plt.show()
 
     @classmethod
     def from_model_files(
