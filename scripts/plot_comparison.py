@@ -72,7 +72,7 @@ for run in runs:
     nb, fs = sort_files(results, model.prefix, ".npz")
     nbs.append(nb)
     files.append(fs)
-    if config["display_sublayer"] and model.nl > 1:
+    if config["display_sublayer"]:
         ax = SecondLayerVorticityAxes.from_kwargs()
         ax.set_title(r"$\omega_{INF}$" + f"-{model.prefix}")
         axes.append(ax)

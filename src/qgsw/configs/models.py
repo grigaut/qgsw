@@ -1,10 +1,12 @@
 """Model Configuration."""
 
+from functools import cached_property
 from typing import Any, ClassVar
 
 import torch
 
 from qgsw.configs import keys
+from qgsw.configs.alpha import ColinearityCoefficientConfig
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
 from qgsw.specs import DEVICE
@@ -77,19 +79,10 @@ class ModelConfig(_Config):
         """Prefix."""
         return self.params[self._prefix]
 
-    @property
-    def colinearity_coef(self) -> float:
-        """Colinearity Coefficient, only relevant for modified QG models."""
-        return self._get_alpha()
-
-    def _get_alpha(self) -> float:
-        if self.type not in self._colinearity_allowed:
-            msg = (
-                "The colinearity coefficient is only relevant "
-                f"for the following models: {self._colinearity_allowed}."
-            )
-            raise AttributeError(msg)
-        return self.params[self._alpha]
+    @cached_property
+    def colinearity_coef(self) -> ColinearityCoefficientConfig:
+        """Colinearity coeffciient configuration."""
+        return ColinearityCoefficientConfig.parse(self.params)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate that H and g' shapes match.

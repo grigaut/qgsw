@@ -6,10 +6,9 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.exceptions import (
-    InvalidLayersDefinitionError,
-    InvalidModelParameterError,
-)
+from qgsw.models.base import Model
+from qgsw.models.exceptions import InvalidLayersDefinitionError
+from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
 from qgsw.models.sw import SW
 from qgsw.models.variables import UVH
@@ -26,14 +25,14 @@ class QGColinearSublayerStreamFunction(QG):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _supported_layers_nb: int = 2
-    _alpha = 0.01
+    _coefficient = 0.01
 
     def __init__(
         self,
         space_3d: SpaceDiscretization3D,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        alpha: float = _alpha,
+        coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         """Colinear Sublayer Stream Function.
@@ -42,23 +41,36 @@ class QGColinearSublayerStreamFunction(QG):
             space_3d (SpaceDiscretization3D): Space Discretization
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
-            alpha (float): Colinearity coefficient.
+            coefficient (float): Colinearity coefficient.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        self._set_alpha(alpha)
-        super().__init__(
+        Model.__init__(
+            self,
             space_3d=space_3d,
             g_prime=g_prime,
             beta_plane=beta_plane,
             optimize=optimize,
         )
+        self._core = self._init_core_model(optimize=optimize)
+        self.coefficient = coefficient
+        if self.coefficient.isconstant:
+            self._update_A()
         self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
 
     @property
-    def alpha(self) -> float:
+    def coefficient(self) -> Coefficient:
         """Colinearity coefficient."""
-        return self._alpha
+        return self._coefficient
+
+    @coefficient.setter
+    def coefficient(self, coefficient: float | Coefficient) -> None:
+        return self._set_coefficient(coefficient)
+
+    @property
+    def alpha(self) -> float:
+        """Alpha value."""
+        return self.coefficient.at_current_time()
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
@@ -90,19 +102,24 @@ class QGColinearSublayerStreamFunction(QG):
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
 
-    def _set_alpha(self, alpha: float) -> None:
+    def _set_coefficient(self, coefficient: float | Coefficient) -> None:
         """Set colinearity coefficient value.
 
         Args:
-            alpha (float): Colinearity Coefficient.
+            coefficient (float): Colinearity Coefficient.
+        """
+        if isinstance(coefficient, (int, float)):
+            self._coefficient = ConstantCoefficient(coefficient)
+        else:
+            self._coefficient = coefficient
+        self._update_A()
 
-        Raises:
-            InvalidModelParameterError: If α < 0 or α > 1
-        """  # noqa: RUF002
-        if alpha < 0 or alpha > 1:
-            msg = f"α must be between 0 and 1. Given value: {alpha}."  # noqa: RUF001
-            raise InvalidModelParameterError(msg)
-        self._alpha = alpha
+    def _update_A(self) -> None:  # noqa: N802
+        """Update the stretching operator matrix."""
+        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
+        decomposition = self.compute_layers_to_mode_decomposition(self.A)
+        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        self.set_helmholtz_solver(self.lambd)
 
     def _init_core_model(self, optimize: bool) -> SW:  # noqa: FBT001
         """Initialize the core Shallow Water model.
@@ -165,3 +182,10 @@ class QGColinearSublayerStreamFunction(QG):
             * self.space.area
         )
         return UVH(uvh.u, uvh.v, h)
+
+    def step(self) -> None:
+        """Performs one step time-integration with RK3-SSP scheme."""
+        if not self.coefficient.isconstant:
+            self.coefficient.next_time(self.dt)
+            self._update_A()
+        return super().step()

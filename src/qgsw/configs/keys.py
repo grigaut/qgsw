@@ -49,6 +49,13 @@ MODELS = {
     "colinearity coef": "colinearity_coef",
 }
 
+COEF = {
+    "section": "colinearity_coef",
+    "type": "type",
+    "value": "value",
+    "source file": "source_file",
+}
+
 OUTPUT = {
     "section": "output",
     "save": "save_results",

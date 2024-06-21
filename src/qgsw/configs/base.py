@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +10,7 @@ from typing_extensions import Self
 from qgsw.configs.exceptions import ConfigError
 
 
-class _Config(metaclass=ABCMeta):
+class _Config:
     """Configuration."""
 
     section: str
@@ -38,7 +37,6 @@ class _Config(metaclass=ABCMeta):
         """
         return self.params.__repr__()
 
-    @abstractmethod
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate prameters values."""
         return params

@@ -20,13 +20,13 @@ bottom_drag_coefficient = 0
 
 [simulation]
 duration = 8 # units of Tau
-tau = nan # in f0⁻¹, if nan: Tau is automatically computed
-dt = nan # in s, if nan: dt is automatically computed
+tau = 28 # in f0⁻¹, if nan: Tau is automatically computed
+dt = 26 # in s, if nan: dt is automatically computed
 
 [model]
 name = "Two Layers"
 prefix = "two_layers_"
-type = "QG"
+type = "QGColinearSublayerStreamFunction"
 h = [
     200,
     800
@@ -35,7 +35,11 @@ g_prime = [
     10.0,
     5e-2
 ]
-colinearity_coef = 0.1 # Only relevant for modifiedd QG models
+[model.colinearity_coef]
+# Section relevant for modified QG models only
+type = "constant" # 'constant' or 'changing'
+value = 0.1 # Only relevant for constant coefficients.
+source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficients.
 
 [space]
 nx = 24
