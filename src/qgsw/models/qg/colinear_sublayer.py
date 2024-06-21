@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw.models.base import Model
-from qgsw.models.exceptions import InvalidLayersDefinitionError
+from qgsw.models.exceptions import (
+    InvalidLayersDefinitionError,
+    InvalidModelParameterError,
+)
 from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
 from qgsw.models.sw import SW
@@ -102,7 +105,7 @@ class QGColinearSublayerStreamFunction(QG):
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
 
-    def _set_coefficient(self, coefficient: float) -> None:
+    def _set_coefficient(self, coefficient: float | Coefficient) -> None:
         """Set colinearity coefficient value.
 
         Args:
@@ -112,6 +115,12 @@ class QGColinearSublayerStreamFunction(QG):
             self._coefficient = ConstantCoefficient(coefficient)
         else:
             self._coefficient = coefficient
+            if (not coefficient.isconstant) and (coefficient.dt != self.dt):
+                msg = (
+                    "Changing Coefficients must match model's timestep."
+                    f"Model dt: {self.dt} - Coefficient dt: {coefficient.dt}"
+                )
+                raise InvalidModelParameterError(msg)
         self._update_A()
 
     def _update_A(self) -> None:  # noqa: N802
