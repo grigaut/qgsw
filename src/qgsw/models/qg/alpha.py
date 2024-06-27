@@ -375,22 +375,37 @@ class ChangingCoefficient(Coefficient):
             self._coefs,
         )
 
-    def show(self) -> None:
-        """Show the coefficient evolution."""
+    def show(self, current: bool = True) -> None:  # noqa: FBT001, FBT002
+        """Show the coefficient evolution.
+
+        Args:
+            current (bool, optional): Whether to show current time or not.
+            Defaults to True.
+        """
         ax: Axes
         _, ax = plt.subplots(figsize=(6, 6))
+        ax.scatter(
+            self._times,
+            self._coefs,
+            c="orange",
+            alpha=0.75,
+            marker=".",
+            label="Reference Values.",
+        )
         ax.plot(
             self._times,
             self._smooth(self._coefs),
             c="blue",
-            label="All Steps.",
+            label="Smoothed Values.",
         )
-        ax.scatter(
-            self._time,
-            self.at_time(self._time),
-            c="red",
-            label="Current Step.",
-        )
+        if current:
+            ax.scatter(
+                self._time,
+                self.at_time(self._time),
+                c="red",
+                marker="o",
+                label="Current Time.",
+            )
         plt.legend()
         plt.show()
 
