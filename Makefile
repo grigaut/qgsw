@@ -27,6 +27,7 @@ SCRIPTS := scripts
 # Files
 PYPROJECT := pyproject.toml
 MAKEFILE := Makefile
+ALPHA_COEFFICIENTS := data/coefficients.npz
 
 all:
 	@${MAKE} install-dev
@@ -57,7 +58,7 @@ g5k-export:
 	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
-	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT} ${REQUIREMENTS} ${ENVIRONMENT_FILE}
+	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT} ${REQUIREMENTS} ${ENVIRONMENT_FILE} ${ALPHA_COEFFICIENTS}
 	# Export to g5k
 	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
 	# Remove temp files

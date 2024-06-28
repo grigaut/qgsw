@@ -20,6 +20,7 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
     """Perturbation base class."""
 
     _type: str
+    _ratio_sub_top: float
 
     def __init__(self, magnitude: float = 1e-3) -> None:
         super(TypeSwitch).__init__()
@@ -29,6 +30,11 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
     def type(self) -> str:
         """Perturbation type."""
         return self._type
+
+    @property
+    def layer_ratio(self) -> float:
+        """Ratio between sublayers streamfunctions and top layer one."""
+        return self._ratio_sub_top
 
     @property
     def magnitude(self) -> float:
@@ -61,16 +67,26 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
             torch.Tensor: Stream function values, (1, nl, nx, ny) shaped.
         """
 
-    @abstractmethod
     def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
-        """Compute the stream function induced by the perturbation.
+        """Value of the stream function ψ.
 
         Args:
-            grid_3d (Grid3D): 3D Grid.
+            grid_3d (Grid3D): 3D Grid to generate Stream Function on.
 
         Returns:
             torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
         """
+        psi = torch.ones(
+            (1, grid_3d.nl, grid_3d.nx, grid_3d.ny),
+            device=DEVICE,
+            dtype=torch.float64,
+        )
+        psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
+        psi[0, 0, ...] = psi_2d
+        for i in range(1, grid_3d.nl):
+            psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
+            psi[0, i, ...] = self.layer_ratio * psi_2d
+        return psi
 
     def _adjust_stream_function(
         self,
@@ -139,45 +155,16 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
 class BarotropicPerturbation(_Perturbation):
     """Barotropic Perturbation."""
 
-    def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
-        """Value of the stream function ψ.
-
-        Args:
-            grid_3d (Grid3D): 3D Grid to generate Stream Function on.
-
-        Returns:
-            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
-        """
-        psi = torch.ones(
-            (1, grid_3d.nl, grid_3d.nx, grid_3d.ny),
-            device=DEVICE,
-            dtype=torch.float64,
-        )
-        for i in range(grid_3d.nl):
-            psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
-            psi[0, i, ...] = psi_2d
-        return psi
+    _ratio_sub_top = 1
 
 
 class BaroclinicPerturbation(_Perturbation):
     """Baroclinic Perturbation."""
 
-    def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
-        """Value of the stream function ψ.
+    _ratio_sub_top = 0
 
-        Args:
-            grid_3d (Grid3D): 3D Grid to generate Stream Function on.
 
-        Returns:
-            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
-        """
-        psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
-        nx, ny = psi_2d.shape[-2:]
-        psi = torch.ones(
-            (1, grid_3d.nl, nx, ny),
-            device=DEVICE,
-            dtype=torch.float64,
-        )
+class HalfBarotropicPerturbation(_Perturbation):
+    """Half Barotropic Perturbation."""
 
-        psi[0, 0, ...] = psi_2d
-        return psi
+    _ratio_sub_top = 0.5

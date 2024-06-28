@@ -13,6 +13,7 @@ from qgsw.models.core import helmholtz
 from qgsw.perturbations.base import (
     BaroclinicPerturbation,
     BarotropicPerturbation,
+    HalfBarotropicPerturbation,
     _Perturbation,
 )
 from qgsw.spatial.core.grid import Grid2D, Grid3D
@@ -330,6 +331,20 @@ class BarotropicVortex(RankineVortex3D, BarotropicPerturbation):
     """3D Rankine Vortex with similar vortex behavior accross all layers."""
 
     _type = "vortex-barotropic"
+
+    def _set_2d_vortex(self, magnitude: float) -> None:
+        """Set the 2D  vortex.
+
+        Args:
+            magnitude (float): Vortex perturbation magnitude
+        """
+        self._2d_vortex = RankineVortex2D(perturbation_magnitude=magnitude)
+
+
+class HalfBarotropicVortex(RankineVortex3D, HalfBarotropicPerturbation):
+    """3D Rankine Vortex with similar vortex behavior accross all layers."""
+
+    _type = "vortex-half-barotropic"
 
     def _set_2d_vortex(self, magnitude: float) -> None:
         """Set the 2D  vortex.
