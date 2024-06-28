@@ -39,7 +39,7 @@ class BaseFigure:
 
     def show(self) -> None:
         """Show the figure."""
-        plt.pause(0.05)
+        plt.pause(0.01)
 
 
 class BaseSingleFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):

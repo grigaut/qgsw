@@ -208,6 +208,7 @@ class VorticityAxesContent(BaseAxesContent):
     def update_colorbar(self, ax: Axes, axesim: AxesImage) -> None:
         """Remove the colorbar."""
         if self._has_cbar:
+            self._cbar.ax.cla()
             self._cbar = ax.figure.colorbar(
                 axesim,
                 cax=self._cbar.ax,
