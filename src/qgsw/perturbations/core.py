@@ -9,6 +9,7 @@ from qgsw.perturbations.random import RandomSurfacePerturbation
 from qgsw.perturbations.vortex import (
     BaroclinicVortex,
     BarotropicVortex,
+    HalfBarotropicVortex,
     PerturbedBaroclinicVortex,
     PerturbedBarotropicVortex,
 )
@@ -81,6 +82,7 @@ class Perturbation:
         perturbations = {
             BaroclinicVortex.get_type(): BaroclinicVortex,
             BarotropicVortex.get_type(): BarotropicVortex,
+            HalfBarotropicVortex.get_type(): HalfBarotropicVortex,
             RandomSurfacePerturbation.get_type(): RandomSurfacePerturbation,
             PerturbedBaroclinicVortex.get_type(): PerturbedBaroclinicVortex,
             PerturbedBarotropicVortex.get_type(): PerturbedBarotropicVortex,
