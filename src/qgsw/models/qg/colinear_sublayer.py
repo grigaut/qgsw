@@ -299,3 +299,64 @@ class QGColinearSublayerPV(_QGColinearSublayer):
         if not self.coefficient.isconstant:
             self.coefficient.next_time(self.dt)
         return super().step()
+
+
+class QGPVMixture(QGColinearSublayerPV):
+    """Mixture of Barotropic and Baroclinic Streamfunctions."""
+
+    def QoG_inv(  # noqa: N802
+        self,
+        elliptic_rhs: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """(Q o G)^{-1} operator: solve elliptic eq with mass conservation.
+
+        Modified implementation: Expand to 2 layers and retrieve
+        top layer streamfunction.
+
+        Args:
+            elliptic_rhs (torch.Tensor): Elliptic equation right hand side
+            value (ω-f_0*h/H).
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Quasi-geostrophique pressure,
+            interpolated quasi-geostroophic pressure ("middle of grid cell").
+        """
+        # Expand to 2 layers
+        _, _, nx, ny = elliptic_rhs.shape
+        elliptic_rhs_baroclinic = torch.zeros(
+            (1, 2, nx, ny),
+            device=DEVICE,
+            dtype=torch.float64,
+        )
+        elliptic_rhs_baroclinic[0, 0, ...] = elliptic_rhs
+        elliptic_rhs_baroclinic[0, 1, ...] = 0 * elliptic_rhs
+        # Extract 2 layers stream functions
+        p_qg_baroclinic, p_qg_i_baroclinic = _QGColinearSublayer.QoG_inv(
+            self,
+            elliptic_rhs_baroclinic,
+        )
+
+        elliptic_rhs_barotropic = torch.zeros(
+            (1, 2, nx, ny),
+            device=DEVICE,
+            dtype=torch.float64,
+        )
+        elliptic_rhs_barotropic[0, 0, ...] = elliptic_rhs
+        elliptic_rhs_barotropic[0, 1, ...] = 1 * elliptic_rhs
+        # Extract 2 layers stream functions
+        p_qg_barotropic, p_qg_i_barotropic = _QGColinearSublayer.QoG_inv(
+            self,
+            elliptic_rhs_barotropic,
+        )
+        p_qg_barocl_top = p_qg_baroclinic[0, 0, ...]
+        p_qg_barotr_top = p_qg_barotropic[0, 0, ...]
+        p_qg_i_barocl_top = p_qg_i_baroclinic[0, 0, ...]
+        p_qg_i_barotr_top = p_qg_i_baroclinic[0, 0, ...]
+
+        alpha = self.alpha
+
+        # Shrink to 1 layer
+        return (
+            (1 - alpha) * p_qg_barotr_top + alpha * p_qg_barocl_top,
+            (1 - alpha) * p_qg_i_barotr_top + alpha * p_qg_i_barocl_top,
+        )
