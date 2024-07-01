@@ -4,7 +4,7 @@ import torch
 from torch.nn import MSELoss
 
 
-def rmse(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+def RMSE(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # noqa: N802
     """RMSE.
 
     Args:
