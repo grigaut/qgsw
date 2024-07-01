@@ -21,11 +21,11 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
 
 
-class QGColinearSublayerStreamFunction(QG):
-    """Modified QG model implementing CoLinear Sublayer Behavior."""
+class _QGColinearSublayer(QG):
+    """Colinear QG Model."""
 
-    _supported_layers_nb: int = 2
-    _coefficient = 0.01
+    _supported_layers_nb: int
+    _coefficient: float = 0.01
 
     def __init__(
         self,
@@ -54,9 +54,6 @@ class QGColinearSublayerStreamFunction(QG):
         )
         self._core = self._init_core_model(optimize=optimize)
         self.coefficient = coefficient
-        if self.coefficient.isconstant:
-            self._update_A()
-        self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
 
     @property
     def coefficient(self) -> Coefficient:
@@ -96,7 +93,7 @@ class QGColinearSublayerStreamFunction(QG):
         """
         if self.space.nl != self._supported_layers_nb:
             msg = (
-                "QGColinearSublayer can only support"
+                "_QGColinearSublayer can only support"
                 f"{self._supported_layers_nb} layers."
             )
             raise InvalidLayersDefinitionError(msg)
@@ -112,14 +109,6 @@ class QGColinearSublayerStreamFunction(QG):
             self._coefficient = ConstantCoefficient(coefficient)
         else:
             self._coefficient = coefficient
-        self._update_A()
-
-    def _update_A(self) -> None:  # noqa: N802
-        """Update the stretching operator matrix."""
-        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
-        decomposition = self.compute_layers_to_mode_decomposition(self.A)
-        self.Cm2l, self.lambd, self.Cl2m = decomposition
-        self.set_helmholtz_solver(self.lambd)
 
     def _init_core_model(self, optimize: bool) -> SW:  # noqa: FBT001
         """Initialize the core Shallow Water model.
@@ -136,6 +125,53 @@ class QGColinearSublayerStreamFunction(QG):
             beta_plane=self.beta_plane,
             optimize=optimize,
         )
+
+
+class QGColinearSublayerStreamFunction(_QGColinearSublayer):
+    """Modified QG model implementing CoLinear Sublayer Behavior."""
+
+    _supported_layers_nb: int = 2
+    _coefficient = 0.01
+
+    def __init__(
+        self,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        coefficient: float | Coefficient = _coefficient,
+        optimize: bool = True,  # noqa: FBT001, FBT002
+    ) -> None:
+        """Colinear Sublayer Stream Function.
+
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            coefficient (float): Colinearity coefficient.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            coefficient=coefficient,
+            optimize=optimize,
+        )
+        if self.coefficient.isconstant:
+            self._update_A()
+        self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
+
+    def _set_coefficient(self, coefficient: float | Coefficient) -> None:
+        super()._set_coefficient(coefficient)
+        self._update_A()
+
+    def _update_A(self) -> None:  # noqa: N802
+        """Update the stretching operator matrix."""
+        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
+        decomposition = self.compute_layers_to_mode_decomposition(self.A)
+        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        self.set_helmholtz_solver(self.lambd)
 
     def compute_A(  # noqa: N802
         self,
