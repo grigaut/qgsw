@@ -348,15 +348,16 @@ class QGPVMixture(QGColinearSublayerPV):
             self,
             elliptic_rhs_barotropic,
         )
-        p_qg_barocl_top = p_qg_baroclinic[0, 0, ...]
-        p_qg_barotr_top = p_qg_barotropic[0, 0, ...]
-        p_qg_i_barocl_top = p_qg_i_baroclinic[0, 0, ...]
-        p_qg_i_barotr_top = p_qg_i_baroclinic[0, 0, ...]
+
+        # Shrink to 1 layer
+        p_qg_barocl_top = p_qg_baroclinic[:, 0, ...]
+        p_qg_barotr_top = p_qg_barotropic[:, 0, ...]
+        p_qg_i_barocl_top = p_qg_i_baroclinic[:, 0, ...]
+        p_qg_i_barotr_top = p_qg_i_barotropic[:, 0, ...]
 
         alpha = self.alpha
 
-        # Shrink to 1 layer
-        return (
-            (1 - alpha) * p_qg_barotr_top + alpha * p_qg_barocl_top,
-            (1 - alpha) * p_qg_i_barotr_top + alpha * p_qg_i_barocl_top,
-        )
+        p_qg = (1 - alpha) * p_qg_barotr_top + alpha * p_qg_barocl_top
+        p_qg_i = (1 - alpha) * p_qg_i_barotr_top + alpha * p_qg_i_barocl_top
+
+        return p_qg, p_qg_i
