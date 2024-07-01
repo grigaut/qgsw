@@ -9,6 +9,7 @@ from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import QG, QGColinearSublayerStreamFunction
 from qgsw.models.qg.alpha import coefficient_from_config
+from qgsw.models.qg.colinear_sublayer import QGColinearSublayerPV
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
@@ -36,7 +37,11 @@ if config.io.results.save:
     save_file = config.io.results.directory.joinpath("_summary.toml")
     summary.to_file(save_file)
 
-supported_models = ["QG", "QGColinearSublayerStreamFunction"]
+supported_models = [
+    "QG",
+    "QGColinearSublayerStreamFunction",
+    "QGColinearSublayerPV",
+]
 
 if config.model.type not in supported_models:
     msg = "Unsupported model type, possible values are: QG."
@@ -82,6 +87,18 @@ if config.model.type == "QG":
     )
 elif config.model.type == "QGColinearSublayerStreamFunction":
     model = QGColinearSublayerStreamFunction(
+        space_3d=space,
+        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+        beta_plane=config.physics.beta_plane,
+        coefficient=coefficient_from_config(config.model.colinearity_coef),
+    )
+    p0 = perturbation.compute_initial_pressure(
+        keep_top_layer(space).omega,
+        config.physics.f0,
+        Ro,
+    )
+elif config.model.type == "QGColinearSublayerPV":
+    model = QGColinearSublayerPV(
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
