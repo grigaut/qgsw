@@ -357,7 +357,7 @@ class QGPVMixture(QGColinearSublayerPV):
 
         alpha = self.alpha
 
-        p_qg = (1 - alpha) * p_qg_barotr_top + alpha * p_qg_barocl_top
-        p_qg_i = (1 - alpha) * p_qg_i_barotr_top + alpha * p_qg_i_barocl_top
+        p_qg = alpha * p_qg_barotr_top + (1 - alpha) * p_qg_barocl_top
+        p_qg_i = alpha * p_qg_i_barotr_top + (1 - alpha) * p_qg_i_barocl_top
 
         return p_qg, p_qg_i
