@@ -12,10 +12,12 @@ from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
 from qgsw.models.sw import SW
 from qgsw.models.variables import UVH
+from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
     keep_top_layer,
 )
+from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -224,4 +226,76 @@ class QGColinearSublayerStreamFunction(_QGColinearSublayer):
         if not self.coefficient.isconstant:
             self.coefficient.next_time(self.dt)
             self._update_A()
+        return super().step()
+
+
+class QGColinearSublayerPV(_QGColinearSublayer):
+    """Modified QG Model implementing potential vorticity colinear behavior."""
+
+    _supported_layers_nb: int = 2
+    _coefficient = 0.01
+
+    def __init__(
+        self,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        coefficient: float | Coefficient = _coefficient,
+        optimize: bool = True,  # noqa: FBT002, FBT001
+    ) -> None:
+        """Colinear Sublayer Potential Vorticity.
+
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            coefficient (float): Colinearity coefficient.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        super().__init__(space_3d, g_prime, beta_plane, coefficient, optimize)
+        # Two layers stretching operator for QoG inversion
+        A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
+        decomposition = self.compute_layers_to_mode_decomposition(A_2l)
+        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        # Two layers helmholtz solver
+        self.set_helmholtz_solver(self.lambd)
+        # One layer stretching operator for G
+        self.A = self.compute_A(self.H[:, 0, 0], self.g_prime[:, 0, 0])
+
+    def QoG_inv(  # noqa: N802
+        self,
+        elliptic_rhs: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """(Q o G)^{-1} operator: solve elliptic eq with mass conservation.
+
+        Modified implementation: Expand to 2 layers and retrieve
+        top layer streamfunction.
+
+        Args:
+            elliptic_rhs (torch.Tensor): Elliptic equation right hand side
+            value (ω-f_0*h/H).
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Quasi-geostrophique pressure,
+            interpolated quasi-geostroophic pressure ("middle of grid cell").
+        """
+        # Expand to 2 layers
+        _, _, nx, ny = elliptic_rhs.shape
+        elliptic_rhs_2l = torch.zeros(
+            (1, 2, nx, ny),
+            device=DEVICE,
+            dtype=torch.float64,
+        )
+        elliptic_rhs_2l[0, 0, ...] = elliptic_rhs
+        elliptic_rhs_2l[0, 1, ...] = self.alpha * elliptic_rhs
+        # Extract 2 layers stream functions
+        p_qg_2l, p_qg_i_2l = super().QoG_inv(elliptic_rhs_2l)
+        # Shrink to 1 layer
+        return p_qg_2l[:, 0, ...], p_qg_i_2l[:, 0, ...]
+
+    def step(self) -> None:
+        """Performs one step time-integration with RK3-SSP scheme."""
+        if not self.coefficient.isconstant:
+            self.coefficient.next_time(self.dt)
         return super().step()
