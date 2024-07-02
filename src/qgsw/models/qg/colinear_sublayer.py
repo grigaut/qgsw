@@ -11,7 +11,6 @@ from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
 from qgsw.models.sw import SW
-from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
@@ -162,7 +161,6 @@ class QGColinearSublayerStreamFunction(_QGColinearSublayer):
         )
         if self.coefficient.isconstant:
             self._update_A()
-        self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
 
     def _set_coefficient(self, coefficient: float | Coefficient) -> None:
         super()._set_coefficient(coefficient)
@@ -200,26 +198,6 @@ class QGColinearSublayerStreamFunction(_QGColinearSublayer):
         )
         # Select top row from matrix product
         return (A @ layers_coefs)[0, ...].unsqueeze(0).unsqueeze(0)
-
-    def G(self, p: torch.Tensor, p_i: torch.Tensor | None = None) -> UVH:  # noqa: N802
-        """G operator.
-
-        Args:
-            p (torch.Tensor): Pressure.
-            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
-             ("middle of grid cell"). Defaults to None.
-
-        Returns:
-            UVH: u, v and h
-        """
-        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
-        uvh = super().G(p, p_i)
-        h = (
-            self.H
-            * torch.einsum("lm,...mxy->...lxy", self.A_1l, p_i)
-            * self.space.area
-        )
-        return UVH(uvh.u, uvh.v, h)
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
