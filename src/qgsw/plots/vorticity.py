@@ -36,7 +36,7 @@ P = ParamSpec("P")
 class VorticityAxesContext(BaseAxesContext):
     """Axes Context Manager for vorticity plots."""
 
-    _default_title = r"$\omega$"
+    _default_title = r"$\Potential Vorticity$"
 
     def _create_axes(self, figure: Figure) -> Axes:
         """Create Axes on a given figure.
@@ -173,7 +173,7 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             np.ndarray: Retrieved array (1,nl,nx,ny).
         """
-        return model.get_physical_omega_as_ndarray()
+        return model.pv
 
     def retrieve_array_from_file(self, filepath: Path) -> np.ndarray:
         """Retrieve relevant array from a given file.

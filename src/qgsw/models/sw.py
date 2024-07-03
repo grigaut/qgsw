@@ -106,6 +106,12 @@ class SW(Model):
             optimize=optimize,
         )
 
+    @property
+    def pv(self) -> torch.Tensor:
+        """Potenital Vorticity."""
+        msg = "Shallow Water Model don't have vorticity plots."
+        raise AttributeError(msg)
+
     def _compute_coriolis(self) -> None:
         """Set Coriolis Related Grids."""
         super()._compute_coriolis()
