@@ -1,5 +1,6 @@
 """Run a single model with a Vortex forcing."""
 
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -25,8 +26,16 @@ from qgsw.utils import time_params
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
+parser = argparse.ArgumentParser(description="Process some integers.")
+parser.add_argument(
+    "--config",
+    default="config/run_model.toml",
+    help="Configuration File Path (from qgsw root level)",
+)
+args = parser.parse_args()
+
 ROOT_PATH = Path(__file__).parent.parent
-CONFIG_PATH = ROOT_PATH.joinpath("config/run_model.toml")
+CONFIG_PATH = ROOT_PATH.joinpath(args.config)
 config = Configuration.from_file(CONFIG_PATH)
 summary = RunSummary.from_configuration(config)
 
