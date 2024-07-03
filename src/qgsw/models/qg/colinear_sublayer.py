@@ -11,6 +11,7 @@ from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
 from qgsw.models.sw import SW
+from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
@@ -159,8 +160,6 @@ class QGColinearSublayerStreamFunction(_QGColinearSublayer):
             coefficient=coefficient,
             optimize=optimize,
         )
-        if self.coefficient.isconstant:
-            self._update_A()
 
     def _set_coefficient(self, coefficient: float | Coefficient) -> None:
         super()._set_coefficient(coefficient)
@@ -205,6 +204,60 @@ class QGColinearSublayerStreamFunction(_QGColinearSublayer):
             self.coefficient.next_time(self.dt)
             self._update_A()
         return super().step()
+
+
+class QGColinearSublayerSFModifiedA(QGColinearSublayerStreamFunction):
+    """Modified QG model implementing CoLinear Sublayer Behavior."""
+
+    _supported_layers_nb: int = 2
+    _coefficient = 0.01
+
+    def __init__(
+        self,
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        coefficient: float | Coefficient = _coefficient,
+        optimize: bool = True,  # noqa: FBT001, FBT002
+    ) -> None:
+        """Colinear Sublayer Stream Function.
+
+        Args:
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            coefficient (float): Colinearity coefficient.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        super().__init__(
+            space_3d=space_3d,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            coefficient=coefficient,
+            optimize=optimize,
+        )
+        self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
+
+    def G(self, p: torch.Tensor, p_i: torch.Tensor | None = None) -> UVH:  # noqa: N802
+        """G operator.
+
+        Args:
+            p (torch.Tensor): Pressure.
+            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
+             ("middle of grid cell"). Defaults to None.
+
+        Returns:
+            UVH: u, v and h
+        """
+        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
+        uvh = super().G(p, p_i)
+        h = (
+            self.H
+            * torch.einsum("lm,...mxy->...lxy", self.A_1l, p_i)
+            * self.space.area
+        )
+        return UVH(uvh.u, uvh.v, h)
 
 
 class QGColinearSublayerPV(_QGColinearSublayer):
