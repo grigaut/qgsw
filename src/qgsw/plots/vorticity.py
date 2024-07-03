@@ -173,7 +173,7 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             np.ndarray: Retrieved array (1,nl,nx,ny).
         """
-        return model.pv
+        return model.pv.cpu().numpy()
 
     def retrieve_array_from_file(self, filepath: Path) -> np.ndarray:
         """Retrieve relevant array from a given file.
