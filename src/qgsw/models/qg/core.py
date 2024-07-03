@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
 import torch
 
+from qgsw import verbose
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -18,6 +20,8 @@ from qgsw.models.sw import SW
 from qgsw.models.variables import UVH
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
@@ -411,3 +415,51 @@ class QG(Model):
             UVH: update prognostic variables.
         """
         return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
+
+    def compute_diagnostic_variables(self, uvh: UVH) -> None:
+        """Compute the model's diagnostic variables.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Computed variables:
+        - Vorticity: omega
+        - Interface heights: eta
+        - Pressure: p
+        - Zonal velocity: U
+        - Meridional velocity: V
+        - Kinetic Energy: k_energy
+
+        Compute the result given the prognostic
+        variables u,v and h.
+        """
+        super().compute_diagnostic_variables(uvh)
+        omega = self.cell_corners_to_cell_centers(self.omega)
+        h_ratio = self.h / self.h_ref
+        self.pv = omega / self.space.area - self.beta_plane.f0 * h_ratio
+
+    def save_uvhwp(self, output_file: Path) -> None:
+        """Save uvh, vorticity and pressure values.
+
+        Args:
+            output_file (Path): File to save value in (.npz).
+        """
+        self._raise_if_invalid_savefile(output_file=output_file)
+
+        omega = self.get_physical_omega_as_ndarray()
+        u, v, h = self.get_physical_uvh_as_ndarray()
+
+        np.savez(
+            output_file,
+            u=u.astype("float32"),
+            v=v.astype("float32"),
+            h=h.astype("float32"),
+            omega=omega.astype("float32"),
+            p=self.p.cpu().numpy().astype("float32"),
+            pv=self.pv.cpu().numpy().astype("float32"),
+        )
+
+        verbose.display(
+            msg=f"saved u,v,h,ω,p,pv to {output_file}",
+            trigger_level=1,
+        )

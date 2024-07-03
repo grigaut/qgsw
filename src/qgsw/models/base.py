@@ -86,6 +86,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     eta: torch.Tensor
     U: torch.Tensor
     V: torch.Tensor
+    pv: torch.Tensor
     V_m: torch.Tensor
     U_m: torch.Tensor
     h_tot_ugrid: torch.Tensor
