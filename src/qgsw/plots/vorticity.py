@@ -377,7 +377,7 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
             self.figure.colorbar(
                 self._axes_ms[0].content.axes_image,
                 cax=self._cbar_axes,
-                label=r"$\omega / f_0$",
+                label=r"$s^{-1}$",
             )
 
     def _update(self, *datas: np.ndarray, **kwargs: P.kwargs) -> None:
