@@ -184,7 +184,7 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             np.ndarray: Retrieved data (1,nl,nx,ny).
         """
-        return np.load(file=filepath)["omega"]
+        return np.load(file=filepath)["pv"]
 
     def update(self, ax: Axes, data: np.ndarray, **kwargs: P.kwargs) -> Axes:
         """Update Axes content.
