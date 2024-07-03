@@ -26,7 +26,7 @@ from qgsw.utils import time_params
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
-parser = argparse.ArgumentParser(description="Process some integers.")
+parser = argparse.ArgumentParser(description="Retrieve Configuration file.")
 parser.add_argument(
     "--config",
     default="config/run_model.toml",
