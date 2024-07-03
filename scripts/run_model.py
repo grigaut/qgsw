@@ -10,7 +10,11 @@ from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import QG, QGColinearSublayerStreamFunction
 from qgsw.models.qg.alpha import coefficient_from_config
-from qgsw.models.qg.colinear_sublayer import QGColinearSublayerPV, QGPVMixture
+from qgsw.models.qg.colinear_sublayer import (
+    QGColinearSublayerPV,
+    QGColinearSublayerSFModifiedA,
+    QGPVMixture,
+)
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
@@ -51,6 +55,7 @@ supported_models = [
     "QGColinearSublayerStreamFunction",
     "QGColinearSublayerPV",
     "QGPVMixture",
+    "QGColinearSublayerSFModifiedA",
 ]
 
 if config.model.type not in supported_models:
@@ -119,9 +124,20 @@ elif config.model.type == "QGColinearSublayerPV":
         config.physics.f0,
         Ro,
     )
-
 elif config.model.type == "QGPVMixture":
     model = QGPVMixture(
+        space_3d=space,
+        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+        beta_plane=config.physics.beta_plane,
+        coefficient=coefficient_from_config(config.model.colinearity_coef),
+    )
+    p0 = perturbation.compute_initial_pressure(
+        keep_top_layer(space).omega,
+        config.physics.f0,
+        Ro,
+    )
+elif config.model.type == "QGColinearSublayerSFModifiedA":
+    model = QGColinearSublayerSFModifiedA(
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
