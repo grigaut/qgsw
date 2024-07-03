@@ -204,7 +204,7 @@ for n in range(n_steps + 1):
     if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
         name = config.model.name_sc
-        model.save_omega(directory.joinpath(f"{prefix}{n}.npz"))
+        model.save_uvhwp(directory.joinpath(f"{prefix}{n}.npz"))
     model.step()
 
     t += dt

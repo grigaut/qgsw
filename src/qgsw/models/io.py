@@ -19,6 +19,7 @@ class ModelResultsRetriever:
     uvh: UVH
     device: str
     omega: torch.Tensor
+    p: torch.Tensor
     beta_plane: BetaPlane
     eta: torch.Tensor
 
@@ -137,3 +138,28 @@ class ModelResultsRetriever:
         np.savez(output_file, omega=omega.astype("float32"))
 
         verbose.display(msg=f"saved ω to {output_file}", trigger_level=1)
+
+    def save_uvhwp(self, output_file: Path) -> None:
+        """Save uvh, vorticity and pressure values.
+
+        Args:
+            output_file (Path): File to save value in (.npz).
+        """
+        self._raise_if_invalid_savefile(output_file=output_file)
+
+        omega = self.get_physical_omega_as_ndarray()
+        u, v, h = self.get_physical_uvh_as_ndarray()
+
+        np.savez(
+            output_file,
+            u=u.astype("float32"),
+            v=v.astype("float32"),
+            h=h.astype("float32"),
+            omega=omega.astype("float32"),
+            p=self.p.cpu().numpy().astype("float32"),
+        )
+
+        verbose.display(
+            msg=f"saved u,v,h,ω,p to {output_file}",
+            trigger_level=1,
+        )
