@@ -212,7 +212,7 @@ class VorticityAxesContent(BaseAxesContent):
             self._cbar = ax.figure.colorbar(
                 axesim,
                 cax=self._cbar.ax,
-                label=r"$\omega / f_0$",
+                label=r"$s^{-1}$",
             )
         else:
             cbar_ax = make_axes_locatable(ax).append_axes(
@@ -223,7 +223,7 @@ class VorticityAxesContent(BaseAxesContent):
             self._cbar = ax.figure.colorbar(
                 axesim,
                 cax=cbar_ax,
-                label=r"$\omega / f_0$",
+                label=r"$s^{-1}$",
             )
         self._has_cbar = True
         self._axesim = axesim
