@@ -67,14 +67,12 @@ for run in runs:
     model = run.summary.configuration.model
     results = list(folder.glob(f"{model.prefix}*.npz"))
     ax = SurfaceVorticityAxes.from_kwargs()
-    ax.set_title(r"$\omega_{TOP}$" + f"-{model.prefix}")
     axes.append(ax)
     nb, fs = sort_files(results, model.prefix, ".npz")
     nbs.append(nb)
     files.append(fs)
     if config["display_sublayer"]:
         ax = SecondLayerVorticityAxes.from_kwargs()
-        ax.set_title(r"$\omega_{INF}$" + f"-{model.prefix}")
         axes.append(ax)
         nb, fs = sort_files(results, model.prefix, ".npz")
         nbs.append(nb)
@@ -96,6 +94,7 @@ if not all(nb == nbs[0] for nb in nbs[1:]):
 freq_save = steps // config["snapshots"]["saved_nb"]
 
 for i in range(steps):
+    plot.set_titles([run.summary.configuration.io.name for run in runs])
     plot.update_with_files(
         *[f[i] for f in files],
     )
