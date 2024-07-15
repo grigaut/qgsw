@@ -333,6 +333,14 @@ class BaseAxes(Generic[AxesContext, AxesContent], metaclass=ABCMeta):
         """
         return self._content.retrieve_array_from_file(filepath=file)
 
+    def reload_axes(self, ax: Axes) -> None:
+        """Reload Ax style.
+
+        Args:
+            ax (Axes): Axes to reload.
+        """
+        self.context.reload_axes(ax)
+
     @classmethod
     @abstractmethod
     def from_kwargs(

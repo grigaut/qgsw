@@ -44,6 +44,18 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         self._axes: np.ndarray = axes.reshape((-1,))
         self._set_axes()
 
+    def set_titles(self, titles: list[str]) -> None:
+        """Set the title of all figures.
+
+        Args:
+            titles (list[str]): List of titles to set.
+        """
+        if len(titles) != len(self._axes_ms):
+            msg = "'titles' length is not matching the number of Axes."
+            raise ValueError(msg)
+        for i, ms in enumerate(self._axes_ms):
+            ms.set_title(titles[i])
+
     def _raise_if_inconsistent_length(self, elements_nb: int) -> None:
         """Raise an error if the number of plot to update is invalid.
 
@@ -73,6 +85,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
             nrows=nrows,
             ncols=ncols,
             figsize=(6 * ncols, 6 * nrows),
+            dpi=150,
         )
         fig.tight_layout(pad=6)
         if nrows == 1 and ncols == 1:
@@ -89,6 +102,7 @@ class ComparisonFigure(Generic[AxesManager], BaseFigure, metaclass=ABCMeta):
         """Update the Figure."""
         self._raise_if_inconsistent_length(elements_nb=len(datas))
         for i, data in enumerate(datas):
+            self._axes_ms[i].context.reload_axes(self._axes_ms[i].ax)
             self._axes_ms[i].update(data, **kwargs)
 
     def update_with_arrays(
