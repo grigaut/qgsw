@@ -1,5 +1,5 @@
 [io]
-name = "Single Model Vortex"
+name = "Two Layers Model"
 performance_log = false
 [io.output]
 save_results = false
@@ -25,8 +25,8 @@ dt = 26 # in s, if nan: dt is automatically computed
 
 [model]
 name = "Two Layers"
-prefix = "two_layers_"
-type = "QGColinearSublayerStreamFunction"
+prefix = "results_step_"
+type = "QG"
 h = [
     200,
     800
@@ -42,8 +42,8 @@ value = 0.1 # Only relevant for constant coefficients.
 source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficients.
 
 [space]
-nx = 24
-ny = 24
+nx = 192
+ny = 192
 box_unit = "m"
 [space.box]
 unit = "m"
