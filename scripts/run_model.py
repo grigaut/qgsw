@@ -23,7 +23,6 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
-from qgsw.spatial.core.discretization import keep_top_layer
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.utils import time_params
 
@@ -89,17 +88,19 @@ verbose.display(
 )
 
 ## Set model parameters
+
+p0 = perturbation.compute_initial_pressure(
+    space.omega,
+    config.physics.f0,
+    Ro,
+)
 if config.model.type == "QG":
     model = QG(
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
     )
-    p0 = perturbation.compute_initial_pressure(
-        space.omega,
-        config.physics.f0,
-        Ro,
-    )
+    uvh0 = model.G(p0)
 elif config.model.type == "QGColinearSublayerStreamFunction":
     model = QGColinearSublayerStreamFunction(
         space_3d=space,
@@ -107,11 +108,7 @@ elif config.model.type == "QGColinearSublayerStreamFunction":
         beta_plane=config.physics.beta_plane,
         coefficient=coefficient_from_config(config.model.colinearity_coef),
     )
-    p0 = perturbation.compute_initial_pressure(
-        keep_top_layer(space).omega,
-        config.physics.f0,
-        Ro,
-    )
+    uvh0 = model.G0(p0)
 elif config.model.type == "QGColinearSublayerPV":
     model = QGColinearSublayerPV(
         space_3d=space,
@@ -119,11 +116,7 @@ elif config.model.type == "QGColinearSublayerPV":
         beta_plane=config.physics.beta_plane,
         coefficient=coefficient_from_config(config.model.colinearity_coef),
     )
-    p0 = perturbation.compute_initial_pressure(
-        keep_top_layer(space).omega,
-        config.physics.f0,
-        Ro,
-    )
+    uvh0 = model.G0(p0)
 elif config.model.type == "QGPVMixture":
     model = QGPVMixture(
         space_3d=space,
@@ -131,11 +124,7 @@ elif config.model.type == "QGPVMixture":
         beta_plane=config.physics.beta_plane,
         coefficient=coefficient_from_config(config.model.colinearity_coef),
     )
-    p0 = perturbation.compute_initial_pressure(
-        keep_top_layer(space).omega,
-        config.physics.f0,
-        Ro,
-    )
+    uvh0 = model.G0(p0)
 elif config.model.type == "QGColinearSublayerSFModifiedA":
     model = QGColinearSublayerSFModifiedA(
         space_3d=space,
@@ -143,15 +132,10 @@ elif config.model.type == "QGColinearSublayerSFModifiedA":
         beta_plane=config.physics.beta_plane,
         coefficient=coefficient_from_config(config.model.colinearity_coef),
     )
-    p0 = perturbation.compute_initial_pressure(
-        keep_top_layer(space).omega,
-        config.physics.f0,
-        Ro,
-    )
+    uvh0 = model.G0(p0)
 model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coef
 model.set_wind_forcing(taux, tauy)
-uvh0 = model.G(p0)
 
 if np.isnan(config.simulation.dt):
     dt = time_params.compute_dt(uvh0, model.space, model.g_prime, model.H)

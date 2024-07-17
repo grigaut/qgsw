@@ -1,5 +1,5 @@
 [io]
-name = "Single Model Vortex"
+name = "Two Layers Model"
 performance_log = false
 [io.output]
 save_results = false
@@ -25,7 +25,7 @@ dt = 26 # in s, if nan: dt is automatically computed
 
 [model]
 name = "Two Layers"
-prefix = "two_layers_"
+prefix = "results_step_"
 type = "QG"
 h = [
     200,

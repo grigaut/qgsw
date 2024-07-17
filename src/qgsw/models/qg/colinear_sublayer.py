@@ -128,6 +128,37 @@ class _QGColinearSublayer(QG):
             optimize=optimize,
         )
 
+    def G0(self, p: torch.Tensor, p_i: torch.Tensor | None = None) -> UVH:  # noqa: N802
+        """G0 operator, for initial pressure to varibale computation.
+
+        Args:
+            p (torch.Tensor): Pressure.
+            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
+             ("middle of grid cell"). Defaults to None.
+
+        Returns:
+            UVH: u, v and h
+        """
+        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
+        dx, dy = self.space.dx, self.space.dy
+
+        # geostrophic balance
+        u = -torch.diff(p, dim=-1) / dy / self.beta_plane.f0 * dx
+        v = torch.diff(p, dim=-2) / dx / self.beta_plane.f0 * dy
+        # h = diag(H)Ap
+        A_2l = super().compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
+        h = (
+            self.H
+            * torch.einsum("lm,...mxy->...lxy", A_2l, p_i)
+            * self.space.area
+        )
+
+        return UVH(
+            u[:, 0, ...].unsqueeze(1),
+            v[:, 0, ...].unsqueeze(1),
+            h[:, 0, ...].unsqueeze(1),
+        )
+
 
 class QGColinearSublayerStreamFunction(_QGColinearSublayer):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
