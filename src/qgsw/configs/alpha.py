@@ -1,4 +1,4 @@
-"""Colinearity Coefficient Configuration."""
+"""Collinearity Coefficient Configuration."""
 
 from pathlib import Path
 
@@ -7,8 +7,8 @@ from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import UnauthorizedAttributeError
 
 
-class ColinearityCoefficientConfig(_Config):
-    """Colinearity Coefficient Configuration."""
+class CollinearityCoefficientConfig(_Config):
+    """Collinearity Coefficient Configuration."""
 
     section: str = keys.COEF["section"]
     _type: str = keys.COEF["type"]

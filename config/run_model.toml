@@ -35,7 +35,7 @@ g_prime = [
     10.0,
     5e-2
 ]
-[model.colinearity_coef]
+[model.collinearity_coef]
 # Section relevant for modified QG models only
 type = "constant" # 'constant' or 'changing'
 value = 0.1 # Only relevant for constant coefficients.

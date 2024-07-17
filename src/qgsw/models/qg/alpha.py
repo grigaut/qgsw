@@ -1,4 +1,4 @@
-"""Compute Colinearity Coefficient."""
+"""Compute Collinearity Coefficient."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
     from matplotlib.axes import Axes
 
-    from qgsw.configs.alpha import ColinearityCoefficientConfig
+    from qgsw.configs.alpha import CollinearityCoefficientConfig
 ABOVE_ZERO_THRESHOLD = 1e-5
 
 
@@ -478,12 +478,12 @@ class ChangingCoefficient(Coefficient):
 
 
 def coefficient_from_config(
-    coef_config: ColinearityCoefficientConfig,
+    coef_config: CollinearityCoefficientConfig,
 ) -> Coefficient:
     """Create Coefficient from configuration.
 
     Args:
-        coef_config (ColinearityCoefficientConfig): Coefficient Configuration.
+        coef_config (CollinearityCoefficientConfig): Coefficient Configuration.
 
     Raises:
         KeyError: If the coeffciient type is not recognized/

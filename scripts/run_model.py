@@ -8,11 +8,11 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.models import QG, QGColinearSublayerStreamFunction
+from qgsw.models import QG, QGCollinearSublayerStreamFunction
 from qgsw.models.qg.alpha import coefficient_from_config
-from qgsw.models.qg.colinear_sublayer import (
-    QGColinearSublayerPV,
-    QGColinearSublayerSFModifiedA,
+from qgsw.models.qg.collinear_sublayer import (
+    QGCollinearSublayerPV,
+    QGCollinearSublayerSFModifiedA,
     QGPVMixture,
 )
 from qgsw.perturbations import Perturbation
@@ -51,10 +51,10 @@ if config.io.results.save:
 
 supported_models = [
     "QG",
-    "QGColinearSublayerStreamFunction",
-    "QGColinearSublayerPV",
+    "QGCollinearSublayerStreamFunction",
+    "QGCollinearSublayerPV",
     "QGPVMixture",
-    "QGColinearSublayerSFModifiedA",
+    "QGCollinearSublayerSFModifiedA",
 ]
 
 if config.model.type not in supported_models:
@@ -101,20 +101,20 @@ if config.model.type == "QG":
         beta_plane=config.physics.beta_plane,
     )
     uvh0 = model.G(p0)
-elif config.model.type == "QGColinearSublayerStreamFunction":
-    model = QGColinearSublayerStreamFunction(
+elif config.model.type == "QGCollinearSublayerStreamFunction":
+    model = QGCollinearSublayerStreamFunction(
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.colinearity_coef),
+        coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = model.G0(p0)
-elif config.model.type == "QGColinearSublayerPV":
-    model = QGColinearSublayerPV(
+elif config.model.type == "QGCollinearSublayerPV":
+    model = QGCollinearSublayerPV(
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.colinearity_coef),
+        coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = model.G0(p0)
 elif config.model.type == "QGPVMixture":
@@ -122,15 +122,15 @@ elif config.model.type == "QGPVMixture":
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.colinearity_coef),
+        coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = model.G0(p0)
-elif config.model.type == "QGColinearSublayerSFModifiedA":
-    model = QGColinearSublayerSFModifiedA(
+elif config.model.type == "QGCollinearSublayerSFModifiedA":
+    model = QGCollinearSublayerSFModifiedA(
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.colinearity_coef),
+        coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = model.G0(p0)
 model.slip_coef = config.physics.slip_coef

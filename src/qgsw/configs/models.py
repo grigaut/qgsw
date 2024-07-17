@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 import torch
 
 from qgsw.configs import keys
-from qgsw.configs.alpha import ColinearityCoefficientConfig
+from qgsw.configs.alpha import CollinearityCoefficientConfig
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
 from qgsw.specs import DEVICE
@@ -15,8 +15,8 @@ from qgsw.specs import DEVICE
 class ModelConfig(_Config):
     """Model configuration."""
 
-    _colinearity_allowed: ClassVar[list[str]] = [
-        "QGColinearSublayerStreamFunction",
+    _collinearity_allowed: ClassVar[list[str]] = [
+        "QGCollinearSublayerStreamFunction",
     ]
 
     section: str = keys.MODELS["section"]
@@ -26,7 +26,7 @@ class ModelConfig(_Config):
     _h: str = keys.MODELS["layers"]
     _g_prime: str = keys.MODELS["reduced gravity"]
     _prefix: str = keys.MODELS["prefix"]
-    _alpha: str = keys.MODELS["colinearity coef"]
+    _alpha: str = keys.MODELS["collinearity coef"]
 
     def __init__(self, params: dict[str, Any]) -> None:
         """Instantiate ModelConfig.
@@ -80,9 +80,9 @@ class ModelConfig(_Config):
         return self.params[self._prefix]
 
     @cached_property
-    def colinearity_coef(self) -> ColinearityCoefficientConfig:
-        """Colinearity coeffciient configuration."""
-        return ColinearityCoefficientConfig.parse(self.params)
+    def collinearity_coef(self) -> CollinearityCoefficientConfig:
+        """Collinearity coeffciient configuration."""
+        return CollinearityCoefficientConfig.parse(self.params)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate that H and g' shapes match.
