@@ -46,11 +46,11 @@ MODELS = {
     "layers": "h",
     "reduced gravity": "g_prime",
     "prefix": "prefix",
-    "colinearity coef": "colinearity_coef",
+    "collinearity coef": "collinearity_coef",
 }
 
 COEF = {
-    "section": "colinearity_coef",
+    "section": "collinearity_coef",
     "type": "type",
     "value": "value",
     "source file": "source_file",

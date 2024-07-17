@@ -1,4 +1,4 @@
-"""Modified QG Model with Colinear Sublayer Behavior."""
+"""Modified QG Model with Collinear Sublayer Behavior."""
 
 from __future__ import annotations
 
@@ -23,8 +23,8 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
 
 
-class _QGColinearSublayer(QG):
-    """Colinear QG Model."""
+class _QGCollinearSublayer(QG):
+    """Collinear QG Model."""
 
     _supported_layers_nb: int
     _coefficient: float = 0.01
@@ -37,13 +37,13 @@ class _QGColinearSublayer(QG):
         coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
-        """Colinear Sublayer Stream Function.
+        """Collinear Sublayer Stream Function.
 
         Args:
             space_3d (SpaceDiscretization3D): Space Discretization
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Colinearity coefficient.
+            coefficient (float): Collinearity coefficient.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -59,7 +59,7 @@ class _QGColinearSublayer(QG):
 
     @property
     def coefficient(self) -> Coefficient:
-        """Colinearity coefficient."""
+        """Collinearity coefficient."""
         return self._coefficient
 
     @coefficient.setter
@@ -95,17 +95,17 @@ class _QGColinearSublayer(QG):
         """
         if self.space.nl != self._supported_layers_nb:
             msg = (
-                "_QGColinearSublayer can only support"
+                "_QGCollinearSublayer can only support"
                 f"{self._supported_layers_nb} layers."
             )
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
 
     def _set_coefficient(self, coefficient: float | Coefficient) -> None:
-        """Set colinearity coefficient value.
+        """Set collinearity coefficient value.
 
         Args:
-            coefficient (float): Colinearity Coefficient.
+            coefficient (float): Collinearity Coefficient.
         """
         if isinstance(coefficient, (int, float)):
             self._coefficient = ConstantCoefficient(coefficient)
@@ -160,7 +160,7 @@ class _QGColinearSublayer(QG):
         )
 
 
-class QGColinearSublayerStreamFunction(_QGColinearSublayer):
+class QGCollinearSublayerStreamFunction(_QGCollinearSublayer):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _supported_layers_nb: int = 2
@@ -174,13 +174,13 @@ class QGColinearSublayerStreamFunction(_QGColinearSublayer):
         coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
-        """Colinear Sublayer Stream Function.
+        """Collinear Sublayer Stream Function.
 
         Args:
             space_3d (SpaceDiscretization3D): Space Discretization
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Colinearity coefficient.
+            coefficient (float): Collinearity coefficient.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -237,7 +237,7 @@ class QGColinearSublayerStreamFunction(_QGColinearSublayer):
         return super().step()
 
 
-class QGColinearSublayerSFModifiedA(QGColinearSublayerStreamFunction):
+class QGCollinearSublayerSFModifiedA(QGCollinearSublayerStreamFunction):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _supported_layers_nb: int = 2
@@ -251,13 +251,13 @@ class QGColinearSublayerSFModifiedA(QGColinearSublayerStreamFunction):
         coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
-        """Colinear Sublayer Stream Function.
+        """Collinear Sublayer Stream Function.
 
         Args:
             space_3d (SpaceDiscretization3D): Space Discretization
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Colinearity coefficient.
+            coefficient (float): Collinearity coefficient.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -291,8 +291,8 @@ class QGColinearSublayerSFModifiedA(QGColinearSublayerStreamFunction):
         return UVH(uvh.u, uvh.v, h)
 
 
-class QGColinearSublayerPV(_QGColinearSublayer):
-    """Modified QG Model implementing potential vorticity colinear behavior."""
+class QGCollinearSublayerPV(_QGCollinearSublayer):
+    """Modified QG Model implementing collinear pv behavior."""
 
     _supported_layers_nb: int = 2
     _coefficient = 0.01
@@ -305,13 +305,13 @@ class QGColinearSublayerPV(_QGColinearSublayer):
         coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT002, FBT001
     ) -> None:
-        """Colinear Sublayer Potential Vorticity.
+        """Collinear Sublayer Potential Vorticity.
 
         Args:
             space_3d (SpaceDiscretization3D): Space Discretization
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
             beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Colinearity coefficient.
+            coefficient (float): Collinearity coefficient.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -363,7 +363,7 @@ class QGColinearSublayerPV(_QGColinearSublayer):
         return super().step()
 
 
-class QGPVMixture(QGColinearSublayerPV):
+class QGPVMixture(QGCollinearSublayerPV):
     """Mixture of Barotropic and Baroclinic Streamfunctions."""
 
     def QoG_inv(  # noqa: N802
@@ -393,7 +393,7 @@ class QGPVMixture(QGColinearSublayerPV):
         elliptic_rhs_baroclinic[0, 0, ...] = elliptic_rhs
         elliptic_rhs_baroclinic[0, 1, ...] = 0 * elliptic_rhs
         # Extract 2 layers stream functions
-        p_qg_baroclinic, p_qg_i_baroclinic = _QGColinearSublayer.QoG_inv(
+        p_qg_baroclinic, p_qg_i_baroclinic = _QGCollinearSublayer.QoG_inv(
             self,
             elliptic_rhs_baroclinic,
         )
@@ -406,7 +406,7 @@ class QGPVMixture(QGColinearSublayerPV):
         elliptic_rhs_barotropic[0, 0, ...] = elliptic_rhs
         elliptic_rhs_barotropic[0, 1, ...] = 1 * elliptic_rhs
         # Extract 2 layers stream functions
-        p_qg_barotropic, p_qg_i_barotropic = _QGColinearSublayer.QoG_inv(
+        p_qg_barotropic, p_qg_i_barotropic = _QGCollinearSublayer.QoG_inv(
             self,
             elliptic_rhs_barotropic,
         )
