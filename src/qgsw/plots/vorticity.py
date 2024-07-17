@@ -36,7 +36,7 @@ P = ParamSpec("P")
 class VorticityAxesContext(BaseAxesContext):
     """Axes Context Manager for vorticity plots."""
 
-    _default_title = r"$\Potential Vorticity$"
+    _default_title = r""
 
     def _create_axes(self, figure: Figure) -> Axes:
         """Create Axes on a given figure.
@@ -142,7 +142,6 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             Axes: Updated Axes.
         """
-        ax.cla()
         axesim = ax.imshow(data, **self._center_cbar(data))
         self.update_colorbar(ax=ax, axesim=axesim)
         return ax
@@ -212,7 +211,7 @@ class VorticityAxesContent(BaseAxesContent):
             self._cbar = ax.figure.colorbar(
                 axesim,
                 cax=self._cbar.ax,
-                label=r"$s^{-1}$",
+                label=r"Potential Vorticity ($s^{-1}$)",
             )
         else:
             cbar_ax = make_axes_locatable(ax).append_axes(
@@ -223,7 +222,7 @@ class VorticityAxesContent(BaseAxesContent):
             self._cbar = ax.figure.colorbar(
                 axesim,
                 cax=cbar_ax,
-                label=r"$s^{-1}$",
+                label=r"Potential Vorticity ($s^{-1}$)",
             )
         self._has_cbar = True
         self._axesim = axesim
@@ -377,7 +376,7 @@ class VorticityComparisonFigure(ComparisonFigure[VorticityAxes]):
             self.figure.colorbar(
                 self._axes_ms[0].content.axes_image,
                 cax=self._cbar_axes,
-                label=r"$s^{-1}$",
+                label=r"Potential Vorticity ($s^{-1}$)",
             )
 
     def _update(self, *datas: np.ndarray, **kwargs: P.kwargs) -> None:
