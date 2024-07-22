@@ -159,9 +159,9 @@ if config.model.type == "QG":
         beta_plane=config.physics.beta_plane,
     )
     uvh0 = UVH(
-        uvh0.u[: space.nl, ...],
-        uvh0.v[: space.nl, ...],
-        uvh0.h[: space.nl, ...],
+        uvh0.u[:, : space.nl, ...],
+        uvh0.v[:, : space.nl, ...],
+        uvh0.h[:, : space.nl, ...],
     )
 elif config.model.type == "QGCollinearSublayerStreamFunction":
     model = QGCollinearSublayerStreamFunction(
@@ -171,9 +171,9 @@ elif config.model.type == "QGCollinearSublayerStreamFunction":
         coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = UVH(
-        uvh0.u[:1, ...],
-        uvh0.v[:1, ...],
-        uvh0.h[:1, ...],
+        uvh0.u[:, :1, ...],
+        uvh0.v[:, :1, ...],
+        uvh0.h[:, :1, ...],
     )
 elif config.model.type == "QGCollinearSublayerPV":
     model = QGCollinearSublayerPV(
@@ -183,9 +183,9 @@ elif config.model.type == "QGCollinearSublayerPV":
         coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = UVH(
-        uvh0.u[:1, ...],
-        uvh0.v[:1, ...],
-        uvh0.h[:1, ...],
+        uvh0.u[:, :1, ...],
+        uvh0.v[:, :1, ...],
+        uvh0.h[:, :1, ...],
     )
 elif config.model.type == "QGPVMixture":
     model = QGPVMixture(
@@ -195,9 +195,9 @@ elif config.model.type == "QGPVMixture":
         coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = UVH(
-        uvh0.u[:1, ...],
-        uvh0.v[:1, ...],
-        uvh0.h[:1, ...],
+        uvh0.u[:, :1, ...],
+        uvh0.v[:, :1, ...],
+        uvh0.h[:, :1, ...],
     )
 elif config.model.type == "QGCollinearSublayerSFModifiedA":
     model = QGCollinearSublayerSFModifiedA(
@@ -207,9 +207,9 @@ elif config.model.type == "QGCollinearSublayerSFModifiedA":
         coefficient=coefficient_from_config(config.model.collinearity_coef),
     )
     uvh0 = UVH(
-        uvh0.u[:1, ...],
-        uvh0.v[:1, ...],
-        uvh0.h[:1, ...],
+        uvh0.u[:, :1, ...],
+        uvh0.v[:, :1, ...],
+        uvh0.h[:, :1, ...],
     )
 
 model.slip_coef = config.physics.slip_coef
