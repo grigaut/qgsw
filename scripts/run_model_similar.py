@@ -17,7 +17,7 @@ from qgsw.models.qg.collinear_sublayer import (
 )
 from qgsw.models.qg.core import G, compute_A
 from qgsw.models.variables import UVH
-from qgsw.perturbations.base import _Perturbation
+from qgsw.perturbations.base import _Perturbation, grad_perp
 from qgsw.perturbations.vortex import (
     BaroclinicVortex,
     BarotropicVortex,
@@ -118,6 +118,20 @@ psi[0, 0, ...] = psi_2d
 for i in range(1, 2):
     psi_2d = perturbation._compute_streamfunction_2d(space.omega.remove_z_h())  # noqa: SLF001
     psi[0, i, ...] = perturbation.layer_ratio * psi_2d
+
+u, v = grad_perp(
+    psi,
+    space.omega.dx,
+    space.omega.dy,
+)
+u_norm_max = max(torch.abs(u).max(), torch.abs(v).max())
+# set psi amplitude to have a correct Rossby number
+psi = psi * (
+    Ro
+    * config.physics.f0
+    * perturbation.compute_scale(space.omega)
+    / u_norm_max
+)
 
 p0 = psi * config.physics.f0
 
