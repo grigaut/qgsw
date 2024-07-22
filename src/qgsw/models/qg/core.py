@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 import torch
@@ -18,12 +18,91 @@ from qgsw.models.core.helmholtz import (
 )
 from qgsw.models.sw import SW
 from qgsw.models.variables import UVH
+from qgsw.spatial.core.grid_conversion import cell_corners_to_cell_center
+from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
+
+
+def compute_A(  # noqa: N802
+    H: torch.Tensor,  # noqa: N803
+    g_prime: torch.Tensor,
+    dtype: torch.dtype,
+    device: str = DEVICE,
+) -> torch.Tensor:
+    """Compute the stretching operator matrix A.
+
+    Args:
+        H (torch.Tensor): Layers reference height.
+        g_prime (torch.Tensor): Reduced gravity values.
+        dtype (torch.dtype): Data type
+        device (str, optional): Device type. Defaults to DEVICE.
+
+    Returns:
+        torch.Tensor: Streching operator matrix
+    """
+    nl = H.shape[0]
+    if nl == 1:
+        return torch.tensor(
+            [[1.0 / (H * g_prime)]],
+            dtype=dtype,
+            device=device,
+        )
+    A = torch.zeros(  # noqa: N806
+        (nl, nl),
+        dtype=dtype,
+        device=device,
+    )
+    A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
+    A[0, 1] = -1.0 / (H[0] * g_prime[1])
+    for i in range(1, nl - 1):
+        A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
+        A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
+        A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
+    A[-1, -1] = 1.0 / (H[nl - 1] * g_prime[nl - 1])
+    A[-1, -2] = -1.0 / (H[nl - 1] * g_prime[nl - 1])
+    return A
+
+
+def G(  # noqa: N802
+    p: torch.Tensor,
+    space: SpaceDiscretization3D,
+    H: torch.Tensor,  # noqa: N803
+    A: torch.Tensor,  # noqa: N803
+    f0: float,
+    p_i: torch.Tensor = None,
+    corner_to_center: Callable = cell_corners_to_cell_center,
+) -> UVH:
+    """G operator.
+
+    Args:
+        p (torch.Tensor): Pressure.
+        space (SpaceDiscretization3D): Space Discretization
+        H (torch.Tensor): H tensor, (nl,nx,ny) shaped.
+        A (torch.Tensor): Stretching operator matrix, (nl,nl) shaped.
+        f0 (float): Coriolis parameter.
+        p_i (torch.Tensor, optional): Interpolated pressure
+        ("middle of grid cell"). Defaults to None.
+        corner_to_center (Callable, optional): Corner to center interpolation
+        function. Defaults to cell_corners_to_cell_center.
+
+    Returns:
+        UVH: Resulting u v and h
+    """
+    p_i = corner_to_center(p) if p_i is None else p_i
+    dx, dy = space.dx, space.dy
+
+    # geostrophic balance
+    u = -torch.diff(p, dim=-1) / dy / f0 * dx
+    v = torch.diff(p, dim=-2) / dx / f0 * dy
+    # h = diag(H)Ap
+    h = H * torch.einsum("lm,...mxy->...lxy", A, p_i) * space.area
+
+    return UVH(u, v, h)
 
 
 class QG(Model):
@@ -121,27 +200,12 @@ class QG(Model):
         Returns:
             torch.Tensor: Stretching Operator
         """
-        nl = H.shape[0]
-        if nl == 1:
-            return torch.tensor(
-                [[1.0 / (H * g_prime)]],
-                dtype=self.dtype,
-                device=self.device,
-            )
-        A = torch.zeros(  # noqa: N806
-            (nl, nl),
+        return compute_A(
+            H=H,
+            g_prime=g_prime,
             dtype=self.dtype,
             device=self.device,
         )
-        A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
-        A[0, 1] = -1.0 / (H[0] * g_prime[1])
-        for i in range(1, nl - 1):
-            A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
-            A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
-            A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
-        A[-1, -1] = 1.0 / (H[nl - 1] * g_prime[nl - 1])
-        A[-1, -2] = -1.0 / (H[nl - 1] * g_prime[nl - 1])
-        return A
 
     @staticmethod
     def compute_layers_to_mode_decomposition(
@@ -279,20 +343,15 @@ class QG(Model):
         Returns:
             UVH: u, v and h
         """
-        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
-        dx, dy = self.space.dx, self.space.dy
-
-        # geostrophic balance
-        u = -torch.diff(p, dim=-1) / dy / self.beta_plane.f0 * dx
-        v = torch.diff(p, dim=-2) / dx / self.beta_plane.f0 * dy
-        # h = diag(H)Ap
-        h = (
-            self.H
-            * torch.einsum("lm,...mxy->...lxy", self.A, p_i)
-            * self.space.area
+        return G(
+            p,
+            self.space,
+            self.H,
+            self.A,
+            self.beta_plane.f0,
+            p_i,
+            self.cell_corners_to_cell_centers,
         )
-
-        return UVH(u, v, h)
 
     def QoG_inv(  # noqa: N802
         self,
