@@ -23,6 +23,7 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
+from qgsw.spatial.core.discretization import keep_top_layer
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.utils import time_params
 
@@ -89,50 +90,68 @@ verbose.display(
 
 ## Set model parameters
 
-p0 = perturbation.compute_initial_pressure(
-    space.omega,
-    config.physics.f0,
-    Ro,
-)
 if config.model.type == "QG":
     model = QG(
         space_3d=space,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
         beta_plane=config.physics.beta_plane,
     )
+    p0 = perturbation.compute_initial_pressure(
+        space.omega,
+        config.physics.f0,
+        Ro,
+    )
     uvh0 = model.G(p0)
-elif config.model.type == "QGCollinearSublayerStreamFunction":
-    model = QGCollinearSublayerStreamFunction(
-        space_3d=space,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.collinearity_coef),
+else:
+    p0 = perturbation.compute_initial_pressure(
+        keep_top_layer(space).omega,
+        config.physics.f0,
+        Ro,
     )
-    uvh0 = model.G0(p0)
-elif config.model.type == "QGCollinearSublayerPV":
-    model = QGCollinearSublayerPV(
-        space_3d=space,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.collinearity_coef),
-    )
-    uvh0 = model.G0(p0)
-elif config.model.type == "QGPVMixture":
-    model = QGPVMixture(
-        space_3d=space,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.collinearity_coef),
-    )
-    uvh0 = model.G0(p0)
-elif config.model.type == "QGCollinearSublayerSFModifiedA":
-    model = QGCollinearSublayerSFModifiedA(
-        space_3d=space,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
-        coefficient=coefficient_from_config(config.model.collinearity_coef),
-    )
-    uvh0 = model.G0(p0)
+    # Initial coefficient for initial prognostic variables set up
+    if perturbation.type == "vortex-baroclinic":
+        coef0 = 0
+    elif perturbation.type == "vortex-half-barotropic":
+        coef0 = 0.5
+    elif perturbation.type == "vortex-barotropic":
+        coef0 = 1
+    else:
+        msg = f"Unknown perturbation type: {perturbation.type}"
+        raise ValueError(msg)
+    # Instantiate model
+    if config.model.type == "QGCollinearSublayerStreamFunction":
+        model = QGCollinearSublayerStreamFunction(
+            space_3d=space,
+            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+            beta_plane=config.physics.beta_plane,
+            coefficient=coef0,
+        )
+    elif config.model.type == "QGCollinearSublayerPV":
+        model = QGCollinearSublayerPV(
+            space_3d=space,
+            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+            beta_plane=config.physics.beta_plane,
+            coefficient=coef0,
+        )
+    elif config.model.type == "QGPVMixture":
+        model = QGPVMixture(
+            space_3d=space,
+            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+            beta_plane=config.physics.beta_plane,
+            coefficient=coef0,
+        )
+    elif config.model.type == "QGCollinearSublayerSFModifiedA":
+        model = QGCollinearSublayerSFModifiedA(
+            space_3d=space,
+            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
+            beta_plane=config.physics.beta_plane,
+            coefficient=coef0,
+        )
+    # Project Model
+    uvh0 = model.G(p0)
+    # Set model coefficient
+    model.coefficient = coefficient_from_config(config.model.collinearity_coef)
+
 model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coef
 model.set_wind_forcing(taux, tauy)
