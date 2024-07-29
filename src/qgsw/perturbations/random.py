@@ -68,7 +68,7 @@ class RandomSurfacePerturbation(_Perturbation):
         random_field = torch.rand(
             (nx_rand_area, ny_rand_area),
             dtype=torch.float64,
-            device=DEVICE,
+            device=DEVICE.get(),
         )  # shape (nx_rand_area, ny_rand_area)
         centered_random_field = 2 * random_field - 1
         # pad random field to match grid size.
@@ -99,7 +99,7 @@ class RandomSurfacePerturbation(_Perturbation):
         mean = (size - 1) / 2.0
         variance = self._sigma**2.0
 
-        x_cord = torch.arange(size, dtype=torch.float64, device=DEVICE)
+        x_cord = torch.arange(size, dtype=torch.float64, device=DEVICE.get())
         x_grid = x_cord.repeat(size).view(size, size)
         y_grid = x_grid.t()
         xy_grid = torch.stack([x_grid, y_grid], dim=-1)
@@ -141,7 +141,7 @@ class RandomSurfacePerturbation(_Perturbation):
         nx, ny = psi_2d.shape[-2:]
         psi = torch.ones(
             (1, grid_3d.nl, nx, ny),
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
 

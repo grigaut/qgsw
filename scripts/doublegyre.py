@@ -37,7 +37,7 @@ mask = torch.ones(
     config.space.nx,
     config.space.ny,
     dtype=torch.float64,
-    device=DEVICE,
+    device=DEVICE.get(),
 )
 
 taux, tauy = wind.compute()
@@ -52,7 +52,7 @@ param = {
     "rho": config.physics.rho,
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
-    "device": DEVICE,
+    "device": DEVICE.get(),
     "dtype": torch.float64,
     "slip_coef": config.physics.slip_coef,
     "interp_fd": False,
@@ -80,7 +80,7 @@ for model, name, dt, start_file in [
     if model == SW:
         c = (
             torch.sqrt(config.model.h.sum() * config.model.g_prime[0])
-            .to(device=DEVICE)
+            .to(device=DEVICE.get())
             .item()
         )
         cfl = 20 if param["barotropic_filter"] else 0.5

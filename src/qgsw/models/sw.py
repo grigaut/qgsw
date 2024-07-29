@@ -199,9 +199,9 @@ class SW(Model):
             if isinstance(h_phys, np.ndarray)
             else h_phys
         )
-        u_ = u_.to(self.device)
-        v_ = u_.to(self.device)
-        h_ = u_.to(self.device)
+        u_ = u_.to(self.device.get())
+        v_ = u_.to(self.device.get())
+        h_ = u_.to(self.device.get())
         if not (u_ * self.masks.u == u_).all():
             msg = (
                 "Input velocity u incoherent with domain mask, "
@@ -413,7 +413,7 @@ class SWFilterBarotropic(SW):
             self.space.dy,
             lambd,
             self.dtype,
-            self.device,
+            self.device.get(),
             mask=self.masks.h[0, 0],
         )
 
@@ -430,7 +430,7 @@ class SWFilterBarotropic(SW):
             coef_ugrid=coef_ugrid,
             coef_vgrid=coef_vgrid,
             lambd=lambd,
-            device=self.device,
+            device=self.device.get(),
             dtype=self.dtype,
             mask=self.masks.h[0, 0],
             niter_bottom=20,

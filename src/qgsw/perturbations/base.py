@@ -78,7 +78,7 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         """
         psi = torch.ones(
             (1, grid_3d.nl, grid_3d.nx, grid_3d.ny),
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
         psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())

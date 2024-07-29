@@ -1,0 +1,14 @@
+metric = "bmc_node_power_watt"
+folder = "output/g5k/consumption"
+
+[[runs]]
+id = 2263719
+start = 2024-07-26 17:32:23
+end = 2024-07-26 17:48:35
+folder = "one_layer_model"
+
+[[runs]]
+id = 2263738
+start = 2024-07-26 21:25:16
+end = 2024-07-26 21:42:15
+folder = "two_layers_model"

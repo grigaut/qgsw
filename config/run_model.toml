@@ -7,8 +7,8 @@ quantity = 10
 directory = "results"
 [io.plots]
 show = true
-save = false
-quantity = 100
+save = true
+quantity = 10
 plots_directory = "plots"
 
 [physics]
@@ -48,11 +48,11 @@ box_unit = "m"
 [space.box]
 unit = "m"
 [space.box.x]
-min = -150_000
-max = 150_000
+min = -500_000
+max = 500_000
 [space.box.y]
-min = -150_000
-max = 150_000
+min = -500_000
+max = 500_000
 
 [windstress]
 type = "none"

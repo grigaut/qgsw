@@ -521,14 +521,14 @@ class SpaceDiscretization2D:
             grid_config.box.x_max,
             grid_config.nx + 1,
             dtype=torch.float64,
-            device=DEVICE,
+            device=DEVICE.get(),
         )
         y = torch.linspace(
             grid_config.box.y_min,
             grid_config.box.y_max,
             grid_config.ny + 1,
             dtype=torch.float64,
-            device=DEVICE,
+            device=DEVICE.get(),
         )
         return cls.from_tensors(
             x=x,
@@ -1029,14 +1029,14 @@ class SpaceDiscretization3D:
             grid_config.box.x_max,
             grid_config.nx + 1,
             dtype=torch.float64,
-            device=DEVICE,
+            device=DEVICE.get(),
         )
         y = torch.linspace(
             grid_config.box.y_min,
             grid_config.box.y_max,
             grid_config.ny + 1,
             dtype=torch.float64,
-            device=DEVICE,
+            device=DEVICE.get(),
         )
         return cls.from_tensors(
             x=x,

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.specs._utils import Device
 
 
 def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -78,7 +79,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     """
 
     dtype = torch.float64
-    device = DEVICE
+    device: Device = DEVICE
     _taux: torch.Tensor | float = 0.0
     _tauy: torch.Tensor | float = 0.0
 
@@ -242,17 +243,17 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         h = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny),
             dtype=self.dtype,
-            device=self.device,
+            device=self.device.get(),
         )
         u = torch.zeros(
             (*base_shape, self.space.nx + 1, self.space.ny),
             dtype=self.dtype,
-            device=self.device,
+            device=self.device.get(),
         )
         v = torch.zeros(
             (*base_shape, self.space.nx, self.space.ny + 1),
             dtype=self.dtype,
-            device=self.device,
+            device=self.device.get(),
         )
         return UVH(u, v, h)
 
@@ -345,9 +346,9 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
             v (torch.Tensor): State variable v.
             h (torch.Tensor): State variable h.
         """
-        u = u.to(self.device)
-        v = v.to(self.device)
-        h = h.to(self.device)
+        u = u.to(self.device.get())
+        v = v.to(self.device.get())
+        h = h.to(self.device.get())
 
         if not (u * self.masks.u == u).all():
             msg = (

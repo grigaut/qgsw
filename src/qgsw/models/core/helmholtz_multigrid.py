@@ -202,7 +202,7 @@ class MG_Helmholtz:
         tol=1e-8,
         max_ite=20,
         dtype=torch.float64,
-        device=DEVICE,
+        device=DEVICE.get(),
         mask=None,
         niter_bottom=-1,
         use_compilation=True,

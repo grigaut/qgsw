@@ -224,7 +224,7 @@ class QGCollinearSublayerStreamFunction(_QGCollinearSublayer):
         layers_coefs = torch.tensor(
             [1, self.alpha],
             dtype=self.dtype,
-            device=self.device,
+            device=self.device.get(),
         )
         # Select top row from matrix product
         return (A @ layers_coefs)[0, ...].unsqueeze(0).unsqueeze(0)
@@ -346,7 +346,7 @@ class QGCollinearSublayerPV(_QGCollinearSublayer):
         _, _, nx, ny = elliptic_rhs.shape
         elliptic_rhs_2l = torch.zeros(
             (1, 2, nx, ny),
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
         elliptic_rhs_2l[0, 0, ...] = elliptic_rhs
@@ -387,7 +387,7 @@ class QGPVMixture(QGCollinearSublayerPV):
         _, _, nx, ny = elliptic_rhs.shape
         elliptic_rhs_baroclinic = torch.zeros(
             (1, 2, nx, ny),
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
         elliptic_rhs_baroclinic[0, 0, ...] = elliptic_rhs
@@ -400,7 +400,7 @@ class QGPVMixture(QGCollinearSublayerPV):
 
         elliptic_rhs_barotropic = torch.zeros(
             (1, 2, nx, ny),
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
         elliptic_rhs_barotropic[0, 0, ...] = elliptic_rhs

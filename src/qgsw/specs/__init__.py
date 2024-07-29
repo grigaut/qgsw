@@ -1,5 +1,5 @@
 """System specs."""
 
-import torch
+from qgsw.specs._utils import Device
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = Device.set_automatically()

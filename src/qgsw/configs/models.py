@@ -58,11 +58,11 @@ class ModelConfig(_Config):
         h = torch.zeros(
             size=(nl, 1, 1),
             dtype=torch.float64,
-            device=DEVICE,
+            device=DEVICE.get(),
         )
         h[:, 0, 0] = torch.Tensor(self.params[self._h])
         return torch.Tensor(self.params[self._h]).to(
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
 
@@ -70,7 +70,7 @@ class ModelConfig(_Config):
     def g_prime(self) -> torch.Tensor:
         """Values of reduced gravity (g')."""
         return torch.Tensor(self.params[self._g_prime]).to(
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
 
