@@ -92,7 +92,7 @@ if __name__ == "__main__":
         output = folder.joinpath(f"{run['folder']}/{metric}_{run['id']}.json")
 
         if not output.parent.is_dir():
-            output.mkdir(parents=True)
+            output.parent.mkdir(parents=True)
 
         with output.open("w") as file:
             json.dump(results, file)
