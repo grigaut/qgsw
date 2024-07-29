@@ -65,7 +65,7 @@ g5k-export:
 	rm -rf ${tmp}
 
 g5k-import-%:
-	scp -r ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${G5K_IMPORT_STORAGE}
+	scp -r ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${G5K_IMPORT_STORAGE}/$*
 
 g5k-import:
 	@${MAKE} g5k-import-results
