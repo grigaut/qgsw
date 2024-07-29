@@ -99,7 +99,7 @@ class RankineVortex2D:
             grid_2d.ny - 1,
             grid_2d.dx,
             grid_2d.dy,
-            device=DEVICE,
+            device=DEVICE.get(),
             dtype=torch.float64,
         )
         # Solve problem in Fourier space : "ψ = ω/∆"
@@ -171,7 +171,7 @@ class PerturbedVortex2D(RankineVortex2D):
         random_field = torch.rand(
             (nx, ny),
             dtype=torch.float64,
-            device=DEVICE,
+            device=DEVICE.get(),
         )  # shape (nx_rand_area, ny_rand_area)
         return 2 * random_field - 1
 

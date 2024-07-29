@@ -48,7 +48,7 @@ class ModelParamChecker:
             trigger_level=2,
         )
         verbose.display(
-            msg=f"device: {self.device}",
+            msg=f"device: {self.device.get()}",
             trigger_level=2,
         )
         ## Space
@@ -108,7 +108,7 @@ class ModelParamChecker:
                 self.space.nx,
                 self.space.ny,
                 dtype=self.dtype,
-                device=self.device,
+                device=self.device.get(),
             )
             self._masks = Masks(mask)
         return self._masks

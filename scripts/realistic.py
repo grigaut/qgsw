@@ -76,8 +76,8 @@ f = coriolis.compute_beta_plane(
 )
 verbose.display(
     msg=(
-        f"Coriolis param min {f.min().to(device=DEVICE).item():.2e},"
-        f" {f.max().to(device=DEVICE).item():.2e}"
+        f"Coriolis param min {f.min().to(device=DEVICE.get()).item():.2e},"
+        f" {f.max().to(device=DEVICE.get()).item():.2e}"
     ),
     trigger_level=1,
 )
@@ -94,7 +94,7 @@ param = {
     "g_prime": config.model.g_prime.unsqueeze(1).unsqueeze(1),
     "bottom_drag_coef": config.physics.bottom_drag_coef,
     "f": f,
-    "device": DEVICE,
+    "device": DEVICE.get(),
     "dtype": torch.float64,
     "slip_coef": config.physics.slip_coef,
     "dt": config.simulation.dt,  # time-step (s)

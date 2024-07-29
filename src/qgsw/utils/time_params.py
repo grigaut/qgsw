@@ -53,4 +53,4 @@ def compute_tau(omega: torch.Tensor, space: SpaceDiscretization3D) -> float:
         float: Tau, in seconds.
     """
     w = omega.squeeze() / space.area
-    return 1.0 / torch.sqrt(w.pow(2).mean()).to(device=DEVICE).item()
+    return 1.0 / torch.sqrt(w.pow(2).mean()).to(device=DEVICE.get()).item()

@@ -32,7 +32,7 @@ def compute_A(  # noqa: N802
     H: torch.Tensor,  # noqa: N803
     g_prime: torch.Tensor,
     dtype: torch.dtype,
-    device: str = DEVICE,
+    device: str = DEVICE.get(),
 ) -> torch.Tensor:
     """Compute the stretching operator matrix A.
 
@@ -204,7 +204,7 @@ class QG(Model):
             H=H,
             g_prime=g_prime,
             dtype=self.dtype,
-            device=self.device,
+            device=self.device.get(),
         )
 
     @staticmethod
@@ -248,7 +248,7 @@ class QG(Model):
                 self.space.dx,
                 self.space.dy,
                 dtype=self.dtype,
-                device=self.device,
+                device=self.device.get(),
             )
             .unsqueeze(0)
             .unsqueeze(0)
@@ -259,7 +259,7 @@ class QG(Model):
         cst_wgrid = torch.ones(
             (1, nl, nx + 1, ny + 1),
             dtype=self.dtype,
-            device=self.device,
+            device=self.device.get(),
         )
         if len(self.masks.psi_irrbound_xids) > 0:
             # Handle Non rectangular geometry

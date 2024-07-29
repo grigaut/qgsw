@@ -93,7 +93,7 @@ for Ro in [
         "taux": taux,
         "tauy": tauy,
         "bottom_drag_coef": config.physics.bottom_drag_coef,
-        "device": DEVICE,
+        "device": DEVICE.get(),
         "dtype": torch.float64,
         "mask": mask,
         "compile": True,
@@ -115,7 +115,7 @@ for Ro in [
         "tauy": tauy,
         "mask": mask,
         "bottom_drag_coef": config.physics.bottom_drag_coef,
-        "device": DEVICE,
+        "device": DEVICE.get(),
         "dtype": torch.float64,
         "slip_coef": 1,
         "compile": True,
@@ -171,7 +171,7 @@ for Ro in [
     wa_0 = qg_ml.omega_a.squeeze().cpu().numpy()
 
     w_0 = qg_ml.omega.squeeze() / qg_ml.dx / qg_ml.dy
-    tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(device=DEVICE).item()
+    tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(device=DEVICE.get()).item()
     verbose.display(
         msg=f"tau = {tau *f0:.2f} f0-1",
         trigger_level=1,

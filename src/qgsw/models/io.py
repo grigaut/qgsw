@@ -10,6 +10,7 @@ from qgsw.models.exceptions import InvalidSavingFileError
 from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.specs._utils import Device
 
 
 class ModelResultsRetriever:
@@ -17,7 +18,7 @@ class ModelResultsRetriever:
 
     space: SpaceDiscretization3D
     uvh: UVH
-    device: str
+    device: Device
     omega: torch.Tensor
     p: torch.Tensor
     beta_plane: BetaPlane
@@ -31,9 +32,9 @@ class ModelResultsRetriever:
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        u_phys = (self.uvh.u / self.space.dx).to(device=self.device)
-        v_phys = (self.uvh.v / self.space.dy).to(device=self.device)
-        h_phys = (self.uvh.h / self.space.area).to(device=self.device)
+        u_phys = (self.uvh.u / self.space.dx).to(device=self.device.get())
+        v_phys = (self.uvh.v / self.space.dy).to(device=self.device.get())
+        h_phys = (self.uvh.h / self.space.area).to(device=self.device.get())
 
         return (u_phys, v_phys, h_phys)
 
@@ -56,7 +57,7 @@ class ModelResultsRetriever:
             torch.Tensor: Vorticity
         """
         vorticity = self.omega / self.space.area / self.beta_plane.f0
-        return vorticity.to(device=self.device)
+        return vorticity.to(device=self.device.get())
 
     def get_physical_omega_as_ndarray(
         self,
@@ -79,18 +80,19 @@ class ModelResultsRetriever:
         u = self.uvh.u / self.space.dx
         v = self.uvh.v / self.space.dy
         h = self.uvh.h / self.space.area
+        device = self.device.get()
         with np.printoptions(precision=2):
-            eta_surface = eta[:, 0].min().to(device=self.device).item()
+            eta_surface = eta[:, 0].min().to(device=device).item()
             return (
-                f"u: {u.mean().to(device=self.device).item():+.5E}, "
-                f"{u.abs().max().to(device=self.device).item():.5E}, "
-                f"v: {v.mean().to(device=self.device).item():+.5E}, "
-                f"{v.abs().max().to(device=self.device).item():.5E}, "
+                f"u: {u.mean().to(device=device).item():+.5E}, "
+                f"{u.abs().max().to(device=device).item():.5E}, "
+                f"v: {v.mean().to(device=device).item():+.5E}, "
+                f"{v.abs().max().to(device=device).item():.5E}, "
                 f"hl_mean: {hl_mean.squeeze().cpu().numpy()}, "
-                f"h min: {h.min().to(device=self.device).item():.5E}, "
-                f"max: {h.max().to(device=self.device).item():.5E}, "
+                f"h min: {h.min().to(device=device).item():.5E}, "
+                f"max: {h.max().to(device=device).item():.5E}, "
                 f"eta_sur min: {eta_surface:+.5f}, "
-                f"max: {eta[:,0].max().to(device=self.device).item():.5f}"
+                f"max: {eta[:,0].max().to(device=device).item():.5f}"
             )
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:

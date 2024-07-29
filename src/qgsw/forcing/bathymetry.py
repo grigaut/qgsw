@@ -96,7 +96,9 @@ class Bathymetry:
                 area_threshold=self._config.island_min_area,
             ),
         )
-        return torch.from_numpy(land).type(torch.float64).to(device=DEVICE)
+        return (
+            torch.from_numpy(land).type(torch.float64).to(device=DEVICE.get())
+        )
 
     def compute_ocean_mask(
         self,
@@ -127,7 +129,9 @@ class Bathymetry:
         ocean = self._remove_isolated_land(
             ocean_without_lakes.astype("float64"),
         )
-        return torch.from_numpy(ocean).type(torch.float64).to(device=DEVICE)
+        return (
+            torch.from_numpy(ocean).type(torch.float64).to(device=DEVICE.get())
+        )
 
     def _remove_isolated_land(self, ocean_mask: np.ndarray) -> np.ndarray:
         """Remove land cells surrounded by at least 3 ocean cells.
