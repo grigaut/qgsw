@@ -21,10 +21,12 @@ from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary
 from qgsw.spatial.core.discretization import keep_top_layer
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
+from qgsw.specs import DEVICE
 from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(0)
+DEVICE.set_manually("cpu")
 
 parser = argparse.ArgumentParser(description="Retrieve Configuration file.")
 parser.add_argument(
