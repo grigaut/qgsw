@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from pyJoules.energy_meter import measure_energy
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
@@ -184,7 +183,6 @@ n_steps = int(t_end / dt) + 1
 # Start runs
 
 
-@measure_energy
 def run_model(model: Model, n_steps: int, t: float) -> None:
     """Run the model.
 
