@@ -407,7 +407,7 @@ class WindForcing:
 
         space_2d = SpaceDiscretization2D.from_config(grid_config=grid_config)
 
-        forcing = wind_forcings[windstress_config.type](
+        forcing = wind_forcings[windstress_config.type].from_config(
             windstress_config=windstress_config,
             physics_config=physics_config,
             space_2d=space_2d,

@@ -1,5 +1,6 @@
 """Wind Stress configuration."""
 
+from functools import cached_property
 from typing import Any
 
 from qgsw.configs import keys
@@ -22,12 +23,11 @@ class WindStressConfig(_Config):
             params (dict[str, Any]): Windstress configuration parameters.
         """
         super().__init__(params)
-        self._data = WindStressDataConfig.parse(self.params)
 
-    @property
+    @cached_property
     def data(self) -> "WindStressDataConfig":
         """Windstress Data Configuration."""
-        return self._data
+        return WindStressDataConfig.parse(self.params)
 
     @property
     def type(self) -> str:

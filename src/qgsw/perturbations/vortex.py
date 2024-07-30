@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F  # noqa: N812
+from typing_extensions import Self
 
 from qgsw import verbose
 from qgsw.models.core import helmholtz
@@ -22,6 +23,7 @@ from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
+    from qgsw.configs.perturbation import PerturbationConfig
     from qgsw.spatial.core.grid import Grid2D, Grid3D
 
 
@@ -325,6 +327,20 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
             float: Inner vortex gyre radius.
         """
         return self._2d_vortex.compute_vortex_scales(grid_3d.remove_z_h())[0]
+
+    @classmethod
+    def from_config(cls, perturbation_config: PerturbationConfig) -> Self:
+        """Instantiate Perturbation from config.
+
+        Args:
+            perturbation_config (PerturbationConfig): Perturbation Config.
+
+        Returns:
+            Self: Perturbation.
+        """
+        return cls(
+            magnitude=perturbation_config.perturbation_magnitude,
+        )
 
 
 class BarotropicVortex(RankineVortex3D, BarotropicPerturbation):
