@@ -8,13 +8,7 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.models import QG, QGCollinearSublayerStreamFunction
-from qgsw.models.qg.alpha import coefficient_from_config
-from qgsw.models.qg.collinear_sublayer import (
-    QGCollinearSublayerPV,
-    QGCollinearSublayerSFModifiedA,
-    QGPVMixture,
-)
+from qgsw.models.qg.instantiation import instantiate_model
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (
@@ -23,7 +17,6 @@ from qgsw.plots.vorticity import (
     VorticityComparisonFigure,
 )
 from qgsw.run_summary import RunSummary
-from qgsw.spatial.core.discretization import keep_top_layer
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.utils import time_params
 
@@ -49,18 +42,6 @@ if config.io.plots.save:
 if config.io.results.save:
     save_file = config.io.results.directory.joinpath("_summary.toml")
     summary.to_file(save_file)
-
-supported_models = [
-    "QG",
-    "QGCollinearSublayerStreamFunction",
-    "QGCollinearSublayerPV",
-    "QGPVMixture",
-    "QGCollinearSublayerSFModifiedA",
-]
-
-if config.model.type not in supported_models:
-    msg = "Unsupported model type, possible values are: QG."
-    raise ValueError(msg)
 
 # Common Set-up
 ## Wind Forcing
@@ -90,90 +71,17 @@ verbose.display(
 
 ## Set model parameters
 
-if config.model.type == "QG":
-    model = QG(
-        space_3d=space,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
-    )
-    p0 = perturbation.compute_initial_pressure(
-        space.omega,
-        config.physics.f0,
-        Ro,
-    )
-    uvh0 = model.G(p0)
-else:
-    p0 = perturbation.compute_initial_pressure(
-        keep_top_layer(space).omega,
-        config.physics.f0,
-        Ro,
-    )
-    # Initial coefficient for initial prognostic variables set up
-    if perturbation.type == "vortex-baroclinic":
-        coef0 = 0
-    elif perturbation.type == "vortex-half-barotropic":
-        coef0 = 0.5
-    elif perturbation.type == "vortex-barotropic":
-        coef0 = 1
-    else:
-        msg = f"Unknown perturbation type: {perturbation.type}"
-        raise ValueError(msg)
-    # Instantiate model
-    if config.model.type == "QGCollinearSublayerStreamFunction":
-        model = QGCollinearSublayerStreamFunction(
-            space_3d=space,
-            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-            beta_plane=config.physics.beta_plane,
-            coefficient=coef0,
-        )
-    elif config.model.type == "QGCollinearSublayerPV":
-        model = QGCollinearSublayerPV(
-            space_3d=space,
-            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-            beta_plane=config.physics.beta_plane,
-            coefficient=coef0,
-        )
-    elif config.model.type == "QGPVMixture":
-        model = QGPVMixture(
-            space_3d=space,
-            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-            beta_plane=config.physics.beta_plane,
-            coefficient=coef0,
-        )
-    elif config.model.type == "QGCollinearSublayerSFModifiedA":
-        model = QGCollinearSublayerSFModifiedA(
-            space_3d=space,
-            g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-            beta_plane=config.physics.beta_plane,
-            coefficient=coef0,
-        )
-    # Project Model
-    uvh0 = model.G(p0)
-    # Set model coefficient
-    model.coefficient = coefficient_from_config(config.model.collinearity_coef)
-
-model.slip_coef = config.physics.slip_coef
-model.bottom_drag_coef = config.physics.bottom_drag_coef
-model.set_wind_forcing(taux, tauy)
-
-if np.isnan(config.simulation.dt):
-    dt = time_params.compute_dt(uvh0, model.space, model.g_prime, model.H)
-else:
-    dt = config.simulation.dt
-
-# Instantiate Model
-model.dt = dt
-model.set_uvh(
-    u=torch.clone(uvh0.u),
-    v=torch.clone(uvh0.v),
-    h=torch.clone(uvh0.h),
+model = instantiate_model(
+    config=config,
+    space_3d=space,
+    perturbation=perturbation,
+    Ro=Ro,
 )
+model.set_wind_forcing(taux, tauy)
 
 ## time params
 t = 0
-
-model.compute_diagnostic_variables(model.uvh)
-model.compute_time_derivatives(model.uvh)
+dt = model.dt
 
 if np.isnan(config.simulation.tau):
     tau = time_params.compute_tau(model.omega, model.space)
