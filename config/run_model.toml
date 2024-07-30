@@ -20,6 +20,7 @@ bottom_drag_coefficient = 0
 
 [simulation]
 duration = 8 # units of Tau
+reference= 'tau' # 'tau' or 'sec'
 tau = 28 # in f0⁻¹, if nan: Tau is automatically computed
 dt = 26 # in s, if nan: dt is automatically computed
 
