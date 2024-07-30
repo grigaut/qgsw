@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
 import torch
+from typing_extensions import Self
 
 from qgsw import verbose
 from qgsw.configs.base import _Config, _DataConfig
@@ -34,17 +35,35 @@ Config = TypeVar("Config", bound=_Config)
 class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
     """Data loader."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(
+        self,
+        url: str,
+        output_folder: Path,
+        preprocessor: Preprocessor,
+    ) -> None:
         """Instantiate Loader.
 
         Args:
-            config (Config): Loader data configuration.
+            url (str): URL to retrieve data from.
+            output_folder (Path): Folder to store data in.
+            preprocessor (Preprocessor): Data Preprocessor.
         """
-        self._config = self._set_config(config)
+        self._url = url
+        self._folder_out = output_folder
         filepath = self._set_filepath()
         self._load_from_url(filepath=filepath)
         self._reader = Reader(filepath=filepath)
-        self._preprocess = self.set_preprocessor(config=config)
+        self._preprocess = preprocessor
+
+    @property
+    def url(self) -> str:
+        """URL to retrieve from."""
+        return self._url
+
+    @property
+    def output_folder(self) -> Path:
+        """Output folder."""
+        return self._folder_out
 
     @abstractmethod
     def set_preprocessor(self, config: Config) -> Preprocess:
@@ -59,8 +78,8 @@ class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
         Returns:
             Path: Path to save data at.
         """
-        filename = Path(self._config.url).name
-        return self._config.folder.joinpath(filename)
+        filename = Path(self.url).name
+        return self.output_folder.joinpath(filename)
 
     @abstractmethod
     def _set_config(self, config: Config) -> _DataConfig:
@@ -75,21 +94,33 @@ class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
         return self._preprocess(self._reader)
 
     def _load_from_url(self, filepath: Path) -> None:
-        """Create BathyLoader from a URL.
+        """Create Loader from a URL.
 
         Args:
             filepath (Path): Filepath to save data in.
 
         Returns:
-            Self: Instantiated BathyLoader.
+            Self: Instantiated Loader.
         """
         if not filepath.is_file():
             verbose.display(
-                msg=f"Downloading file {filepath} from {self._config.url}...",
+                msg=f"Downloading file {filepath} from {self.url}...",
                 trigger_level=1,
             )
-            urllib.request.urlretrieve(self._config.url, filepath)
+            urllib.request.urlretrieve(self.url, filepath)
             verbose.display(msg="..done", trigger_level=1)
+
+    @classmethod
+    @abstractmethod
+    def from_config(cls, config: Config) -> Self:
+        """Instantiate the loader from configuration.
+
+        Args:
+            config (Config): Configuration.
+
+        Returns:
+            Self: Loader.
+        """
 
 
 BathyData = tuple[np.ndarray, np.ndarray, np.ndarray]
@@ -98,20 +129,21 @@ BathyData = tuple[np.ndarray, np.ndarray, np.ndarray]
 class BathyLoader(Loader[BathyDataConfig, BathyData, BathyPreprocessor]):
     """Bathymetry loader."""
 
-    def set_preprocessor(self, config: BathyDataConfig) -> BathyPreprocessor:
-        """Set Bathymetric data preprocessor.
+    @classmethod
+    def from_config(cls, config: BathyDataConfig) -> Self:
+        """Instantiate the BathyLoader from configuration.
+
+        Args:
+            config (BathyDataConfig): Configuration.
 
         Returns:
-            BathyPreprocessor: Preprocessor.
+            Self: BathyLoader
         """
-        return BathyPreprocessor(
-            longitude_key=config.longitude,
-            latitude_key=config.latitude,
-            bathymetry_key=config.elevation,
+        return cls(
+            url=config.url,
+            folder=config.folder,
+            preprocessor=BathyPreprocessor.from_config(config),
         )
-
-    def _set_config(self, config: BathyDataConfig) -> BathyDataConfig:
-        return config
 
 
 class WindForcingLoader(
@@ -123,51 +155,40 @@ class WindForcingLoader(
 ):
     """Wind Forcing Data Loader."""
 
-    def set_preprocessor(
-        self,
-        config: WindStressConfig,
-    ) -> _WindStressPreprocessor:
-        """Set WindStress preprocessor.
+    @classmethod
+    def from_config(cls, config: WindStressDataConfig) -> Self:
+        """Instantiate the WindForcingLoader from configuration.
 
         Args:
-            config (ScriptConfig): configuration.
+            config (WindStressDataConfig): Configuration.
 
         Raises:
-            KeyError: If the configuration is not valid.
+            KeyError: If the windstress type is not recognized.
 
         Returns:
-            _WindStressPreprocessor: Preprocessor.
+            Self: WindForcingLoader
         """
-        ws_data = config.data
-        if ws_data.data_type == "speed":
-            return WindStressPreprocessorSpeed(
-                longitude_key=ws_data.longitude,
-                latitude_key=ws_data.latitude,
-                time_key=ws_data.time,
-                u10_key=ws_data.field_1,
-                v10_key=ws_data.field_2,
+        if config.data_type == "speed":
+            preprocessor = WindStressPreprocessorSpeed(
+                longitude_key=config.longitude,
+                latitude_key=config.latitude,
+                time_key=config.time,
+                u10_key=config.field_1,
+                v10_key=config.field_2,
             )
-        if ws_data.data_type == "tau":
-            return WindStressPreprocessorTaux(
-                longitude_key=ws_data.longitude,
-                latitude_key=ws_data.latitude,
-                time_key=ws_data.time,
-                u10_key=ws_data.field_1,
-                v10_key=ws_data.field_2,
+        elif config.data_type == "tau":
+            preprocessor = WindStressPreprocessorTaux(
+                longitude_key=config.longitude,
+                latitude_key=config.latitude,
+                time_key=config.time,
+                u10_key=config.field_1,
+                v10_key=config.field_2,
             )
-        msg = "Unrecognized data type in windstress.data section."
-        raise KeyError(msg)
-
-    def _set_config(
-        self,
-        windstress_config: WindStressConfig,
-    ) -> WindStressDataConfig:
-        """Set Data Configuration.
-
-        Args:
-            windstress_config (WindStressConfig): Windstress Configuration.
-
-        Returns:
-            WindStressDataConfig: Data configuration.
-        """
-        return windstress_config.data
+        else:
+            msg = "Unrecognized data type in windstress.data section."
+            raise KeyError(msg)
+        return cls(
+            url=config.url,
+            folder=config.folder,
+            preprocessor=preprocessor,
+        )

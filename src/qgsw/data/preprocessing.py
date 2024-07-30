@@ -6,10 +6,13 @@ from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
+from typing_extensions import Self
 
 from qgsw.data.readers import Reader
 
 if TYPE_CHECKING:
+    from qgsw.configs.bathymetry import BathyDataConfig
+    from qgsw.configs.windstress import WindStressDataConfig
     from qgsw.data.readers import Reader
 
 T = TypeVar("T")
@@ -70,6 +73,22 @@ class BathyPreprocessor(
         bathy = data.get(self._bathy).T
         return lon_bath, lat_bath, bathy
 
+    @classmethod
+    def from_config(cls, config: BathyDataConfig) -> Self:
+        """Instantiate the preprocessor from the config.
+
+        Args:
+            config (BathyDataConfig): Config for Bathymetry Data.
+
+        Returns:
+            Self: BathyDataPreprocessor
+        """
+        return cls(
+            longitude_key=config.longitude,
+            latitude_key=config.latitude,
+            bathymetry_key=config.elevation,
+        )
+
 
 class _WindStressPreprocessor(
     Preprocessor[tuple[torch.Tensor, torch.Tensor]],
@@ -77,32 +96,41 @@ class _WindStressPreprocessor(
 ):
     """Windtress Preprocessor."""
 
+    @abstractmethod
+    def __call__(self, data: Reader) -> tuple[torch.Tensor, torch.Tensor]:
+        return super().__call__(data)
+
+    @classmethod
+    @abstractmethod
+    def from_config(cls, config: WindStressDataConfig) -> Self: ...
+
+
+class WindStressPreprocessorSpeed(_WindStressPreprocessor):
+    """WindStress Preprocessor based on speed data."""
+
     def __init__(
         self,
         longitude_key: str,
         latitude_key: str,
         time_key: str,
         *,
-        taux_key: None | str = None,
-        tauy_key: None | str = None,
-        u10_key: None | str = None,
-        v10_key: None | str = None,
+        u10_key: str,
+        v10_key: str,
     ) -> None:
+        """Instantiate the WindStressPreprocessorSpeed.
+
+        Args:
+            longitude_key (str): Longitude data key.
+            latitude_key (str): Latitude data key.
+            time_key (str): Time data key.
+            u10_key (str): Speed (on x) data key.
+            v10_key (str): Speed (on y) data key.
+        """
         self._lon = longitude_key
         self._lat = latitude_key
         self._time = time_key
-        self._taux = taux_key
-        self._tauy = tauy_key
         self._u10 = u10_key
         self._v10 = v10_key
-
-    @abstractmethod
-    def __call__(self, data: Reader) -> tuple[torch.Tensor, torch.Tensor]:
-        return super().__call__(data)
-
-
-class WindStressPreprocessorSpeed(_WindStressPreprocessor):
-    """WindStress Preprocessor based on speed data."""
 
     def __call__(self, data: Reader) -> WindStressData:
         """Preprocess data.
@@ -121,9 +149,51 @@ class WindStressPreprocessorSpeed(_WindStressPreprocessor):
 
         return lon, lat, time, speed_x, speed_y
 
+    @classmethod
+    def from_config(cls, config: WindStressDataConfig) -> Self:
+        """Instantiate the preprocessor from the config.
+
+        Args:
+            config (WindStressDataConfig): Config for Windstress Data.
+
+        Returns:
+            Self: WindStressPreprocessorSpeed
+        """
+        return cls(
+            longitude_key=config.longitude,
+            latitude_key=config.latitude,
+            time_key=config.time,
+            u10_key=config.field_1,
+            v10_key=config.field_2,
+        )
+
 
 class WindStressPreprocessorTaux(_WindStressPreprocessor):
     """WindStress Preprocessor based on tau data."""
+
+    def __init__(
+        self,
+        longitude_key: str,
+        latitude_key: str,
+        time_key: str,
+        *,
+        taux_key: str,
+        tauy_key: str,
+    ) -> None:
+        """Instantiate the WindStressPreprocessorTaux.
+
+        Args:
+            longitude_key (str): Longitude data key.
+            latitude_key (str): Latitude data key.
+            time_key (str): Time data key.
+            taux_key (str): Tau (on x) data key.
+            tauy_key (str): Tau (on y) data key.
+        """
+        self._lon = longitude_key
+        self._lat = latitude_key
+        self._time = time_key
+        self._taux = taux_key
+        self._tauy = tauy_key
 
     def __call__(self, data: Reader) -> WindStressData:
         """Preprocess data.
@@ -141,3 +211,21 @@ class WindStressPreprocessorTaux(_WindStressPreprocessor):
         full_tauy_ref = data.get(self._tauy)
 
         return lon, lat, time, full_taux_ref, full_tauy_ref
+
+    @classmethod
+    def from_config(cls, config: WindStressDataConfig) -> Self:
+        """Instantiate the WindStressPreprocessorTaux from config.
+
+        Args:
+            config (WindStressDataConfig): Configuration.
+
+        Returns:
+            Self: WindStressPreprocessorTaux
+        """
+        return cls(
+            longitude_key=config.longitude,
+            latitude_key=config.latitude,
+            time_key=config.time,
+            taux_key=config.field_1,
+            tauy_key=config.field_2,
+        )
