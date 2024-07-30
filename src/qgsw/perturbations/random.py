@@ -2,8 +2,10 @@
 
 import torch
 from torch.nn import functional as F  # noqa: N812
+from typing_extensions import Self
 
 from qgsw import verbose
+from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.perturbations.base import _Perturbation
 from qgsw.spatial.core.grid import Grid3D
 from qgsw.specs import DEVICE
@@ -147,3 +149,17 @@ class RandomSurfacePerturbation(_Perturbation):
 
         psi[0, 0, ...] = psi_2d
         return psi  # shape: (1, nl, nx, ny)
+
+    @classmethod
+    def from_config(cls, perturbation_config: PerturbationConfig) -> Self:
+        """Instantiate Perturbation from config.
+
+        Args:
+            perturbation_config (PerturbationConfig): Perturbation Config.
+
+        Returns:
+            Self: Perturbation.
+        """
+        return cls(
+            magnitude=perturbation_config.perturbation_magnitude,
+        )

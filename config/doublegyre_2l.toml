@@ -1,14 +1,14 @@
 [io]
-name = "Two Layers Model"
+name = "Double Gyre Two Layers"
 performance_log = false
 [io.output]
-save_results = false
-quantity = 10
+save_results = true
+quantity = 100
 directory = "results"
 [io.plots]
-show = true
-save = true
-quantity = 10
+show = false
+save = false
+quantity = 100
 plots_directory = "plots"
 
 [physics]
@@ -19,10 +19,9 @@ beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
 [simulation]
-duration = 8 # units of Tau
-reference= 'tau' # 'tau' or 'sec'
-tau = 28 # in f0⁻¹, if nan: Tau is automatically computed
-dt = 26 # in s, if nan: dt is automatically computed
+duration = 31536000 # units of 'reference'
+reference = "sec" # 'tau' or 'sec'
+dt = 16000 # in s, if nan: dt is automatically computed
 
 [model]
 name = "Two Layers"
@@ -43,24 +42,21 @@ value = 0.1 # Only relevant for constant coefficients.
 source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficients.
 
 [space]
-nx = 192
-ny = 192
+nx = 32
+ny = 64
 box_unit = "m"
 [space.box]
 unit = "m"
 [space.box.x]
-min = -500_000
-max = 500_000
+min = 0
+max = 2_560_000
 [space.box.y]
-min = -500_000
-max = 500_000
+min = 0
+max = 5_120_000
 
 [windstress]
-type = "none"
-magnitude = nan # (Pa m-1 kg s-2)
-drag_coefficient = nan
-[windstress.data]
+type = "cosine"
+magnitude = 0.08 # (Pa m-1 kg s-2)
 
 [perturbation]
-type = "vortex-baroclinic"
-perturbation_magnitude = 1e-3
+type = "none"

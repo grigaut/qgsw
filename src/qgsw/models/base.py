@@ -160,10 +160,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         taux: float | torch.Tensor,
         tauy: float | torch.Tensor,
     ) -> None:
-        """Set the winf forcing attributes taux and tauy.
-
-        # TODO: consider implementing validation
-        in taux and tauy properties getters/
+        """Set the wind forcing attributes taux and tauy.
 
         Args:
             taux (float | torch.Tensor): Taux value.

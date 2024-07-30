@@ -461,7 +461,7 @@ class QG(Model):
         Returns:
             UVH: dt_u, dt_v, dt_h
         """
-        dt_uvh_sw = self._core.compute_time_derivatives(uvh)
+        dt_uvh_sw = self.sw.compute_time_derivatives(uvh)
         return self.project(dt_uvh_sw)
 
     def update(self, uvh: UVH) -> UVH:
@@ -522,3 +522,17 @@ class QG(Model):
             msg=f"saved u,v,h,ω,p,pv to {output_file}",
             trigger_level=1,
         )
+
+    def set_wind_forcing(
+        self,
+        taux: float | torch.Tensor,
+        tauy: float | torch.Tensor,
+    ) -> None:
+        """Set the wind forcing attributes taux and tauy.
+
+        Args:
+            taux (float | torch.Tensor): Taux value.
+            tauy (float | torch.Tensor): Tauy value.
+        """
+        super().set_wind_forcing(taux, tauy)
+        self.sw.set_wind_forcing(taux, tauy)

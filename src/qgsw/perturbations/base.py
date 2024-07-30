@@ -3,7 +3,9 @@
 from abc import ABCMeta, abstractmethod
 
 import torch
+from typing_extensions import Self
 
+from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.spatial.core.grid import Grid2D, Grid3D
 from qgsw.specs import DEVICE
 from qgsw.utils.type_switch import TypeSwitch
@@ -57,14 +59,14 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _compute_streamfunction_2d(self, grid_3d: Grid2D) -> torch.Tensor:
+    def _compute_streamfunction_2d(self, grid_2d: Grid2D) -> torch.Tensor:
         """Compute the streamfunction for a single layer.
 
         Args:
-            grid_3d (Grid2D): Grid to use for stream function computation.
+            grid_2d (Grid2D): Grid to use for stream function computation.
 
         Returns:
-            torch.Tensor: Stream function values, (1, nl, nx, ny) shaped.
+            torch.Tensor: Stream function values, (nx, ny) shaped.
         """
 
     def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
@@ -150,6 +152,18 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
         psi = self.compute_stream_function(grid_3d=grid_3d)
         psi_adjusted = self._adjust_stream_function(psi, grid_3d, f0, Ro)
         return self._convert_to_pressure(psi=psi_adjusted, f0=f0)
+
+    @classmethod
+    @abstractmethod
+    def from_config(cls, perturbation_config: PerturbationConfig) -> Self:
+        """Instantiate Perturbation from config.
+
+        Args:
+            perturbation_config (PerturbationConfig): Perturbation Config.
+
+        Returns:
+            Self: Perturbation.
+        """
 
 
 class BarotropicPerturbation(_Perturbation):
