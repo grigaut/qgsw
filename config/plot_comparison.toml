@@ -1,12 +1,6 @@
 folders = [
-    "output/g5k/sf_alpha_1_1000",
-    "output/g5k/two_layers_barotropic_100km",
-    # "output/g5k/one_layer_baroclinic_100km",
-    # "output/g5k/alpha_0_25",
-    # "output/g5k/two_layers_baroclinic_100km",
-    # "output/g5k/one_layer_baroclinic_100km",
-    # "output/g5k/alpha_0_5",
-    # "output/g5k/two_layers_baroclinic_100km",
+    "output/g5k/doublegyre_1l",
+    "output/g5k/doublegyre_2l",
 ]
 display_sublayer = false
 common_colorbar = true

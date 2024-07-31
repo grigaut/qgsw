@@ -62,6 +62,7 @@ if save:
 axes = []
 nbs = []
 files = []
+titles = []
 for run in runs:
     folder = run.folder
     model = run.summary.configuration.model
@@ -71,12 +72,14 @@ for run in runs:
     nb, fs = sort_files(results, model.prefix, ".npz")
     nbs.append(nb)
     files.append(fs)
+    titles.append(run.summary.configuration.io.name)
     if config["display_sublayer"]:
         ax = SecondLayerVorticityAxes.from_kwargs()
         axes.append(ax)
         nb, fs = sort_files(results, model.prefix, ".npz")
         nbs.append(nb)
         files.append(fs)
+        titles.append(run.summary.configuration.io.name + " (bottom)")
 
 # Prepare Plot
 plot = VorticityComparisonFigure(

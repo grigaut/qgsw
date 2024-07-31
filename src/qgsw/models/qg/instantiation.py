@@ -179,5 +179,7 @@ def _determine_coef0(perturbation_type: str) -> float:
         return 0.5
     if perturbation_type == "vortex-barotropic":
         return 1
+    if perturbation_type == "none":
+        return 1
     msg = f"Unknown perturbation type: {perturbation_type}"
     raise ValueError(msg)
