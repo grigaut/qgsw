@@ -11,6 +11,7 @@ class SimulationConfig(_Config):
 
     section: str = keys.SIMULATION["section"]
     _duration: str = keys.SIMULATION["duration"]
+    _ref: str = keys.SIMULATION["reference"]
     _tau: str = keys.SIMULATION["tau"]
     _dt: str = keys.SIMULATION["timestep"]
 
@@ -23,6 +24,11 @@ class SimulationConfig(_Config):
     def duration(self) -> float:
         """Simulation duration, relative unit."""
         return self.params[self._duration]
+
+    @property
+    def reference(self) -> str:
+        """Refernce Time, whether 'tau' or 'sec'."""
+        return self.params[self._ref]
 
     @property
     def tau(self) -> float:

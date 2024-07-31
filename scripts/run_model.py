@@ -83,16 +83,19 @@ model.set_wind_forcing(taux, tauy)
 t = 0
 dt = model.dt
 
-if np.isnan(config.simulation.tau):
-    tau = time_params.compute_tau(model.omega, model.space)
+if config.simulation.reference == "tau":
+    if np.isnan(config.simulation.tau):
+        tau = time_params.compute_tau(model.omega, model.space)
+    else:
+        tau = config.simulation.tau / config.physics.f0
+    verbose.display(
+        msg=f"tau = {tau *config.physics.f0:.2f} f0⁻¹",
+        trigger_level=1,
+    )
+    t_end = config.simulation.duration * tau
 else:
-    tau = config.simulation.tau / config.physics.f0
-verbose.display(
-    msg=f"tau = {tau *config.physics.f0:.2f} f0⁻¹",
-    trigger_level=1,
-)
+    t_end = config.simulation.duration
 
-t_end = config.simulation.duration * tau
 freq_plot = int(t_end / config.io.plots.quantity / dt) + 1
 freq_save = int(t_end / config.io.results.quantity / dt) + 1
 freq_log = int(t_end / 100 / dt) + 1
