@@ -161,7 +161,7 @@ class VorticityAxesContent(BaseAxesContent):
                 f"with {array.shape}-shaped array."
             )
             raise InvalidLayerNumberError(msg)
-        return array[0, self._layer_nb]
+        return array[0, self._layer_nb].T
 
     def retrieve_array_from_model(self, model: Model) -> np.ndarray:
         """Retrieve array from a model.
