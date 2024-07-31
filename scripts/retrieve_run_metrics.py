@@ -28,7 +28,7 @@ def parse_json(power_json: dict) -> dict:
     return power_json
 
 
-def get_power(
+def get_metric(
     node: str,
     site: str,
     start: int,
@@ -48,7 +48,7 @@ def get_power(
         dict: Results.
     """
     url = f"https://api.grid5000.fr/stable/sites/{site}/metrics?metrics={metric}&nodes={node}&start_time={int(start)}&end_time={int(stop)}"
-    data = session.get(url, verify=False)  # .json()
+    data = session.get(url, verify=True)  # .json()
     data.raise_for_status()
     return data.json()
 
@@ -79,20 +79,23 @@ if __name__ == "__main__":
         config = toml.load(file)
 
     folder = ROOT.joinpath(f"{config['folder']}")
-    metric = config["metric"]
+    for metric in config["metrics"]:
+        print(f"Collecting: {metric}")  # noqa: T201
+        for run in config["runs"]:
+            print(f"\tRetrieving for job n°{run['id']}")  # noqa: T201
+            results = get_metric(
+                "abacus16-1",
+                "rennes",
+                run["start"].timestamp(),
+                run["end"].timestamp(),
+                metric=metric,
+            )
+            output = folder.joinpath(
+                f"{run['folder']}/{metric}_{run['id']}.json",
+            )
 
-    for run in config["runs"]:
-        results = get_power(
-            "abacus16-1",
-            "rennes",
-            run["start"].timestamp(),
-            run["end"].timestamp(),
-            metric=metric,
-        )
-        output = folder.joinpath(f"{run['folder']}/{metric}_{run['id']}.json")
+            if not output.parent.is_dir():
+                output.parent.mkdir(parents=True)
 
-        if not output.parent.is_dir():
-            output.parent.mkdir(parents=True)
-
-        with output.open("w") as file:
-            json.dump(results, file)
+            with output.open("w") as file:
+                json.dump(results, file)

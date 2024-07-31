@@ -1,92 +1,99 @@
-metric = "bmc_node_power_watt"
+metrics = [
+    "bmc_node_power_watt",
+    "prom_node_memory_Buffers_bytes",
+    "prom_node_memory_Cached_bytes",
+    "prom_node_memory_MemTotal_bytes",
+    "prom_node_memory_MemFree_bytes",
+
+    ]
 folder = "output/g5k/consumption"
 
 [[runs]]
-id = 2285748
-start = 2024-07-30 03:23:31
-end = 2024-07-30 04:09:34
-folder = "one_layer_model"
+id = 2300196
+start = 2024-07-31 09:37:12
+end = 2024-07-31 09:53:54
+folder = "gpu_one_layer_model"
 
 [[runs]]
-id = 2285750
-start = 2024-07-30 04:09:59
-end = 2024-07-30 04:57:15
-folder = "one_layer_model"
+id = 2300197
+start = 2024-07-31 09:54:09
+end = 2024-07-31 10:10:22
+folder = "gpu_one_layer_model"
 
 [[runs]]
-id = 2285751
-start = 2024-07-30 04:57:31
-end = 2024-07-30 05:46:21
-folder = "one_layer_model"
+id = 2300198
+start = 2024-07-31 10:10:42
+end = 2024-07-31 10:26:48
+folder = "gpu_one_layer_model"
 
 [[runs]]
-id = 2285752
-start = 2024-07-30 05:46:39
-end = 2024-07-30 06:35:27
-folder = "one_layer_model"
+id = 2300199
+start = 2024-07-31 10:27:03
+end = 2024-07-31 10:43:22
+folder = "gpu_one_layer_model"
 
 [[runs]]
-id = 2285753
-start = 2024-07-30 06:35:43
-end = 2024-07-30 07:23:56
-folder = "one_layer_model"
+id = 2300201
+start = 2024-07-31 10:43:48
+end = 2024-07-31 11:00:02
+folder = "gpu_one_layer_model"
 
 [[runs]]
-id = 2285761
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "two_layers_model"
+id = 2300203
+start = 2024-07-31 11:00:31
+end = 2024-07-31 11:17:03
+folder = "gpu_two_layers_model"
 
 [[runs]]
-id = 2285762
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "two_layers_model"
+id = 2300204
+start = 2024-07-31 11:17:29
+end = 2024-07-31 11:34:21
+folder = "gpu_two_layers_model"
 
 [[runs]]
-id = 2285764
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "two_layers_model"
+id = 2300205
+start = 2024-07-31 11:34:42
+end = 2024-07-31 11:51:39
+folder = "gpu_two_layers_model"
 
 [[runs]]
-id = 2291126
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "two_layers_model"
+id = 2300206
+start = 2024-07-31 11:51:54
+end = 2024-07-31 12:08:52
+folder = "gpu_two_layers_model"
 
 [[runs]]
-id = 2291160
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "two_layers_model"
+id = 2300207
+start = 2024-07-31 12:09:07
+end = 2024-07-31 12:25:42
+folder = "gpu_two_layers_model"
 
 [[runs]]
-id = 2285770
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "modified_model"
+id = 2300209
+start = 2024-07-31 12:26:08
+end = 2024-07-31 12:42:14
+folder = "gpu_modified_model"
 
 [[runs]]
-id = 2285771
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "modified_model"
+id = 2300210
+start = 2024-07-31 12:42:37
+end = 2024-07-31 12:58:58
+folder = "gpu_modified_model"
 
 [[runs]]
-id = 2285772
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "modified_model"
+id = 2300211
+start = 2024-07-31 12:59:13
+end = 2024-07-31 13:15:36
+folder = "gpu_modified_model"
 
 [[runs]]
-id = 2285773
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "modified_model"
+id = 2300212
+start = 2024-07-31 13:15:55
+end = 2024-07-31 13:32:01
+folder = "gpu_modified_model"
 
 [[runs]]
-id = 2285774
-start = 2024-07-30 #06:35:43
-end = 2024-07-30 #07:23:56
-folder = "modified_model"
+id = 2300214
+start = 2024-07-31 13:32:22
+end = 2024-07-31 13:48:46
+folder = "gpu_modified_model"
