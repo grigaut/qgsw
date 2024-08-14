@@ -11,6 +11,7 @@ from scipy import interpolate
 from typing_extensions import Self
 
 from qgsw.run_summary import RunSummary
+from qgsw.utils.gaussian_filtering import GaussianFilter1D
 from qgsw.utils.sorting import sort_files
 from qgsw.utils.type_switch import TypeSwitch
 
@@ -270,8 +271,6 @@ class ChangingCoefficient(Coefficient):
     """Changing coefficient."""
 
     _type = "changing"
-    sigma = 0.25
-    _kernel_width = 30
 
     def __init__(
         self,
@@ -287,15 +286,18 @@ class ChangingCoefficient(Coefficient):
         """
         self._coefs = coefficients
         self._times = times
+
+        self._filter = GaussianFilter1D(sigma=0.25, kernel_width=30)
+
         self._coef_interpolation = self._interpolate_coefs(
             self._times,
             self._coefs,
         )
 
     @property
-    def kernel_width(self) -> int:
-        """Width of the smoothing kernel."""
-        return self._kernel_width
+    def gaussian_filter(self) -> GaussianFilter1D:
+        """Gaussian Filter."""
+        return self._filter
 
     def _interpolate_coefs(
         self,
@@ -311,37 +313,8 @@ class ChangingCoefficient(Coefficient):
         Returns:
             interpolate.interp1d: Interpolator.
         """
-        smoothed_coefs = self._smooth(coefficients)
+        smoothed_coefs = self.gaussian_filter.smooth(coefficients)
         return interpolate.interp1d(times, y=smoothed_coefs)
-
-    def _smooth(self, coefficients: np.ndarray) -> np.ndarray:
-        """Smooth coefficients using a gaussian kernel.
-
-        Args:
-            coefficients (np.ndarray): Coefficients.
-
-        Returns:
-            np.ndarray: Smoothed coefficients.
-        """
-        kernel = self._generate_kernel()
-        pad = (kernel.shape[0] - 1, kernel.shape[0] - 1)
-        pad_coefs = np.pad(coefficients, pad, mode="edge")
-        convolved = np.convolve(pad_coefs, kernel, mode="same")
-        return convolved[pad[0] : -pad[1]]
-
-    def _generate_kernel(self) -> np.ndarray:
-        """Generate filtering kernel.
-
-        Returns:
-            np.ndarray: Filtering kernel.
-        """
-        x = np.linspace(-1, 1, int(self.kernel_width))
-        kernel = (
-            1
-            / (self.sigma * np.sqrt(2 * np.pi))
-            * np.exp(-np.power(x, 2) / (2 * self.sigma**2))
-        )
-        return kernel / np.sum(kernel)
 
     def at_time(self, time: int) -> float:
         """Compute the coefficient at a given time.
@@ -369,7 +342,7 @@ class ChangingCoefficient(Coefficient):
             msg = "Unable to retrieve steps spacing."
             raise ValueError(msg)
         returning_time = 1 / (Ro * f0)
-        self._kernel_width = returning_time // dt[0] + 1
+        self.gaussian_filter.kernel_width = int(returning_time // dt[0]) + 1
         self._coef_interpolation = self._interpolate_coefs(
             self._times,
             self._coefs,
@@ -394,7 +367,7 @@ class ChangingCoefficient(Coefficient):
         )
         ax.plot(
             self._times,
-            self._smooth(self._coefs),
+            self.gaussian_filter.smooth(self._coefs),
             c="blue",
             label="Smoothed Values.",
         )
