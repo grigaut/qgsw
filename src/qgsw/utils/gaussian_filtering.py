@@ -7,7 +7,7 @@ from typing import overload
 
 import numpy as np
 import torch
-from torch.nn import functional as F  # noqa: N812
+from scipy import signal
 
 from qgsw.specs import DEVICE
 
@@ -15,15 +15,15 @@ from qgsw.specs import DEVICE
 class GaussianFilterBase(metaclass=ABCMeta):
     """Base Class for Gaussian Filters."""
 
-    def __init__(self, sigma: float, kernel_width: int) -> None:
+    def __init__(self, sigma: float, radius: int) -> None:
         """Instantiates the Gaussian filter.
 
         Args:
-            sigma (float): _description_
-            kernel_width (int): _description_
+            sigma (float): Standard deviation.
+            radius (int): Kernel Radius.
         """
         self.sigma = sigma
-        self.kernel_width = kernel_width
+        self.radius = radius
 
     @property
     def sigma(self) -> float:
@@ -38,26 +38,26 @@ class GaussianFilterBase(metaclass=ABCMeta):
         self._sigma = value
 
     @property
-    def kernel_width(self) -> int:
+    def radius(self) -> int:
         """Kernel Width."""
-        return self._kernel_width
+        return self._radius
 
-    @kernel_width.setter
-    def kernel_width(self, value: int) -> None:
+    @radius.setter
+    def radius(self, value: int) -> None:
         if value <= 0:
             msg = "Kernel width must be greater than 0."
             raise ValueError(msg)
         if not isinstance(value, int):
             msg = "Kernel width must be an integer."
             raise TypeError(msg)
-        self._kernel_width = value
+        self._radius = value
         self._kernel = self._generate_kernel()
 
     @abstractmethod
     def _generate_kernel(self) -> torch.Tensor: ...
 
     @abstractmethod
-    def _smooth(self, y: torch.Tensor) -> torch.Tensor: ...
+    def _smooth(self, y: np.ndarray) -> np.ndarray: ...
 
     @overload
     def smooth(self, y: np.ndarray) -> np.ndarray: ...
@@ -78,26 +78,24 @@ class GaussianFilterBase(metaclass=ABCMeta):
             torch.Tensor | np.ndarray: Smoothed array.
         """
         if isinstance(y, np.ndarray):
-            return self._smooth(
-                torch.tensor(y, dtype=torch.float64, device=DEVICE.get()),
-            )
+            return self._smooth(y)
         return torch.tensor(
-            self._smooth(y),
+            self._smooth(y.numpy()),
             dtype=torch.float64,
             device=DEVICE.get(),
         )
 
 
 class GaussianFilter1D(GaussianFilterBase):
-    """1D Gaussian Filetring."""
+    """1D Gaussian Filtering."""
 
     def _generate_kernel(self) -> torch.Tensor:
-        """Generate filtering kernel.
+        """Generate gaussian kernel.
 
         Returns:
-            torch.Tensor: Filtering kernel.
+            torch.Tensor: gaussian kernel.
         """
-        x = torch.linspace(-1, 1, int(self.kernel_width))
+        x = torch.linspace(-1, 1, int(self.radius))
         kernel = (
             1
             / (self.sigma * np.sqrt(2 * torch.pi))
@@ -105,22 +103,73 @@ class GaussianFilter1D(GaussianFilterBase):
         )
         return kernel / torch.sum(kernel)
 
-    def _smooth(self, y: torch.Tensor) -> torch.Tensor:
+    def _smooth(self, y: np.ndarray) -> np.ndarray:
         """Smooth coefficients using a gaussian kernel.
 
         Args:
-            y (torch.Tensor): tensor to smooth.
+            y (np.ndarray): tensor to smooth.
 
         Returns:
-            torch.Tensor: Smoothed tensor.
+            np.ndarray: Smoothed tensor.
         """
-        pad_size = self._kernel.shape[0] - 1
-        pad_y_left = F.pad(y, (pad_size, 0), mode="constant", value=y[0])
-        pad_y = F.pad(
-            pad_y_left,
-            (0, pad_size),
-            mode="constant",
-            value=pad_y_left[-1],
+        # Padding
+        i_left = self._kernel.shape[0] - 1
+        i_right = self._kernel.shape[0] - 1
+        pad_width = (i_left, i_right)
+        y_padded = np.pad(y, pad_width=pad_width, mode="edge")
+        # Convolution
+        convolved = signal.convolve(y_padded, self._kernel, mode="same")
+        return convolved[i_left:-i_right]
+
+
+class GaussianFilter2d(GaussianFilterBase):
+    """1D Gaussian Filtering."""
+
+    def _generate_kernel(self) -> torch.Tensor:
+        """Generate gaussian kernel.
+
+        Returns:
+            torch.Tensor: gaussian kernel.
+        """
+        x_cord = torch.linspace(
+            -1,
+            1,
+            self._radius * 2,
+            dtype=torch.float64,
+            device=DEVICE.get(),
         )
-        convolved = np.convolve(pad_y, self._kernel, mode="same")
-        return convolved[pad_size:-pad_size]
+        x_grid = x_cord.repeat(self._radius * 2).view(
+            self._radius * 2,
+            self._radius * 2,
+        )
+        y_grid = x_grid.t()
+        xy_grid = torch.stack([x_grid, y_grid], dim=-1)
+
+        # Calculate the 2-dimensional gaussian kernel which is
+        # the product of two gaussian distributions for two different
+        # variables (in this case called x and y)
+        gaussian_kernel = (1.0 / (self._sigma**2 * 2 * torch.pi)) * torch.exp(
+            -torch.sum((xy_grid) ** 2.0, dim=-1) / (2 * self._sigma**2),
+        )
+        # Make sure sum of values in gaussian kernel equals 1.
+        return gaussian_kernel / torch.sum(gaussian_kernel)
+
+    def _smooth(self, y: np.ndarray) -> np.ndarray:
+        """Smooth coefficients using a gaussian kernel.
+
+        Args:
+            y (np.ndarray): tensor to smooth.
+
+        Returns:
+            np.ndarray: Smoothed tensor.
+        """
+        # Padding
+        i_left = self._kernel.shape[0] - 1
+        i_right = self._kernel.shape[0] - 1
+        j_left = self._kernel.shape[0] - 1
+        j_right = self._kernel.shape[0] - 1
+        pad_width = ((i_left, i_right), (j_left, j_right))
+        y_padded = np.pad(y, pad_width=pad_width, mode="edge")
+        # Convolution
+        convolved = signal.convolve2d(y_padded, self._kernel, mode="same")
+        return convolved[i_left:-i_right, j_left:-j_right]

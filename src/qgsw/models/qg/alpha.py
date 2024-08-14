@@ -287,7 +287,7 @@ class ChangingCoefficient(Coefficient):
         self._coefs = coefficients
         self._times = times
 
-        self._filter = GaussianFilter1D(sigma=0.25, kernel_width=30)
+        self._filter = GaussianFilter1D(sigma=0.25, radius=30)
 
         self._coef_interpolation = self._interpolate_coefs(
             self._times,
