@@ -6,13 +6,10 @@ from typing_extensions import Self
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.perturbations.base import _Perturbation
 from qgsw.perturbations.none import NoPerturbation
-from qgsw.perturbations.random import RandomSurfacePerturbation
 from qgsw.perturbations.vortex import (
     BaroclinicVortex,
     BarotropicVortex,
     HalfBarotropicVortex,
-    PerturbedBaroclinicVortex,
-    PerturbedBarotropicVortex,
 )
 from qgsw.spatial.core.grid import Grid3D
 
@@ -84,9 +81,6 @@ class Perturbation:
             BaroclinicVortex.get_type(): BaroclinicVortex,
             BarotropicVortex.get_type(): BarotropicVortex,
             HalfBarotropicVortex.get_type(): HalfBarotropicVortex,
-            RandomSurfacePerturbation.get_type(): RandomSurfacePerturbation,
-            PerturbedBaroclinicVortex.get_type(): PerturbedBaroclinicVortex,
-            PerturbedBarotropicVortex.get_type(): PerturbedBarotropicVortex,
             NoPerturbation.get_type(): NoPerturbation,
         }
         if perturbation_config.type not in perturbations:
