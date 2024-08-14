@@ -122,7 +122,7 @@ class GaussianFilter1D(GaussianFilterBase):
         return convolved[i_left:-i_right]
 
 
-class GaussianFilter2d(GaussianFilterBase):
+class GaussianFilter2D(GaussianFilterBase):
     """1D Gaussian Filtering."""
 
     def _generate_kernel(self) -> torch.Tensor:
