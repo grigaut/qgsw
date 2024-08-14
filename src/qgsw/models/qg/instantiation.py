@@ -11,6 +11,7 @@ from qgsw.models.qg.alpha import coefficient_from_config
 from qgsw.models.qg.collinear_sublayer import (
     QGCollinearPV,
     QGCollinearSF,
+    QGSmoothCollinearSF,
     _QGCollinearSublayer,
 )
 from qgsw.models.qg.core import QG
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
 collinear_models = {
     "QGCollinearSF": QGCollinearSF,
     "QGCollinearPV": QGCollinearPV,
+    "QGSmoothCollinearSF": QGSmoothCollinearSF,
 }
 
 
