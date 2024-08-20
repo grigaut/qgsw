@@ -16,7 +16,7 @@ class ModelConfig(_Config):
     """Model configuration."""
 
     _collinearity_allowed: ClassVar[list[str]] = [
-        "QGCollinearSublayerStreamFunction",
+        "QGCollinearSF",
     ]
 
     section: str = keys.MODELS["section"]

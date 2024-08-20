@@ -9,8 +9,9 @@ import torch
 
 from qgsw.models.qg.alpha import coefficient_from_config
 from qgsw.models.qg.collinear_sublayer import (
-    QGCollinearSublayerPV,
-    QGCollinearSublayerStreamFunction,
+    QGCollinearPV,
+    QGCollinearSF,
+    QGSmoothCollinearSF,
     _QGCollinearSublayer,
 )
 from qgsw.models.qg.core import QG
@@ -26,8 +27,9 @@ if TYPE_CHECKING:
     from qgsw.perturbations.core import Perturbation
 
 collinear_models = {
-    "QGCollinearSublayerStreamFunction": QGCollinearSublayerStreamFunction,
-    "QGCollinearSublayerPV": QGCollinearSublayerPV,
+    "QGCollinearSF": QGCollinearSF,
+    "QGCollinearPV": QGCollinearPV,
+    "QGSmoothCollinearSF": QGSmoothCollinearSF,
 }
 
 
@@ -36,7 +38,7 @@ def instantiate_model(
     space_3d: SpaceDiscretization3D,
     perturbation: Perturbation,
     Ro: float,  # noqa: N803
-) -> QG | QGCollinearSublayerPV | QGCollinearSublayerStreamFunction:
+) -> QG | QGCollinearPV | QGCollinearSF:
     """Instantiate the model, given the configuration an dthe perturbation.
 
     Args:

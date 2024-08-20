@@ -18,6 +18,7 @@ from qgsw.spatial.core.discretization import (
     keep_top_layer,
 )
 from qgsw.specs import DEVICE
+from qgsw.utils.gaussian_filtering import GaussianFilter2D
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -128,39 +129,8 @@ class _QGCollinearSublayer(QG):
             optimize=optimize,
         )
 
-    def G0(self, p: torch.Tensor, p_i: torch.Tensor | None = None) -> UVH:  # noqa: N802
-        """G0 operator, for initial pressure to varibale computation.
 
-        Args:
-            p (torch.Tensor): Pressure.
-            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
-             ("middle of grid cell"). Defaults to None.
-
-        Returns:
-            UVH: u, v and h
-        """
-        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
-        dx, dy = self.space.dx, self.space.dy
-
-        # geostrophic balance
-        u = -torch.diff(p, dim=-1) / dy / self.beta_plane.f0 * dx
-        v = torch.diff(p, dim=-2) / dx / self.beta_plane.f0 * dy
-        # h = diag(H)Ap
-        A_2l = super().compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
-        h = (
-            self.H
-            * torch.einsum("lm,...mxy->...lxy", A_2l, p_i)
-            * self.space.area
-        )
-
-        return UVH(
-            u[:, 0, ...].unsqueeze(1),
-            v[:, 0, ...].unsqueeze(1),
-            h[:, 0, ...].unsqueeze(1),
-        )
-
-
-class QGCollinearSublayerStreamFunction(_QGCollinearSublayer):
+class QGCollinearSF(_QGCollinearSublayer):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _supported_layers_nb: int = 2
@@ -237,61 +207,7 @@ class QGCollinearSublayerStreamFunction(_QGCollinearSublayer):
         return super().step()
 
 
-class QGCollinearSublayerSFModifiedA(QGCollinearSublayerStreamFunction):
-    """Modified QG model implementing CoLinear Sublayer Behavior."""
-
-    _supported_layers_nb: int = 2
-    _coefficient = 0.01
-
-    def __init__(
-        self,
-        space_3d: SpaceDiscretization3D,
-        g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
-        coefficient: float | Coefficient = _coefficient,
-        optimize: bool = True,  # noqa: FBT001, FBT002
-    ) -> None:
-        """Collinear Sublayer Stream Function.
-
-        Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Collinearity coefficient.
-            optimize (bool, optional): Whether to precompile functions or
-            not. Defaults to True.
-        """
-        super().__init__(
-            space_3d=space_3d,
-            g_prime=g_prime,
-            beta_plane=beta_plane,
-            coefficient=coefficient,
-            optimize=optimize,
-        )
-        self.A_1l = QG.compute_A(self, self.H[:, 0, 0], self.g_prime[:, 0, 0])
-
-    def G(self, p: torch.Tensor, p_i: torch.Tensor | None = None) -> UVH:  # noqa: N802
-        """G operator.
-
-        Args:
-            p (torch.Tensor): Pressure.
-            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
-             ("middle of grid cell"). Defaults to None.
-
-        Returns:
-            UVH: u, v and h
-        """
-        p_i = self.cell_corners_to_cell_centers(p) if p_i is None else p_i
-        uvh = super().G(p, p_i)
-        h = (
-            self.H
-            * torch.einsum("lm,...mxy->...lxy", self.A_1l, p_i)
-            * self.space.area
-        )
-        return UVH(uvh.u, uvh.v, h)
-
-
-class QGCollinearSublayerPV(_QGCollinearSublayer):
+class QGCollinearPV(_QGCollinearSublayer):
     """Modified QG Model implementing collinear pv behavior."""
 
     _supported_layers_nb: int = 2
@@ -363,63 +279,79 @@ class QGCollinearSublayerPV(_QGCollinearSublayer):
         return super().step()
 
 
-class QGPVMixture(QGCollinearSublayerPV):
-    """Mixture of Barotropic and Baroclinic Streamfunctions."""
+class QGSmoothCollinearSF(_QGCollinearSublayer):
+    """QGSmoothCollinearSF."""
 
-    def QoG_inv(  # noqa: N802
+    _coefficient = 0
+    _supported_layers_nb = 2
+
+    def __init__(
         self,
-        elliptic_rhs: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """(Q o G)^{-1} operator: solve elliptic eq with mass conservation.
-
-        Modified implementation: Expand to 2 layers and retrieve
-        top layer streamfunction.
+        space_3d: SpaceDiscretization3D,
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        coefficient: float | Coefficient = _coefficient,
+        optimize: bool = True,  # noqa: FBT001, FBT002
+    ) -> None:
+        """Smoothed Collinear Sublayer Stream Function.
 
         Args:
-            elliptic_rhs (torch.Tensor): Elliptic equation right hand side
-            value (ω-f_0*h/H).
+            space_3d (SpaceDiscretization3D): Space Discretization
+            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (BetaPlane): Beta Plane.
+            coefficient (float): Collinearity coefficient.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        super().__init__(space_3d, g_prime, beta_plane, coefficient, optimize)
+        # Two layers stretching operator for QoG inversion
+        A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
+        decomposition = self.compute_layers_to_mode_decomposition(A_2l)
+        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        # Two layers helmholtz solver
+        self.set_helmholtz_solver(self.lambd)
+        # One layer stretching operator for G
+        self.A = self.compute_A(self.H[:, 0, 0], self.g_prime[:, 0, 0])
+        self._gaussian_filter = GaussianFilter2D(3, 10)
+
+    def G(self, p: torch.Tensor, p_i: torch.Tensor | None = None) -> UVH:  # noqa: N802
+        """G operator.
+
+        Args:
+            p (torch.Tensor): Pressure.
+            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
+             ("middle of grid cell"). Defaults to None.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Quasi-geostrophique pressure,
-            interpolated quasi-geostroophic pressure ("middle of grid cell").
+            UVH: u, v and h
         """
-        # Expand to 2 layers
-        _, _, nx, ny = elliptic_rhs.shape
-        elliptic_rhs_baroclinic = torch.zeros(
-            (1, 2, nx, ny),
-            device=DEVICE.get(),
-            dtype=torch.float64,
-        )
-        elliptic_rhs_baroclinic[0, 0, ...] = elliptic_rhs
-        elliptic_rhs_baroclinic[0, 1, ...] = 0 * elliptic_rhs
-        # Extract 2 layers stream functions
-        p_qg_baroclinic, p_qg_i_baroclinic = _QGCollinearSublayer.QoG_inv(
-            self,
-            elliptic_rhs_baroclinic,
-        )
+        uvh = super().G(p=p, p_i=p_i)
+        return UVH(uvh.u[:, [0], ...], uvh.v[:, [0], ...], uvh.h[:, [0], ...])
 
-        elliptic_rhs_barotropic = torch.zeros(
-            (1, 2, nx, ny),
-            device=DEVICE.get(),
-            dtype=torch.float64,
-        )
-        elliptic_rhs_barotropic[0, 0, ...] = elliptic_rhs
-        elliptic_rhs_barotropic[0, 1, ...] = 1 * elliptic_rhs
-        # Extract 2 layers stream functions
-        p_qg_barotropic, p_qg_i_barotropic = _QGCollinearSublayer.QoG_inv(
-            self,
-            elliptic_rhs_barotropic,
-        )
+    def Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
+        """Q operator: compute elliptic equation r.h.s.
 
-        # Shrink to 1 layer
-        p_qg_barocl_top = p_qg_baroclinic[:, 0, ...]
-        p_qg_barotr_top = p_qg_barotropic[:, 0, ...]
-        p_qg_i_barocl_top = p_qg_i_baroclinic[:, 0, ...]
-        p_qg_i_barotr_top = p_qg_i_barotropic[:, 0, ...]
+        Args:
+            uvh (UVH): u,v and h.
 
+        Returns:
+            torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
+        """
         alpha = self.alpha
+        smooth_u = self._gaussian_filter.smooth(uvh.u[0, 0, ...])
+        u_2l = torch.cat(
+            [uvh.u[0, [0], ...], alpha * smooth_u.unsqueeze(0)],
+            dim=0,
+        ).unsqueeze(0)
+        smooth_v = self._gaussian_filter.smooth(uvh.v[0, 0, ...])
+        v_2l = torch.cat(
+            [uvh.v[0, [0], ...], alpha * smooth_v.unsqueeze(0)],
+            dim=0,
+        ).unsqueeze(0)
+        smooth_h = self._gaussian_filter.smooth(uvh.h[0, 0, ...])
+        h_2l = torch.cat(
+            [uvh.h[0, [0], ...], alpha * smooth_h.unsqueeze(0)],
+            dim=0,
+        ).unsqueeze(0)
 
-        p_qg = alpha * p_qg_barotr_top + (1 - alpha) * p_qg_barocl_top
-        p_qg_i = alpha * p_qg_i_barotr_top + (1 - alpha) * p_qg_i_barocl_top
-
-        return p_qg, p_qg_i
+        return super().Q(UVH(u_2l, v_2l, h_2l))
