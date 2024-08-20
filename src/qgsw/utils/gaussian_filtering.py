@@ -54,7 +54,7 @@ class GaussianFilterBase(metaclass=ABCMeta):
         self._kernel = self._generate_kernel()
 
     @abstractmethod
-    def _generate_kernel(self) -> torch.Tensor: ...
+    def _generate_kernel(self) -> np.ndarray: ...
 
     @abstractmethod
     def _smooth(self, y: np.ndarray) -> np.ndarray: ...
@@ -89,19 +89,19 @@ class GaussianFilterBase(metaclass=ABCMeta):
 class GaussianFilter1D(GaussianFilterBase):
     """1D Gaussian Filtering."""
 
-    def _generate_kernel(self) -> torch.Tensor:
+    def _generate_kernel(self) -> np.ndarray:
         """Generate gaussian kernel.
 
         Returns:
-            torch.Tensor: gaussian kernel.
+            np.ndarray: gaussian kernel.
         """
-        x = torch.linspace(-1, 1, int(self.radius))
+        x = np.linspace(-1, 1, int(self.radius))
         kernel = (
             1
             / (self.sigma * np.sqrt(2 * torch.pi))
-            * torch.exp(-torch.pow(x, 2) / (2 * self.sigma**2))
+            * np.exp(-np.power(x, 2) / (2 * self.sigma**2))
         )
-        return kernel / torch.sum(kernel)
+        return kernel / np.sum(kernel)
 
     def _smooth(self, y: np.ndarray) -> np.ndarray:
         """Smooth coefficients using a gaussian kernel.
@@ -125,34 +125,31 @@ class GaussianFilter1D(GaussianFilterBase):
 class GaussianFilter2D(GaussianFilterBase):
     """1D Gaussian Filtering."""
 
-    def _generate_kernel(self) -> torch.Tensor:
+    def _generate_kernel(self) -> np.ndarray:
         """Generate gaussian kernel.
 
         Returns:
-            torch.Tensor: gaussian kernel.
+            np.ndarray: gaussian kernel.
         """
-        x_cord = torch.linspace(
+        x_cord = np.linspace(
             -1,
             1,
             self._radius * 2,
-            dtype=torch.float64,
-            device=DEVICE.get(),
         )
-        x_grid = x_cord.repeat(self._radius * 2).view(
-            self._radius * 2,
-            self._radius * 2,
+        x_grid = np.repeat(x_cord, self._radius * 2).reshape(
+            (self._radius * 2, self._radius * 2),
         )
-        y_grid = x_grid.t()
-        xy_grid = torch.stack([x_grid, y_grid], dim=-1)
+        y_grid = x_grid.transpose()
+        xy_grid = np.stack([x_grid, y_grid], axis=-1)
 
         # Calculate the 2-dimensional gaussian kernel which is
         # the product of two gaussian distributions for two different
         # variables (in this case called x and y)
-        gaussian_kernel = (1.0 / (self._sigma**2 * 2 * torch.pi)) * torch.exp(
-            -torch.sum((xy_grid) ** 2.0, dim=-1) / (2 * self._sigma**2),
+        kernel = (1.0 / (self._sigma**2 * 2 * np.pi)) * np.exp(
+            -np.sum((xy_grid) ** 2.0, axis=-1) / (2 * self._sigma**2),
         )
         # Make sure sum of values in gaussian kernel equals 1.
-        return gaussian_kernel / torch.sum(gaussian_kernel)
+        return kernel / np.sum(kernel)
 
     def _smooth(self, y: np.ndarray) -> np.ndarray:
         """Smooth coefficients using a gaussian kernel.
