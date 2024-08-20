@@ -80,7 +80,7 @@ class GaussianFilterBase(metaclass=ABCMeta):
         if isinstance(y, np.ndarray):
             return self._smooth(y)
         return torch.tensor(
-            self._smooth(y.numpy()),
+            self._smooth(y.cpu().numpy()),
             dtype=torch.float64,
             device=DEVICE.get(),
         )
