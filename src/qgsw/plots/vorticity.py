@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Self
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from typing_extensions import ParamSpec, Self
+from typing_extensions import ParamSpec
 
 from qgsw.plots.base.axes import (
     BaseAxes,
@@ -290,7 +290,7 @@ class SecondLayerVorticityAxes(
         )
 
 
-VorticityAxes = Union[SurfaceVorticityAxes, SecondLayerVorticityAxes]
+VorticityAxes = SurfaceVorticityAxes | SecondLayerVorticityAxes
 
 
 class VorticityFigure(BaseSingleFigure[VorticityAxes]):

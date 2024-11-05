@@ -5,11 +5,10 @@ from __future__ import annotations
 import urllib.request
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 import numpy as np
 import torch
-from typing_extensions import Self
 
 from qgsw import verbose
 from qgsw.configs.base import _Config, _DataConfig

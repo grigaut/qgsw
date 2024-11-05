@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 import numpy as np
-from typing_extensions import ParamSpec, Self
+from typing_extensions import ParamSpec
 
 from qgsw.plots.exceptions import (
     AxesInstantiationError,

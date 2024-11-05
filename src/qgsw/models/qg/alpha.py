@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import interpolate
-from typing_extensions import Self
 
 from qgsw.run_summary import RunSummary
 from qgsw.utils.gaussian_filtering import GaussianFilter1D

@@ -1,7 +1,8 @@
 """Specs utils."""
 
+from typing import Self
+
 import torch
-from typing_extensions import Self
 
 
 class Device:

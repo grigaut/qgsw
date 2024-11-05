@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -22,6 +22,7 @@ from qgsw.spatial.core.grid_conversion import cell_corners_to_cell_center
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane

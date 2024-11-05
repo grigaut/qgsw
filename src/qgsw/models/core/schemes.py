@@ -1,6 +1,6 @@
 """Schemes for Time-integration."""
 
-from typing import Callable
+from collections.abc import Callable
 
 from qgsw.models.variables import UVH
 
