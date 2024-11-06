@@ -59,31 +59,38 @@ def instantiate_model(
     Returns:
         Model: Model.
     """
-    match config.model.type:
-        case "SW" | "SWFilterBarotropicSpectral" | "SWFilterBarotropicExact":
-            model = _instantiate_sw(
-                config=config,
-                space_3d=space_3d,
-                perturbation=perturbation,
-                Ro=Ro,
-            )
-        case "QG":
-            model = _instantiate_qg(
-                config=config,
-                space_3d=space_3d,
-                perturbation=perturbation,
-                Ro=Ro,
-            )
-        case "QGCollinearSF" | "QGCollinearPV" | "QGSmoothCollinearSF":
-            model = _instantiate_collinear_qg(
-                config=config,
-                space_3d=space_3d,
-                perturbation=perturbation,
-                Ro=Ro,
-            )
-        case _:
-            msg = f"Unsupported model type: {config.model.type}"
-            raise UnrecognizedQGModelError(msg)
+    if config.model.type in [
+        "SW",
+        "SWFilterBarotropicSpectral",
+        "SWFilterBarotropicExact",
+    ]:
+        model = _instantiate_sw(
+            config=config,
+            space_3d=space_3d,
+            perturbation=perturbation,
+            Ro=Ro,
+        )
+    elif config.model.type == "QG":
+        model = _instantiate_qg(
+            config=config,
+            space_3d=space_3d,
+            perturbation=perturbation,
+            Ro=Ro,
+        )
+    elif config.model.type in [
+        "QGCollinearSF",
+        "QGCollinearPV",
+        "QGSmoothCollinearSF",
+    ]:
+        model = _instantiate_collinear_qg(
+            config=config,
+            space_3d=space_3d,
+            perturbation=perturbation,
+            Ro=Ro,
+        )
+    else:
+        msg = f"Unsupported model type: {config.model.type}"
+        raise UnrecognizedQGModelError(msg)
     model.slip_coef = config.physics.slip_coef
     model.bottom_drag_coef = config.physics.bottom_drag_coef
     if np.isnan(config.simulation.dt):
@@ -106,16 +113,15 @@ def _instantiate_sw(
     perturbation: Perturbation,
     Ro: float,  # noqa: N803
 ) -> SW:
-    match config.model.type:
-        case "SW":
-            model_class = SW
-        case "SWFilterBarotropicSpectral":
-            model_class = SWFilterBarotropicSpectral
-        case "SWFilterBarotropicExact":
-            model_class = SWFilterBarotropicExact
-        case _:
-            msg = f"Unrecognized model type: {config.model.type}"
-            raise ValueError(msg)
+    if config.model.type == "SW":
+        model_class = SW
+    elif config.model.type == "SWFilterBarotropicSpectral":
+        model_class = SWFilterBarotropicSpectral
+    elif config.model.type == "SWFilterBarotropicExact":
+        model_class = SWFilterBarotropicExact
+    else:
+        msg = f"Unrecognized model type: {config.model.type}"
+        raise ValueError(msg)
     model = model_class(
         space_3d=space_3d,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
@@ -204,18 +210,17 @@ def _instantiate_collinear_qg(
         config.physics.beta_plane.f0,
         Ro,
     )
-    match config.model.type:
-        case "QG":
-            model_class = QG
-        case "QGCollinearSF":
-            model_class = QGCollinearSF
-        case "QGCollinearPV":
-            model_class = QGCollinearPV
-        case "QGSmoothCollinearSF":
-            model_class = QGSmoothCollinearSF
-        case _:
-            msg = f"Unrecognized model type: {config.model.type}"
-            raise ValueError(msg)
+    if config.model.type == "QG":
+        model_class = QG
+    elif config.model.type == "QGCollinearSF":
+        model_class = QGCollinearSF
+    elif config.model.type == "QGCollinearPV":
+        model_class = QGCollinearPV
+    elif config.model.type == "QGSmoothCollinearSF":
+        model_class = QGSmoothCollinearSF
+    else:
+        msg = f"Unrecognized model type: {config.model.type}"
+        raise ValueError(msg)
     model = model_class(
         space_3d=space_3d,
         g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
