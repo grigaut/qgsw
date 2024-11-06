@@ -108,8 +108,8 @@ class SW(Model):
 
     @property
     def pv(self) -> torch.Tensor:
-        """Potenital Vorticity."""
-        msg = "Shallow Water Model don't have vorticity plots."
+        """Potential Vorticity."""
+        msg = "Shallow Water Models don't have vorticity plots."
         raise AttributeError(msg)
 
     def _compute_coriolis(self) -> None:
