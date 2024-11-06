@@ -9,7 +9,7 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.models.qg.instantiation import instantiate_model
+from qgsw.models.instantiation import instantiate_model
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.plots.vorticity import (

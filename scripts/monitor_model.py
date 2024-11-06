@@ -9,7 +9,7 @@ import torch
 from qgsw import verbose
 from qgsw.configs import Configuration
 from qgsw.forcing.wind import WindForcing
-from qgsw.models.qg.instantiation import instantiate_model
+from qgsw.models.instantiation import instantiate_model
 from qgsw.perturbations import Perturbation
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.utils import time_params

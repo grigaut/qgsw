@@ -16,7 +16,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
-from qgsw.models.sw import SW
+from qgsw.models.sw.core import SW
 from qgsw.models.variables import UVH
 from qgsw.spatial.core.grid_conversion import cell_corners_to_cell_center
 from qgsw.specs import DEVICE
