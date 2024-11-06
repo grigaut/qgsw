@@ -48,7 +48,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 pytz==2024.2
 PyYAML==6.0.2
--e git+https://github.com/grigaut/qgsw.git@4185b7cb49a016601ef66ef885c03c585759da0c#egg=qgsw
 ruff==0.7.2
 scikit-image==0.24.0
 scipy==1.14.1
