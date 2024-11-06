@@ -229,9 +229,7 @@ class HelmholtzNeumannSolver:
 
         # helmholtz dct-II
         self.helmholtz_dctII = (
-            compute_laplace_dctII(
-                nx, ny, dx, dy, {"dtype": dtype, "device": device}
-            )
+            compute_laplace_dctII(nx, ny, dx, dy, dtype=dtype, device=device)
             - lambd
         )
 

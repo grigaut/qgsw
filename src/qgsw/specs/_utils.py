@@ -39,6 +39,21 @@ class Device:
 
         self._device = torch.device(device)
 
+    def use_cpu(self) -> None:
+        """Set cpu as device."""
+        return self.set_manually("cpu")
+
+    def use_cuda(self) -> None:
+        """Set cuda as device.
+
+        Raises:
+            ValueError: If cuda is not available.
+        """
+        if not torch.cuda.is_available():
+            return self.set_manually("cuda")
+        msg = "CUDA not available."
+        raise ValueError(msg)
+
     def get(self) -> torch.device:
         """Get the device type.
 
