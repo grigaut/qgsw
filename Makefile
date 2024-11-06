@@ -9,10 +9,12 @@ else
 	BIN = ${VENV}/bin/
 endif
 VENV := .venv
+ENV_LOCAL := environment-local.yml
+ENV_G5000 := environment-g5000.yml
 ifeq (${ENVIRONMENT}, local)
-	ENVIRONMENT_FILE = environment-local.yml
+	ENVIRONMENT_FILE = ${ENV_LOCAL}
 else ifeq (${ENVIRONMENT}, grid5000)
-	ENVIRONMENT_FILE = environment-g5000.yml
+	ENVIRONMENT_FILE = ${ENV_G5000}
 endif
 # Binaries
 PYTHON:= ${BIN}/python
@@ -32,9 +34,6 @@ SCRIPTS := scripts
 PYPROJECT := pyproject.toml
 MAKEFILE := Makefile
 ALPHA_COEFFICIENTS := data/coefficients.npz
-
-tmp:
-	echo ${ENVIRONMENT_FILE}
 
 all:
 	@${MAKE} install-dev
@@ -65,7 +64,7 @@ g5k-export:
 	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
-	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT} ${REQUIREMENTS} ${ENVIRONMENT_FILE} ${ALPHA_COEFFICIENTS}
+	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT} ${REQUIREMENTS} ${ENV_G5000} ${ALPHA_COEFFICIENTS}
 	# Export to g5k
 	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
 	# Remove temp files
