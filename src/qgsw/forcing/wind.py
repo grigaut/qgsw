@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 import scipy.interpolate
 import torch
-from typing_extensions import Self
 
 from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.windstress import WindStressConfig

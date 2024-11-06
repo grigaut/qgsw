@@ -1,6 +1,7 @@
 """Wind forcing testing modules."""
 
 import torch
+
 from qgsw.forcing.wind import CosineZonalWindForcing
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.units._units import METERS

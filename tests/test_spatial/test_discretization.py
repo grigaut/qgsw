@@ -1,6 +1,7 @@
 """Space Discretization Testing Module."""
 
 import torch
+
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.units._units import METERS
 

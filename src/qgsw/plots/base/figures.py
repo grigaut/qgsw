@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Generic, Self
 
 import matplotlib.pyplot as plt
-from typing_extensions import ParamSpec, Self
+from typing_extensions import ParamSpec
 
 from qgsw.plots.base.axes import AxesManager
 

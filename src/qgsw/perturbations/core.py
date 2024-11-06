@@ -1,7 +1,8 @@
 """Main perturbation class."""
 
+from typing import Self
+
 import torch
-from typing_extensions import Self
 
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.perturbations.base import _Perturbation

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import torch
 import torch.nn.functional as F  # noqa: N812
-from typing_extensions import Self
 
 from qgsw.models.core import helmholtz
 from qgsw.perturbations.base import (

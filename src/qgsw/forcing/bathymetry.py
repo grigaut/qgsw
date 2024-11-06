@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 import scipy.interpolate
@@ -11,7 +11,6 @@ import scipy.ndimage
 import skimage.morphology
 import torch
 import torch.nn.functional as F  # noqa: N812
-from typing_extensions import Self
 
 from qgsw.data.loaders import BathyLoader
 from qgsw.spatial.units._units import DEGREES, Unit

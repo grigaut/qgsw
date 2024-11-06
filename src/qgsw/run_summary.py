@@ -2,10 +2,9 @@
 
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import toml
-from typing_extensions import Self
 
 from qgsw.configs import Configuration
 

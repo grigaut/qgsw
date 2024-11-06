@@ -36,7 +36,7 @@ clean:
 	@${CONDA_EXE} env remove --prefix ${VENV}
 
 ${VENV}:
-	@${CONDA_EXE} env create --file ${ENVIRONMENT_FILE} --prefix ${VENV}
+	@${CONDA_EXE} env create --file=${ENVIRONMENT_FILE} --prefix=${VENV}
 
 venv: ${VENV}
 

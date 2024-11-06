@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 import torch
-from typing_extensions import Self
 
 from qgsw.data.readers import Reader
 

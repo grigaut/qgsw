@@ -1,9 +1,9 @@
 """Base class for perturbations."""
 
 from abc import ABCMeta, abstractmethod
+from typing import Self
 
 import torch
-from typing_extensions import Self
 
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.spatial.core.grid import Grid2D, Grid3D

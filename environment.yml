@@ -1,10 +1,10 @@
-name: py39_QGSW
+name: py312_QGSW
 
 channels:
   - conda-forge
 
 dependencies:
-  - python=3.9.2
+  - python=3.12
   - pip
   - pip:
-    - --requirement requirements.txt
+    - --requirement requirements_.txt

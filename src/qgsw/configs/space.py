@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 
@@ -18,6 +18,9 @@ from qgsw.spatial.units._units import (
     RADIANS,
     Unit,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class SpaceConfig(_Config):

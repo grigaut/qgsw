@@ -5,6 +5,7 @@ from typing import NamedTuple
 
 import numpy as np
 import toml
+
 from qgsw.plots.vorticity import (
     SecondLayerVorticityAxes,
     SurfaceVorticityAxes,

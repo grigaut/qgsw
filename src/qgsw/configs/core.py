@@ -2,10 +2,9 @@
 
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import toml
-from typing_extensions import Self
 
 from qgsw.configs.bathymetry import BathyConfig
 from qgsw.configs.io import IOConfig

@@ -6,6 +6,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import toml
+
 from qgsw.run_summary import RunSummary
 
 colorscale_bwr = [

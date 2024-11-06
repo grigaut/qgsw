@@ -89,10 +89,9 @@ Horizontal Grids Relative Sizes:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import torch
-from typing_extensions import Self
 
 from qgsw.spatial.core.grid import Grid2D, Grid3D
 from qgsw.spatial.units._units import METERS

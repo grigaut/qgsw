@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, Self
 
 import torch
-from typing_extensions import Self
 
 from qgsw.spatial.core.coordinates import (
     Coordinates1D,
