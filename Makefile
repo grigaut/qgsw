@@ -3,12 +3,16 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 # Virtual Environment Management
-ENVIRONMENT_FILE := environment.yml
-VENV := .venv
 ifeq ($(OS), Windows_NT)
 	BIN = ${VENV}/Scripts/
 else
 	BIN = ${VENV}/bin/
+endif
+VENV := .venv
+ifeq (${ENVIRONMENT}, local)
+	ENVIRONMENT_FILE = environment-local.yml
+else ifeq (${ENVIRONMENT}, grid5000)
+	ENVIRONMENT_FILE = environment-g5000.yml
 endif
 # Binaries
 PYTHON:= ${BIN}/python
@@ -28,6 +32,9 @@ SCRIPTS := scripts
 PYPROJECT := pyproject.toml
 MAKEFILE := Makefile
 ALPHA_COEFFICIENTS := data/coefficients.npz
+
+tmp:
+	echo ${ENVIRONMENT_FILE}
 
 all:
 	@${MAKE} install-dev
