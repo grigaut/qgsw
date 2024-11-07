@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import torch
 

@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 79
-target-version = "py312"
+target-version = "py39"
 extend-exclude = ["*.ipynb"]
 lint.select = ["ALL"]
 lint.ignore = [
