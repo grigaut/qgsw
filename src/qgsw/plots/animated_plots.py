@@ -24,7 +24,6 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         self._datas = datas
         self._check_lengths()
         self._fig = self._create_figure()
-        self.figure.update_layout(self._create_layout())
         self._add_traces()
 
     @cached_property
@@ -33,7 +32,7 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         return len(self._datas)
 
     @cached_property
-    def n_steps(self) -> int:
+    def n_frames(self) -> int:
         """Number of steps."""
         return len(self._datas[0])
 
@@ -54,7 +53,7 @@ class BaseAnimatedPlots(ABC, Generic[T]):
 
     def _check_lengths(self) -> None:
         """Check than the data length are matching."""
-        if all(len(data) == self.n_steps for data in self._datas):
+        if all(len(data) == self.n_frames for data in self._datas):
             return
         msg = "Different lengths for datas."
         raise ValueError(msg)
@@ -73,17 +72,78 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         Returns:
             go.Layout: Layout.
         """
-        return {
-            "updatemenus": [
-                {
-                    "type": "buttons",
-                    "visible": True,
-                    "buttons": [
-                        {"label": "Play", "method": "animate", "args": [None]},
+        return go.Layout(
+            sliders=[self._create_slider()],
+            updatemenus=[
+                go.layout.Updatemenu(
+                    type="buttons",
+                    visible=True,
+                    buttons=[
+                        go.layout.updatemenu.Button(
+                            label="Play",
+                            method="animate",
+                            args=[
+                                None,
+                                {
+                                    "frame": {
+                                        "duration": 300,
+                                        "redraw": True,
+                                    },
+                                    "fromcurrent": True,
+                                    "transition": {
+                                        "duration": 500,
+                                        "easing": "quadratic-in-out",
+                                    },
+                                },
+                            ],
+                        ),
+                        go.layout.updatemenu.Button(
+                            label="Pause",
+                            method="animate",
+                            args=[
+                                None,
+                                {
+                                    "frame": {"duration": 0, "redraw": False},
+                                    "mode": "immediate",
+                                    "transition": {"duration": 0},
+                                },
+                            ],
+                        ),
                     ],
-                },
+                    direction="left",
+                    pad={"r": 10, "t": 87},
+                    showactive=False,
+                    x=0.1,
+                    xanchor="right",
+                    y=0,
+                    yanchor="top",
+                ),
             ],
-        }
+        )
+
+    def _create_slider(
+        self,
+    ) -> go.layout.Slider:
+        return go.layout.Slider(
+            active=0,
+            yanchor="top",
+            xanchor="left",
+            currentvalue=go.layout.slider.Currentvalue(
+                font={"size": 20},
+                prefix="Frame: ",
+                visible=True,
+                xanchor="right",
+            ),
+            transition=go.layout.slider.Transition(
+                duration=300,
+                easing="cubic-in-out",
+            ),
+            pad={"b": 10, "t": 50},
+            len=0.9,
+            x=0.1,
+            y=0,
+            steps=self._generate_steps(),
+        )
 
     def map_subplot_index_to_subplot_loc(
         self,
@@ -115,17 +175,27 @@ class BaseAnimatedPlots(ABC, Generic[T]):
     def _add_traces(self) -> None:
         """Initialize the traces."""
 
-    @abstractmethod
     def _generate_frames(self) -> list[go.Frame]:
         """Generate the frames.
 
         Returns:
             list[dict]: Frames list.
         """
+        return [self._compute_frame(frame) for frame in range(self.n_frames)]
+
+    def _generate_steps(self) -> list[go.layout.slider.Step]:
+        return [self._compute_step(frame) for frame in range(self.n_frames)]
+
+    @abstractmethod
+    def _compute_frame(self, frame_nb: int) -> go.Frame: ...
+
+    @abstractmethod
+    def _compute_step(self, frame_nb: int) -> go.Frame: ...
 
     def show(self) -> None:
         """Show the Figure."""
         self.figure.update(frames=self._generate_frames())
+        self.figure.update_layout(self._create_layout())
         self.figure.show()
 
 
@@ -153,45 +223,35 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
                 col=col,
             )
 
-    def _generate_frames(self) -> list[go.Frame]:
-        """Generate the frames.
+    def _compute_frame(self, frame_nb: int) -> go.Frame:
+        zmax = max(
+            np.max(np.abs(data)) for data in [d[frame_nb] for d in self._datas]
+        )
+        return go.Frame(
+            data=[
+                go.Heatmap(
+                    z=self._datas[subplot_index][frame_nb],
+                    colorscale=pco.diverging.RdBu_r,
+                    showscale=subplot_index == 0,
+                    zmin=-zmax,
+                    zmax=zmax,
+                )
+                for subplot_index in range(self.n_subplots)
+            ],
+            traces=list(range(self.n_subplots)),
+            name=frame_nb,
+        )
 
-        Returns:
-            list[go.Frame]: Frames list.
-        """
-        zbounds = [
-            self._compute_zbounds([d[i] for d in self._datas])
-            for i in range(self.n_steps)
-        ]
-        return [
-            go.Frame(
-                name=step,
-                data=[
-                    go.Heatmap(
-                        z=self._datas[subplot_index][step],
-                        colorscale=pco.diverging.RdBu_r,
-                        showscale=subplot_index == 0,
-                        zmin=zbounds[step]["min"],
-                        zmax=zbounds[step]["max"],
-                    )
-                    for subplot_index in range(self.n_subplots)
-                ],
-                traces=list(range(self.n_subplots)),
-            )
-            for step in range(self.n_steps)
-        ]
-
-    def _compute_zbounds(
-        self,
-        datas_at_step: list[np.ndarray],
-    ) -> tuple[int, int]:
-        """Compute colorbar bounds.
-
-        Args:
-            datas_at_step (list[np.ndarray]): List of data at given step.
-
-        Returns:
-            tuple[int, int]: Minimum and maximum value.
-        """
-        zmax = max(np.max(np.abs(data)) for data in datas_at_step)
-        return {"min": -zmax, "max": zmax}
+    def _compute_step(self, frame_nb: int) -> go.Frame:
+        return go.layout.slider.Step(
+            args=[
+                [frame_nb],
+                {
+                    "frame": {"duration": 300, "redraw": True},
+                    "mode": "immediate",
+                    "transition": {"duration": 300},
+                },
+            ],
+            label=frame_nb,
+            method="animate",
+        )
