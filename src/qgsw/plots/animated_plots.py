@@ -5,6 +5,7 @@ from functools import cached_property
 from typing import Generic, TypeVar
 
 import numpy as np
+import plotly.colors as pco
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -128,8 +129,15 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         self.figure.show()
 
 
-class AnimatedHeatmaps(BaseAnimatedPlots[np.ndarray]):
-    """Animated Plot."""
+class AnimatedHeatmaps(BaseAnimatedPlots):
+    """Animated Heatmap with shared colorscale."""
+
+    def __init__(
+        self,
+        datas: list[list[np.ndarray]],
+    ) -> None:
+        """Instantiate plot."""
+        super().__init__(datas)
 
     def _add_traces(self) -> None:
         """Initialize the traces."""
@@ -138,6 +146,8 @@ class AnimatedHeatmaps(BaseAnimatedPlots[np.ndarray]):
             self.figure.add_trace(
                 go.Heatmap(
                     z=self._datas[subplot_index][0],
+                    showscale=subplot_index == 0,
+                    colorscale=pco.diverging.RdBu_r,
                 ),
                 row=row,
                 col=col,
@@ -147,19 +157,41 @@ class AnimatedHeatmaps(BaseAnimatedPlots[np.ndarray]):
         """Generate the frames.
 
         Returns:
-            list[dict]: Frames list.
+            list[go.Frame]: Frames list.
         """
+        zbounds = [
+            self._compute_zbounds([d[i] for d in self._datas])
+            for i in range(self.n_steps)
+        ]
         return [
             go.Frame(
-                name=k,
+                name=step,
                 data=[
                     go.Heatmap(
-                        z=self._datas[i][k],
-                        coloraxis="coloraxis",
+                        z=self._datas[subplot_index][step],
+                        colorscale=pco.diverging.RdBu_r,
+                        showscale=subplot_index == 0,
+                        zmin=zbounds[step]["min"],
+                        zmax=zbounds[step]["max"],
                     )
-                    for i in range(self.n_subplots)
+                    for subplot_index in range(self.n_subplots)
                 ],
                 traces=list(range(self.n_subplots)),
             )
-            for k in range(self.n_steps)
+            for step in range(self.n_steps)
         ]
+
+    def _compute_zbounds(
+        self,
+        datas_at_step: list[np.ndarray],
+    ) -> tuple[int, int]:
+        """Compute colorbar bounds.
+
+        Args:
+            datas_at_step (list[np.ndarray]): List of data at given step.
+
+        Returns:
+            tuple[int, int]: Minimum and maximum value.
+        """
+        zmax = max(np.max(np.abs(data)) for data in datas_at_step)
+        return {"min": -zmax, "max": zmax}
