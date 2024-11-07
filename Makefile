@@ -3,12 +3,18 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 # Virtual Environment Management
-ENVIRONMENT_FILE := environment.yml
-VENV := .venv
 ifeq ($(OS), Windows_NT)
 	BIN = ${VENV}/Scripts/
 else
 	BIN = ${VENV}/bin/
+endif
+VENV := .venv
+ENV_LOCAL := environment-local.yml
+ENV_G5000 := environment-g5000.yml
+ifeq (${ENVIRONMENT}, local)
+	ENVIRONMENT_FILE = ${ENV_LOCAL}
+else ifeq (${ENVIRONMENT}, grid5000)
+	ENVIRONMENT_FILE = ${ENV_G5000}
 endif
 # Binaries
 PYTHON:= ${BIN}/python
@@ -58,7 +64,7 @@ g5k-export:
 	find ${SRC} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${SCRIPTS} -iname \*.py | zip -r ${tmp}/${ZIP_FILE} -@
 	find ${CONFIG} -iname \*.toml | zip -r ${tmp}/${ZIP_FILE} -@
-	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT} ${REQUIREMENTS} ${ENVIRONMENT_FILE} ${ALPHA_COEFFICIENTS}
+	zip -r ${tmp}/${ZIP_FILE} ${MAKEFILE} ${PYPROJECT} ${REQUIREMENTS} ${ENV_G5000} ${ALPHA_COEFFICIENTS}
 	# Export to g5k
 	scp ${tmp}/${ZIP_FILE} ${G5K_LOGIN}@rennes.g5k:~/
 	# Remove temp files

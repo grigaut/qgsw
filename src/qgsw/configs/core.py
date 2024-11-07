@@ -2,7 +2,12 @@
 
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import toml
 

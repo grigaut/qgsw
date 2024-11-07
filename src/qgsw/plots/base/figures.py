@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Generic, Self
+from typing import TYPE_CHECKING, Generic
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import matplotlib.pyplot as plt
 from typing_extensions import ParamSpec

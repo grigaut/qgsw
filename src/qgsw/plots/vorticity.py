@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Union
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -172,7 +177,7 @@ class VorticityAxesContent(BaseAxesContent):
         Returns:
             np.ndarray: Retrieved array (1,nl,nx,ny).
         """
-        return model.p.cpu().numpy()
+        return model.pv.cpu().numpy()
 
     def retrieve_array_from_file(self, filepath: Path) -> np.ndarray:
         """Retrieve relevant array from a given file.
@@ -290,7 +295,7 @@ class SecondLayerVorticityAxes(
         )
 
 
-VorticityAxes = SurfaceVorticityAxes | SecondLayerVorticityAxes
+VorticityAxes = Union[SurfaceVorticityAxes, SecondLayerVorticityAxes]
 
 
 class VorticityFigure(BaseSingleFigure[VorticityAxes]):
