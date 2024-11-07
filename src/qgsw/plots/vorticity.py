@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 try:
     from typing import Self
@@ -295,7 +295,7 @@ class SecondLayerVorticityAxes(
         )
 
 
-VorticityAxes = SurfaceVorticityAxes | SecondLayerVorticityAxes
+VorticityAxes = Union[SurfaceVorticityAxes, SecondLayerVorticityAxes]
 
 
 class VorticityFigure(BaseSingleFigure[VorticityAxes]):

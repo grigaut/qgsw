@@ -1,11 +1,11 @@
 """Base class for perturbations."""
 
+from abc import ABCMeta, abstractmethod
+
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
-
-from abc import ABCMeta, abstractmethod
 
 import torch
 
