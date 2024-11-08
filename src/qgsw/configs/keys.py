@@ -69,14 +69,6 @@ PERTURBATION = {
     "perturbation magnitude": "perturbation_magnitude",
 }
 
-PLOTS = {
-    "section": "plots",
-    "show": "show",
-    "save": "save",
-    "directory": "plots_directory",
-    "quantity": "quantity",
-}
-
 PHYSICS = {
     "section": "physics",
     "rho": "rho",

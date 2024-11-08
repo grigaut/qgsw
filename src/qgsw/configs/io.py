@@ -26,7 +26,6 @@ class IOConfig(_Config):
         """
         super().__init__(params)
         self._res = OutputsConfig.parse(params)
-        self._plots = PlotsConfig.parse(params)
 
     @property
     def name(self) -> str:
@@ -43,11 +42,6 @@ class IOConfig(_Config):
         """Results saving configuration."""
         return OutputsConfig.parse(self.params)
 
-    @cached_property
-    def plots(self) -> PlotsConfig:
-        """Plots configuration."""
-        return PlotsConfig.parse(self.params)
-
     @property
     def log_performance(self) -> bool:
         """Whether to log performances or not."""
@@ -62,53 +56,6 @@ class IOConfig(_Config):
         Returns:
             dict[str, Any]: IO configuration dictionnary.
         """
-        return super()._validate_params(params)
-
-
-class PlotsConfig(_Config):
-    """Plots Configuration."""
-
-    section: str = keys.PLOTS["section"]
-    _save: str = keys.PLOTS["save"]
-    _show: str = keys.PLOTS["show"]
-    _dir: str = keys.PLOTS["directory"]
-    _quantity: str = keys.PLOTS["quantity"]
-
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate plots configuration object.
-
-        Args:
-            params (dict[str, Any]): Configuration parameters.
-        """
-        super().__init__(params)
-
-    @property
-    def save(self) -> bool:
-        """Whether to save the plots or not."""
-        return self.params[self._save]
-
-    @property
-    def show(self) -> bool:
-        """Whether to show the plots or not."""
-        return self.params[self._show]
-
-    @property
-    def quantity(self) -> int:
-        """Number of plots."""
-        return self.params[self._quantity]
-
-    @property
-    def directory(self) -> Path:
-        """Directory in which to save the plots."""
-        directory = get_absolute_storage_path(Path(self.params[self._dir]))
-        if self.save and not directory.is_dir():
-            directory.mkdir()
-            gitignore = directory.joinpath(".gitignore")
-            with gitignore.open("w") as file:
-                file.write("*")
-        return directory
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         return super()._validate_params(params)
 
 

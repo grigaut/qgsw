@@ -1,8 +1,11 @@
 """Generate run summaries."""
 
+from functools import cached_property
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
+
+from qgsw.utils.sorting import sort_files
 
 try:
     from typing import Self
@@ -215,3 +218,41 @@ class RunSummary:
             Self: Summary.
         """
         return cls(run_params=configuration.params)
+
+
+class RunOutput:
+    """Run output."""
+
+    def __init__(self, folder: Path) -> None:
+        """Instantiate run output.
+
+        Args:
+            folder (Path): Run output folder.
+        """
+        self._folder = Path(folder)
+        self._summary = RunSummary.from_file(
+            self.folder.joinpath("_summary.toml"),
+        )
+        prefix = self.summary.configuration.model.prefix
+        files = list(self.folder.glob(f"{prefix}*.npz"))
+        self._steps, self._files = sort_files(files, prefix, ".npz")
+
+    @cached_property
+    def folder(self) -> Path:
+        """Run output folder."""
+        return Path(self._folder)
+
+    @property
+    def summary(self) -> RunSummary:
+        """Run summary."""
+        return self._summary
+
+    @property
+    def files(self) -> list[Path]:
+        """Sorted output files."""
+        return self._files
+
+    @property
+    def steps(self) -> list[int]:
+        """Sorted run steps."""
+        return self._steps

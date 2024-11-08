@@ -5,11 +5,6 @@ performance_log = false
 save_results = false
 quantity = 10
 directory = "results"
-[io.plots]
-show = true
-save = false
-quantity = 100
-plots_directory = "plots"
 
 [physics]
 rho = 1000

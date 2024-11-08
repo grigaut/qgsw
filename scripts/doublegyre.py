@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.append("../src")
 
 from qgsw.models import SW, QG
-from qgsw.models.sw.core import SWFilterBarotropic
 from qgsw.configs import Configuration
 from qgsw.physics import coriolis
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
