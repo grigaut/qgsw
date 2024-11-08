@@ -32,9 +32,6 @@ CONFIG_PATH = ROOT_PATH.joinpath(args.config)
 config = Configuration.from_file(CONFIG_PATH)
 summary = RunSummary.from_configuration(config)
 
-if config.io.plots.save:
-    save_file = config.io.plots.directory.joinpath("_summary.toml")
-    summary.to_file(save_file)
 if config.io.results.save:
     save_file = config.io.results.directory.joinpath("_summary.toml")
     summary.to_file(save_file)
@@ -92,14 +89,11 @@ if config.simulation.reference == "tau":
 else:
     t_end = config.simulation.duration
 
-freq_plot = int(t_end / config.io.plots.quantity / dt) + 1
 freq_save = int(t_end / config.io.results.quantity / dt) + 1
 freq_log = int(t_end / 100 / dt) + 1
 n_steps = int(t_end / dt) + 1
 
 summary.register_steps(t_end=t_end, dt=dt, n_steps=n_steps)
-
-plots_required = config.io.plots.save or config.io.plots.show
 
 verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 

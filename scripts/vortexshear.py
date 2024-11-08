@@ -15,12 +15,8 @@ from pathlib import Path
 from qgsw.forcing.wind import WindForcing
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.physics import compute_burger
-from qgsw.models import SW, QG, SWFilterBarotropic
+from qgsw.models import SW, QG
 from qgsw.specs import DEVICE
-from qgsw.plots.vorticity import (
-    SurfaceVorticityAxes,
-    VorticityComparisonFigure,
-)
 
 msg = (
     "Major Changes Added Since last use of this scripts."
