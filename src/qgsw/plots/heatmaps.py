@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -20,60 +21,86 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
 
     def __init__(
         self,
-        datas: list[list[np.ndarray]],
+        datas: list[list],
+        frame_labels: list[str] | None = None,
     ) -> None:
-        """Instantiate plot."""
-        super().__init__(datas)
+        """Instantiate the plot.
+
+        Args:
+            datas (list[list[T]]): Data list.
+            frame_labels (list[str] | None, optional): Frames names.
+            Defaults to None.
+        """
+        self._colorbar = self._create_colorbar()
+        super().__init__(datas, frame_labels)
+
+    @property
+    def colorbar(self) -> go.heatmap.ColorBar:
+        """Plot colorbar."""
+        return self._colorbar
+
+    def _create_colorbar(self) -> go.heatmap.ColorBar:
+        return go.heatmap.ColorBar(
+            exponentformat="e",
+            showexponent="all",
+            title={"text": "", "side": "right"},
+            thickness=50,
+        )
 
     def _add_traces(self) -> None:
         """Initialize the traces."""
+        zmax = max(np.max(np.abs(data)) for data in self._datas[0][1])
+
         for subplot_index in range(self.n_subplots):
             row, col = self.map_subplot_index_to_subplot_loc(subplot_index)
             self.figure.add_trace(
                 go.Heatmap(
-                    z=self._datas[subplot_index][0],
+                    z=self._datas[0][1][subplot_index],
                     showscale=subplot_index == 0,
                     colorscale=pco.diverging.RdBu_r,
+                    zmin=-zmax,
+                    zmax=zmax,
+                    colorbar=self.colorbar,
                 ),
                 row=row,
                 col=col,
             )
 
-    def _compute_frame(self, frame_nb: int) -> go.Frame:
-        zmax = max(
-            np.max(np.abs(data)) for data in [d[frame_nb] for d in self._datas]
-        )
+    def _compute_frame(self, frame_index: int) -> go.Frame:
+        frame_data = self._datas[frame_index][1]
+        zmax = max(np.max(np.abs(data)) for data in frame_data)
         return go.Frame(
             data=[
                 go.Heatmap(
-                    z=self._datas[subplot_index][frame_nb],
+                    z=frame_data[subplot_index],
                     colorscale=pco.diverging.RdBu_r,
                     showscale=subplot_index == 0,
+                    colorbar=self.colorbar,
                     zmin=-zmax,
                     zmax=zmax,
                 )
                 for subplot_index in range(self.n_subplots)
             ],
             traces=list(range(self.n_subplots)),
-            name=frame_nb,
+            name=frame_index,
         )
 
-    def _compute_step(self, frame_nb: int) -> go.Frame:
+    def _compute_step(self, frame_index: int) -> go.Frame:
         return go.layout.slider.Step(
             args=[
-                [frame_nb],
+                [frame_index],
                 {
                     "frame": {"duration": 300, "redraw": True},
                     "mode": "immediate",
                     "transition": {"duration": 300},
                 },
             ],
-            label=frame_nb,
+            label=self._datas[frame_index][0],
             method="animate",
         )
 
 
-class AnimatedHeatmapsFromRunFolders:
+class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
     """Animated heatmap from folders."""
 
     def __init__(
@@ -95,22 +122,41 @@ class AnimatedHeatmapsFromRunFolders:
         self._check_compatibilities()
         self._field = field
         self._layers = self._set_layers(layers)
-        self._plot = AnimatedHeatmaps(
+        super().__init__(
             [
                 [self._read_data(file, self._layers[k]) for file in run.files]
                 for k, run in enumerate(self._runs)
             ],
+            frame_labels=self._compute_frame_labels(),
         )
-
-    @property
-    def figure(self) -> go.Figure:
-        """Figure."""
-        return self._plot.figure
 
     @property
     def field(self) -> str:
         """Field to plot."""
         return self._field
+
+    def _create_slider_current_value(self) -> go.layout.slider.Currentvalue:
+        """Create Slider current value and set prefix to 'Time'.
+
+        Returns:
+            go.layout.slider.Currentvalue: Slider current value.
+        """
+        return super()._create_slider_current_value().update(prefix="Time: ")
+
+    def _create_colorbar(self) -> go.heatmap.ColorBar:
+        return (
+            super()
+            ._create_colorbar()
+            .update(title={"text": self.field, "side": "right"})
+        )
+
+    def _compute_frame_labels(self) -> list[str]:
+        dt = self._runs[0].summary.configuration.simulation.dt
+        steps = self._runs[0].steps
+        return [
+            f"{datetime.timedelta(seconds=step * dt).days} days"
+            for step in steps
+        ]
 
     def _check_compatibilities(self) -> None:
         """Ensure that timesteps are compatible.
@@ -124,10 +170,6 @@ class AnimatedHeatmapsFromRunFolders:
             return
         msg = "Incompatible timesteps."
         raise ValueError(msg)
-
-    def show(self) -> None:
-        """Show the Figure."""
-        return self._plot.show()
 
     def _set_layers(self, layers: int | list[int]) -> list[int]:
         """Set the layers.
