@@ -224,7 +224,7 @@ class RunOutput:
     """Run output."""
 
     def __init__(self, folder: Path) -> None:
-        """INstantiate run output.
+        """Instantiate run output.
 
         Args:
             folder (Path): Run output folder.
