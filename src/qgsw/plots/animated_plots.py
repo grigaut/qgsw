@@ -272,12 +272,12 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         self._set_figure()
         self.figure.show()
 
-    def save_frame(self, frame_index: int, output_file: Path) -> None:
+    def save_frame(self, frame_index: int, output_folder: Path) -> None:
         """Save a given frame.
 
         Args:
             frame_index (int): Frame index.
-            output_file (Path): Output to save in.
+            output_folder (Path): Folder to save output in.
         """
         self._set_figure()
         figure = self._create_figure()
@@ -291,4 +291,8 @@ class BaseAnimatedPlots(ABC, Generic[T]):
             rows=[row for row, _ in rows_cols],
             cols=[col for _, col in rows_cols],
         )
-        figure.write_image(output_file)
+        figure.write_image(
+            output_folder.joinpath(
+                f"frame_{self._frame_labels[frame_index]}.png",
+            ),
+        )

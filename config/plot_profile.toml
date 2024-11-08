@@ -1,0 +1,16 @@
+field = "pv"
+
+[[source]]
+folder = "output/g5k/double_gyre_3l_qg"
+layer = 0
+[[source]]
+folder = "output/g5k/double_gyre_3l_qg"
+layer = 1
+[[source]]
+folder = "output/g5k/double_gyre_3l_qg"
+layer = 2
+
+[snapshots]
+save = true
+folder = "tmp"
+saved_nb = 10
