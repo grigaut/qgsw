@@ -4,8 +4,6 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Generic, TypeVar
 
-import numpy as np
-import plotly.colors as pco
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -197,61 +195,3 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         self.figure.update(frames=self._generate_frames())
         self.figure.update_layout(self._create_layout())
         self.figure.show()
-
-
-class AnimatedHeatmaps(BaseAnimatedPlots):
-    """Animated Heatmap with shared colorscale."""
-
-    def __init__(
-        self,
-        datas: list[list[np.ndarray]],
-    ) -> None:
-        """Instantiate plot."""
-        super().__init__(datas)
-
-    def _add_traces(self) -> None:
-        """Initialize the traces."""
-        for subplot_index in range(self.n_subplots):
-            row, col = self.map_subplot_index_to_subplot_loc(subplot_index)
-            self.figure.add_trace(
-                go.Heatmap(
-                    z=self._datas[subplot_index][0],
-                    showscale=subplot_index == 0,
-                    colorscale=pco.diverging.RdBu_r,
-                ),
-                row=row,
-                col=col,
-            )
-
-    def _compute_frame(self, frame_nb: int) -> go.Frame:
-        zmax = max(
-            np.max(np.abs(data)) for data in [d[frame_nb] for d in self._datas]
-        )
-        return go.Frame(
-            data=[
-                go.Heatmap(
-                    z=self._datas[subplot_index][frame_nb],
-                    colorscale=pco.diverging.RdBu_r,
-                    showscale=subplot_index == 0,
-                    zmin=-zmax,
-                    zmax=zmax,
-                )
-                for subplot_index in range(self.n_subplots)
-            ],
-            traces=list(range(self.n_subplots)),
-            name=frame_nb,
-        )
-
-    def _compute_step(self, frame_nb: int) -> go.Frame:
-        return go.layout.slider.Step(
-            args=[
-                [frame_nb],
-                {
-                    "frame": {"duration": 300, "redraw": True},
-                    "mode": "immediate",
-                    "transition": {"duration": 300},
-                },
-            ],
-            label=frame_nb,
-            method="animate",
-        )
