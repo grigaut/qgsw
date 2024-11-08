@@ -12,11 +12,6 @@ from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
-from qgsw.plots.vorticity import (
-    SecondLayerVorticityAxes,
-    SurfaceVorticityAxes,
-    VorticityComparisonFigure,
-)
 from qgsw.run_summary import RunSummary
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.utils import time_params
@@ -109,29 +104,10 @@ plots_required = config.io.plots.save or config.io.plots.show
 verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 
-# Instantiate Figures
-qg_top_axes = SurfaceVorticityAxes.from_kwargs()
-qg_top_axes.set_title(r"$\omega_{QG-TOP}$")
-qg_inf_axes = SecondLayerVorticityAxes.from_kwargs()
-qg_inf_axes.set_title(r"$\omega_{QG-INF}$")
-plot = VorticityComparisonFigure(qg_top_axes, qg_inf_axes, common_cbar=False)
-
 summary.register_start()
 prefix = config.model.prefix
 # Start runs
 for n in range(n_steps + 1):
-    if plots_required and (n % freq_plot == 0 or n == n_steps):
-        plot.figure.suptitle(
-            f"Ro={Ro:.2f}, Bu={Bu:.2f} t={t/tau:.2f}$\\tau$",
-        )
-        plot.update_with_models(model, model)
-        if config.io.plots.show:
-            plot.show()
-        if config.io.plots.save:
-            output_dir = config.io.plots.directory
-            output_name = Path(f"{config.io.name_sc}_{n}.png")
-            plot.savefig(output_dir.joinpath(output_name))
-
     if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
         name = config.model.name_sc
