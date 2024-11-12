@@ -198,6 +198,11 @@ class BaseAnimatedPlots(ABC, Generic[T]):
     def _create_slider(
         self,
     ) -> go.layout.Slider:
+        """Create the slider.
+
+        Returns:
+            go.layout.Slider: Slider.
+        """
         return go.layout.Slider(
             active=0,
             yanchor="top",
@@ -250,13 +255,34 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         return [self._compute_frame(frame) for frame in range(self.n_frames)]
 
     def _generate_steps(self) -> list[go.layout.slider.Step]:
+        """Generate the steps.
+
+        Returns:
+            list[go.layout.slider.Step]: List of steps.
+        """
         return [self._compute_step(frame) for frame in range(self.n_frames)]
 
     @abstractmethod
-    def _compute_frame(self, frame_index: int) -> go.Frame: ...
+    def _compute_frame(self, frame_index: int) -> go.Frame:
+        """Compute a frame at a given index.
+
+        Args:
+            frame_index (int): Frame index.
+
+        Returns:
+            go.Frame: Frame
+        """
 
     @abstractmethod
-    def _compute_step(self, frame_index: int) -> go.Frame: ...
+    def _compute_step(self, frame_index: int) -> go.Frame:
+        """Compute a step at a given index.
+
+        Args:
+            frame_index (int): Frame index.
+
+        Returns:
+            go.Frame: Step.
+        """
 
     def _set_figure(self) -> None:
         """Set the figure traces."""

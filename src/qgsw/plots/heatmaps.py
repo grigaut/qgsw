@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import plotly.colors as pco
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from qgsw.plots.animated_plots import BaseAnimatedPlots
 from qgsw.run_summary import RunOutput
@@ -40,6 +41,11 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
         return self._colorbar
 
     def _create_colorbar(self) -> go.heatmap.ColorBar:
+        """Create the colorbar.
+
+        Returns:
+            go.heatmap.ColorBar: Colorbar.
+        """
         return go.heatmap.ColorBar(
             exponentformat="e",
             showexponent="all",
@@ -67,6 +73,14 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
             )
 
     def _compute_frame(self, frame_index: int) -> go.Frame:
+        """Compute a frame a at a given index.
+
+        Args:
+            frame_index (int): Frame index.
+
+        Returns:
+            go.Frame: Frame.
+        """
         frame_data = self._datas[frame_index][1]
         zmax = max(np.max(np.abs(data)) for data in frame_data)
         return go.Frame(
@@ -85,7 +99,15 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
             name=frame_index,
         )
 
-    def _compute_step(self, frame_index: int) -> go.Frame:
+    def _compute_step(self, frame_index: int) -> go.layout.slider.Step:
+        """Compute a step at a given index.
+
+        Args:
+            frame_index (int): Frame index.
+
+        Returns:
+            go.layout.slider.Step: Step..
+        """
         return go.layout.slider.Step(
             args=[
                 [frame_index],
@@ -135,6 +157,29 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         """Field to plot."""
         return self._field
 
+    def _make_titles(self) -> list[str]:
+        """Create subplots titles.
+
+        Returns:
+            list[str]: List of titles.
+        """
+        return [
+            f"{run.summary.configuration.model.name} - Layer {self._layers[i]}"
+            for i, run in enumerate(self._runs)
+        ]
+
+    def _create_figure(self) -> go.Figure:
+        """Create the figure.
+
+        Returns:
+            go.Figure: Figure.
+        """
+        return make_subplots(
+            rows=self.n_rows,
+            cols=self.n_cols,
+            subplot_titles=self._make_titles(),
+        )
+
     def _create_slider_current_value(self) -> go.layout.slider.Currentvalue:
         """Create Slider current value and set prefix to 'Time'.
 
@@ -144,6 +189,11 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         return super()._create_slider_current_value().update(prefix="Time: ")
 
     def _create_colorbar(self) -> go.heatmap.ColorBar:
+        """Create the colorbar.
+
+        Returns:
+            go.heatmap.ColorBar: Colorbar.
+        """
         return (
             super()
             ._create_colorbar()
@@ -151,6 +201,11 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         )
 
     def _compute_frame_labels(self) -> list[str]:
+        """Compute the labels of the frames.
+
+        Returns:
+            list[str]: FRame labels list.
+        """
         dt = self._runs[0].summary.configuration.simulation.dt
         steps = self._runs[0].steps
         return [
