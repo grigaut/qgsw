@@ -1,9 +1,13 @@
 """Generate run summaries."""
 
+import datetime
+from collections.abc import Iterator
 from functools import cached_property
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
+
+import numpy as np
 
 from qgsw.utils.sorting import sort_files
 
@@ -220,6 +224,22 @@ class RunSummary:
         return cls(run_params=configuration.params)
 
 
+class OutputFile(NamedTuple):
+    """Output file wrapper."""
+
+    step: int
+    timestep: datetime.timedelta
+    path: Path
+
+    def read(self) -> np.ndarray:
+        """Read the file data.
+
+        Returns:
+            np.ndarray: Data.
+        """
+        return np.load(file=self.path)
+
+
 class RunOutput:
     """Run output."""
 
@@ -235,7 +255,14 @@ class RunOutput:
         )
         prefix = self.summary.configuration.model.prefix
         files = list(self.folder.glob(f"{prefix}*.npz"))
-        self._steps, self._files = sort_files(files, prefix, ".npz")
+        steps, files = sort_files(files, prefix, ".npz")
+        dt = self._summary.configuration.simulation.dt
+        timesteps = [datetime.timedelta(seconds=step * dt) for step in steps]
+
+        self._outputs = [
+            OutputFile(step=steps[i], timestep=timesteps[i], path=files[i])
+            for i in range(len(files))
+        ]
 
     @cached_property
     def folder(self) -> Path:
@@ -247,12 +274,42 @@ class RunOutput:
         """Run summary."""
         return self._summary
 
-    @property
-    def files(self) -> list[Path]:
-        """Sorted output files."""
-        return self._files
+    def files(self) -> Iterator[Path]:
+        """Sorted list of files.
 
-    @property
-    def steps(self) -> list[int]:
-        """Sorted run steps."""
-        return self._steps
+        Returns:
+            Iterator[float]: Files iterator.
+        """
+        return (output.path for output in self.outputs())
+
+    def steps(self) -> Iterator[int]:
+        """Sorted list of steps.
+
+        Returns:
+            Iterator[float]: Steps iterator.
+        """
+        return (output.step for output in self.outputs())
+
+    def timesteps(self) -> Iterator[datetime.timedelta]:
+        """Sorted list of timesteps.
+
+        Returns:
+            Iterator[float]: Timesteps iterator.
+        """
+        return (output.timestep for output in self.outputs())
+
+    def outputs(self) -> Iterator[OutputFile]:
+        """Sorted outputs.
+
+        Returns:
+            Iterator[OutputFile]: Outputs iterator.
+        """
+        return iter(self._outputs)
+
+    def datas(self) -> Iterator[np.ndarray]:
+        """Sorted datas.
+
+        Returns:
+            Iterator[np.ndarray]: Datas iterators.
+        """
+        return (output.read() for output in self.outputs())

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -146,7 +145,7 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         self._layers = self._set_layers(layers)
         super().__init__(
             [
-                [self._read_data(file, self._layers[k]) for file in run.files]
+                self._read_data(run, self._layers[k])
                 for k, run in enumerate(self._runs)
             ],
             frame_labels=self._compute_frame_labels(),
@@ -206,12 +205,7 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         Returns:
             list[str]: FRame labels list.
         """
-        dt = self._runs[0].summary.configuration.simulation.dt
-        steps = self._runs[0].steps
-        return [
-            f"{datetime.timedelta(seconds=step * dt).days} days"
-            for step in steps
-        ]
+        return [f"{ts.days} days" for ts in self._runs[0].timesteps()]
 
     def _check_compatibilities(self) -> None:
         """Ensure that timesteps are compatible.
@@ -251,14 +245,14 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         msg = "`layers` parameter should be of type int or list[int]."
         raise ValueError(msg)
 
-    def _read_data(self, file: Path, layer: int) -> np.ndarray:
+    def _read_data(self, run: RunOutput, layer: int) -> list[np.ndarray]:
         """Read the data from a file.
 
         Args:
-            file (Path): File to read data from.
+            run (RunOutput): run output.
             layer (int): Layer to consider.
 
         Returns:
             np.ndarray: Data.
         """
-        return np.load(file)[self.field][0, layer].T
+        return [data[self.field][0, layer].T for data in run.datas()]
