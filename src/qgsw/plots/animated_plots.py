@@ -49,7 +49,9 @@ class BaseAnimatedPlots(ABC, Generic[T]):
             msg = "frame_labels must contain unique values."
         self._n_subplots = len(datas)
         # self._datas groups frames number and datas at the given step.
-        self._datas = list(zip(frame_labels, list(zip(*datas))))
+        self._datas: list[tuple[str, list[T]]] = list(
+            zip(frame_labels, list(zip(*datas))),
+        )
         self._frame_labels = frame_labels
         self._fig = self._create_figure()
 

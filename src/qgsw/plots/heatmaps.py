@@ -16,18 +16,18 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class AnimatedHeatmaps(BaseAnimatedPlots):
+class AnimatedHeatmaps(BaseAnimatedPlots[np.ndarray]):
     """Animated Heatmap with shared colorscale."""
 
     def __init__(
         self,
-        datas: list[list],
+        datas: list[list[np.ndarray]],
         frame_labels: list[str] | None = None,
     ) -> None:
         """Instantiate the plot.
 
         Args:
-            datas (list[list[T]]): Data list.
+            datas (list[list[np.ndarray]]): Data list.
             frame_labels (list[str] | None, optional): Frames names.
             Defaults to None.
         """
@@ -54,14 +54,14 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
 
     def _add_traces(self) -> None:
         """Initialize the traces."""
-        zmax = max(np.max(np.abs(data)) for data in self._datas[0][1])
-
+        zmax = self._compute_zmax(self._datas[0][1])
+        showscales = self._compute_showscales(self._datas[0][1])
         for subplot_index in range(self.n_subplots):
             row, col = self.map_subplot_index_to_subplot_loc(subplot_index)
             self.figure.add_trace(
                 go.Heatmap(
                     z=self._datas[0][1][subplot_index],
-                    showscale=subplot_index == 0,
+                    showscale=showscales[subplot_index],
                     colorscale=pco.diverging.RdBu_r,
                     zmin=-zmax,
                     zmax=zmax,
@@ -80,14 +80,15 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
         Returns:
             go.Frame: Frame.
         """
-        frame_data = self._datas[frame_index][1]
-        zmax = max(np.max(np.abs(data)) for data in frame_data)
+        frame_arrays = self._datas[frame_index][1]
+        zmax = self._compute_zmax(frame_arrays)
+        showscales = self._compute_showscales(frame_arrays)
         return go.Frame(
             data=[
                 go.Heatmap(
-                    z=frame_data[subplot_index],
+                    z=frame_arrays[subplot_index],
                     colorscale=pco.diverging.RdBu_r,
-                    showscale=subplot_index == 0,
+                    showscale=showscales[subplot_index],
                     colorbar=self.colorbar,
                     zmin=-zmax,
                     zmax=zmax,
@@ -119,6 +120,38 @@ class AnimatedHeatmaps(BaseAnimatedPlots):
             label=self._datas[frame_index][0],
             method="animate",
         )
+
+    def _compute_showscales(self, arrays: list[np.ndarray]) -> list[bool]:
+        """Compute which trace to show scale of.
+
+        Args:
+            arrays (list[np.ndarray]): List of data arrays.
+
+        Returns:
+            list[bool]: True on the index of scale to show, False elsewhere.
+        """
+        not_empty_arrays = [~np.isnan(array).all() for array in arrays]
+        find_first = np.cumsum(not_empty_arrays)
+        remove_trailing = np.cumsum(find_first)
+        return [bool(res) for res in (remove_trailing == 1)]
+
+    def _compute_zmax(self, arrays: list[np.ndarray]) -> float:
+        """Compute maxiumal value over al ist of arrays, without nans.
+
+        Args:
+            arrays (list[np.ndarray]): List of arrays to find the max of.
+
+        Returns:
+            float: Maximum values over the arrays, np.nan only if all array
+            are entirely made of nans.
+        """
+        not_empty_arrays = [
+            array for array in arrays if ~np.isnan(array).all()
+        ]
+        if not not_empty_arrays:
+            return np.nan
+        not_empty_vals = [arr[~np.isnan(arr)] for arr in not_empty_arrays]
+        return max(np.max(np.abs(arr)) for arr in not_empty_vals)
 
 
 class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
