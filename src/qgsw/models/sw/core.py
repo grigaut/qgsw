@@ -253,7 +253,7 @@ class SW(Model):
         # Sum h on v grid
         self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
 
-    def update(self, uvh: UVH) -> None:
+    def update(self, uvh: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
 
         Agrs:
