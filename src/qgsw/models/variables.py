@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, NamedTuple, Self
+from typing import TYPE_CHECKING, Generic, NamedTuple, Self, TypeVar
 
 import torch
 import torch.nn.functional as F  # noqa: N812
@@ -49,17 +49,14 @@ class DiagnosticVariable(ABC):
         return f"Diagnostic Variable: {self.__class__}"
 
     @abstractmethod
-    def _compute(self, uvh: UVH) -> torch.Tensor: ...
-
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            uvh (UVH): _description_
+            uvh (UVH): Prognostic variables
         """
-        return self._compute(uvh)
 
-    def bind(self, state: State) -> BoundDiagnosticVariable:
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a ggivent state.
 
         Args:
@@ -73,13 +70,16 @@ class DiagnosticVariable(ABC):
         return bound_var
 
 
-class BoundDiagnosticVariable(DiagnosticVariable):
+T = TypeVar("T", bound=DiagnosticVariable)
+
+
+class BoundDiagnosticVariable(DiagnosticVariable, Generic[T]):
     """Bound variable."""
 
     _up_to_date = False
 
-    def __init__(self, state: State, variable: DiagnosticVariable) -> None:
-        """INstantiate the bound variable.
+    def __init__(self, state: State, variable: T) -> None:
+        """Instantiate the bound variable.
 
         Args:
             state (State): State to bound to.
@@ -92,7 +92,7 @@ class BoundDiagnosticVariable(DiagnosticVariable):
         """Bound variable representation."""
         return "Bound " + self._var.__repr__()
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value if outdated.
 
         Args:
@@ -113,9 +113,7 @@ class BoundDiagnosticVariable(DiagnosticVariable):
         Returns:
             torch.Tensor: Variable value.
         """
-        return self.compute(
-            UVH(self._state.u, self._state.v, self._state.h),
-        )
+        return self.compute(self._state.uvh)
 
     def outdated(self) -> None:
         """Set the variable as outdated.
@@ -154,7 +152,15 @@ class Vorticity(DiagnosticVariable):
         self._w_vertical_bound = masks.w_vertical_bound
         self._w_horizontal_bound = masks.w_horizontal_bound
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Value
+        """
         u_ = F.pad(uvh.u, (1, 1, 0, 0))
         v_ = F.pad(uvh.v, (0, 0, 1, 1))
         dx_v = torch.diff(v_, dim=-2)
@@ -181,7 +187,15 @@ class PhysicalZonalVelocity(DiagnosticVariable):
         """
         self._dx = dx
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            UVH: Value
+        """
         return uvh.u / self._dx**2
 
 
@@ -196,7 +210,15 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
         """
         self._dy = dy
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Value
+        """
         return uvh.v / self._dy**2
 
 
@@ -211,7 +233,15 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
         """
         self._area = area
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Value
+        """
         return reverse_cumsum(uvh.h / self._area, dim=-3)
 
 
@@ -228,7 +258,15 @@ class Pressure(DiagnosticVariable):
         self._g_prime = g_prime
         self._eta = eta
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Value
+        """
         return torch.cumsum(self._g_prime * self._eta.compute(uvh), dim=-3)
 
     def bind(self, state: State) -> BoundDiagnosticVariable:
@@ -266,7 +304,7 @@ class KineticEnergy(DiagnosticVariable):
         self._V = V
         self._comp_ke = OptimizableFunction(finite_diff.comp_ke)
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the kinetic energy.
 
         Args:
@@ -304,44 +342,63 @@ class PotentialVorticity(DiagnosticVariable):
         self._omega = omega
         self._interp = OptimizableFunction(points_to_surfaces)
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Value
+        """
         omega = self._interp(self._omega.compute(uvh))
         return omega / self._area - self._f0 * uvh.h / self._h_ref
 
 
 class State:
-    """State."""
+    """State: wrapper for UVH state variables.
+
+    This wrapper links uvh variables to diagnostic variables.
+    Diagnostic variables can be bound to the state so that they are updated
+    only when the state has changed.
+    """
 
     def __init__(
         self,
-        u: torch.Tensor,
-        v: torch.Tensor,
-        h: torch.Tensor,
+        uvh: UVH,
     ) -> None:
         """Instantiate state.
 
         Args:
-            u (torch.Tensor): Zonal velocity.
-            v (torch.Tensor): Meridional velocity.
-            h (torch.Tensor): Layer thickness anomaly.
+            uvh (UVH): Prognostic variables.
         """
         self.unbind()
-        self.update(u, v, h)
+        self.uvh = uvh
+
+    @property
+    def uvh(self) -> UVH:
+        """Prognostic variables."""
+        return self._uvh
+
+    @uvh.setter
+    def uvh(self, uvh: UVH) -> None:
+        self._uvh = uvh
+        self._updated()
 
     @property
     def u(self) -> torch.Tensor:
         """Prognostic zonal velocity."""
-        return self._u
+        return self._uvh.u
 
     @property
     def v(self) -> torch.Tensor:
         """Prognostic meriodional velocity."""
-        return self._v
+        return self._uvh.v
 
     @property
     def h(self) -> torch.Tensor:
         """Prognostic layer thickness anomaly."""
-        return self._h
+        return self._uvh.h
 
     @property
     def diag_vars(self) -> list[BoundDiagnosticVariable]:
@@ -353,43 +410,20 @@ class State:
         u: torch.Tensor,
         v: torch.Tensor,
         h: torch.Tensor,
-    ) -> Self:
+    ) -> None:
         """Update prognostic variables.
 
         Args:
-            u (torch.Tensor): Prognostic zonal speed.
-            v (torch.Tensor): Prognostic meriodional speed.
-            h (torch.Tensor): Prognostic layer thickness anomly.
-
-        Returns:
-            Self: State.
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meriodional velocity.
+            h (torch.Tensor): Surface height anomaly.
         """
-        self._u = u
-        self._v = v
-        self._h = h
-        self._updated()
-        return self
+        self.uvh = UVH(u, v, h)
 
     def _updated(self) -> None:
         """Update diagnostic variables."""
         for var in self.diag_vars:
             var.outdated()
-
-    def __mul__(self, value: float) -> Self:
-        """Left mutltiplication."""
-        return self.update(self.u * value, self.v * value, self.h * value)
-
-    def __rmul__(self, value: float) -> Self:
-        """Right multiplication."""
-        return self.__mul__(value)
-
-    def add(self, du: float, dv: float, dh: float) -> Self:
-        """Addition."""
-        return self.update(self.u + du, self.v + dv, self.h + dh)
-
-    def sub(self, du: float, dv: float, dh: float) -> Self:
-        """Substraction."""
-        return self.add(-du, -dv, -dh)
 
     def add_bound_diagnostic_variable(
         self,
@@ -444,4 +478,23 @@ class State:
             dtype=dtype,
             device=device,
         )
-        return cls(u=u, v=v, h=h)
+        return cls.from_tensors(u, v, h)
+
+    @classmethod
+    def from_tensors(
+        cls,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+    ) -> Self:
+        """Instantiate the state from tensors.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meridional velocity.
+            h (torch.Tensor): Surface height anomaly.
+
+        Returns:
+            Self: State.
+        """
+        return cls(UVH(u, v, h))

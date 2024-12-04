@@ -7,7 +7,6 @@ import torch
 
 from qgsw import verbose
 from qgsw.models.exceptions import InvalidSavingFileError
-from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs._utils import Device
@@ -17,7 +16,9 @@ class ModelResultsRetriever:
     """Model Results Retriever."""
 
     space: SpaceDiscretization3D
-    uvh: UVH
+    u: torch.Tensor
+    v: torch.Tensor
+    h: torch.Tensor
     device: Device
     omega: torch.Tensor
     p: torch.Tensor
@@ -32,9 +33,9 @@ class ModelResultsRetriever:
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        u_phys = (self.uvh.u / self.space.dx).to(device=self.device.get())
-        v_phys = (self.uvh.v / self.space.dy).to(device=self.device.get())
-        h_phys = (self.uvh.h / self.space.area).to(device=self.device.get())
+        u_phys = (self.u / self.space.dx).to(device=self.device.get())
+        v_phys = (self.v / self.space.dy).to(device=self.device.get())
+        h_phys = (self.h / self.space.area).to(device=self.device.get())
 
         return (u_phys, v_phys, h_phys)
 
@@ -75,11 +76,11 @@ class ModelResultsRetriever:
         Returns:
             str: Summary of variables.
         """
-        hl_mean = (self.uvh.h / self.space.area).mean((-1, -2))
+        hl_mean = (self.h / self.space.area).mean((-1, -2))
         eta = self.eta
-        u = self.uvh.u / self.space.dx
-        v = self.uvh.v / self.space.dy
-        h = self.uvh.h / self.space.area
+        u = self.u / self.space.dx
+        v = self.v / self.space.dy
+        h = self.h / self.space.area
         device = self.device.get()
         with np.printoptions(precision=2):
             eta_surface = eta[:, 0].min().to(device=device).item()

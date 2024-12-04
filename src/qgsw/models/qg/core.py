@@ -308,23 +308,6 @@ class QG(Model):
         )
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
 
-    def set_physical_uvh(
-        self,
-        u_phys: torch.Tensor,  # noqa: ARG002
-        v_phys: torch.Tensor,  # noqa: ARG002
-        h_phys: torch.Tensor,  # noqa: ARG002
-    ) -> None:
-        """Set the physical u,v and h.
-
-        Args:
-            u_phys (torch.Tensor): useless, for compatibilty reasons only.
-            v_phys (torch.Tensor): useless, for compatibilty reasons only.
-            h_phys (torch.Tensor): useless, for compatibilty reasons only.
-        """
-        super().compute_time_derivatives()
-        uvh = self.project(self.uvh)
-        self._state.update(uvh.u, uvh.v, uvh.h)
-
     def set_uvh(
         self,
         u: torch.Tensor,

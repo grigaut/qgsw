@@ -7,13 +7,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
-from qgsw.models.exceptions import IncoherentWithMaskError
 from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
@@ -158,61 +156,6 @@ class SW(Model):
         dv[..., -1, :, :] += -self.bottom_drag_coef * uvh.v[..., -1, :, 1:-1]
         return du, dv
 
-    def set_physical_uvh(
-        self,
-        u_phys: torch.Tensor | np.ndarray,
-        v_phys: torch.Tensor | np.ndarray,
-        h_phys: torch.Tensor | np.ndarray,
-    ) -> None:
-        """Set state variables from physical variables.
-
-        As a reminder, the physical variables u_phys, v_phys, h_phys
-        are linked to the state variable u,v,h through:
-        - u = u_phys * dx
-        - v = v_phys * dy
-        - h = h_phys * dx * dy
-
-        Args:
-            u_phys (torch.Tensor|np.ndarray): Physical U.
-            v_phys (torch.Tensor|np.ndarray): Physical V.
-            h_phys (torch.Tensor|np.ndarray): Physical H.
-        """
-        u_ = (
-            torch.from_numpy(u_phys)
-            if isinstance(u_phys, np.ndarray)
-            else u_phys
-        )
-        v_ = (
-            torch.from_numpy(v_phys)
-            if isinstance(v_phys, np.ndarray)
-            else v_phys
-        )
-        h_ = (
-            torch.from_numpy(h_phys)
-            if isinstance(h_phys, np.ndarray)
-            else h_phys
-        )
-        u_ = u_.to(self.device.get())
-        v_ = u_.to(self.device.get())
-        h_ = u_.to(self.device.get())
-        if not (u_ * self.masks.u == u_).all():
-            msg = (
-                "Input velocity u incoherent with domain mask, "
-                "velocity must be zero out of domain."
-            )
-            raise IncoherentWithMaskError(msg)
-
-        if not (v_ * self.masks.v == v_).all():
-            msg = (
-                "Input velocity v incoherent with domain mask, "
-                "velocity must be zero out of domain."
-            )
-            raise IncoherentWithMaskError(msg)
-        u = u_.type(self.dtype) * self.masks.u * self.space.dx
-        v = v_.type(self.dtype) * self.masks.v * self.space.dy
-        h = h_.type(self.dtype) * self.masks.h * self.space.area
-        self._state.update(u, v, h)
-
     def update(self, uvh: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
 
@@ -300,7 +243,7 @@ class SW(Model):
         Returns:
             UVH: dt_u, dt_v, dt_h
         """
-        self._state.update(uvh.u, uvh.v, uvh.h)
+        self._state.uvh = uvh
         dt_h = self.advection_h(uvh.h)
         dt_u, dt_v = self.advection_momentum(uvh)
         return UVH(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
+import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
@@ -31,8 +32,6 @@ from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    import numpy as np
-
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
     from qgsw.specs._utils import Device
@@ -127,7 +126,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     @property
     def uvh(self) -> UVH:
         """UVH."""
-        return UVH(self.u, self.v, self.h)
+        return self._state.uvh
 
     @property
     def u(self) -> torch.Tensor:
@@ -273,7 +272,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         self._V = V.bind(state)
         self._k_energy = k_energy.bind(state)
 
-    @abstractmethod
     def set_physical_uvh(
         self,
         u_phys: torch.Tensor | np.ndarray,
@@ -282,11 +280,37 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     ) -> None:
         """Set state variables from physical variables.
 
+        As a reminder, the physical variables u_phys, v_phys, h_phys
+        are linked to the state variable u,v,h through:
+        - u = u_phys * dx
+        - v = v_phys * dy
+        - h = h_phys * dx * dy
+
         Args:
             u_phys (torch.Tensor|np.ndarray): Physical U.
             v_phys (torch.Tensor|np.ndarray): Physical V.
             h_phys (torch.Tensor|np.ndarray): Physical H.
         """
+        u_ = (
+            torch.from_numpy(u_phys)
+            if isinstance(u_phys, np.ndarray)
+            else u_phys
+        )
+        v_ = (
+            torch.from_numpy(v_phys)
+            if isinstance(v_phys, np.ndarray)
+            else v_phys
+        )
+        h_ = (
+            torch.from_numpy(h_phys)
+            if isinstance(h_phys, np.ndarray)
+            else h_phys
+        )
+        self.set_uvh(
+            u_ * self.space.dx,
+            v_ * self.space.dy,
+            h_ * self.space.area,
+        )
 
     def set_uvh(
         self,
@@ -354,5 +378,4 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        uvh = self.update(self.uvh)
-        self._state.update(uvh.u, uvh.v, uvh.h)
+        self._state.uvh = self.update(self._state.uvh)
