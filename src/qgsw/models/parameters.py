@@ -13,13 +13,14 @@ from qgsw.models.exceptions import InvalidModelParameterError
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.specs._utils import Device
 
 
 class ModelParamChecker:
     """Model Parameters."""
 
     dtype: torch.dtype
-    device: str
+    device: Device
     _n_ens: int = 1
     _masks: Masks = None
     _dt: float
@@ -175,7 +176,7 @@ class ModelParamChecker:
         if (slip_coefficient < 0) or (slip_coefficient > 1):
             msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
             raise InvalidModelParameterError(msg)
-        self._clip_coef = slip_coefficient
+        self._slip_coef = slip_coefficient
 
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set th ebottom drag coefficient.

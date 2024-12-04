@@ -5,44 +5,36 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
+import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.models.core import finite_diff, flux
+from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.exceptions import (
     IncoherentWithMaskError,
 )
 from qgsw.models.io import ModelResultsRetriever
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.variables import UVH
-from qgsw.spatial.core import grid_conversion
+from qgsw.models.variables import (
+    UVH,
+    KineticEnergy,
+    PhysicalMeridionalVelocity,
+    PhysicalZonalVelocity,
+    Pressure,
+    State,
+    SurfaceHeightAnomaly,
+    Vorticity,
+)
+from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    import numpy as np
-
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
     from qgsw.specs._utils import Device
-
-
-def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
-    """Pytorch cumsum in the reverse order.
-
-    Example:
-    reverse_cumsum(torch.arange(1,4), dim=-1)
-    >>> tensor([6, 5, 3])
-
-    Args:
-        x (torch.Tensor): Tensor.
-        dim (int): Dimension to perform reverse cumsum on.
-
-    Returns:
-        torch.Tensor: Result
-    """
-    return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
 
 
 class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
@@ -83,16 +75,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     _taux: torch.Tensor | float = 0.0
     _tauy: torch.Tensor | float = 0.0
 
-    omega: torch.Tensor
-    eta: torch.Tensor
-    U: torch.Tensor
-    V: torch.Tensor
-    pv: torch.Tensor
-    V_m: torch.Tensor
-    U_m: torch.Tensor
-    h_tot_ugrid: torch.Tensor
-    h_tot_vgrid: torch.Tensor
-
     def __init__(
         self,
         *,
@@ -123,29 +105,79 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         )
         ModelResultsRetriever.__init__(self)
         self._compute_coriolis()
-        ## Topography and Ref values
+        ##Topography and Ref values
         self._set_ref_variables()
 
+        # initialize state
+        self._state = State.steady(
+            n_ens=self.n_ens,
+            nl=self.space.nl,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
         # initialize variables
-        self.uvh = self._initialize_vars()
+        self._create_diagnostic_vars(self._state)
 
         self._set_utils(optimize)
         self._set_fluxes(optimize)
 
     @property
+    def uvh(self) -> UVH:
+        """UVH."""
+        return self._state.uvh
+
+    @property
     def u(self) -> torch.Tensor:
         """State Variable u: Zonal Speed."""
-        return self.uvh.u
+        return self._state.u
 
     @property
     def v(self) -> torch.Tensor:
         """State Variable v: Meridional Speed."""
-        return self.uvh.v
+        return self._state.v
 
     @property
     def h(self) -> torch.Tensor:
         """State Variable h: Layers Thickness."""
-        return self.uvh.h
+        return self._state.h
+
+    @property
+    def omega(self) -> torch.Tensor:
+        """Vorticity."""
+        return self._omega.get()
+
+    @property
+    def eta(self) -> torch.Tensor:
+        """Surface height anomaly."""
+        return self._eta.get()
+
+    @property
+    def p(self) -> torch.Tensor:
+        """Pressure."""
+        return self._p.get()
+
+    @property
+    def U(self) -> torch.Tensor:  # noqa: N802
+        """Physical zonal velocity."""
+        return self._U.get()
+
+    @property
+    def V(self) -> torch.Tensor:  # noqa: N802
+        """Physical meriodional velocity."""
+        return self._V.get()
+
+    @property
+    def k_energy(self) -> torch.Tensor:
+        """Physical meriodional velocity."""
+        return self._k_energy.get()
+
+    @ModelParamChecker.slip_coef.setter
+    def slip_coef(self, slip_coef: float) -> None:
+        """Timestep setter."""
+        ModelParamChecker.slip_coef.fset(self, slip_coef)
+        self._create_diagnostic_vars(self._state)
 
     def _compute_coriolis(
         self,
@@ -209,14 +241,12 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         """
         if optimize:
             self.comp_ke = OptimizableFunction(finite_diff.comp_ke)
-            self.cell_corners_to_cell_centers = OptimizableFunction(
-                grid_conversion.cell_corners_to_cell_center,
+            self.points_to_surfaces = OptimizableFunction(
+                convert.points_to_surfaces,
             )
         else:
             self.comp_ke = finite_diff.comp_ke
-            self.cell_corners_to_cell_centers = (
-                grid_conversion.cell_corners_to_cell_center
-            )
+            self.points_to_surfaces = convert.points_to_surfaces
 
     def _set_fluxes(self, optimize: bool) -> None:  # noqa: FBT001
         """Set fluxes.
@@ -226,92 +256,22 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         """
         self._fluxes = flux.Fluxes(masks=self.masks, optimize=optimize)
 
-    def _initialize_vars(self) -> UVH:
-        """Initialize variables.
+    def _create_diagnostic_vars(self, state: State) -> None:
+        state.unbind()
+        omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
+        eta = SurfaceHeightAnomaly(area=self.space.area)
+        p = Pressure(g_prime=self.g_prime, eta=eta)
+        U = PhysicalZonalVelocity(dx=self.space.dx)  # noqa: N806
+        V = PhysicalMeridionalVelocity(dy=self.space.dy)  # noqa: N806
+        k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
-        Create Empty variables.
+        self._omega = omega.bind(state)
+        self._eta = eta.bind(state)
+        self._p = p.bind(state)
+        self._U = U.bind(state)
+        self._V = V.bind(state)
+        self._k_energy = k_energy.bind(state)
 
-        Concerned variables:
-        - u
-        - v
-        - h
-        """
-        base_shape = (self.n_ens, self.space.nl)
-        h = torch.zeros(
-            (*base_shape, self.space.nx, self.space.ny),
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
-        u = torch.zeros(
-            (*base_shape, self.space.nx + 1, self.space.ny),
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
-        v = torch.zeros(
-            (*base_shape, self.space.nx, self.space.ny + 1),
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
-        return UVH(u, v, h)
-
-    def compute_omega(self, uvh: UVH) -> torch.Tensor:
-        """Pad u, v using boundary conditions.
-
-        Possible boundary conditions: free-slip, partial free-slip, no-slip.
-
-        Args:
-            uvh (UVH): Prognostic variables.
-
-        Returns:
-            torch.Tensor: result
-        """
-        u_ = F.pad(uvh.u, (1, 1, 0, 0))
-        v_ = F.pad(uvh.v, (0, 0, 1, 1))
-        dx_v = torch.diff(v_, dim=-2)
-        dy_u = torch.diff(u_, dim=-1)
-        curl_uv = dx_v - dy_u
-        alpha = 2 * (1 - self.slip_coef)
-        omega: torch.Tensor = (
-            self.masks.w_valid * curl_uv
-            + self.masks.w_cornerout_bound * (1 - self.slip_coef) * curl_uv
-            + self.masks.w_vertical_bound * alpha * dx_v
-            - self.masks.w_horizontal_bound * alpha * dy_u
-        )
-        return omega
-
-    def compute_diagnostic_variables(self, uvh: UVH) -> None:
-        """Compute the model's diagnostic variables.
-
-        Args:
-            uvh (UVH): Prognostic variables.
-
-        Computed variables:
-        - Vorticity: omega
-        - Interface heights: eta
-        - Pressure: p
-        - Zonal velocity: U
-        - Meridional velocity: V
-        - Kinetic Energy: k_energy
-
-        Compute the result given the prognostic
-        variables u,v and h.
-        """
-        # Diagnostic: vorticity values
-        self.omega = self.compute_omega(uvh)
-        # Diagnostic: interface height : physical
-        self.eta = reverse_cumsum(uvh.h / self.space.area, dim=-3)
-        # Diagnostic: pressure values
-        self.p = torch.cumsum(self.g_prime * self.eta, dim=-3)
-        # Diagnostic: zonal velocity
-        self.U = uvh.u / self.space.dx**2
-        # Diagnostic: meridional velocity
-        self.V = uvh.v / self.space.dy**2
-        # Diagnostic: kinetic energy
-        self.k_energy = (
-            self.comp_ke(uvh.u, self.U, uvh.v, self.V) * self.masks.h
-        )
-
-    @abstractmethod
     def set_physical_uvh(
         self,
         u_phys: torch.Tensor | np.ndarray,
@@ -320,11 +280,37 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     ) -> None:
         """Set state variables from physical variables.
 
+        As a reminder, the physical variables u_phys, v_phys, h_phys
+        are linked to the state variable u,v,h through:
+        - u = u_phys * dx
+        - v = v_phys * dy
+        - h = h_phys * dx * dy
+
         Args:
             u_phys (torch.Tensor|np.ndarray): Physical U.
             v_phys (torch.Tensor|np.ndarray): Physical V.
             h_phys (torch.Tensor|np.ndarray): Physical H.
         """
+        u_ = (
+            torch.from_numpy(u_phys)
+            if isinstance(u_phys, np.ndarray)
+            else u_phys
+        )
+        v_ = (
+            torch.from_numpy(v_phys)
+            if isinstance(v_phys, np.ndarray)
+            else v_phys
+        )
+        h_ = (
+            torch.from_numpy(h_phys)
+            if isinstance(h_phys, np.ndarray)
+            else h_phys
+        )
+        self.set_uvh(
+            u_ * self.space.dx,
+            v_ * self.space.dy,
+            h_ * self.space.area,
+        )
 
     def set_uvh(
         self,
@@ -363,8 +349,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         u = u.type(self.dtype) * self.masks.u
         v = v.type(self.dtype) * self.masks.v
         h = h.type(self.dtype) * self.masks.h
-        self.uvh = UVH(u, v, h)
-        self.compute_diagnostic_variables(self.uvh)
+        self._state.update(u, v, h)
 
     @abstractmethod
     def compute_time_derivatives(
@@ -393,5 +378,4 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        self.uvh = self.update(self.uvh)
-        self.compute_diagnostic_variables(self.uvh)
+        self._state.uvh = self.update(self._state.uvh)
