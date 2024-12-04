@@ -16,7 +16,7 @@ from qgsw.models.core import finite_diff, schemes
 from qgsw.models.exceptions import IncoherentWithMaskError
 from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.core import grid_conversion
+from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 if TYPE_CHECKING:
@@ -115,9 +115,9 @@ class SW(Model):
         """Set Coriolis Related Grids."""
         super()._compute_coriolis()
         ## Coriolis grids
-        self.f_ugrid = grid_conversion.omega_to_u(self.f)
-        self.f_vgrid = grid_conversion.omega_to_v(self.f)
-        self.f_hgrid = grid_conversion.omega_to_h(self.f)
+        self.f_ugrid = convert.omega_to_u(self.f)
+        self.f_vgrid = convert.omega_to_v(self.f)
+        self.f_hgrid = convert.omega_to_h(self.f)
         self.fstar_ugrid = self.f_ugrid * self.space.area
         self.fstar_vgrid = self.f_vgrid * self.space.area
         self.fstar_hgrid = self.f_hgrid * self.space.area
@@ -136,8 +136,12 @@ class SW(Model):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing.
         """
-        h_ugrid = self.h_tot_ugrid / self.space.area
-        h_vgrid = self.h_tot_vgrid / self.space.area
+        # Sum h on u grid
+        h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
+        # Sum h on v grid
+        h_tot_vgrid = self.h_ref_vgrid + convert.h_to_v(self.h, self.masks.h)
+        h_ugrid = h_tot_ugrid / self.space.area
+        h_vgrid = h_tot_vgrid / self.space.area
         du_wind = self.taux / h_ugrid[..., 0, 1:-1, :] * self.space.dx
         dv_wind = self.tauy / h_vgrid[..., 0, :, 1:-1] * self.space.dy
         du[..., 0, :, :] += du_wind
@@ -217,41 +221,7 @@ class SW(Model):
         u = u_.type(self.dtype) * self.masks.u * self.space.dx
         v = v_.type(self.dtype) * self.masks.v * self.space.dy
         h = h_.type(self.dtype) * self.masks.h * self.space.area
-        self.uvh = UVH(u, v, h)
-        self.compute_diagnostic_variables(self.uvh)
-
-    def compute_diagnostic_variables(self, uvh: UVH) -> None:
-        """Compute the model's diagnostic variables.
-
-        Args:
-            uvh (UVH): Prognostic variables.
-
-        Computed variables:
-        - Vorticity: omega
-        - Interface heights: eta
-        - Pressure: p
-        - Zonal velocity: U
-        - Meridional velocity: V
-        - Kinetic Energy: k_energy
-
-        Compute the result given the prognostic
-        variables u,v and h.
-        """
-        super().compute_diagnostic_variables(uvh)
-        # Zonal velocity -> corresponds to the v grid
-        # Has no value on the boundary of the v grid
-        self.U_m = self.cell_corners_to_cell_centers(self.U)
-        # Meridional velocity -> corresponds to the u grid
-        # Has no value on the boundary of the u grid
-        self.V_m = self.cell_corners_to_cell_centers(self.V)
-        # Match u grid dimensions (1, nl, nx, ny)
-        self.h_ugrid = grid_conversion.h_to_u(uvh.h, self.masks.h)
-        # Match v grid dimension
-        self.h_vgrid = grid_conversion.h_to_v(uvh.h, self.masks.h)
-        # Sum h on u grid
-        self.h_tot_ugrid = self.h_ref_ugrid + self.h_ugrid
-        # Sum h on v grid
-        self.h_tot_vgrid = self.h_ref_vgrid + self.h_vgrid
+        self._state.update(u, v, h)
 
     def update(self, uvh: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
@@ -276,12 +246,19 @@ class SW(Model):
         Returns:
             tuple[torch.Tensor,torch.Tensor]: u, v advection (∂_t u, ∂_t v).
         """
-        # Vortex-force + Coriolis
-        omega_v_m = self._fluxes.w_y(self.omega[..., 1:-1, :], self.V_m)
-        omega_u_m = self._fluxes.w_x(self.omega[..., 1:-1], self.U_m)
+        # Zonal velocity -> corresponds to the v grid
+        # Has no value on the boundary of the v grid
+        U_m = self.points_to_surfaces(self.U)  # noqa: N806
+        # Meridional velocity -> corresponds to the u grid
+        # Has no value on the boundary of the u grid
+        V_m = self.points_to_surfaces(self.V)  # noqa: N806
 
-        dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * self.V_m
-        dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * self.U_m)
+        # Vortex-force + Coriolis
+        omega_v_m = self._fluxes.w_y(self.omega[..., 1:-1, :], V_m)
+        omega_u_m = self._fluxes.w_x(self.omega[..., 1:-1], U_m)
+
+        dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * V_m
+        dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * U_m)
 
         # grad pressure + k_energy
         ke_pressure = self.k_energy + self.p
@@ -333,7 +310,7 @@ class SW(Model):
         Returns:
             UVH: dt_u, dt_v, dt_h
         """
-        self.compute_diagnostic_variables(uvh)
+        self._state.update(uvh.u, uvh.v, uvh.h)
         dt_h = self.advection_h(uvh.h)
         dt_u, dt_v = self.advection_momentum(uvh)
         return UVH(

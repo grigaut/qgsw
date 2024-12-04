@@ -17,8 +17,8 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI_cmm,
 )
 from qgsw.models.sw.core import SW
-from qgsw.models.variables import UVH
-from qgsw.spatial.core.grid_conversion import cell_corners_to_cell_center
+from qgsw.models.variables import UVH, PotentialVorticity, State
+from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
@@ -76,7 +76,7 @@ def G(  # noqa: N802
     A: torch.Tensor,  # noqa: N803
     f0: float,
     p_i: torch.Tensor = None,
-    corner_to_center: Callable = cell_corners_to_cell_center,
+    corner_to_center: Callable = points_to_surfaces,
 ) -> UVH:
     """G operator.
 
@@ -89,7 +89,7 @@ def G(  # noqa: N802
         p_i (torch.Tensor, optional): Interpolated pressure
         ("middle of grid cell"). Defaults to None.
         corner_to_center (Callable, optional): Corner to center interpolation
-        function. Defaults to cell_corners_to_cell_center.
+        function. Defaults to points_to_surfaces.
 
     Returns:
         UVH: Resulting u v and h
@@ -142,6 +142,11 @@ class QG(Model):
         """Core Shallow Water Model."""
         return self._core
 
+    @property
+    def pv(self) -> torch.Tensor:
+        """Potential Vorticity."""
+        return self._pv.get()
+
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set the bottom drag coefficient.
 
@@ -186,6 +191,16 @@ class QG(Model):
         """
         self.sw.n_ens = n_ens
         return super()._set_n_ens(n_ens)
+
+    def _create_diagnostic_vars(self, state: State) -> None:
+        super()._create_diagnostic_vars(state)
+        pv = PotentialVorticity(
+            self._omega,
+            self.h_ref,
+            self.space.area,
+            self.beta_plane.f0,
+        )
+        self._pv = pv.bind(self._state)
 
     def compute_A(  # noqa: N802
         self,
@@ -288,7 +303,7 @@ class QG(Model):
             cst_wgrid + sol_wgrid * self.beta_plane.f0**2 * lambd
         )
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
-        self.homsol_hgrid = self.cell_corners_to_cell_centers(
+        self.homsol_hgrid = self.points_to_surfaces(
             self.homsol_wgrid,
         )
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
@@ -307,7 +322,8 @@ class QG(Model):
             h_phys (torch.Tensor): useless, for compatibilty reasons only.
         """
         super().compute_time_derivatives()
-        self.uvh = self.project(self.u, self.v, self.h)
+        uvh = self.project(self.uvh)
+        self._state.update(uvh.u, uvh.v, uvh.h)
 
     def set_uvh(
         self,
@@ -351,7 +367,7 @@ class QG(Model):
             self.A,
             self.beta_plane.f0,
             p_i,
-            self.cell_corners_to_cell_centers,
+            self.points_to_surfaces,
         )
 
     def QoG_inv(  # noqa: N802
@@ -397,7 +413,7 @@ class QG(Model):
             self.Cm2l,
             p_modes,
         )
-        p_qg_i = self.cell_corners_to_cell_centers(p_qg)
+        p_qg_i = self.points_to_surfaces(p_qg)
         return p_qg, p_qg_i
 
     def Q(  # noqa: N802
@@ -419,9 +435,7 @@ class QG(Model):
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.cell_corners_to_cell_centers(uvh.h) / H) * (
-            f0 / area
-        )
+        return (omega - f0 * self.points_to_surfaces(uvh.h) / H) * (f0 / area)
 
     def project(
         self,
@@ -475,28 +489,6 @@ class QG(Model):
             UVH: update prognostic variables.
         """
         return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
-
-    def compute_diagnostic_variables(self, uvh: UVH) -> None:
-        """Compute the model's diagnostic variables.
-
-        Args:
-            uvh (UVH): Prognostic variables.
-
-        Computed variables:
-        - Vorticity: omega
-        - Interface heights: eta
-        - Pressure: p
-        - Zonal velocity: U
-        - Meridional velocity: V
-        - Kinetic Energy: k_energy
-
-        Compute the result given the prognostic
-        variables u,v and h.
-        """
-        super().compute_diagnostic_variables(uvh)
-        omega = self.cell_corners_to_cell_centers(self.omega)
-        h_ratio = self.h / self.h_ref
-        self.pv = omega / self.space.area - self.beta_plane.f0 * h_ratio
 
     def save_uvhwp(self, output_file: Path) -> None:
         """Save uvh, vorticity and pressure values.

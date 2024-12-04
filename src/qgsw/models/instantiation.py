@@ -102,7 +102,6 @@ def instantiate_model(
         )
     else:
         model.dt = config.simulation.dt
-    model.compute_diagnostic_variables(model.uvh)
     model.compute_time_derivatives(model.uvh)
     return model
 
