@@ -13,13 +13,14 @@ from qgsw.models.exceptions import InvalidModelParameterError
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.specs._utils import Device
 
 
 class ModelParamChecker:
     """Model Parameters."""
 
     dtype: torch.dtype
-    device: str
+    device: Device
     _n_ens: int = 1
     _masks: Masks = None
     _dt: float
