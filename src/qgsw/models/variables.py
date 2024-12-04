@@ -9,28 +9,12 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.models.core import finite_diff
+from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from qgsw.masks import Masks
-
-
-def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
-    """Pytorch cumsum in the reverse order.
-
-    Example:
-    reverse_cumsum(torch.arange(1,4), dim=-1)
-    >>> tensor([6, 5, 3])
-
-    Args:
-        x (torch.Tensor): Tensor.
-        dim (int): Dimension to perform reverse cumsum on.
-
-    Returns:
-        torch.Tensor: Result
-    """
-    return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
 
 
 class UVH(NamedTuple):

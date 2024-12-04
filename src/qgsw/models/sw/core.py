@@ -24,16 +24,6 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
-def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
-    """Pytorch cumsum in the reverse order.
-
-    Example:
-    reverse_cumsum(torch.arange(1,4), dim=-1)
-    >>> tensor([6, 5, 3])
-    """
-    return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
-
-
 def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     """Inverse of reverse cumsum function.
 

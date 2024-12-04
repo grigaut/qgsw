@@ -47,3 +47,20 @@ def div_nofluxbc(flux_x: torch.Tensor, flux_y: torch.Tensor) -> torch.Tensor:
     return torch.diff(F.pad(flux_y, (1, 1)), dim=-1) + torch.diff(
         F.pad(flux_x, (0, 0, 1, 1)), dim=-2
     )
+
+
+def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
+    """Pytorch cumsum in the reverse order.
+
+    Example:
+    reverse_cumsum(torch.arange(1,4), dim=-1)
+    >>> tensor([6, 5, 3])
+
+    Args:
+        x (torch.Tensor): Tensor.
+        dim (int): Dimension to perform reverse cumsum on.
+
+    Returns:
+        torch.Tensor: Result
+    """
+    return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)

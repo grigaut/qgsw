@@ -10,6 +10,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.models.core import finite_diff, flux
+from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.exceptions import (
     IncoherentWithMaskError,
@@ -35,23 +36,6 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
     from qgsw.specs._utils import Device
-
-
-def reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
-    """Pytorch cumsum in the reverse order.
-
-    Example:
-    reverse_cumsum(torch.arange(1,4), dim=-1)
-    >>> tensor([6, 5, 3])
-
-    Args:
-        x (torch.Tensor): Tensor.
-        dim (int): Dimension to perform reverse cumsum on.
-
-    Returns:
-        torch.Tensor: Result
-    """
-    return x + torch.sum(x, dim=dim, keepdim=True) - torch.cumsum(x, dim=dim)
 
 
 class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
