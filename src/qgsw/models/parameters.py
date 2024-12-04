@@ -175,7 +175,7 @@ class ModelParamChecker:
         if (slip_coefficient < 0) or (slip_coefficient > 1):
             msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
             raise InvalidModelParameterError(msg)
-        self._clip_coef = slip_coefficient
+        self._slip_coef = slip_coefficient
 
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set th ebottom drag coefficient.
