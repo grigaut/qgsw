@@ -16,10 +16,18 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
+from qgsw.models.qg.stretching_matrix import (
+    compute_A,
+    compute_layers_to_mode_decomposition,
+)
 from qgsw.models.sw.core import SW
 from qgsw.models.variables import UVH, PotentialVorticity, State
+from qgsw.models.variables.energetics import (
+    TotalModalAvailablePotentialEnergy,
+    TotalModalEnergy,
+    TotalModalKineticEnergy,
+)
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -27,46 +35,6 @@ if TYPE_CHECKING:
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
-
-
-def compute_A(  # noqa: N802
-    H: torch.Tensor,  # noqa: N803
-    g_prime: torch.Tensor,
-    dtype: torch.dtype,
-    device: str = DEVICE.get(),
-) -> torch.Tensor:
-    """Compute the stretching operator matrix A.
-
-    Args:
-        H (torch.Tensor): Layers reference height.
-        g_prime (torch.Tensor): Reduced gravity values.
-        dtype (torch.dtype): Data type
-        device (str, optional): Device type. Defaults to DEVICE.
-
-    Returns:
-        torch.Tensor: Streching operator matrix
-    """
-    nl = H.shape[0]
-    if nl == 1:
-        return torch.tensor(
-            [[1.0 / (H * g_prime)]],
-            dtype=dtype,
-            device=device,
-        )
-    A = torch.zeros(  # noqa: N806
-        (nl, nl),
-        dtype=dtype,
-        device=device,
-    )
-    A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
-    A[0, 1] = -1.0 / (H[0] * g_prime[1])
-    for i in range(1, nl - 1):
-        A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
-        A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
-        A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
-    A[-1, -1] = 1.0 / (H[nl - 1] * g_prime[nl - 1])
-    A[-1, -2] = -1.0 / (H[nl - 1] * g_prime[nl - 1])
-    return A
 
 
 def G(  # noqa: N802
@@ -125,6 +93,7 @@ class QG(Model):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self.A = self.compute_A(space_3d.h.xyh.h[:, 0, 0], g_prime[:, 0, 0])
         super().__init__(
             space_3d=space_3d,
             g_prime=g_prime,
@@ -132,8 +101,7 @@ class QG(Model):
             optimize=optimize,
         )
         self._core = self._init_core_model(optimize=optimize)
-        self.A = self.compute_A(space_3d.h.xyh.h[:, 0, 0], g_prime[:, 0, 0])
-        decomposition = self.compute_layers_to_mode_decomposition(self.A)
+        decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, self.lambd, self.Cl2m = decomposition
         self.set_helmholtz_solver(self.lambd)
 
@@ -146,6 +114,21 @@ class QG(Model):
     def pv(self) -> torch.Tensor:
         """Potential Vorticity."""
         return self._pv.get()
+
+    @property
+    def ke_hat(self) -> torch.Tensor:
+        """Modal kinetic energy, shape: (n_ens)."""
+        return self._ke_hat.get()
+
+    @property
+    def ape_hat(self) -> torch.Tensor:
+        """Modal available potential energy, shape: (n_ens)."""
+        return self._ape_hat.get()
+
+    @property
+    def total_energy(self) -> torch.Tensor:
+        """Total energy, shape: (n_ens)."""
+        return self._total_energy.get()
 
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set the bottom drag coefficient.
@@ -200,7 +183,14 @@ class QG(Model):
             self.space.area,
             self.beta_plane.f0,
         )
+        total_ke_hat = TotalModalKineticEnergy(self.A, self._p)
+        total_ape_hat = TotalModalAvailablePotentialEnergy(self.A, self._p)
+        total_energy = TotalModalEnergy(total_ke_hat, total_ape_hat)
+
         self._pv = pv.bind(self._state)
+        self._ke_hat = total_ke_hat.bind(self._state)
+        self._ape_hat = total_ape_hat.bind(self._state)
+        self._total_energy = total_energy.bind(self._state)
 
     def compute_A(  # noqa: N802
         self,
@@ -222,32 +212,6 @@ class QG(Model):
             dtype=self.dtype,
             device=self.device.get(),
         )
-
-    @staticmethod
-    def compute_layers_to_mode_decomposition(
-        A: torch.Tensor,  # noqa: N803
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Compute Layers to mode decomposition.
-
-        A = Cm2l @ Λ @ Cl2m
-
-        Args:
-            A (torch.Tensor): Stretching Operator
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Cm2l, Λ, Cl2m
-        """
-        # layer-to-mode and mode-to-layer matrices
-        lambd_r, R = torch.linalg.eig(A)  # noqa: N806
-        _, L = torch.linalg.eig(A.T)  # noqa: N806
-        lambd: torch.Tensor = lambd_r.real.reshape((1, A.shape[0], 1, 1))
-        R, L = R.real, L.real  # noqa: N806
-        # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
-        # layer to mode: pseudo inverse of R
-        Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T  # noqa: N806
-        # mode to layer
-        Cm2l = R  # noqa: N806
-        return Cm2l, lambd, Cl2m
 
     def set_helmholtz_solver(self, lambd: torch.Tensor) -> None:
         """Set the Helmholtz Solver.

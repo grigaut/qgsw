@@ -14,8 +14,9 @@ from qgsw.models.qg.collinear_sublayer import (
     QGSmoothCollinearSF,
     _QGCollinearSublayer,
 )
-from qgsw.models.qg.core import QG, G, compute_A
+from qgsw.models.qg.core import QG, G
 from qgsw.models.qg.exceptions import UnrecognizedQGModelError
+from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
 from qgsw.models.sw.filtering import (
     SWFilterBarotropicExact,

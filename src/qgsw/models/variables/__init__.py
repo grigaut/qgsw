@@ -9,7 +9,13 @@ from qgsw.models.variables.dynamics import (
     SurfaceHeightAnomaly,
     Vorticity,
 )
-from qgsw.models.variables.energetics import KineticEnergy
+from qgsw.models.variables.energetics import (
+    KineticEnergy,
+    TotalKineticEnergy,
+    TotalModalAvailablePotentialEnergy,
+    TotalModalEnergy,
+    TotalModalKineticEnergy,
+)
 
 __all__ = [
     "PhysicalMeridionalVelocity",
@@ -19,6 +25,10 @@ __all__ = [
     "KineticEnergy",
     "State",
     "SurfaceHeightAnomaly",
+    "TotalKineticEnergy",
+    "TotalModalAvailablePotentialEnergy",
+    "TotalModalEnergy",
+    "TotalModalKineticEnergy",
     "UVH",
     "Vorticity",
 ]

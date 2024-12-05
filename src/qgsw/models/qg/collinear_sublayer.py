@@ -10,6 +10,9 @@ from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
 from qgsw.models.qg.core import QG
+from qgsw.models.qg.stretching_matrix import (
+    compute_layers_to_mode_decomposition,
+)
 from qgsw.models.sw.core import SW
 from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -169,9 +172,10 @@ class QGCollinearSF(_QGCollinearSublayer):
     def _update_A(self) -> None:  # noqa: N802
         """Update the stretching operator matrix."""
         self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
-        decomposition = self.compute_layers_to_mode_decomposition(self.A)
+        decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, self.lambd, self.Cl2m = decomposition
         self.set_helmholtz_solver(self.lambd)
+        self._create_diagnostic_vars(self._state)
 
     def compute_A(  # noqa: N802
         self,
@@ -234,7 +238,7 @@ class QGCollinearPV(_QGCollinearSublayer):
         super().__init__(space_3d, g_prime, beta_plane, coefficient, optimize)
         # Two layers stretching operator for QoG inversion
         A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
-        decomposition = self.compute_layers_to_mode_decomposition(A_2l)
+        decomposition = compute_layers_to_mode_decomposition(A_2l)
         self.Cm2l, self.lambd, self.Cl2m = decomposition
         # Two layers helmholtz solver
         self.set_helmholtz_solver(self.lambd)
@@ -306,7 +310,7 @@ class QGSmoothCollinearSF(_QGCollinearSublayer):
         super().__init__(space_3d, g_prime, beta_plane, coefficient, optimize)
         # Two layers stretching operator for QoG inversion
         A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
-        decomposition = self.compute_layers_to_mode_decomposition(A_2l)
+        decomposition = compute_layers_to_mode_decomposition(A_2l)
         self.Cm2l, self.lambd, self.Cl2m = decomposition
         # Two layers helmholtz solver
         self.set_helmholtz_solver(self.lambd)
