@@ -108,7 +108,7 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
 
 
 class SurfaceHeightAnomaly(DiagnosticVariable):
-    """Surface heogh anomaly."""
+    """Surface heigh anomaly."""
 
     def __init__(self, area: float) -> None:
         """Instantiate variable.
@@ -155,7 +155,7 @@ class Pressure(DiagnosticVariable):
         return torch.cumsum(self._g_prime * self._eta.compute(uvh), dim=-3)
 
     def bind(self, state: State) -> BoundDiagnosticVariable:
-        """Bind the variable to a ggivent state.
+        """Bind the variable to a given state.
 
         Args:
             state (State): State to bind the variable to.

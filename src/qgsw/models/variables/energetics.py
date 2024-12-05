@@ -70,7 +70,7 @@ class TotalKineticEnergy(DiagnosticVariable):
             uvh (UVH): Prognostic variables.
 
         Returns:
-            float: Total kinetic energy, shape: (n_ens).
+            torch.Tensor: Total kinetic energy, shape: (n_ens).
         """
         return torch.sum(self._ke.compute(uvh), dim=[-1, -2, -3]).cpu().item()
 
