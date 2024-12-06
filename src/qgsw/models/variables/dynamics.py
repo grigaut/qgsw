@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
     """Physical zonal velocity."""
 
-    _unit = "s⁻¹"
+    _unit = "m.s⁻¹"
 
     def __init__(self, dx: float, dy: float) -> None:
         """Instantiate the variable.

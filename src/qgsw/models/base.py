@@ -159,13 +159,13 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
 
     @property
     def U(self) -> torch.Tensor:  # noqa: N802
-        """Physical zonal velocity."""
-        return self._U.get()
+        """Momentum on X.."""
+        return self._UV.get()[0]
 
     @property
     def V(self) -> torch.Tensor:  # noqa: N802
-        """Physical meriodional velocity."""
-        return self._V.get()
+        """Momentum on Y."""
+        return self._UV.get()[1]
 
     @property
     def k_energy(self) -> torch.Tensor:
