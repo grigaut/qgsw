@@ -278,7 +278,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         UV = Momentum(dx=self.space.dx, dy=self.space.dy)  # noqa: N806
         omega = Vorticity(UV=UV, masks=self.masks, slip_coef=self.slip_coef)
         omega_phys = PhysicalVorticity(omega, ds=self.space.area)
-        eta = SurfaceHeightAnomaly(area=self.space.area)
+        eta = SurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta=eta)
         k_energy = KineticEnergy(masks=self.masks, UV=UV)
 

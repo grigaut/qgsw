@@ -38,7 +38,7 @@ T = TypeVar("T")
 class DiagnosticVariable(ABC, Generic[T]):
     """Diagnostic Variable Base Class."""
 
-    _unit: str
+    _unit: str = ""
     _to_bind: list | None
 
     @property
