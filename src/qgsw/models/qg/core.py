@@ -184,7 +184,10 @@ class QG(Model):
             self.beta_plane.f0,
         )
         total_ke_hat = TotalModalKineticEnergy(self.A, self._p)
-        total_ape_hat = TotalModalAvailablePotentialEnergy(self.A, self._p)
+        total_ape_hat = TotalModalAvailablePotentialEnergy(
+            self.A,
+            self._p,
+        )
         total_energy = TotalModalEnergy(total_ke_hat, total_ape_hat)
 
         self._pv = pv.bind(self._state)

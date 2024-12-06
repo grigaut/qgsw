@@ -104,9 +104,9 @@ class TotalModalKineticEnergy(DiagnosticVariable):
         p = self._p.compute(uvh)
         p_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, p)
         # Pad x with 0 on top
-        p_hat_pad_x = F.pad(p_hat, (0, 0, 1, 0))
+        p_hat_pad_x = F.pad(p_hat, (0, 0, 0, 1))
         # Pad y with 0 on the left
-        p_hat_pad_y = F.pad(p_hat, (1, 0, 0, 0))
+        p_hat_pad_y = F.pad(p_hat, (0, 1, 0, 0))
         # Differentiate
         p_hat_dx = torch.diff(p_hat_pad_x, dim=-2)
         p_hat_dy = torch.diff(p_hat_pad_y, dim=-1)
