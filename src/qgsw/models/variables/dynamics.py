@@ -189,22 +189,6 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
         )
         return omega
 
-    def bind(
-        self,
-        state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
-        """Bind the variable to a given state.
-
-        Args:
-            state (State): State to bind the variable to.
-
-        Returns:
-            BoundDiagnosticVariable: Bound variable.
-        """
-        # Bind the UV variable
-        self._UV = self._UV.bind(state)
-        return super().bind(state)
-
 
 class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
     """Physical vorticity."""
