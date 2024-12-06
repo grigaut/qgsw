@@ -7,22 +7,21 @@ import torch
 
 from qgsw import verbose
 from qgsw.models.exceptions import InvalidSavingFileError
-from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.models.variables.core import UVH
 from qgsw.specs._utils import Device
 
 
 class ModelResultsRetriever:
     """Model Results Retriever."""
 
-    space: SpaceDiscretization3D
+    uvh_phys: UVH
     u: torch.Tensor
     v: torch.Tensor
     h: torch.Tensor
     device: Device
     omega: torch.Tensor
+    omega_phys: torch.Tensor
     p: torch.Tensor
-    beta_plane: BetaPlane
     eta: torch.Tensor
 
     def get_physical_uvh(
@@ -33,9 +32,9 @@ class ModelResultsRetriever:
         Returns:
             tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
         """
-        u_phys = (self.u / self.space.dx).to(device=self.device.get())
-        v_phys = (self.v / self.space.dy).to(device=self.device.get())
-        h_phys = (self.h / self.space.area).to(device=self.device.get())
+        u_phys = self.uvh_phys.u.to(device=self.device.get())
+        v_phys = self.uvh_phys.v.to(device=self.device.get())
+        h_phys = self.uvh_phys.h.to(device=self.device.get())
 
         return (u_phys, v_phys, h_phys)
 
@@ -57,8 +56,9 @@ class ModelResultsRetriever:
         Returns:
             torch.Tensor: Vorticity
         """
-        vorticity = self.omega / self.space.area / self.beta_plane.f0
-        return vorticity.to(device=self.device.get())
+        return self.omega_phys.to(
+            device=self.device.get(),
+        )  # divide by self.batea_plane.f0 ?
 
     def get_physical_omega_as_ndarray(
         self,
@@ -76,11 +76,11 @@ class ModelResultsRetriever:
         Returns:
             str: Summary of variables.
         """
-        hl_mean = (self.h / self.space.area).mean((-1, -2))
+        hl_mean = (self.uvh_phys.h).mean((-1, -2))
         eta = self.eta
-        u = self.u / self.space.dx
-        v = self.v / self.space.dy
-        h = self.h / self.space.area
+        u = self.uvh_phys.u
+        v = self.uvh_phys.v
+        h = self.uvh_phys.h
         device = self.device.get()
         with np.printoptions(precision=2):
             eta_surface = eta[:, 0].min().to(device=device).item()
@@ -126,7 +126,10 @@ class ModelResultsRetriever:
             h=h.astype("float32"),
         )
 
-        verbose.display(msg=f"saved u,v,h to {output_file}", trigger_level=1)
+        verbose.display(
+            msg=f"saved physical u,v,h to {output_file}",
+            trigger_level=1,
+        )
 
     def save_omega(self, output_file: Path) -> None:
         """Save vorticity values.
@@ -140,7 +143,10 @@ class ModelResultsRetriever:
 
         np.savez(output_file, omega=omega.astype("float32"))
 
-        verbose.display(msg=f"saved ω to {output_file}", trigger_level=1)
+        verbose.display(
+            msg=f"saved physical vorticity to {output_file}",
+            trigger_level=1,
+        )
 
     def save_uvhwp(self, output_file: Path) -> None:
         """Save uvh, vorticity and pressure values.

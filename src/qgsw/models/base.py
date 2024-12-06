@@ -26,7 +26,12 @@ from qgsw.models.variables import (
     SurfaceHeightAnomaly,
     Vorticity,
 )
-from qgsw.models.variables.dynamics import Momentum
+from qgsw.models.variables.dynamics import (
+    Momentum,
+    PhysicalLayerDepthAnomaly,
+    PhysicalVelocity,
+    PhysicalVorticity,
+)
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
 
@@ -143,9 +148,19 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         return self._state.h
 
     @property
+    def uvh_phys(self) -> UVH:
+        """Physical prognostic variables."""
+        return UVH(*self._uv_phys.get(), self._h_phys.get())
+
+    @property
     def omega(self) -> torch.Tensor:
         """Vorticity."""
         return self._omega.get()
+
+    @property
+    def omega_phys(self) -> torch.Tensor:
+        """Physical vorticity."""
+        return self._omega_phys.get()
 
     @property
     def eta(self) -> torch.Tensor:
@@ -257,16 +272,23 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
 
     def _create_diagnostic_vars(self, state: State) -> None:
         state.unbind()
+
+        uv_phys = PhysicalVelocity(dx=self.space.dx, dy=self.space.dy)
+        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.area)
         UV = Momentum(dx=self.space.dx, dy=self.space.dy)  # noqa: N806
         omega = Vorticity(UV=UV, masks=self.masks, slip_coef=self.slip_coef)
+        omega_phys = PhysicalVorticity(omega, ds=self.space.area)
         eta = SurfaceHeightAnomaly(area=self.space.area)
         p = Pressure(g_prime=self.g_prime, eta=eta)
         k_energy = KineticEnergy(masks=self.masks, UV=UV)
 
+        self._uv_phys = uv_phys.bind(state)
+        self._h_phys = h_phys.bind(state)
+        self._UV = UV.bind(state)
         self._omega = omega.bind(state)
+        self._omega_phys = omega_phys.bind(state)
         self._eta = eta.bind(state)
         self._p = p.bind(state)
-        self._UV = UV.bind(state)
         self._k_energy = k_energy.bind(state)
 
     def set_physical_uvh(
