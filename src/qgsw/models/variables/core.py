@@ -95,6 +95,11 @@ class BoundDiagnosticVariable(DiagnosticVariable, Generic[DiagVar, T]):
         """Bound variable representation."""
         return "Bound " + self._var.__repr__()
 
+    @property
+    def up_to_date(self) -> bool:
+        """Whether the variable must be updated or not."""
+        return self._up_to_date
+
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value if outdated.
 

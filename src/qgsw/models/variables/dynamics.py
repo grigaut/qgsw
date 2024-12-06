@@ -45,7 +45,7 @@ class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             torch.Tensor: Physical zonal velocity component.
         """
-        return (uvh.u * self._dx, uvh.v * self._dy)
+        return (uvh.u / self._dx, uvh.v / self._dy)
 
 
 class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
@@ -73,10 +73,10 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
         return uvh.h / self._ds
 
 
-class Momentum(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
-    """Physical Zonal velocity Variable."""
+class VelocityFlux(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+    """Velocity flux."""
 
-    _unit = "m².s⁻¹"
+    _unit = "s⁻¹"
 
     def __init__(self, dx: float, dy: float) -> None:
         """Instantiate the variable.
@@ -150,18 +150,15 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
 
     def __init__(
         self,
-        UV: Momentum,  # noqa: N803
         masks: Masks,
         slip_coef: float,
     ) -> None:
         """Instantiate the vorticity variable.
 
         Args:
-            UV (Momentum): Momentum (Covariant velocity).
             masks (Masks): Masks
             slip_coef (float): Slip coefficient
         """
-        self._UV = UV
         self._slip_coef = slip_coef
         self._w_valid = masks.w_valid
         self._w_cornerout_bound = masks.w_cornerout_bound
@@ -177,9 +174,9 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
         Returns:
             torch.Tensor: Vorticity
         """
-        U, V = self._UV.compute(uvh)  # noqa: N806
-        u_ = F.pad(U, (1, 1, 0, 0))
-        v_ = F.pad(V, (0, 0, 1, 1))
+        u, v, _ = uvh
+        u_ = F.pad(u, (1, 1, 0, 0))
+        v_ = F.pad(v, (0, 0, 1, 1))
         dx_v = torch.diff(v_, dim=-2)
         dy_u = torch.diff(u_, dim=-1)
         curl_uv = dx_v - dy_u

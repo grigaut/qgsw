@@ -27,10 +27,10 @@ from qgsw.models.variables import (
     Vorticity,
 )
 from qgsw.models.variables.dynamics import (
-    Momentum,
     PhysicalLayerDepthAnomaly,
     PhysicalVelocity,
     PhysicalVorticity,
+    VelocityFlux,
 )
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
@@ -174,12 +174,12 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
 
     @property
     def U(self) -> torch.Tensor:  # noqa: N802
-        """Momentum on X.."""
+        """Flux of u."""
         return self._UV.get()[0]
 
     @property
     def V(self) -> torch.Tensor:  # noqa: N802
-        """Momentum on Y."""
+        """Flux of v."""
         return self._UV.get()[1]
 
     @property
@@ -275,7 +275,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
 
         uv_phys = PhysicalVelocity(dx=self.space.dx, dy=self.space.dy)
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.area)
-        UV = Momentum(dx=self.space.dx, dy=self.space.dy)  # noqa: N806
+        UV = VelocityFlux(dx=self.space.dx, dy=self.space.dy)  # noqa: N806
         omega = Vorticity(UV=UV, masks=self.masks, slip_coef=self.slip_coef)
         omega_phys = PhysicalVorticity(omega, ds=self.space.area)
         eta = SurfaceHeightAnomaly(h_phys=h_phys)

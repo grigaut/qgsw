@@ -18,8 +18,8 @@ from qgsw.models.variables.core import (
     State,
 )
 from qgsw.models.variables.dynamics import (
-    Momentum,
     Pressure,
+    VelocityFlux,
 )
 
 
@@ -29,13 +29,13 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
     def __init__(
         self,
         masks: Masks,
-        UV: Momentum,  # noqa: N803
+        UV: VelocityFlux,  # noqa: N803
     ) -> None:
         """Instantiate Kinetic Energy variable.
 
         Args:
             masks (Masks): Masks.
-            UV (Momentum): Velocity Flux (Covariant).
+            UV (VelocityFlux): Velocity Flux (Contravarianrt velocity vector).
         """
         self._h_mask = masks.h
         self._UV = UV
