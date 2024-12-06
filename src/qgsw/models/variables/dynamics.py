@@ -168,7 +168,7 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
         self._w_vertical_bound = masks.w_vertical_bound
         self._w_horizontal_bound = masks.w_horizontal_bound
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
