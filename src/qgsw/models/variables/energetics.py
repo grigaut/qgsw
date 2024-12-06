@@ -11,9 +11,9 @@ from qgsw.models.qg.stretching_matrix import (
 )
 from qgsw.models.variables.core import UVH, DiagnosticVariable
 from qgsw.models.variables.dynamics import (
-    PhysicalMeridionalVelocity,
-    PhysicalZonalVelocity,
+    MeridionalVelocityFlux,
     Pressure,
+    ZonalVelocityFlux,
 )
 
 
@@ -23,15 +23,15 @@ class KineticEnergy(DiagnosticVariable):
     def __init__(
         self,
         masks: Masks,
-        U: PhysicalZonalVelocity,  # noqa: N803
-        V: PhysicalMeridionalVelocity,  # noqa: N803
+        U: ZonalVelocityFlux,  # noqa: N803
+        V: MeridionalVelocityFlux,  # noqa: N803
     ) -> None:
         """Instantiate Kinetic Energy variable.
 
         Args:
             masks (Masks): Masks.
-            U (PhysicalZonalVelocity): Physical Zonal Velocity.
-            V (PhysicalMeridionalVelocity): Physical Meridional Velocity.
+            U (ZonalVelocityFlux): Physical Zonal Velocity.
+            V (MeridionalVelocityFlux): Physical Meridional Velocity.
         """
         self._h_mask = masks.h
         self._U = U

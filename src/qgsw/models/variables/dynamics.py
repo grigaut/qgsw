@@ -61,7 +61,7 @@ class Vorticity(DiagnosticVariable):
         return omega
 
 
-class PhysicalZonalVelocity(DiagnosticVariable):
+class ZonalVelocityFlux(DiagnosticVariable):
     """Physical Zonal velocity Variable."""
 
     def __init__(self, dx: float) -> None:
@@ -84,7 +84,7 @@ class PhysicalZonalVelocity(DiagnosticVariable):
         return uvh.u / self._dx**2
 
 
-class PhysicalMeridionalVelocity(DiagnosticVariable):
+class MeridionalVelocityFlux(DiagnosticVariable):
     """Physical Zonal velocity Variable."""
 
     def __init__(self, dy: float) -> None:

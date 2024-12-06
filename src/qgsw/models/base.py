@@ -21,12 +21,12 @@ from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.variables import (
     UVH,
     KineticEnergy,
-    PhysicalMeridionalVelocity,
-    PhysicalZonalVelocity,
+    MeridionalVelocityFlux,
     Pressure,
     State,
     SurfaceHeightAnomaly,
     Vorticity,
+    ZonalVelocityFlux,
 )
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
@@ -261,8 +261,8 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
         omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
         eta = SurfaceHeightAnomaly(area=self.space.area)
         p = Pressure(g_prime=self.g_prime, eta=eta)
-        U = PhysicalZonalVelocity(dx=self.space.dx)  # noqa: N806
-        V = PhysicalMeridionalVelocity(dy=self.space.dy)  # noqa: N806
+        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
+        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
         self._omega = omega.bind(state)
