@@ -32,23 +32,34 @@ class UVH(NamedTuple):
         return UVH(self.u - value.u, self.v - value.v, self.h - value.h)
 
 
-class DiagnosticVariable(ABC):
+T = TypeVar("T")
+
+
+class DiagnosticVariable(ABC, Generic[T]):
     """Diagnostic Variable Base Class."""
+
+    _unit: str
+    _to_bind: list | None
+
+    @property
+    def unit(self) -> str:
+        """Variable unit."""
+        return self._unit
 
     def __repr__(self) -> str:
         """Variable string representation."""
-        return f"Diagnostic Variable: {self.__class__}"
+        return f"Diagnostic Variable: {self.__class__} [{self.unit}]"
 
     @abstractmethod
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, uvh: UVH) -> T:
         """Compute the value of the variable.
 
         Args:
             uvh (UVH): Prognostic variables
         """
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
-        """Bind the variable to a ggivent state.
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self, T]:
+        """Bind the variable to a given state.
 
         Args:
             state (State): State to bind the variable to.
@@ -61,15 +72,15 @@ class DiagnosticVariable(ABC):
         return bound_var
 
 
-T = TypeVar("T", bound=DiagnosticVariable)
+DiagVar = TypeVar("DiagVar", bound=DiagnosticVariable)
 
 
-class BoundDiagnosticVariable(DiagnosticVariable, Generic[T]):
+class BoundDiagnosticVariable(DiagnosticVariable, Generic[DiagVar, T]):
     """Bound variable."""
 
     _up_to_date = False
 
-    def __init__(self, state: State, variable: T) -> None:
+    def __init__(self, state: State, variable: DiagVar) -> None:
         """Instantiate the bound variable.
 
         Args:
@@ -78,6 +89,7 @@ class BoundDiagnosticVariable(DiagnosticVariable, Generic[T]):
         """
         self._var = variable
         self._state = state
+        self._unit = self._var.unit
 
     def __repr__(self) -> str:
         """Bound variable representation."""
@@ -98,7 +110,7 @@ class BoundDiagnosticVariable(DiagnosticVariable, Generic[T]):
         self._value = self._var.compute(uvh)
         return self._value
 
-    def get(self) -> torch.Tensor:
+    def get(self) -> T:
         """Get the variable value.
 
         Returns:

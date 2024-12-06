@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import torch
 import torch.nn.functional as F  # noqa: N812
@@ -21,58 +21,74 @@ if TYPE_CHECKING:
     from qgsw.masks import Masks
 
 
-class Vorticity(DiagnosticVariable):
-    """Vorticity Diagnostic Variable."""
+class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+    """Physical zonal velocity."""
 
-    def __init__(self, masks: Masks, slip_coef: float) -> None:
-        """Instantiate the vorticity variable.
+    _unit = "s⁻¹"
 
-        Args:
-            masks (Masks): Masks
-            slip_coef (float): Slip coefficient
-        """
-        self._slip_coef = slip_coef
-        self._w_valid = masks.w_valid
-        self._w_cornerout_bound = masks.w_cornerout_bound
-        self._w_vertical_bound = masks.w_vertical_bound
-        self._w_horizontal_bound = masks.w_horizontal_bound
-
-    def compute(self, uvh: UVH) -> torch.Tensor:
-        """Compute the value of the variable.
-
-        Args:
-            uvh (UVH): Prognostic variables
-
-        Returns:
-            torch.Tensor: Vorticity
-        """
-        u_ = F.pad(uvh.u, (1, 1, 0, 0))
-        v_ = F.pad(uvh.v, (0, 0, 1, 1))
-        dx_v = torch.diff(v_, dim=-2)
-        dy_u = torch.diff(u_, dim=-1)
-        curl_uv = dx_v - dy_u
-        alpha = 2 * (1 - self._slip_coef)
-        omega: torch.Tensor = (
-            self._w_valid * curl_uv
-            + self._w_cornerout_bound * (1 - self._slip_coef) * curl_uv
-            + self._w_vertical_bound * alpha * dx_v
-            - self._w_horizontal_bound * alpha * dy_u
-        )
-        return omega
-
-
-class ZonalVelocityFlux(DiagnosticVariable):
-    """Physical Zonal velocity Variable."""
-
-    def __init__(self, dx: float) -> None:
+    def __init__(self, dx: float, dy: float) -> None:
         """Instantiate the variable.
 
         Args:
-            dx (float): X step.
+            dx (float): Elementary distance in the x direction.
+            dy (float): Elementary distance in the y direction.
         """
         self._dx = dx
+        self._dy = dy
+
+    def compute(self, uvh: UVH) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute the variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Physical zonal velocity component.
+        """
+        return (uvh.u * self._dx, uvh.v * self._dy)
+
+
+class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
+    """Physical layer depth anomaly."""
+
+    _unit = "m"
+
+    def __init__(self, ds: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            ds (float): Elementary surface element.
+        """
+        self._ds = ds
 
     def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Physical layer depth anomaly.
+        """
+        return uvh.h / self._ds
+
+
+class Momentum(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+    """Physical Zonal velocity Variable."""
+
+    _unit = "m².s⁻¹"
+
+    def __init__(self, dx: float, dy: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            dx (float): Elementary distance in the x direction.
+            dy (float): Elementary distance in the y direction.
+        """
+        self._dx = dx
+        self._dy = dy
+
+    def compute(self, uvh: UVH) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute the value of the variable.
 
         Args:
@@ -81,42 +97,21 @@ class ZonalVelocityFlux(DiagnosticVariable):
         Returns:
             UVH: Value
         """
-        return uvh.u / self._dx**2
+        return (uvh.u / self._dx**2, uvh.v / self._dy**2)
 
 
-class MeridionalVelocityFlux(DiagnosticVariable):
-    """Physical Zonal velocity Variable."""
+class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
+    """Surface height anomaly."""
 
-    def __init__(self, dy: float) -> None:
-        """Instantiate the variable.
+    _unit = "m"
 
-        Args:
-            dy (float): Y step.
-        """
-        self._dy = dy
-
-    def compute(self, uvh: UVH) -> torch.Tensor:
-        """Compute the value of the variable.
-
-        Args:
-            uvh (UVH): Prognostioc variables
-
-        Returns:
-            torch.Tensor: Value
-        """
-        return uvh.v / self._dy**2
-
-
-class SurfaceHeightAnomaly(DiagnosticVariable):
-    """Surface heigh anomaly."""
-
-    def __init__(self, area: float) -> None:
+    def __init__(self, h_phys: PhysicalLayerDepthAnomaly) -> None:
         """Instantiate variable.
 
         Args:
-            area (float): Elementary area.
+            h_phys (PhysicalLayerDepthAnomaly): Physical surface anomaly.
         """
-        self._area = area
+        self._h_phys = h_phys
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
@@ -129,11 +124,138 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
         """
         # the prognostic variable is h^* = h dx dy
         # then uvh.h must be divided by dx dy
-        return reverse_cumsum(uvh.h / self._area, dim=-3)
+        return reverse_cumsum(self._h_phys.compute(uvh), dim=-3)
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the h_phys variable
+        self._h_phys = self._h_phys.bind(state)
+        return super().bind(state)
 
 
-class Pressure(DiagnosticVariable):
+class Vorticity(DiagnosticVariable[torch.Tensor]):
+    """Vorticity Diagnostic Variable."""
+
+    _unit = "m².s⁻¹"
+
+    def __init__(
+        self,
+        UV: Momentum,  # noqa: N803
+        masks: Masks,
+        slip_coef: float,
+    ) -> None:
+        """Instantiate the vorticity variable.
+
+        Args:
+            UV (Momentum): Momentum (Covariant velocity).
+            masks (Masks): Masks
+            slip_coef (float): Slip coefficient
+        """
+        self._UV = UV
+        self._slip_coef = slip_coef
+        self._w_valid = masks.w_valid
+        self._w_cornerout_bound = masks.w_cornerout_bound
+        self._w_vertical_bound = masks.w_vertical_bound
+        self._w_horizontal_bound = masks.w_horizontal_bound
+
+    def _compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostic variables
+
+        Returns:
+            torch.Tensor: Vorticity
+        """
+        U, V = self._UV.compute(uvh)  # noqa: N806
+        u_ = F.pad(U, (1, 1, 0, 0))
+        v_ = F.pad(V, (0, 0, 1, 1))
+        dx_v = torch.diff(v_, dim=-2)
+        dy_u = torch.diff(u_, dim=-1)
+        curl_uv = dx_v - dy_u
+        alpha = 2 * (1 - self._slip_coef)
+        omega: torch.Tensor = (
+            self._w_valid * curl_uv
+            + self._w_cornerout_bound * (1 - self._slip_coef) * curl_uv
+            + self._w_vertical_bound * alpha * dx_v
+            - self._w_horizontal_bound * alpha * dy_u
+        )
+        return omega
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the UV variable
+        self._UV = self._UV.bind(state)
+        return super().bind(state)
+
+
+class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
+    """Physical vorticity."""
+
+    _unit = "s⁻¹"
+
+    def __init__(self, vorticity: Vorticity, ds: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            vorticity (Vorticity): Vorticity.
+            ds (float): Elementary surface element.
+        """
+        self._vorticity = vorticity
+        self._ds = ds
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Physical vorticity.
+        """
+        return self._vorticity.compute(uvh) / self._ds
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the vorticity variable
+        self._vorticity = self._vorticity.bind(state)
+        return super().bind(state)
+
+
+class Pressure(DiagnosticVariable[torch.Tensor]):
     """Pressure."""
+
+    _unit = "m².s⁻²"
 
     def __init__(self, g_prime: float, eta: SurfaceHeightAnomaly) -> None:
         """Instantiate the pressure variable.
@@ -156,7 +278,10 @@ class Pressure(DiagnosticVariable):
         """
         return torch.cumsum(self._g_prime * self._eta.compute(uvh), dim=-3)
 
-    def bind(self, state: State) -> BoundDiagnosticVariable:
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Pressure, torch.Tensor]:
         """Bind the variable to a given state.
 
         Args:
@@ -170,12 +295,14 @@ class Pressure(DiagnosticVariable):
         return super().bind(state)
 
 
-class PotentialVorticity(DiagnosticVariable):
+class PotentialVorticity(DiagnosticVariable[torch.Tensor]):
     """Potential Vorticity."""
+
+    _unit = "s⁻¹"
 
     def __init__(
         self,
-        omega: Vorticity,
+        vorticity: PhysicalVorticity,
         h_ref: torch.Tensor,
         area: float,
         f0: float,
@@ -183,7 +310,7 @@ class PotentialVorticity(DiagnosticVariable):
         """Instantiate variable.
 
         Args:
-            omega (Vorticity): Vorticity.
+            vorticity (PhysicalVorticity): Physical vorticity.
             h_ref (torch.Tensor): Reference heights.
             area (float): Elementary area.
             f0 (float): Coriolis parameter.
@@ -191,7 +318,7 @@ class PotentialVorticity(DiagnosticVariable):
         self._h_ref = h_ref
         self._area = area
         self._f0 = f0
-        self._omega = omega
+        self._vorticity = vorticity
         self._interp = OptimizableFunction(points_to_surfaces)
 
     def compute(self, uvh: UVH) -> torch.Tensor:
@@ -203,5 +330,21 @@ class PotentialVorticity(DiagnosticVariable):
         Returns:
             torch.Tensor: Value
         """
-        omega = self._interp(self._omega.compute(uvh))
-        return omega / self._area - self._f0 * uvh.h / self._h_ref
+        vorticity = self._interp(self._vorticity.compute(uvh))
+        return vorticity - self._f0 * uvh.h / self._h_ref
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the vorticity variable
+        self._vorticity = self._vorticity.bind(state)
+        return super().bind(state)
