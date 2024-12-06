@@ -41,10 +41,10 @@ class Vorticity(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            uvh (UVH): Prognostioc variables
+            uvh (UVH): Prognostic variables
 
         Returns:
-            torch.Tensor: Value
+            torch.Tensor: Vorticity
         """
         u_ = F.pad(uvh.u, (1, 1, 0, 0))
         v_ = F.pad(uvh.v, (0, 0, 1, 1))
@@ -125,8 +125,10 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
             uvh (UVH): Prognostioc variables
 
         Returns:
-            torch.Tensor: Value
+            torch.Tensor: Surface height anomaly
         """
+        # the prognostic variable is h^* = h dx dy
+        # then uvh.h must be divided by dx dy
         return reverse_cumsum(uvh.h / self._area, dim=-3)
 
 
@@ -150,7 +152,7 @@ class Pressure(DiagnosticVariable):
             uvh (UVH): Prognostioc variables
 
         Returns:
-            torch.Tensor: Value
+            torch.Tensor: Pressure
         """
         return torch.cumsum(self._g_prime * self._eta.compute(uvh), dim=-3)
 
