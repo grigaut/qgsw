@@ -21,7 +21,7 @@ class VerboseDisplayer:
     _min_verbose_allowed: int = 0
     _max_verbose_allowed: int = 3
 
-    def __init__(self, level: int, prefix: str = "\t") -> None:
+    def __init__(self, level: int) -> None:
         r"""Instantiate verbose displayer.
 
         Args:
@@ -36,7 +36,7 @@ class VerboseDisplayer:
             Defaults to "\t".
         """
         self.level = level
-        self.prefix = prefix
+        self.prefix = "└── "
 
     @property
     def level(self) -> int:
@@ -112,7 +112,7 @@ class VerboseDisplayer:
         Returns:
             str: Indentated message.
         """
-        indent = "".join([self._prefix] * (level))
+        indent = "".join(["\t"] * (level) + [self._prefix] * (level > 0))
         return f"{indent}{msg}"
 
     def display(self, msg: str, trigger_level: int) -> None:
@@ -125,6 +125,9 @@ class VerboseDisplayer:
         trigger = self._check_trigger_level(trigger_level=trigger_level)
         if self.level >= trigger:
             print(self._indent(msg=msg, level=(trigger - 1)))  # noqa: T201
+
+    def is_mute(self) -> bool:
+        return self.level <= 0
 
 
 VERBOSE = VerboseDisplayer(0)
@@ -175,3 +178,7 @@ def display(msg: str, trigger_level: int) -> None:
         trigger_level (int): Trigger level.
     """
     return VERBOSE.display(msg=msg, trigger_level=trigger_level)
+
+
+def is_mute() -> bool:
+    return VERBOSE.is_mute()
