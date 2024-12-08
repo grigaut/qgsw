@@ -27,10 +27,12 @@ from qgsw.models.variables import (
     Vorticity,
 )
 from qgsw.models.variables.dynamics import (
+    MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
-    PhysicalVelocity,
+    PhysicalMeridionalVelocity,
     PhysicalVorticity,
-    VelocityFlux,
+    PhysicalZonalVelocity,
+    ZonalVelocityFlux,
 )
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
@@ -150,7 +152,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     @property
     def uvh_phys(self) -> UVH:
         """Physical prognostic variables."""
-        return UVH(*self._uv_phys.get(), self._h_phys.get())
+        return UVH(self._u_phys.get(), self._v_phys.get(), self._h_phys.get())
 
     @property
     def omega(self) -> torch.Tensor:
@@ -175,12 +177,12 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     @property
     def U(self) -> torch.Tensor:  # noqa: N802
         """Flux of u."""
-        return self._UV.get()[0]
+        return self._U.get()
 
     @property
     def V(self) -> torch.Tensor:  # noqa: N802
         """Flux of v."""
-        return self._UV.get()[1]
+        return self._V.get()
 
     @property
     def k_energy(self) -> torch.Tensor:
@@ -273,18 +275,22 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     def _create_diagnostic_vars(self, state: State) -> None:
         state.unbind()
 
-        uv_phys = PhysicalVelocity(dx=self.space.dx, dy=self.space.dy)
+        u_phys = PhysicalZonalVelocity(dx=self.space.dx)
+        v_phys = PhysicalMeridionalVelocity(dy=self.space.dy)
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.area)
-        UV = VelocityFlux(dx=self.space.dx, dy=self.space.dy)  # noqa: N806
+        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
+        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
         omega_phys = PhysicalVorticity(omega, ds=self.space.area)
         eta = SurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta=eta)
-        k_energy = KineticEnergy(masks=self.masks, UV=UV)
+        k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
-        self._uv_phys = uv_phys.bind(state)
+        self._u_phys = u_phys.bind(state)
+        self._v_phys = v_phys.bind(state)
         self._h_phys = h_phys.bind(state)
-        self._UV = UV.bind(state)
+        self._U = U.bind(state)
+        self._V = V.bind(state)
         self._omega = omega.bind(state)
         self._omega_phys = omega_phys.bind(state)
         self._eta = eta.bind(state)

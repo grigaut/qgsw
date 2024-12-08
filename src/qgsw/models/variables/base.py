@@ -26,6 +26,11 @@ class Variable(Generic[T]):
         """Variable unit."""
         return self._unit
 
+    @property
+    def name(self) -> str:
+        """Varoiable name."""
+        return self._name
+
     def __repr__(self) -> str:
         """Variable string representation."""
         return f"Variable {self._name} [{self.unit}]: {self._description}"
@@ -105,7 +110,7 @@ class DiagnosticVariable(Variable[T], ABC):
 DiagVar = TypeVar("DiagVar", bound=DiagnosticVariable)
 
 
-class BoundDiagnosticVariable(DiagnosticVariable, Generic[DiagVar, T]):
+class BoundDiagnosticVariable(Variable, Generic[DiagVar, T]):
     """Bound variable."""
 
     _up_to_date = False

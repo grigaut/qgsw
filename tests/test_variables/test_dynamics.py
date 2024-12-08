@@ -3,10 +3,12 @@
 import pytest
 import torch
 
-from qgsw.models.variables.dynamics import (
+from qgsw.models.variables import (
+    MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
-    PhysicalVelocity,
-    VelocityFlux,
+    PhysicalMeridionalVelocity,
+    PhysicalZonalVelocity,
+    ZonalVelocityFlux,
 )
 from qgsw.models.variables.state import UVH, State
 
@@ -31,10 +33,12 @@ def test_physical_prognostic_variables(state: State) -> None:
     dx = 2
     dy = 3
     # Variables
-    uv_phys = PhysicalVelocity(dx=dx, dy=dy)
+    u_phys = PhysicalZonalVelocity(dx=dx)
+    v_phys = PhysicalMeridionalVelocity(dy=dy)
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
     # Compute physical variables
-    u_phys, v_phys = uv_phys.compute(state.uvh)
+    u_phys = u_phys.compute(state.uvh)
+    v_phys = v_phys.compute(state.uvh)
     h_phys = h_phys.compute(state.uvh)
     # Assert values equality
     assert (u_phys == state.uvh.u / dx).all()
@@ -47,9 +51,11 @@ def test_velocity_flux(state: State) -> None:
     dx = 2
     dy = 3
     # Variables
-    momentum = VelocityFlux(dx=dx, dy=dy)
+    u_flux = ZonalVelocityFlux(dx=dx)
+    v_flux = MeridionalVelocityFlux(dy=dy)
     # Compute momentum
-    U, V = momentum.compute(state.uvh)  # noqa: N806
+    U = u_flux.compute(state.uvh)  # noqa: N806
+    V = v_flux.compute(state.uvh)  # noqa: N806
     # Assert values equality
     assert (state.uvh.u / dx**2 == U).all()
     assert (state.uvh.v / dy**2 == V).all()

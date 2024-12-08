@@ -21,24 +21,22 @@ if TYPE_CHECKING:
     from qgsw.models.variables.uvh import UVH
 
 
-class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+class PhysicalZonalVelocity(DiagnosticVariable[torch.Tensor]):
     """Physical zonal velocity."""
 
     _unit = "m.s⁻¹"
-    _name = "uv_phys"
-    _description = "Physical horizontal velocity."
+    _name = "u_phys"
+    _description = "Physical zonal velocity."
 
-    def __init__(self, dx: float, dy: float) -> None:
+    def __init__(self, dx: float) -> None:
         """Instantiate the variable.
 
         Args:
             dx (float): Elementary distance in the x direction.
-            dy (float): Elementary distance in the y direction.
         """
         self._dx = dx
-        self._dy = dy
 
-    def compute(self, uvh: UVH) -> tuple[torch.Tensor, torch.Tensor]:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -47,7 +45,34 @@ class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             torch.Tensor: Physical zonal velocity component.
         """
-        return (uvh.u / self._dx, uvh.v / self._dy)
+        return uvh.u / self._dx
+
+
+class PhysicalMeridionalVelocity(DiagnosticVariable[torch.Tensor]):
+    """Physical zonal velocity."""
+
+    _unit = "m.s⁻¹"
+    _name = "v_phys"
+    _description = "Physical meridional velocity."
+
+    def __init__(self, dy: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            dy (float): Elementary distance in the x direction.
+        """
+        self._dy = dy
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Physical zonal velocity component.
+        """
+        return uvh.v / self._dy
 
 
 class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
@@ -77,24 +102,22 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
         return uvh.h / self._ds
 
 
-class VelocityFlux(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+class ZonalVelocityFlux(DiagnosticVariable[torch.Tensor]):
     """Velocity flux."""
 
     _unit = "s⁻¹"
-    _name = "UV"
-    _description = "Horizontal velocity flux."
+    _name = "U"
+    _description = "Zonal velocity flux."
 
-    def __init__(self, dx: float, dy: float) -> None:
+    def __init__(self, dx: float) -> None:
         """Instantiate the variable.
 
         Args:
             dx (float): Elementary distance in the x direction.
-            dy (float): Elementary distance in the y direction.
         """
         self._dx = dx
-        self._dy = dy
 
-    def compute(self, uvh: UVH) -> tuple[torch.Tensor, torch.Tensor]:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -103,7 +126,34 @@ class VelocityFlux(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             UVH: Value
         """
-        return (uvh.u / self._dx**2, uvh.v / self._dy**2)
+        return uvh.u / self._dx**2
+
+
+class MeridionalVelocityFlux(DiagnosticVariable[torch.Tensor]):
+    """Velocity flux."""
+
+    _unit = "s⁻¹"
+    _name = "V"
+    _description = "Meriodional velocity flux."
+
+    def __init__(self, dy: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            dy (float): Elementary distance in the y direction.
+        """
+        self._dy = dy
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            UVH: Value
+        """
+        return uvh.v / self._dy**2
 
 
 class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):

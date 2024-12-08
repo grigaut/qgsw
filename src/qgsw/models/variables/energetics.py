@@ -16,8 +16,9 @@ from qgsw.models.variables.base import (
     DiagnosticVariable,
 )
 from qgsw.models.variables.dynamics import (
+    MeridionalVelocityFlux,
     Pressure,
-    VelocityFlux,
+    ZonalVelocityFlux,
 )
 from qgsw.models.variables.state import State
 from qgsw.models.variables.uvh import UVH
@@ -33,16 +34,21 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
     def __init__(
         self,
         masks: Masks,
-        UV: VelocityFlux,  # noqa: N803
+        U: ZonalVelocityFlux,  # noqa: N803
+        V: MeridionalVelocityFlux,  # noqa:N803
     ) -> None:
         """Instantiate Kinetic Energy variable.
 
         Args:
             masks (Masks): Masks.
-            UV (VelocityFlux): Velocity Flux (Contravarianrt velocity vector).
+            U (ZonalVelocityFlux): Zonal Velocity Flux
+            (Contravariant velocity vector).
+            V (MeriodionalVelocityFlux): Meriodional Velocity Flux
+            (Contravariant velocity vector).
         """
         self._h_mask = masks.h
-        self._UV = UV
+        self._U = U
+        self._V = V
         self._comp_ke = OptimizableFunction(finite_diff.comp_ke)
 
     def compute(self, uvh: UVH) -> torch.Tensor:
@@ -55,7 +61,8 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
             torch.Tensor: Kinetic energy.
         """
         u, v, _ = uvh
-        U, V = self._UV.compute(uvh)  # noqa: N806
+        U = self._U.compute(uvh)  # noqa: N806
+        V = self._V.compute(uvh)  # noqa: N806
         return self._comp_ke(u, U, v, V) * self._h_mask
 
     def bind(
@@ -70,8 +77,9 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
         Returns:
             BoundDiagnosticVariable: Bound variable.
         """
-        # Bind the UV variable
-        self._UV = self._UV.bind(state)
+        # Bind the UV variables
+        self._U = self._U.bind(state)
+        self._V = self._V.bind(state)
         return super().bind(state)
 
 
