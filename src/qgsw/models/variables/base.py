@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Generic, Self, TypeVar
 if TYPE_CHECKING:
     import torch
 
-    from qgsw.models.variables.core import UVH, State
+    from qgsw.models.variables.state import State
+    from qgsw.models.variables.uvh import UVH
 
 T = TypeVar("T")
 

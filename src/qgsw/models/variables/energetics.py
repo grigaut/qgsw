@@ -15,13 +15,13 @@ from qgsw.models.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
 )
-from qgsw.models.variables.core import (
-    UVH,
-    State,
-)
 from qgsw.models.variables.dynamics import (
     Pressure,
     VelocityFlux,
+)
+from qgsw.models.variables.state import (
+    UVH,
+    State,
 )
 
 

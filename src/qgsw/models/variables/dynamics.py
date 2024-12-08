@@ -17,10 +17,8 @@ from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from qgsw.masks import Masks
-    from qgsw.models.variables.core import (
-        UVH,
-        State,
-    )
+    from qgsw.models.variables.state import State
+    from qgsw.models.variables.uvh import UVH
 
 
 class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
