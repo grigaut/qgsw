@@ -105,14 +105,14 @@ for n in range(n_steps + 1):
     if config.io.results.save and (n % freq_save == 0 or n == n_steps):
         directory = config.io.results.directory
         name = config.model.name_sc
-        model.save_uvhwp(directory.joinpath(f"{prefix}{n}.npz"))
+        model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
     model.step()
 
     t += dt
 
     if (freq_log > 0 and n % freq_log == 0) or (n == n_steps):
         verbose.display(
-            msg=f"n={n:05d} -> {model.get_print_info()}",
+            msg=f"[n={n:05d}/{n_steps:05d}] -> {model.io.print_step()}",
             trigger_level=1,
         )
         summary.register_step(n)

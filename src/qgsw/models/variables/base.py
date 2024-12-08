@@ -28,8 +28,13 @@ class Variable:
 
     @property
     def name(self) -> str:
-        """Varoiable name."""
+        """Variable name."""
         return self._name
+
+    @property
+    def description(self) -> str:
+        """Variable description."""
+        return self._description
 
     def __repr__(self) -> str:
         """Variable string representation."""
@@ -68,6 +73,23 @@ class PrognosticVariable(Variable):
     def __sub__(self, other: Self) -> Self:
         """Substraction."""
         return self.__add__(-1 * other)
+
+    def update(self, data: torch.Tensor) -> None:
+        """Update the variable value.
+
+        Args:
+            data (torch.Tensor): New value for the variable.
+
+        Raises:
+            ValueError: If the value shape does not match.
+        """
+        if self._data.shape != data.shape:
+            msg = (
+                f"Invalid shape, expected {self._data.shape}"
+                f", received {data.shape}."
+            )
+            raise ValueError(msg)
+        self._data = data
 
     def get(self) -> torch.Tensor:
         """Variable value.
@@ -125,6 +147,8 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._var = variable
         self._state = state
         self._unit = self._var.unit
+        self._name = self._var.name
+        self._description = self._var.description
 
     def __repr__(self) -> str:
         """Bound variable representation."""

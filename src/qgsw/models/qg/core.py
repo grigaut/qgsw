@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import torch
 
-from qgsw import verbose
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -31,7 +29,6 @@ from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
@@ -194,6 +191,8 @@ class QG(Model):
         self._ke_hat = total_ke_hat.bind(self._state)
         self._ape_hat = total_ape_hat.bind(self._state)
         self._total_energy = total_energy.bind(self._state)
+
+        self.io.add_diagnostic_vars(self._pv)
 
     def compute_A(  # noqa: N802
         self,
@@ -439,32 +438,6 @@ class QG(Model):
             UVH: update prognostic variables.
         """
         return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
-
-    def save_uvhwp(self, output_file: Path) -> None:
-        """Save uvh, vorticity and pressure values.
-
-        Args:
-            output_file (Path): File to save value in (.npz).
-        """
-        self._raise_if_invalid_savefile(output_file=output_file)
-
-        omega = self.get_physical_omega_as_ndarray()
-        u, v, h = self.get_physical_uvh_as_ndarray()
-
-        np.savez(
-            output_file,
-            u=u.astype("float32"),
-            v=v.astype("float32"),
-            h=h.astype("float32"),
-            omega=omega.astype("float32"),
-            p=self.p.cpu().numpy().astype("float32"),
-            pv=self.pv.cpu().numpy().astype("float32"),
-        )
-
-        verbose.display(
-            msg=f"saved u,v,h,ω,p,pv to {output_file}",
-            trigger_level=1,
-        )
 
     def set_wind_forcing(
         self,
