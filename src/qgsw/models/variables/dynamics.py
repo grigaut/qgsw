@@ -25,6 +25,8 @@ class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
     """Physical zonal velocity."""
 
     _unit = "m.s⁻¹"
+    _name = "uv_phys"
+    _description = "Physical horizontal velocity."
 
     def __init__(self, dx: float, dy: float) -> None:
         """Instantiate the variable.
@@ -52,6 +54,8 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
     """Physical layer depth anomaly."""
 
     _unit = "m"
+    _name = "h_phys"
+    _description = "Physical layer depth anomaly."
 
     def __init__(self, ds: float) -> None:
         """Instantiate the variable.
@@ -77,6 +81,8 @@ class VelocityFlux(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
     """Velocity flux."""
 
     _unit = "s⁻¹"
+    _name = "UV"
+    _description = "Horizontal velocity flux."
 
     def __init__(self, dx: float, dy: float) -> None:
         """Instantiate the variable.
@@ -104,6 +110,8 @@ class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
     """Surface height anomaly."""
 
     _unit = "m"
+    _name = "eta"
+    _description = "Surface height anomaly."
 
     def __init__(self, h_phys: PhysicalLayerDepthAnomaly) -> None:
         """Instantiate variable.
@@ -147,6 +155,8 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
     """Vorticity Diagnostic Variable."""
 
     _unit = "m².s⁻¹"
+    _name = "omega"
+    _description = "Vorticity."
 
     def __init__(
         self,
@@ -194,6 +204,8 @@ class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
     """Physical vorticity."""
 
     _unit = "s⁻¹"
+    _name = "omega_phys"
+    _description = "Physical vorticity."
 
     def __init__(self, vorticity: Vorticity, ds: float) -> None:
         """Instantiate the variable.
@@ -237,6 +249,8 @@ class Pressure(DiagnosticVariable[torch.Tensor]):
     """Pressure."""
 
     _unit = "m².s⁻²"
+    _name = "p"
+    _description = "Pressure per unit of mass."
 
     def __init__(self, g_prime: float, eta: SurfaceHeightAnomaly) -> None:
         """Instantiate the pressure variable.
@@ -280,6 +294,8 @@ class PotentialVorticity(DiagnosticVariable[torch.Tensor]):
     """Potential Vorticity."""
 
     _unit = "s⁻¹"
+    _name = "pv"
+    _description = "Potential vorticity."
 
     def __init__(
         self,

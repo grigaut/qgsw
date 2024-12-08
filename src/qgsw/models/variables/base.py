@@ -76,8 +76,6 @@ class PrognosticVariable(Variable[T]):
 class DiagnosticVariable(Variable[T], ABC):
     """Diagnostic Variable Base Class."""
 
-    _unit = ""
-
     def __repr__(self) -> str:
         """Variable representation."""
         return super().__repr__() + " (Diagnostic)"

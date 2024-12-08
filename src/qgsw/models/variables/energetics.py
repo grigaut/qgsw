@@ -28,6 +28,10 @@ from qgsw.models.variables.state import (
 class KineticEnergy(DiagnosticVariable[torch.Tensor]):
     """Kinetic Energy Variable."""
 
+    _unit = "m²s⁻²"
+    _name = "kinetic_energy"
+    _description = "Kinetic energy."
+
     def __init__(
         self,
         masks: Masks,
@@ -76,6 +80,10 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
 class TotalKineticEnergy(DiagnosticVariable[torch.Tensor]):
     """Total Kinetic Energy."""
 
+    _unit = "m²s⁻²"
+    _name = "total_ke"
+    _description = "Total kinetic energy."
+
     def __init__(self, kinetic_energy: KineticEnergy) -> None:
         """Instantiate the kinetic energy measure.
 
@@ -114,6 +122,10 @@ class TotalKineticEnergy(DiagnosticVariable[torch.Tensor]):
 
 class TotalModalKineticEnergy(DiagnosticVariable[torch.Tensor]):
     """Compute total modal kinetic energy."""
+
+    _unit = ""
+    _name = "ke_hat"
+    _description = "Modal kinetic energy."
 
     def __init__(
         self,
@@ -169,6 +181,10 @@ class TotalModalKineticEnergy(DiagnosticVariable[torch.Tensor]):
 class TotalModalAvailablePotentialEnergy(DiagnosticVariable[torch.Tensor]):
     """Total modal available potential energy."""
 
+    _unit = ""
+    _name = "ape_hat"
+    _description = "Modal available potential energy."
+
     def __init__(
         self,
         A: torch.Tensor,  # noqa: N803
@@ -216,6 +232,10 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable[torch.Tensor]):
 
 class TotalModalEnergy(DiagnosticVariable[torch.Tensor]):
     """Total modal energy."""
+
+    _unit = ""
+    _name = "e_tot_hat"
+    _description = "Total modal energy."
 
     def __init__(
         self,
