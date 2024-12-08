@@ -41,7 +41,7 @@ class IO:
             h (LayerDepthAnomaly): Layer depth anomaly.
             *args (BoundDiagnosticVariable): Diagnostic variableS.
         """
-        self._prog: set[PrognosticVariable] = {u, v, h}
+        self._prog: list[PrognosticVariable] = [u, v, h]
         self._diag = set(args)
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
@@ -66,7 +66,11 @@ class IO:
         self._raise_if_invalid_savefile(output_file=output_file)
         to_save = {
             var.name: var.get().cpu().numpy().astype("float32")
-            for var in self._prog | self._diag
+            for var in self._prog
+        }
+        to_save |= {
+            var.name: var.get().cpu().numpy().astype("float32")
+            for var in self._diag
         }
         np.savez(
             file=output_file,
