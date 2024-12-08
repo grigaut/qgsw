@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from qgsw.models.variables.uvh import UVH
 
 
-class PhysicalZonalVelocity(DiagnosticVariable[torch.Tensor]):
+class PhysicalZonalVelocity(DiagnosticVariable):
     """Physical zonal velocity."""
 
     _unit = "m.s⁻¹"
@@ -48,7 +48,7 @@ class PhysicalZonalVelocity(DiagnosticVariable[torch.Tensor]):
         return uvh.u / self._dx
 
 
-class PhysicalMeridionalVelocity(DiagnosticVariable[torch.Tensor]):
+class PhysicalMeridionalVelocity(DiagnosticVariable):
     """Physical zonal velocity."""
 
     _unit = "m.s⁻¹"
@@ -75,7 +75,7 @@ class PhysicalMeridionalVelocity(DiagnosticVariable[torch.Tensor]):
         return uvh.v / self._dy
 
 
-class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
+class PhysicalLayerDepthAnomaly(DiagnosticVariable):
     """Physical layer depth anomaly."""
 
     _unit = "m"
@@ -102,7 +102,7 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
         return uvh.h / self._ds
 
 
-class ZonalVelocityFlux(DiagnosticVariable[torch.Tensor]):
+class ZonalVelocityFlux(DiagnosticVariable):
     """Velocity flux."""
 
     _unit = "s⁻¹"
@@ -129,7 +129,7 @@ class ZonalVelocityFlux(DiagnosticVariable[torch.Tensor]):
         return uvh.u / self._dx**2
 
 
-class MeridionalVelocityFlux(DiagnosticVariable[torch.Tensor]):
+class MeridionalVelocityFlux(DiagnosticVariable):
     """Velocity flux."""
 
     _unit = "s⁻¹"
@@ -156,7 +156,7 @@ class MeridionalVelocityFlux(DiagnosticVariable[torch.Tensor]):
         return uvh.v / self._dy**2
 
 
-class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
+class SurfaceHeightAnomaly(DiagnosticVariable):
     """Surface height anomaly."""
 
     _unit = "m"
@@ -187,7 +187,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -201,7 +201,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class Vorticity(DiagnosticVariable[torch.Tensor]):
+class Vorticity(DiagnosticVariable):
     """Vorticity Diagnostic Variable."""
 
     _unit = "m².s⁻¹"
@@ -250,7 +250,7 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
         return omega
 
 
-class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
+class PhysicalVorticity(DiagnosticVariable):
     """Physical vorticity."""
 
     _unit = "s⁻¹"
@@ -281,7 +281,7 @@ class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -295,7 +295,7 @@ class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class Pressure(DiagnosticVariable[torch.Tensor]):
+class Pressure(DiagnosticVariable):
     """Pressure."""
 
     _unit = "m².s⁻²"
@@ -326,7 +326,7 @@ class Pressure(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Pressure, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Pressure]:
         """Bind the variable to a given state.
 
         Args:
@@ -340,7 +340,7 @@ class Pressure(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class PotentialVorticity(DiagnosticVariable[torch.Tensor]):
+class PotentialVorticity(DiagnosticVariable):
     """Potential Vorticity."""
 
     _unit = "s⁻¹"
@@ -383,7 +383,7 @@ class PotentialVorticity(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
