@@ -19,10 +19,8 @@ from qgsw.models.variables.dynamics import (
     Pressure,
     VelocityFlux,
 )
-from qgsw.models.variables.state import (
-    UVH,
-    State,
-)
+from qgsw.models.variables.state import State
+from qgsw.models.variables.uvh import UVH
 
 
 class KineticEnergy(DiagnosticVariable[torch.Tensor]):
