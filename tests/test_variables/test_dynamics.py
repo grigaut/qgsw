@@ -1,5 +1,6 @@
 """Tests for dynamic variables."""
 
+import pytest
 import torch
 
 from qgsw.models.variables.dynamics import (
@@ -10,7 +11,8 @@ from qgsw.models.variables.dynamics import (
 from qgsw.models.variables.state import UVH, State
 
 
-def init_state() -> State:
+@pytest.fixture
+def state() -> State:
     """Instantiate a state variable."""
     # Shapes
     n_ens = 1
@@ -24,9 +26,8 @@ def init_state() -> State:
     return State(UVH(u, v, h))
 
 
-def test_physical_prognostic_variables() -> None:
+def test_physical_prognostic_variables(state: State) -> None:
     """Test the physical progonstic variables."""
-    state = init_state()
     dx = 2
     dy = 3
     # Variables
@@ -41,9 +42,8 @@ def test_physical_prognostic_variables() -> None:
     assert (h_phys == state.uvh.h / (dx * dy)).all()
 
 
-def test_velocity_flux() -> None:
+def test_velocity_flux(state: State) -> None:
     """Test the velocity flux."""
-    state = init_state()
     dx = 2
     dy = 3
     # Variables
