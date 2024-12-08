@@ -17,23 +17,27 @@ def test_init_update() -> None:
     ny = 10
     state = State.steady(n_ens, nl, nx, ny, dtype=torch.float64, device="cpu")
 
-    assert state.u.shape == (n_ens, nl, nx + 1, ny)
-    assert state.v.shape == (n_ens, nl, nx, ny + 1)
-    assert state.h.shape == (n_ens, nl, nx, ny)
+    u = state.u.get()
+    v = state.v.get()
+    h = state.h.get()
 
-    assert (state.u == 0).all()
-    assert (state.v == 0).all()
-    assert (state.h == 0).all()
+    assert u.shape == (n_ens, nl, nx + 1, ny)
+    assert v.shape == (n_ens, nl, nx, ny + 1)
+    assert h.shape == (n_ens, nl, nx, ny)
 
-    u = torch.clone(state.u) + 1
-    v = torch.clone(state.v) + 2
-    h = torch.clone(state.h) + 3
+    assert (u == 0).all()
+    assert (v == 0).all()
+    assert (h == 0).all()
+
+    u = torch.clone(u) + 1
+    v = torch.clone(v) + 2
+    h = torch.clone(h) + 3
 
     state.update(u, v, h)
 
-    assert (state.u == u).all()
-    assert (state.v == v).all()
-    assert (state.h == h).all()
+    assert (state.u.get() == u).all()
+    assert (state.v.get() == v).all()
+    assert (state.h.get() == h).all()
 
     u += 1
     v += 2
@@ -41,9 +45,9 @@ def test_init_update() -> None:
 
     state.uvh = UVH(u, v, h)
 
-    assert (state.u == u).all()
-    assert (state.v == v).all()
-    assert (state.h == h).all()
+    assert (state.u.get() == u).all()
+    assert (state.v.get() == v).all()
+    assert (state.h.get() == h).all()
 
 
 def test_nested_bound_variables() -> None:
@@ -66,7 +70,7 @@ def test_nested_bound_variables() -> None:
     # Compare values of eta and h
     assert (eta0 == eta1).all()
     # Update state
-    state.update(state.u, state.v, state.h + 2)
+    state.update(state.u.get(), state.v.get(), state.h.get() + 2)
     # Assert all variables must be updated
     assert all(not var.up_to_date for var in state.diag_vars)
     # Compute the value of eta

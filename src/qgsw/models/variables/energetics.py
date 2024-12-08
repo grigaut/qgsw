@@ -11,10 +11,12 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.models.variables.core import (
-    UVH,
+from qgsw.models.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
+)
+from qgsw.models.variables.core import (
+    UVH,
     State,
 )
 from qgsw.models.variables.dynamics import (

@@ -135,17 +135,17 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     @property
     def u(self) -> torch.Tensor:
         """State Variable u: Zonal Speed."""
-        return self._state.u
+        return self._state.u.get()
 
     @property
     def v(self) -> torch.Tensor:
         """State Variable v: Meridional Speed."""
-        return self._state.v
+        return self._state.v.get()
 
     @property
     def h(self) -> torch.Tensor:
         """State Variable h: Layers Thickness."""
-        return self._state.h
+        return self._state.h.get()
 
     @property
     def uvh_phys(self) -> UVH:

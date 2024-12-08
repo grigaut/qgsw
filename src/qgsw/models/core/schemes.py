@@ -5,7 +5,11 @@ from collections.abc import Callable
 from qgsw.models.variables import UVH
 
 
-def rk3_ssp(uvh: UVH, dt: float, time_derivation_func: Callable) -> UVH:
+def rk3_ssp(
+    uvh: UVH,
+    dt: float,
+    time_derivation_func: Callable[[UVH], UVH],
+) -> UVH:
     """Perform time-integration using a RK3-SSP scheme..
 
     Args:

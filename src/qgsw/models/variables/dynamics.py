@@ -9,16 +9,18 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
-from qgsw.models.variables.core import (
-    UVH,
+from qgsw.models.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
-    State,
 )
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from qgsw.masks import Masks
+    from qgsw.models.variables.core import (
+        UVH,
+        State,
+    )
 
 
 class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):

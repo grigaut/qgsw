@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Generic, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, NamedTuple, Self
 
 import torch
+
+from qgsw.models.variables.prognostic import (
+    LayerDepthAnomaly,
+    MeridionalVelocity,
+    ZonalVelocity,
+)
+
+if TYPE_CHECKING:
+    from qgsw.models.variables.base import BoundDiagnosticVariable
 
 
 class UVH(NamedTuple):
@@ -15,133 +23,21 @@ class UVH(NamedTuple):
     v: torch.Tensor
     h: torch.Tensor
 
-    def __mul__(self, value: float) -> UVH:
+    def __mul__(self, other: float) -> UVH:
         """Left mutlitplication."""
-        return UVH(self.u * value, self.v * value, self.h * value)
+        return UVH(self.u * other, self.v * other, self.h * other)
 
-    def __rmul__(self, value: float) -> UVH:
+    def __rmul__(self, other: float) -> UVH:
         """Right multiplication."""
-        return self.__mul__(value)
+        return self.__mul__(other)
 
-    def __add__(self, value: UVH) -> UVH:
+    def __add__(self, other: UVH) -> UVH:
         """Addition."""
-        return UVH(self.u + value.u, self.v + value.v, self.h + value.h)
+        return UVH(self.u + other.u, self.v + other.v, self.h + other.h)
 
-    def __sub__(self, value: UVH) -> UVH:
+    def __sub__(self, other: UVH) -> UVH:
         """Substraction."""
-        return UVH(self.u - value.u, self.v - value.v, self.h - value.h)
-
-
-T = TypeVar("T")
-
-
-class DiagnosticVariable(ABC, Generic[T]):
-    """Diagnostic Variable Base Class."""
-
-    _unit: str = ""
-    _to_bind: list | None
-
-    @property
-    def unit(self) -> str:
-        """Variable unit."""
-        return self._unit
-
-    def __repr__(self) -> str:
-        """Variable string representation."""
-        return f"Diagnostic Variable: {self.__class__} [{self.unit}]"
-
-    @abstractmethod
-    def compute(self, uvh: UVH) -> T:
-        """Compute the value of the variable.
-
-        Args:
-            uvh (UVH): Prognostic variables
-        """
-
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self, T]:
-        """Bind the variable to a given state.
-
-        Args:
-            state (State): State to bind the variable to.
-
-        Returns:
-            BoundDiagnosticVariable: Bound variable.
-        """
-        bound_var = BoundDiagnosticVariable(state, self)
-        state.add_bound_diagnostic_variable(bound_var)
-        return bound_var
-
-
-DiagVar = TypeVar("DiagVar", bound=DiagnosticVariable)
-
-
-class BoundDiagnosticVariable(DiagnosticVariable, Generic[DiagVar, T]):
-    """Bound variable."""
-
-    _up_to_date = False
-
-    def __init__(self, state: State, variable: DiagVar) -> None:
-        """Instantiate the bound variable.
-
-        Args:
-            state (State): State to bound to.
-            variable (DiagnosticVariable): Variable to bound.
-        """
-        self._var = variable
-        self._state = state
-        self._unit = self._var.unit
-
-    def __repr__(self) -> str:
-        """Bound variable representation."""
-        return "Bound " + self._var.__repr__()
-
-    @property
-    def up_to_date(self) -> bool:
-        """Whether the variable must be updated or not."""
-        return self._up_to_date
-
-    def compute(self, uvh: UVH) -> torch.Tensor:
-        """Compute the variable value if outdated.
-
-        Args:
-            uvh (UVH): UVH.
-
-        Returns:
-            torch.Tensor: Variable value.
-        """
-        if self._up_to_date:
-            return self._value
-        self._up_to_date = True
-        self._value = self._var.compute(uvh)
-        return self._value
-
-    def get(self) -> T:
-        """Get the variable value.
-
-        Returns:
-            torch.Tensor: Variable value.
-        """
-        return self.compute(self._state.uvh)
-
-    def outdated(self) -> None:
-        """Set the variable as outdated.
-
-        Next call to 'get' or 'compute' will recompute the value.
-        """
-        self._up_to_date = False
-
-    def bind(self, state: State) -> BoundDiagnosticVariable:
-        """Bind the variable to anotehr state if required.
-
-        Args:
-            state (State): State to bound to
-
-        Returns:
-            BoundDiagnosticVariable: Bound variable.
-        """
-        if state is not self._state:
-            return self._var.bind(state)
-        return self
+        return self.__add__(-1 * other)
 
 
 class State:
@@ -172,22 +68,25 @@ class State:
     @uvh.setter
     def uvh(self, uvh: UVH) -> None:
         self._uvh = uvh
+        self._u = ZonalVelocity(uvh.u)
+        self._v = MeridionalVelocity(uvh.v)
+        self._h = LayerDepthAnomaly(uvh.h)
         self._updated()
 
     @property
-    def u(self) -> torch.Tensor:
+    def u(self) -> ZonalVelocity:
         """Prognostic zonal velocity."""
-        return self._uvh.u
+        return self._u
 
     @property
-    def v(self) -> torch.Tensor:
+    def v(self) -> MeridionalVelocity:
         """Prognostic meriodional velocity."""
-        return self._uvh.v
+        return self._v
 
     @property
-    def h(self) -> torch.Tensor:
+    def h(self) -> LayerDepthAnomaly:
         """Prognostic layer thickness anomaly."""
-        return self._uvh.h
+        return self._h
 
     @property
     def diag_vars(self) -> list[BoundDiagnosticVariable]:
