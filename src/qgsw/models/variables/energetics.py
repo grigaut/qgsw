@@ -16,14 +16,15 @@ from qgsw.models.variables.base import (
     DiagnosticVariable,
 )
 from qgsw.models.variables.dynamics import (
+    MeridionalVelocityFlux,
     Pressure,
-    VelocityFlux,
+    ZonalVelocityFlux,
 )
 from qgsw.models.variables.state import State
 from qgsw.models.variables.uvh import UVH
 
 
-class KineticEnergy(DiagnosticVariable[torch.Tensor]):
+class KineticEnergy(DiagnosticVariable):
     """Kinetic Energy Variable."""
 
     _unit = "m²s⁻²"
@@ -33,16 +34,21 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
     def __init__(
         self,
         masks: Masks,
-        UV: VelocityFlux,  # noqa: N803
+        U: ZonalVelocityFlux,  # noqa: N803
+        V: MeridionalVelocityFlux,  # noqa:N803
     ) -> None:
         """Instantiate Kinetic Energy variable.
 
         Args:
             masks (Masks): Masks.
-            UV (VelocityFlux): Velocity Flux (Contravarianrt velocity vector).
+            U (ZonalVelocityFlux): Zonal Velocity Flux
+            (Contravariant velocity vector).
+            V (MeriodionalVelocityFlux): Meriodional Velocity Flux
+            (Contravariant velocity vector).
         """
         self._h_mask = masks.h
-        self._UV = UV
+        self._U = U
+        self._V = V
         self._comp_ke = OptimizableFunction(finite_diff.comp_ke)
 
     def compute(self, uvh: UVH) -> torch.Tensor:
@@ -55,13 +61,14 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
             torch.Tensor: Kinetic energy.
         """
         u, v, _ = uvh
-        U, V = self._UV.compute(uvh)  # noqa: N806
+        U = self._U.compute(uvh)  # noqa: N806
+        V = self._V.compute(uvh)  # noqa: N806
         return self._comp_ke(u, U, v, V) * self._h_mask
 
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -70,12 +77,13 @@ class KineticEnergy(DiagnosticVariable[torch.Tensor]):
         Returns:
             BoundDiagnosticVariable: Bound variable.
         """
-        # Bind the UV variable
-        self._UV = self._UV.bind(state)
+        # Bind the UV variables
+        self._U = self._U.bind(state)
+        self._V = self._V.bind(state)
         return super().bind(state)
 
 
-class TotalKineticEnergy(DiagnosticVariable[torch.Tensor]):
+class TotalKineticEnergy(DiagnosticVariable):
     """Total Kinetic Energy."""
 
     _unit = "m²s⁻²"
@@ -99,12 +107,12 @@ class TotalKineticEnergy(DiagnosticVariable[torch.Tensor]):
         Returns:
             torch.Tensor: Total kinetic energy, shape: (n_ens).
         """
-        return torch.sum(self._ke.compute(uvh), dim=[-1, -2, -3]).cpu().item()
+        return torch.sum(self._ke.compute(uvh), dim=[-1, -2, -3])
 
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -118,7 +126,7 @@ class TotalKineticEnergy(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class TotalModalKineticEnergy(DiagnosticVariable[torch.Tensor]):
+class TotalModalKineticEnergy(DiagnosticVariable):
     """Compute total modal kinetic energy."""
 
     _unit = ""
@@ -162,7 +170,7 @@ class TotalModalKineticEnergy(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -176,7 +184,7 @@ class TotalModalKineticEnergy(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class TotalModalAvailablePotentialEnergy(DiagnosticVariable[torch.Tensor]):
+class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
     """Total modal available potential energy."""
 
     _unit = ""
@@ -214,7 +222,7 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -228,7 +236,7 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class TotalModalEnergy(DiagnosticVariable[torch.Tensor]):
+class TotalModalEnergy(DiagnosticVariable):
     """Total modal energy."""
 
     _unit = ""
@@ -264,7 +272,7 @@ class TotalModalEnergy(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:

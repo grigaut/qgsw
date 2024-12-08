@@ -1,11 +1,9 @@
 """Prognostic variables."""
 
-import torch
-
 from qgsw.models.variables.base import PrognosticVariable
 
 
-class ZonalVelocity(PrognosticVariable[torch.Tensor]):
+class ZonalVelocity(PrognosticVariable):
     """Zonal Velocity."""
 
     _unit = "s⁻¹"
@@ -13,7 +11,7 @@ class ZonalVelocity(PrognosticVariable[torch.Tensor]):
     _description = "Contravariant zonal velocity."
 
 
-class MeridionalVelocity(PrognosticVariable[torch.Tensor]):
+class MeridionalVelocity(PrognosticVariable):
     """Meridional Velocity."""
 
     _unit = "s⁻¹"
@@ -21,7 +19,7 @@ class MeridionalVelocity(PrognosticVariable[torch.Tensor]):
     _description = "Contravariant zonal velocity."
 
 
-class LayerDepthAnomaly(PrognosticVariable[torch.Tensor]):
+class LayerDepthAnomaly(PrognosticVariable):
     """Layer Depth Anomaly."""
 
     _unit = "m³"

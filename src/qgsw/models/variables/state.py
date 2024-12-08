@@ -35,7 +35,10 @@ class State:
             uvh (UVH): Prognostic variables.
         """
         self.unbind()
-        self.uvh = uvh
+        self._uvh = uvh
+        self._u = ZonalVelocity(uvh.u)
+        self._v = MeridionalVelocity(uvh.v)
+        self._h = LayerDepthAnomaly(uvh.h)
 
     @property
     def uvh(self) -> UVH:
@@ -45,9 +48,9 @@ class State:
     @uvh.setter
     def uvh(self, uvh: UVH) -> None:
         self._uvh = uvh
-        self._u = ZonalVelocity(uvh.u)
-        self._v = MeridionalVelocity(uvh.v)
-        self._h = LayerDepthAnomaly(uvh.h)
+        self._u.update(uvh.u)
+        self._v.update(uvh.v)
+        self._h.update(uvh.h)
         self._updated()
 
     @property

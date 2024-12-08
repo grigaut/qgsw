@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class Variable(Generic[T]):
+class Variable:
     """Variable."""
 
     _unit: str
@@ -26,15 +26,25 @@ class Variable(Generic[T]):
         """Variable unit."""
         return self._unit
 
+    @property
+    def name(self) -> str:
+        """Variable name."""
+        return self._name
+
+    @property
+    def description(self) -> str:
+        """Variable description."""
+        return self._description
+
     def __repr__(self) -> str:
         """Variable string representation."""
         return f"Variable {self._name} [{self.unit}]: {self._description}"
 
 
-class PrognosticVariable(Variable[T]):
+class PrognosticVariable(Variable):
     """Prognostic variable."""
 
-    def __init__(self, initial: T) -> None:
+    def __init__(self, initial: torch.Tensor) -> None:
         """Instantiate the variable.
 
         Args:
@@ -64,7 +74,24 @@ class PrognosticVariable(Variable[T]):
         """Substraction."""
         return self.__add__(-1 * other)
 
-    def get(self) -> T:
+    def update(self, data: torch.Tensor) -> None:
+        """Update the variable value.
+
+        Args:
+            data (torch.Tensor): New value for the variable.
+
+        Raises:
+            ValueError: If the value shape does not match.
+        """
+        if self._data.shape != data.shape:
+            msg = (
+                f"Invalid shape, expected {self._data.shape}"
+                f", received {data.shape}."
+            )
+            raise ValueError(msg)
+        self._data = data
+
+    def get(self) -> torch.Tensor:
         """Variable value.
 
         Returns:
@@ -73,7 +100,7 @@ class PrognosticVariable(Variable[T]):
         return self._data
 
 
-class DiagnosticVariable(Variable[T], ABC):
+class DiagnosticVariable(Variable, ABC):
     """Diagnostic Variable Base Class."""
 
     def __repr__(self) -> str:
@@ -81,14 +108,14 @@ class DiagnosticVariable(Variable[T], ABC):
         return super().__repr__() + " (Diagnostic)"
 
     @abstractmethod
-    def compute(self, uvh: UVH) -> T:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
             uvh (UVH): Prognostic variables
         """
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self, T]:
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -105,7 +132,7 @@ class DiagnosticVariable(Variable[T], ABC):
 DiagVar = TypeVar("DiagVar", bound=DiagnosticVariable)
 
 
-class BoundDiagnosticVariable(DiagnosticVariable, Generic[DiagVar, T]):
+class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
     """Bound variable."""
 
     _up_to_date = False
@@ -120,6 +147,8 @@ class BoundDiagnosticVariable(DiagnosticVariable, Generic[DiagVar, T]):
         self._var = variable
         self._state = state
         self._unit = self._var.unit
+        self._name = self._var.name
+        self._description = self._var.description
 
     def __repr__(self) -> str:
         """Bound variable representation."""
@@ -145,7 +174,7 @@ class BoundDiagnosticVariable(DiagnosticVariable, Generic[DiagVar, T]):
         self._value = self._var.compute(uvh)
         return self._value
 
-    def get(self) -> T:
+    def get(self) -> torch.Tensor:
         """Get the variable value.
 
         Returns:

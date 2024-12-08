@@ -21,24 +21,22 @@ if TYPE_CHECKING:
     from qgsw.models.variables.uvh import UVH
 
 
-class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+class PhysicalZonalVelocity(DiagnosticVariable):
     """Physical zonal velocity."""
 
     _unit = "m.s⁻¹"
-    _name = "uv_phys"
-    _description = "Physical horizontal velocity."
+    _name = "u_phys"
+    _description = "Physical zonal velocity."
 
-    def __init__(self, dx: float, dy: float) -> None:
+    def __init__(self, dx: float) -> None:
         """Instantiate the variable.
 
         Args:
             dx (float): Elementary distance in the x direction.
-            dy (float): Elementary distance in the y direction.
         """
         self._dx = dx
-        self._dy = dy
 
-    def compute(self, uvh: UVH) -> tuple[torch.Tensor, torch.Tensor]:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -47,10 +45,37 @@ class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             torch.Tensor: Physical zonal velocity component.
         """
-        return (uvh.u / self._dx, uvh.v / self._dy)
+        return uvh.u / self._dx
 
 
-class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
+class PhysicalMeridionalVelocity(DiagnosticVariable):
+    """Physical zonal velocity."""
+
+    _unit = "m.s⁻¹"
+    _name = "v_phys"
+    _description = "Physical meridional velocity."
+
+    def __init__(self, dy: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            dy (float): Elementary distance in the x direction.
+        """
+        self._dy = dy
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Physical zonal velocity component.
+        """
+        return uvh.v / self._dy
+
+
+class PhysicalLayerDepthAnomaly(DiagnosticVariable):
     """Physical layer depth anomaly."""
 
     _unit = "m"
@@ -77,24 +102,22 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
         return uvh.h / self._ds
 
 
-class VelocityFlux(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+class ZonalVelocityFlux(DiagnosticVariable):
     """Velocity flux."""
 
     _unit = "s⁻¹"
-    _name = "UV"
-    _description = "Horizontal velocity flux."
+    _name = "U"
+    _description = "Zonal velocity flux."
 
-    def __init__(self, dx: float, dy: float) -> None:
+    def __init__(self, dx: float) -> None:
         """Instantiate the variable.
 
         Args:
             dx (float): Elementary distance in the x direction.
-            dy (float): Elementary distance in the y direction.
         """
         self._dx = dx
-        self._dy = dy
 
-    def compute(self, uvh: UVH) -> tuple[torch.Tensor, torch.Tensor]:
+    def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -103,10 +126,37 @@ class VelocityFlux(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             UVH: Value
         """
-        return (uvh.u / self._dx**2, uvh.v / self._dy**2)
+        return uvh.u / self._dx**2
 
 
-class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
+class MeridionalVelocityFlux(DiagnosticVariable):
+    """Velocity flux."""
+
+    _unit = "s⁻¹"
+    _name = "V"
+    _description = "Meriodional velocity flux."
+
+    def __init__(self, dy: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            dy (float): Elementary distance in the y direction.
+        """
+        self._dy = dy
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            UVH: Value
+        """
+        return uvh.v / self._dy**2
+
+
+class SurfaceHeightAnomaly(DiagnosticVariable):
     """Surface height anomaly."""
 
     _unit = "m"
@@ -137,7 +187,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -151,7 +201,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class Vorticity(DiagnosticVariable[torch.Tensor]):
+class Vorticity(DiagnosticVariable):
     """Vorticity Diagnostic Variable."""
 
     _unit = "m².s⁻¹"
@@ -200,7 +250,7 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
         return omega
 
 
-class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
+class PhysicalVorticity(DiagnosticVariable):
     """Physical vorticity."""
 
     _unit = "s⁻¹"
@@ -231,7 +281,7 @@ class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -245,7 +295,7 @@ class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class Pressure(DiagnosticVariable[torch.Tensor]):
+class Pressure(DiagnosticVariable):
     """Pressure."""
 
     _unit = "m².s⁻²"
@@ -276,7 +326,7 @@ class Pressure(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Pressure, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Pressure]:
         """Bind the variable to a given state.
 
         Args:
@@ -290,7 +340,7 @@ class Pressure(DiagnosticVariable[torch.Tensor]):
         return super().bind(state)
 
 
-class PotentialVorticity(DiagnosticVariable[torch.Tensor]):
+class PotentialVorticity(DiagnosticVariable):
     """Potential Vorticity."""
 
     _unit = "s⁻¹"
@@ -333,7 +383,7 @@ class PotentialVorticity(DiagnosticVariable[torch.Tensor]):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:

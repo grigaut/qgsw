@@ -16,7 +16,7 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.exceptions import (
     IncoherentWithMaskError,
 )
-from qgsw.models.io import ModelResultsRetriever
+from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.variables import (
     UVH,
@@ -27,10 +27,12 @@ from qgsw.models.variables import (
     Vorticity,
 )
 from qgsw.models.variables.dynamics import (
+    MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
-    PhysicalVelocity,
+    PhysicalMeridionalVelocity,
     PhysicalVorticity,
-    VelocityFlux,
+    PhysicalZonalVelocity,
+    ZonalVelocityFlux,
 )
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
@@ -41,7 +43,7 @@ if TYPE_CHECKING:
     from qgsw.specs._utils import Device
 
 
-class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
+class Model(ModelParamChecker, metaclass=ABCMeta):
     """Base class for models.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -107,7 +109,6 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
             g_prime=g_prime,
             beta_plane=beta_plane,
         )
-        ModelResultsRetriever.__init__(self)
         self._compute_coriolis()
         ##Topography and Ref values
         self._set_ref_variables()
@@ -121,11 +122,17 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
             dtype=self.dtype,
             device=self.device.get(),
         )
+        self._io = IO(u=self._state.u, v=self._state.v, h=self._state.h)
         # initialize variables
         self._create_diagnostic_vars(self._state)
 
         self._set_utils(optimize)
         self._set_fluxes(optimize)
+
+    @property
+    def io(self) -> IO:
+        """Input/Output manager."""
+        return self._io
 
     @property
     def uvh(self) -> UVH:
@@ -150,7 +157,7 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     @property
     def uvh_phys(self) -> UVH:
         """Physical prognostic variables."""
-        return UVH(*self._uv_phys.get(), self._h_phys.get())
+        return UVH(self._u_phys.get(), self._v_phys.get(), self._h_phys.get())
 
     @property
     def omega(self) -> torch.Tensor:
@@ -175,12 +182,12 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
     @property
     def U(self) -> torch.Tensor:  # noqa: N802
         """Flux of u."""
-        return self._UV.get()[0]
+        return self._U.get()
 
     @property
     def V(self) -> torch.Tensor:  # noqa: N802
         """Flux of v."""
-        return self._UV.get()[1]
+        return self._V.get()
 
     @property
     def k_energy(self) -> torch.Tensor:
@@ -272,24 +279,37 @@ class Model(ModelParamChecker, ModelResultsRetriever, metaclass=ABCMeta):
 
     def _create_diagnostic_vars(self, state: State) -> None:
         state.unbind()
+        self.io.remove_diagnostic_vars()
 
-        uv_phys = PhysicalVelocity(dx=self.space.dx, dy=self.space.dy)
+        u_phys = PhysicalZonalVelocity(dx=self.space.dx)
+        v_phys = PhysicalMeridionalVelocity(dy=self.space.dy)
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.area)
-        UV = VelocityFlux(dx=self.space.dx, dy=self.space.dy)  # noqa: N806
+        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
+        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
         omega_phys = PhysicalVorticity(omega, ds=self.space.area)
         eta = SurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta=eta)
-        k_energy = KineticEnergy(masks=self.masks, UV=UV)
+        k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
-        self._uv_phys = uv_phys.bind(state)
+        self._u_phys = u_phys.bind(state)
+        self._v_phys = v_phys.bind(state)
         self._h_phys = h_phys.bind(state)
-        self._UV = UV.bind(state)
+        self._U = U.bind(state)
+        self._V = V.bind(state)
         self._omega = omega.bind(state)
         self._omega_phys = omega_phys.bind(state)
         self._eta = eta.bind(state)
         self._p = p.bind(state)
         self._k_energy = k_energy.bind(state)
+
+        self.io.add_diagnostic_vars(
+            self._u_phys,
+            self._v_phys,
+            self._h_phys,
+            self._omega_phys,
+            self._p,
+        )
 
     def set_physical_uvh(
         self,
