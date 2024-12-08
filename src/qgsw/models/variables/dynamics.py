@@ -9,22 +9,24 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
-from qgsw.models.variables.core import (
-    UVH,
+from qgsw.models.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
-    State,
 )
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from qgsw.masks import Masks
+    from qgsw.models.variables.state import State
+    from qgsw.models.variables.uvh import UVH
 
 
 class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
     """Physical zonal velocity."""
 
     _unit = "m.s⁻¹"
+    _name = "uv_phys"
+    _description = "Physical horizontal velocity."
 
     def __init__(self, dx: float, dy: float) -> None:
         """Instantiate the variable.
@@ -45,13 +47,15 @@ class PhysicalVelocity(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
         Returns:
             torch.Tensor: Physical zonal velocity component.
         """
-        return (uvh.u * self._dx, uvh.v * self._dy)
+        return (uvh.u / self._dx, uvh.v / self._dy)
 
 
 class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
     """Physical layer depth anomaly."""
 
     _unit = "m"
+    _name = "h_phys"
+    _description = "Physical layer depth anomaly."
 
     def __init__(self, ds: float) -> None:
         """Instantiate the variable.
@@ -73,10 +77,12 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable[torch.Tensor]):
         return uvh.h / self._ds
 
 
-class Momentum(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
-    """Physical Zonal velocity Variable."""
+class VelocityFlux(DiagnosticVariable[tuple[torch.Tensor, torch.Tensor]]):
+    """Velocity flux."""
 
-    _unit = "m².s⁻¹"
+    _unit = "s⁻¹"
+    _name = "UV"
+    _description = "Horizontal velocity flux."
 
     def __init__(self, dx: float, dy: float) -> None:
         """Instantiate the variable.
@@ -104,6 +110,8 @@ class SurfaceHeightAnomaly(DiagnosticVariable[torch.Tensor]):
     """Surface height anomaly."""
 
     _unit = "m"
+    _name = "eta"
+    _description = "Surface height anomaly."
 
     def __init__(self, h_phys: PhysicalLayerDepthAnomaly) -> None:
         """Instantiate variable.
@@ -147,21 +155,20 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
     """Vorticity Diagnostic Variable."""
 
     _unit = "m².s⁻¹"
+    _name = "omega"
+    _description = "Vorticity."
 
     def __init__(
         self,
-        UV: Momentum,  # noqa: N803
         masks: Masks,
         slip_coef: float,
     ) -> None:
         """Instantiate the vorticity variable.
 
         Args:
-            UV (Momentum): Momentum (Covariant velocity).
             masks (Masks): Masks
             slip_coef (float): Slip coefficient
         """
-        self._UV = UV
         self._slip_coef = slip_coef
         self._w_valid = masks.w_valid
         self._w_cornerout_bound = masks.w_cornerout_bound
@@ -177,9 +184,9 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
         Returns:
             torch.Tensor: Vorticity
         """
-        U, V = self._UV.compute(uvh)  # noqa: N806
-        u_ = F.pad(U, (1, 1, 0, 0))
-        v_ = F.pad(V, (0, 0, 1, 1))
+        u, v, _ = uvh
+        u_ = F.pad(u, (1, 1, 0, 0))
+        v_ = F.pad(v, (0, 0, 1, 1))
         dx_v = torch.diff(v_, dim=-2)
         dy_u = torch.diff(u_, dim=-1)
         curl_uv = dx_v - dy_u
@@ -192,27 +199,13 @@ class Vorticity(DiagnosticVariable[torch.Tensor]):
         )
         return omega
 
-    def bind(
-        self,
-        state: State,
-    ) -> BoundDiagnosticVariable[Self, torch.Tensor]:
-        """Bind the variable to a given state.
-
-        Args:
-            state (State): State to bind the variable to.
-
-        Returns:
-            BoundDiagnosticVariable: Bound variable.
-        """
-        # Bind the UV variable
-        self._UV = self._UV.bind(state)
-        return super().bind(state)
-
 
 class PhysicalVorticity(DiagnosticVariable[torch.Tensor]):
     """Physical vorticity."""
 
     _unit = "s⁻¹"
+    _name = "omega_phys"
+    _description = "Physical vorticity."
 
     def __init__(self, vorticity: Vorticity, ds: float) -> None:
         """Instantiate the variable.
@@ -256,6 +249,8 @@ class Pressure(DiagnosticVariable[torch.Tensor]):
     """Pressure."""
 
     _unit = "m².s⁻²"
+    _name = "p"
+    _description = "Pressure per unit of mass."
 
     def __init__(self, g_prime: float, eta: SurfaceHeightAnomaly) -> None:
         """Instantiate the pressure variable.
@@ -299,6 +294,8 @@ class PotentialVorticity(DiagnosticVariable[torch.Tensor]):
     """Potential Vorticity."""
 
     _unit = "s⁻¹"
+    _name = "pv"
+    _description = "Potential vorticity."
 
     def __init__(
         self,

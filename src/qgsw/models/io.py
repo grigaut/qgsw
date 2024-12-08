@@ -7,7 +7,7 @@ import torch
 
 from qgsw import verbose
 from qgsw.models.exceptions import InvalidSavingFileError
-from qgsw.models.variables.core import UVH
+from qgsw.models.variables import UVH
 from qgsw.specs._utils import Device
 
 

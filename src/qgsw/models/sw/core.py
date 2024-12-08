@@ -181,17 +181,17 @@ class SW(Model):
         """
         # Zonal velocity -> corresponds to the v grid
         # Has no value on the boundary of the v grid
-        u_m = self.points_to_surfaces(self.u)
+        U_m = self.points_to_surfaces(self.U)  # noqa: N806
         # Meridional velocity -> corresponds to the u grid
         # Has no value on the boundary of the u grid
-        v_m = self.points_to_surfaces(self.v)
+        V_m = self.points_to_surfaces(self.V)  # noqa: N806
 
         # Vortex-force + Coriolis
-        omega_v_m = self._fluxes.w_y(self.omega[..., 1:-1, :], v_m)
-        omega_u_m = self._fluxes.w_x(self.omega[..., 1:-1], u_m)
+        omega_v_m = self._fluxes.w_y(self.omega[..., 1:-1, :], V_m)
+        omega_u_m = self._fluxes.w_x(self.omega[..., 1:-1], U_m)
 
-        dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * v_m
-        dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * u_m)
+        dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * V_m
+        dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * U_m)
 
         # grad pressure + k_energy
         ke_pressure = self.k_energy + self.p
