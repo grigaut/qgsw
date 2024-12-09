@@ -30,6 +30,7 @@ from qgsw.variables import (
     PhysicalZonalVelocity,
     Pressure,
     State,
+    StreamFunction,
     SurfaceHeightAnomaly,
     Vorticity,
     ZonalVelocityFlux,
@@ -178,6 +179,11 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         return self._p.get()
 
     @property
+    def psi(self) -> torch.Tensor:
+        """Stream function."""
+        return self._psi.get()
+
+    @property
     def U(self) -> torch.Tensor:  # noqa: N802
         """Flux of u."""
         return self._U.get()
@@ -288,6 +294,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         omega_phys = PhysicalVorticity(omega, ds=self.space.area)
         eta = SurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta=eta)
+        psi = StreamFunction(pressure=p, f0=self.beta_plane.f0)
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
         self._u_phys = u_phys.bind(state)
@@ -299,6 +306,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         self._omega_phys = omega_phys.bind(state)
         self._eta = eta.bind(state)
         self._p = p.bind(state)
+        self._psi = psi.bind(state)
         self._k_energy = k_energy.bind(state)
 
         self.io.add_diagnostic_vars(
@@ -307,6 +315,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
             self._h_phys,
             self._omega_phys,
             self._p,
+            self._psi,
         )
 
     def set_physical_uvh(

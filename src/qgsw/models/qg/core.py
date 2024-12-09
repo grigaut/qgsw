@@ -182,10 +182,16 @@ class QG(Model):
             self.space.area,
             self.beta_plane.f0,
         )
-        total_ke_hat = TotalModalKineticEnergy(self.A, self._p)
+        total_ke_hat = TotalModalKineticEnergy(
+            self.A,
+            self._psi,
+            self.space.dx,
+            self.space.dy,
+        )
         total_ape_hat = TotalModalAvailablePotentialEnergy(
             self.A,
-            self._p,
+            self._psi,
+            self.beta_plane.f0,
         )
         total_energy = TotalModalEnergy(total_ke_hat, total_ape_hat)
 
@@ -194,7 +200,12 @@ class QG(Model):
         self._ape_hat = total_ape_hat.bind(self._state)
         self._total_energy = total_energy.bind(self._state)
 
-        self.io.add_diagnostic_vars(self._pv)
+        self.io.add_diagnostic_vars(
+            self._pv,
+            self._ke_hat,
+            self._ape_hat,
+            self.total_energy,
+        )
 
     def compute_A(  # noqa: N802
         self,

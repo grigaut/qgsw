@@ -395,3 +395,45 @@ class PotentialVorticity(DiagnosticVariable):
         # Bind the vorticity variable
         self._vorticity = self._vorticity.bind(state)
         return super().bind(state)
+
+
+class StreamFunction(DiagnosticVariable):
+    """Stream function variable."""
+
+    _unit = "m².s⁻¹"
+    _name = "psi"
+    _description = "Stream function."
+
+    def __init__(self, pressure: Pressure, f0: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            pressure (Pressure): Pressure variable.
+            f0 (float): Coriolis parameter.
+        """
+        self._p = pressure
+        self._f0 = f0
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Stream function.
+        """
+        return self._p.compute(uvh) / self._f0
+
+    def bind(self, state: State) -> BoundDiagnosticVariable:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the pressure variable
+        self._p = self._p.bind(state)
+        return super().bind(state)
