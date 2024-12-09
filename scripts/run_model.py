@@ -118,6 +118,7 @@ with Progress() as progress:
         if config.io.results.save and (n % freq_save == 0 or n == n_steps):
             directory = config.io.results.directory
             name = config.model.name_sc
+            print(f"[n={n:05d}/{n_steps:05d}] -> ", end="")  # noqa: T201
             model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
         model.step()
 

@@ -2,8 +2,8 @@
 
 import torch
 
-from qgsw.models.variables import UVH, State
-from qgsw.models.variables.dynamics import (
+from qgsw.variables import UVH, State
+from qgsw.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     SurfaceHeightAnomaly,
 )

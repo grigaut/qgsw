@@ -6,15 +6,15 @@ from typing import TYPE_CHECKING, Self
 
 import torch
 
-from qgsw.models.variables.prognostic import (
+from qgsw.variables.prognostic import (
     LayerDepthAnomaly,
     MeridionalVelocity,
     ZonalVelocity,
 )
-from qgsw.models.variables.uvh import UVH
+from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
-    from qgsw.models.variables.base import BoundDiagnosticVariable
+    from qgsw.variables.base import BoundDiagnosticVariable
 
 
 class State:

@@ -2,9 +2,9 @@
 name = "Two Layers Model"
 performance_log = false
 [io.output]
-save_results = false
-quantity = 10
-directory = "results"
+save_results = true
+quantity = 100
+directory = "results_"
 
 [physics]
 rho = 1000

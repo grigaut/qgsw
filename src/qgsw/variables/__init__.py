@@ -1,6 +1,6 @@
 """Variables."""
 
-from qgsw.models.variables.dynamics import (
+from qgsw.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
@@ -12,17 +12,24 @@ from qgsw.models.variables.dynamics import (
     Vorticity,
     ZonalVelocityFlux,
 )
-from qgsw.models.variables.energetics import (
+from qgsw.variables.energetics import (
     KineticEnergy,
     TotalKineticEnergy,
     TotalModalAvailablePotentialEnergy,
     TotalModalEnergy,
     TotalModalKineticEnergy,
 )
-from qgsw.models.variables.state import State
-from qgsw.models.variables.uvh import UVH
+from qgsw.variables.prognostic import (
+    LayerDepthAnomaly,
+    MeridionalVelocity,
+    ZonalVelocity,
+)
+from qgsw.variables.state import State
+from qgsw.variables.uvh import UVH
 
 __all__ = [
+    "LayerDepthAnomaly",
+    "MeridionalVelocity",
     "MeridionalVelocityFlux",
     "PhysicalLayerDepthAnomaly",
     "PhysicalMeridionalVelocity",
@@ -38,6 +45,7 @@ __all__ = [
     "TotalModalEnergy",
     "TotalModalKineticEnergy",
     "UVH",
+    "ZonalVelocity",
     "ZonalVelocityFlux",
     "Vorticity",
 ]

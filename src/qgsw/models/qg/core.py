@@ -19,13 +19,15 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.models.sw.core import SW
-from qgsw.models.variables import UVH, PotentialVorticity, State
-from qgsw.models.variables.energetics import (
+from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.variables import (
+    UVH,
+    PotentialVorticity,
+    State,
     TotalModalAvailablePotentialEnergy,
     TotalModalEnergy,
     TotalModalKineticEnergy,
 )
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from collections.abc import Callable

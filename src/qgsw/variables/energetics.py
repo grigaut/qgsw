@@ -11,17 +11,17 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.models.variables.base import (
+from qgsw.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
 )
-from qgsw.models.variables.dynamics import (
+from qgsw.variables.dynamics import (
     MeridionalVelocityFlux,
     Pressure,
     ZonalVelocityFlux,
 )
-from qgsw.models.variables.state import State
-from qgsw.models.variables.uvh import UVH
+from qgsw.variables.state import State
+from qgsw.variables.uvh import UVH
 
 
 class KineticEnergy(DiagnosticVariable):

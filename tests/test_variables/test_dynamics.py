@@ -3,14 +3,14 @@
 import pytest
 import torch
 
-from qgsw.models.variables import (
+from qgsw.variables import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
     PhysicalZonalVelocity,
     ZonalVelocityFlux,
 )
-from qgsw.models.variables.state import UVH, State
+from qgsw.variables.state import UVH, State
 
 
 @pytest.fixture

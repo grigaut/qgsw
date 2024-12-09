@@ -18,24 +18,22 @@ from qgsw.models.exceptions import (
 )
 from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.variables import (
+from qgsw.spatial.core import grid_conversion as convert
+from qgsw.specs import DEVICE
+from qgsw.variables import (
     UVH,
     KineticEnergy,
-    Pressure,
-    State,
-    SurfaceHeightAnomaly,
-    Vorticity,
-)
-from qgsw.models.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
     PhysicalVorticity,
     PhysicalZonalVelocity,
+    Pressure,
+    State,
+    SurfaceHeightAnomaly,
+    Vorticity,
     ZonalVelocityFlux,
 )
-from qgsw.spatial.core import grid_conversion as convert
-from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane

@@ -14,7 +14,6 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.models.sw.core import SW
-from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
@@ -22,6 +21,7 @@ from qgsw.spatial.core.discretization import (
 )
 from qgsw.specs import DEVICE
 from qgsw.utils.gaussian_filtering import GaussianFilter2D
+from qgsw.variables import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane

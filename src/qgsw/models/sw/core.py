@@ -12,10 +12,10 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
-from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.variables import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
