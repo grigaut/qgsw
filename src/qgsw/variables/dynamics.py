@@ -180,8 +180,6 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
         Returns:
             torch.Tensor: Surface height anomaly
         """
-        # the prognostic variable is h^* = h dx dy
-        # then uvh.h must be divided by dx dy
         return reverse_cumsum(self._h_phys.compute(uvh), dim=-3)
 
     def bind(
@@ -326,7 +324,7 @@ class Pressure(DiagnosticVariable):
     def bind(
         self,
         state: State,
-    ) -> BoundDiagnosticVariable[Pressure]:
+    ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
@@ -425,7 +423,7 @@ class StreamFunction(DiagnosticVariable):
         """
         return self._p.compute(uvh) / self._f0
 
-    def bind(self, state: State) -> BoundDiagnosticVariable:
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:

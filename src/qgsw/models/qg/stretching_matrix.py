@@ -66,7 +66,7 @@ def compute_layers_to_mode_decomposition(
     lambd: torch.Tensor = lambd_r.real.reshape((1, A.shape[0], 1, 1))
     R, L = R.real, L.real  # noqa: N806
     # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
-    # layer to mode: pseudo inverse of R
+    # layer to mode
     Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T  # noqa: N806
     # mode to layer
     Cm2l = R  # noqa: N806

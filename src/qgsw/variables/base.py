@@ -189,7 +189,7 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         """
         self._up_to_date = False
 
-    def bind(self, state: State) -> BoundDiagnosticVariable:
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to anotehr state if required.
 
         Args:
