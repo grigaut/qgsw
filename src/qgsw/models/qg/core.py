@@ -22,14 +22,14 @@ from qgsw.models.sw.core import SW
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.variables import (
     UVH,
+    ModalAvailablePotentialEnergy,
+    ModalEnergy,
+    ModalKineticEnergy,
     PotentialVorticity,
     State,
     TotalAvailablePotentialEnergy,
     TotalEnergy,
     TotalKineticEnergy,
-    TotalModalAvailablePotentialEnergy,
-    TotalModalEnergy,
-    TotalModalKineticEnergy,
 )
 
 if TYPE_CHECKING:
@@ -119,17 +119,17 @@ class QG(Model):
 
     @property
     def ke_hat(self) -> torch.Tensor:
-        """Modal kinetic energy, shape: (n_ens)."""
+        """Modal kinetic energy, shape: (n_ens, nl)."""
         return self._ke_hat.get()
 
     @property
     def ape_hat(self) -> torch.Tensor:
-        """Modal available potential energy, shape: (n_ens)."""
+        """Modal available potential energy, shape: (n_ens, nl)."""
         return self._ape_hat.get()
 
     @property
     def total_energy_hat(self) -> torch.Tensor:
-        """Total energy, shape: (n_ens)."""
+        """Total energy, shape: (n_ens, nl)."""
         return self._energy_hat.get()
 
     @property
@@ -200,20 +200,20 @@ class QG(Model):
             self.space.area,
             self.beta_plane.f0,
         )
-        ke_hat = TotalModalKineticEnergy(
+        ke_hat = ModalKineticEnergy(
             self.A,
             self._psi,
             self.H,
             self.space.dx,
             self.space.dy,
         )
-        ape_hat = TotalModalAvailablePotentialEnergy(
+        ape_hat = ModalAvailablePotentialEnergy(
             self.A,
             self._psi,
             self._H,
             self.beta_plane.f0,
         )
-        energy_hat = TotalModalEnergy(ke_hat, ape_hat)
+        energy_hat = ModalEnergy(ke_hat, ape_hat)
         ke = TotalKineticEnergy(
             self._psi,
             self.H,
@@ -238,6 +238,8 @@ class QG(Model):
 
         self.io.add_diagnostic_vars(
             self._pv,
+            self._ke_hat,
+            self._ape_hat,
             self._energy,
         )
 

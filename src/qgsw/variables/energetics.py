@@ -83,8 +83,8 @@ class KineticEnergy(DiagnosticVariable):
         return super().bind(state)
 
 
-class TotalModalKineticEnergy(DiagnosticVariable):
-    """Compute total modal kinetic energy."""
+class ModalKineticEnergy(DiagnosticVariable):
+    """Compute modal kinetic energy."""
 
     _unit = "m².s⁻²"
     _name = "ke_hat"
@@ -128,7 +128,7 @@ class TotalModalKineticEnergy(DiagnosticVariable):
             uvh (UVH): Prognostic variables.
 
         Returns:
-            torch.Tensor: Total modal kinetic energy, shape: (n_ens).
+            torch.Tensor: Modal kinetic energy, shape: (n_ens, nl).
         """
         psi = self._psi.compute(uvh)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
@@ -144,7 +144,7 @@ class TotalModalKineticEnergy(DiagnosticVariable):
             self._Cm2lT_W_Cm2l,
             (psi_hat_dx**2 + psi_hat_dy**2),
         )
-        return 0.5 * torch.sum(psiT_CT_W_C_psi, dim=(-1, -2, -3))
+        return 0.5 * torch.sum(psiT_CT_W_C_psi, dim=(-1, -2))
 
     def bind(
         self,
@@ -163,12 +163,12 @@ class TotalModalKineticEnergy(DiagnosticVariable):
         return super().bind(state)
 
 
-class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
-    """Total modal available potential energy."""
+class ModalAvailablePotentialEnergy(DiagnosticVariable):
+    """Modal available potential energy."""
 
     _unit = "m².s⁻²"
     _name = "ape_hat"
-    _description = "Modal available potential energy."
+    _description = "Available potential energy."
 
     def __init__(
         self,
@@ -204,8 +204,8 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
             uvh (UVH): Prognostic variables.
 
         Returns:
-            torch.Tensor: Total modal avalaible potential energy,
-            shape: (n_ens).
+            torch.Tensor: Modal avalaible potential energy,
+            shape: (n_ens,nl).
         """
         psi = self._psi.compute(uvh)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
@@ -214,7 +214,7 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
             self._Cm2lT_W_Cm2l_lambda,
             psi_hat**2,
         )
-        ape = torch.sum(psiT_CT_W_C_lambda_psi, dim=(-1, -2, -3))
+        ape = torch.sum(psiT_CT_W_C_lambda_psi, dim=(-1, -2))
         return 0.5 * self._f0**2 * ape
 
     def bind(
@@ -234,23 +234,23 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
         return super().bind(state)
 
 
-class TotalModalEnergy(DiagnosticVariable):
-    """Total modal energy."""
+class ModalEnergy(DiagnosticVariable):
+    """Modal energy."""
 
     _unit = "m².s-2"
     _name = "e_tot_hat"
-    _description = "Total modal energy."
+    _description = "Modal energy."
 
     def __init__(
         self,
-        ke_hat: TotalModalKineticEnergy,
-        ape_hat: TotalModalAvailablePotentialEnergy,
+        ke_hat: ModalKineticEnergy,
+        ape_hat: ModalAvailablePotentialEnergy,
     ) -> None:
         """Instantiate variable.
 
         Args:
-            ke_hat (TotalModalKineticEnergy): Total modal kinetic energy
-            ape_hat (TotalModalAvailablePotentialEnergy): Total modal
+            ke_hat (TotalModalKineticEnergy): Modal kinetic energy
+            ape_hat (TotalModalAvailablePotentialEnergy): Modal
             available potential energy
         """
         self._ke = ke_hat
@@ -263,7 +263,7 @@ class TotalModalEnergy(DiagnosticVariable):
             uvh (UVH): Prognostic variables.
 
         Returns:
-            torch.Tensor: Total modal energy, shape: (n_ens)
+            torch.Tensor: Modal total energy, shape: (n_ens)
         """
         return self._ke.compute(uvh) + self._ape.compute(uvh)
 
@@ -431,23 +431,23 @@ class TotalEnergy(DiagnosticVariable):
     """Total modal energy."""
 
     _unit = "m².s-2"
-    _name = "e_tot_hat"
+    _name = "e_tot"
     _description = "Total modal energy."
 
     def __init__(
         self,
-        ke_hat: TotalKineticEnergy,
-        ape_hat: TotalAvailablePotentialEnergy,
+        ke: TotalKineticEnergy,
+        ape: TotalAvailablePotentialEnergy,
     ) -> None:
         """Instantiate variable.
 
         Args:
-            ke_hat (TotalKineticEnergy): Total modal kinetic energy
-            ape_hat (TotalAvailablePotentialEnergy): Total modal
+            ke (TotalKineticEnergy): Total modal kinetic energy
+            ape (TotalAvailablePotentialEnergy): Total modal
             available potential energy
         """
-        self._ke = ke_hat
-        self._ape = ape_hat
+        self._ke = ke
+        self._ape = ape
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute total modal energy.
