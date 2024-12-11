@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import torch
 
-from qgsw import verbose
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -16,57 +14,29 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
+from qgsw.models.qg.stretching_matrix import (
+    compute_A,
+    compute_layers_to_mode_decomposition,
+)
 from qgsw.models.sw.core import SW
-from qgsw.models.variables import UVH
-from qgsw.spatial.core.grid_conversion import cell_corners_to_cell_center
-from qgsw.specs import DEVICE
+from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.variables import (
+    UVH,
+    ModalAvailablePotentialEnergy,
+    ModalEnergy,
+    ModalKineticEnergy,
+    PotentialVorticity,
+    State,
+    TotalAvailablePotentialEnergy,
+    TotalEnergy,
+    TotalKineticEnergy,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
-
-
-def compute_A(  # noqa: N802
-    H: torch.Tensor,  # noqa: N803
-    g_prime: torch.Tensor,
-    dtype: torch.dtype,
-    device: str = DEVICE.get(),
-) -> torch.Tensor:
-    """Compute the stretching operator matrix A.
-
-    Args:
-        H (torch.Tensor): Layers reference height.
-        g_prime (torch.Tensor): Reduced gravity values.
-        dtype (torch.dtype): Data type
-        device (str, optional): Device type. Defaults to DEVICE.
-
-    Returns:
-        torch.Tensor: Streching operator matrix
-    """
-    nl = H.shape[0]
-    if nl == 1:
-        return torch.tensor(
-            [[1.0 / (H * g_prime)]],
-            dtype=dtype,
-            device=device,
-        )
-    A = torch.zeros(  # noqa: N806
-        (nl, nl),
-        dtype=dtype,
-        device=device,
-    )
-    A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
-    A[0, 1] = -1.0 / (H[0] * g_prime[1])
-    for i in range(1, nl - 1):
-        A[i, i - 1] = -1.0 / (H[i] * g_prime[i])
-        A[i, i] = 1.0 / H[i] * (1 / g_prime[i + 1] + 1 / g_prime[i])
-        A[i, i + 1] = -1.0 / (H[i] * g_prime[i + 1])
-    A[-1, -1] = 1.0 / (H[nl - 1] * g_prime[nl - 1])
-    A[-1, -2] = -1.0 / (H[nl - 1] * g_prime[nl - 1])
-    return A
 
 
 def G(  # noqa: N802
@@ -76,7 +46,7 @@ def G(  # noqa: N802
     A: torch.Tensor,  # noqa: N803
     f0: float,
     p_i: torch.Tensor = None,
-    corner_to_center: Callable = cell_corners_to_cell_center,
+    corner_to_center: Callable = points_to_surfaces,
 ) -> UVH:
     """G operator.
 
@@ -89,7 +59,7 @@ def G(  # noqa: N802
         p_i (torch.Tensor, optional): Interpolated pressure
         ("middle of grid cell"). Defaults to None.
         corner_to_center (Callable, optional): Corner to center interpolation
-        function. Defaults to cell_corners_to_cell_center.
+        function. Defaults to points_to_surfaces.
 
     Returns:
         UVH: Resulting u v and h
@@ -125,6 +95,7 @@ class QG(Model):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self.A = self.compute_A(space_3d.h.xyh.h[:, 0, 0], g_prime[:, 0, 0])
         super().__init__(
             space_3d=space_3d,
             g_prime=g_prime,
@@ -132,8 +103,7 @@ class QG(Model):
             optimize=optimize,
         )
         self._core = self._init_core_model(optimize=optimize)
-        self.A = self.compute_A(space_3d.h.xyh.h[:, 0, 0], g_prime[:, 0, 0])
-        decomposition = self.compute_layers_to_mode_decomposition(self.A)
+        decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, self.lambd, self.Cl2m = decomposition
         self.set_helmholtz_solver(self.lambd)
 
@@ -141,6 +111,41 @@ class QG(Model):
     def sw(self) -> SW:
         """Core Shallow Water Model."""
         return self._core
+
+    @property
+    def pv(self) -> torch.Tensor:
+        """Potential Vorticity."""
+        return self._pv.get()
+
+    @property
+    def ke_hat(self) -> torch.Tensor:
+        """Modal kinetic energy, shape: (n_ens, nl)."""
+        return self._ke_hat.get()
+
+    @property
+    def ape_hat(self) -> torch.Tensor:
+        """Modal available potential energy, shape: (n_ens, nl)."""
+        return self._ape_hat.get()
+
+    @property
+    def total_energy_hat(self) -> torch.Tensor:
+        """Total energy, shape: (n_ens, nl)."""
+        return self._energy_hat.get()
+
+    @property
+    def ke(self) -> torch.Tensor:
+        """Modal kinetic energy, shape: (n_ens)."""
+        return self._ke.get()
+
+    @property
+    def ape(self) -> torch.Tensor:
+        """Modal available potential energy, shape: (n_ens)."""
+        return self._ape.get()
+
+    @property
+    def total_energy(self) -> torch.Tensor:
+        """Total energy, shape: (n_ens)."""
+        return self._energy.get()
 
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set the bottom drag coefficient.
@@ -187,6 +192,57 @@ class QG(Model):
         self.sw.n_ens = n_ens
         return super()._set_n_ens(n_ens)
 
+    def _create_diagnostic_vars(self, state: State) -> None:
+        super()._create_diagnostic_vars(state)
+        pv = PotentialVorticity(
+            self._omega,
+            self.h_ref,
+            self.space.area,
+            self.beta_plane.f0,
+        )
+        ke_hat = ModalKineticEnergy(
+            self.A,
+            self._psi,
+            self.H,
+            self.space.dx,
+            self.space.dy,
+        )
+        ape_hat = ModalAvailablePotentialEnergy(
+            self.A,
+            self._psi,
+            self._H,
+            self.beta_plane.f0,
+        )
+        energy_hat = ModalEnergy(ke_hat, ape_hat)
+        ke = TotalKineticEnergy(
+            self._psi,
+            self.H,
+            self.space.dx,
+            self.space.dy,
+        )
+        ape = TotalAvailablePotentialEnergy(
+            self.A,
+            self._psi,
+            self._H,
+            self.beta_plane.f0,
+        )
+        energy = TotalEnergy(ke, ape)
+
+        self._pv = pv.bind(self._state)
+        self._ke_hat = ke_hat.bind(self._state)
+        self._ape_hat = ape_hat.bind(self._state)
+        self._energy_hat = energy_hat.bind(self._state)
+        self._ke = ke.bind(self._state)
+        self._ape = ape.bind(self._state)
+        self._energy = energy.bind(self._state)
+
+        self.io.add_diagnostic_vars(
+            self._pv,
+            self._ke_hat,
+            self._ape_hat,
+            self._energy,
+        )
+
     def compute_A(  # noqa: N802
         self,
         H: torch.Tensor,  # noqa: N803
@@ -207,32 +263,6 @@ class QG(Model):
             dtype=self.dtype,
             device=self.device.get(),
         )
-
-    @staticmethod
-    def compute_layers_to_mode_decomposition(
-        A: torch.Tensor,  # noqa: N803
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Compute Layers to mode decomposition.
-
-        A = Cm2l @ Λ @ Cl2m
-
-        Args:
-            A (torch.Tensor): Stretching Operator
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Cm2l, Λ, Cl2m
-        """
-        # layer-to-mode and mode-to-layer matrices
-        lambd_r, R = torch.linalg.eig(A)  # noqa: N806
-        _, L = torch.linalg.eig(A.T)  # noqa: N806
-        lambd: torch.Tensor = lambd_r.real.reshape((1, A.shape[0], 1, 1))
-        R, L = R.real, L.real  # noqa: N806
-        # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
-        # layer to mode: pseudo inverse of R
-        Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T  # noqa: N806
-        # mode to layer
-        Cm2l = R  # noqa: N806
-        return Cm2l, lambd, Cl2m
 
     def set_helmholtz_solver(self, lambd: torch.Tensor) -> None:
         """Set the Helmholtz Solver.
@@ -288,26 +318,10 @@ class QG(Model):
             cst_wgrid + sol_wgrid * self.beta_plane.f0**2 * lambd
         )
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
-        self.homsol_hgrid = self.cell_corners_to_cell_centers(
+        self.homsol_hgrid = self.points_to_surfaces(
             self.homsol_wgrid,
         )
         self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
-
-    def set_physical_uvh(
-        self,
-        u_phys: torch.Tensor,  # noqa: ARG002
-        v_phys: torch.Tensor,  # noqa: ARG002
-        h_phys: torch.Tensor,  # noqa: ARG002
-    ) -> None:
-        """Set the physical u,v and h.
-
-        Args:
-            u_phys (torch.Tensor): useless, for compatibilty reasons only.
-            v_phys (torch.Tensor): useless, for compatibilty reasons only.
-            h_phys (torch.Tensor): useless, for compatibilty reasons only.
-        """
-        super().compute_time_derivatives()
-        self.uvh = self.project(self.u, self.v, self.h)
 
     def set_uvh(
         self,
@@ -351,7 +365,7 @@ class QG(Model):
             self.A,
             self.beta_plane.f0,
             p_i,
-            self.cell_corners_to_cell_centers,
+            self.points_to_surfaces,
         )
 
     def QoG_inv(  # noqa: N802
@@ -397,7 +411,7 @@ class QG(Model):
             self.Cm2l,
             p_modes,
         )
-        p_qg_i = self.cell_corners_to_cell_centers(p_qg)
+        p_qg_i = self.points_to_surfaces(p_qg)
         return p_qg, p_qg_i
 
     def Q(  # noqa: N802
@@ -419,9 +433,7 @@ class QG(Model):
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.cell_corners_to_cell_centers(uvh.h) / H) * (
-            f0 / area
-        )
+        return (omega - f0 * self.points_to_surfaces(uvh.h) / H) * (f0 / area)
 
     def project(
         self,
@@ -475,54 +487,6 @@ class QG(Model):
             UVH: update prognostic variables.
         """
         return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
-
-    def compute_diagnostic_variables(self, uvh: UVH) -> None:
-        """Compute the model's diagnostic variables.
-
-        Args:
-            uvh (UVH): Prognostic variables.
-
-        Computed variables:
-        - Vorticity: omega
-        - Interface heights: eta
-        - Pressure: p
-        - Zonal velocity: U
-        - Meridional velocity: V
-        - Kinetic Energy: k_energy
-
-        Compute the result given the prognostic
-        variables u,v and h.
-        """
-        super().compute_diagnostic_variables(uvh)
-        omega = self.cell_corners_to_cell_centers(self.omega)
-        h_ratio = self.h / self.h_ref
-        self.pv = omega / self.space.area - self.beta_plane.f0 * h_ratio
-
-    def save_uvhwp(self, output_file: Path) -> None:
-        """Save uvh, vorticity and pressure values.
-
-        Args:
-            output_file (Path): File to save value in (.npz).
-        """
-        self._raise_if_invalid_savefile(output_file=output_file)
-
-        omega = self.get_physical_omega_as_ndarray()
-        u, v, h = self.get_physical_uvh_as_ndarray()
-
-        np.savez(
-            output_file,
-            u=u.astype("float32"),
-            v=v.astype("float32"),
-            h=h.astype("float32"),
-            omega=omega.astype("float32"),
-            p=self.p.cpu().numpy().astype("float32"),
-            pv=self.pv.cpu().numpy().astype("float32"),
-        )
-
-        verbose.display(
-            msg=f"saved u,v,h,ω,p,pv to {output_file}",
-            trigger_level=1,
-        )
 
     def set_wind_forcing(
         self,

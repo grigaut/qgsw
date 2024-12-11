@@ -1,102 +1,51 @@
 """Model Data retriever."""
 
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
-import torch
 
 from qgsw import verbose
 from qgsw.models.exceptions import InvalidSavingFileError
-from qgsw.models.variables import UVH
-from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
-from qgsw.specs._utils import Device
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from qgsw.variables import (
+        LayerDepthAnomaly,
+        MeridionalVelocity,
+        ZonalVelocity,
+    )
+    from qgsw.variables.base import (
+        BoundDiagnosticVariable,
+        PrognosticVariable,
+    )
 
 
-class ModelResultsRetriever:
-    """Model Results Retriever."""
+class IO:
+    """Input/Output manager."""
 
-    space: SpaceDiscretization3D
-    uvh: UVH
-    device: Device
-    omega: torch.Tensor
-    p: torch.Tensor
-    beta_plane: BetaPlane
-    eta: torch.Tensor
-
-    def get_physical_uvh(
+    def __init__(
         self,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Get physical variables u_phys, v_phys, h_phys from state variables.
+        u: ZonalVelocity,
+        v: MeridionalVelocity,
+        h: LayerDepthAnomaly,
+        *args: BoundDiagnosticVariable,
+    ) -> None:
+        """Instantiate the object.
 
-        Returns:
-            tuple[torch.Tensor, torch.Tensor, torch.Tensor]: u, v and h
+        Args:
+            u (ZonalVelocity): Zonal velocity.
+            v (MeridionalVelocity): Meriodional velocity.
+            h (LayerDepthAnomaly): Layer depth anomaly.
+            *args (BoundDiagnosticVariable): Diagnostic variableS.
         """
-        u_phys = (self.uvh.u / self.space.dx).to(device=self.device.get())
-        v_phys = (self.uvh.v / self.space.dy).to(device=self.device.get())
-        h_phys = (self.uvh.h / self.space.area).to(device=self.device.get())
-
-        return (u_phys, v_phys, h_phys)
-
-    def get_physical_uvh_as_ndarray(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Get physical variables u_phys, v_phys, h_phys from state variables.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]: u, v and h
-        """
-        return (e.cpu().numpy() for e in self.get_physical_uvh())
-
-    def get_physical_omega(
-        self,
-    ) -> torch.Tensor:
-        """Get physical vorticity.
-
-        Returns:
-            torch.Tensor: Vorticity
-        """
-        vorticity = self.omega / self.space.area / self.beta_plane.f0
-        return vorticity.to(device=self.device.get())
-
-    def get_physical_omega_as_ndarray(
-        self,
-    ) -> np.ndarray:
-        """Get physical vorticity.
-
-        Returns:
-            np.ndarray: Vorticity
-        """
-        return self.get_physical_omega().cpu().numpy()
-
-    def get_print_info(self) -> str:
-        """Returns a string with summary of current variables.
-
-        Returns:
-            str: Summary of variables.
-        """
-        hl_mean = (self.uvh.h / self.space.area).mean((-1, -2))
-        eta = self.eta
-        u = self.uvh.u / self.space.dx
-        v = self.uvh.v / self.space.dy
-        h = self.uvh.h / self.space.area
-        device = self.device.get()
-        with np.printoptions(precision=2):
-            eta_surface = eta[:, 0].min().to(device=device).item()
-            return (
-                f"u: {u.mean().to(device=device).item():+.5E}, "
-                f"{u.abs().max().to(device=device).item():.5E}, "
-                f"v: {v.mean().to(device=device).item():+.5E}, "
-                f"{v.abs().max().to(device=device).item():.5E}, "
-                f"hl_mean: {hl_mean.squeeze().cpu().numpy()}, "
-                f"h min: {h.min().to(device=device).item():.5E}, "
-                f"max: {h.max().to(device=device).item():.5E}, "
-                f"eta_sur min: {eta_surface:+.5f}, "
-                f"max: {eta[:,0].max().to(device=device).item():.5f}"
-            )
+        self._prog: list[PrognosticVariable] = [u, v, h]
+        self._diag = set(args)
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
-        """Raise and error if the saving file is invalid.
+        """Raise an error if the saving file is invalid.
 
         Args:
             output_file (Path): Output file.
@@ -108,60 +57,55 @@ class ModelResultsRetriever:
             msg = "Variables are expected to be saved in an .npz file."
             raise InvalidSavingFileError(msg)
 
-    def save_uvh(self, output_file: Path) -> None:
-        """Save U, V and H values.
+    def save(self, output_file: Path) -> None:
+        """Save given variables.
 
         Args:
             output_file (Path): File to save value in (.npz).
         """
         self._raise_if_invalid_savefile(output_file=output_file)
-
-        u, v, h = self.get_physical_uvh_as_ndarray()
-
+        to_save = {
+            var.name: var.get().cpu().numpy().astype("float32")
+            for var in self._prog
+        }
+        to_save |= {
+            var.name: var.get().cpu().numpy().astype("float32")
+            for var in self._diag
+        }
         np.savez(
-            output_file,
-            u=u.astype("float32"),
-            v=v.astype("float32"),
-            h=h.astype("float32"),
-        )
-
-        verbose.display(msg=f"saved u,v,h to {output_file}", trigger_level=1)
-
-    def save_omega(self, output_file: Path) -> None:
-        """Save vorticity values.
-
-        Args:
-            output_file (Path): File to save value in (.npz).
-        """
-        self._raise_if_invalid_savefile(output_file=output_file)
-
-        omega = self.get_physical_omega_as_ndarray()
-
-        np.savez(output_file, omega=omega.astype("float32"))
-
-        verbose.display(msg=f"saved ω to {output_file}", trigger_level=1)
-
-    def save_uvhwp(self, output_file: Path) -> None:
-        """Save uvh, vorticity and pressure values.
-
-        Args:
-            output_file (Path): File to save value in (.npz).
-        """
-        self._raise_if_invalid_savefile(output_file=output_file)
-
-        omega = self.get_physical_omega_as_ndarray()
-        u, v, h = self.get_physical_uvh_as_ndarray()
-
-        np.savez(
-            output_file,
-            u=u.astype("float32"),
-            v=v.astype("float32"),
-            h=h.astype("float32"),
-            omega=omega.astype("float32"),
-            p=self.p.cpu().numpy().astype("float32"),
+            file=output_file,
+            **to_save,
         )
 
         verbose.display(
-            msg=f"saved u,v,h,ω,p to {output_file}",
+            msg=f"Saved {', '.join(list(to_save.keys()))} to {output_file}.",
             trigger_level=1,
         )
+
+    def add_diagnostic_vars(self, *args: BoundDiagnosticVariable) -> None:
+        """Add a diagnostic varibale to track.
+
+        Args:
+            *args (BoundDiagnosticVariable): Diagnostic variable.
+        """
+        self._diag |= set(args)
+
+    def print_step(self) -> str:
+        """Printable informations of the prognostic variables.
+
+        Returns:
+            str: Informations to print.
+        """
+        snippets = []
+        for var in self._prog:
+            data = var.get()
+            data_mean = data.mean().cpu().item()
+            data_max = data.abs().max().cpu().item()
+            snippets.append(
+                f"{var.name}: mean: {data_mean:+.3E}, max: {data_max:+.3E}",
+            )
+        return " - ".join(snippets)
+
+    def remove_diagnostic_vars(self) -> None:
+        """Remove diagnostic variables tracking."""
+        self._diag = set()

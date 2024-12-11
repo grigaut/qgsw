@@ -3,7 +3,7 @@ name = "Two Layers Model"
 performance_log = false
 [io.output]
 save_results = false
-quantity = 10
+quantity = 100
 directory = "results"
 
 [physics]

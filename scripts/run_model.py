@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from rich.progress import Progress
 
 from qgsw import verbose
 from qgsw.configs import Configuration
@@ -101,19 +102,29 @@ verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 summary.register_start()
 prefix = config.model.prefix
 # Start runs
-for n in range(n_steps + 1):
-    if config.io.results.save and (n % freq_save == 0 or n == n_steps):
-        directory = config.io.results.directory
-        name = config.model.name_sc
-        model.save_uvhwp(directory.joinpath(f"{prefix}{n}.npz"))
-    model.step()
-
-    t += dt
-
-    if (freq_log > 0 and n % freq_log == 0) or (n == n_steps):
-        verbose.display(
-            msg=f"n={n:05d} -> {model.get_print_info()}",
-            trigger_level=1,
+with Progress() as progress:
+    simulation = progress.add_task(
+        rf"\[n=00000/{n_steps:05d}]",
+        total=n_steps,
+    )
+    for n in range(n_steps + 1):
+        progress.update(
+            simulation,
+            description=rf"\[n={n:05d}/{n_steps:05d}]",
         )
-        summary.register_step(n)
-summary.register_end()
+        progress.advance(simulation)
+        # Save step
+        if config.io.results.save and (n % freq_save == 0 or n == n_steps):
+            verbose.display(msg=f"[n={n:05d}/{n_steps:05d}]", trigger_level=1)
+            directory = config.io.results.directory
+            name = config.model.name_sc
+            model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
+
+        model.step()
+        t += dt
+        # Step log
+        if (freq_log > 0 and n % freq_log == 0) or (n == n_steps):
+            verbose.display(msg=model.io.print_step(), trigger_level=1)
+            summary.register_step(n)
+
+    summary.register_end()

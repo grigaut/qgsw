@@ -12,11 +12,18 @@ And one can set verbose levl with:
 >>> verbose.set_level(2)
 """
 
-from qgsw.verbose._core import display, get_level, set_level, set_prefix
+from qgsw.verbose._core import (
+    display,
+    get_level,
+    is_mute,
+    set_level,
+    set_prefix,
+)
 
 __all__ = [
     "display",
     "get_level",
+    "is_mute",
     "set_level",
     "set_prefix",
 ]

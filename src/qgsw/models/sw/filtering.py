@@ -13,9 +13,10 @@ from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.sw.core import SW
-from qgsw.models.variables import UVH
 from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.variables import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -24,8 +25,6 @@ if TYPE_CHECKING:
 
 class BaseSWFilterBarotropic(ABC, SW):
     """Shallow Water with Barotropic Filtering."""
-
-    _barotropic_filter = False
 
     def __init__(
         self,
@@ -130,16 +129,21 @@ class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
         Returns:
             UVH: filtered dt_uvh
         """
+        # Sum h on u grid
+        h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
+        # Sum h on v grid
+        h_tot_vgrid = self.h_ref_vgrid + convert.h_to_v(self.h, self.masks.h)
+
         u_star = (self.u + self.dt * dt_uvh.u) / self.space.dx
         v_star = (self.v + self.dt * dt_uvh.v) / self.space.dy
-        u_bar_star = (u_star * self.h_tot_ugrid).sum(
+        u_bar_star = (u_star * h_tot_ugrid).sum(
             dim=-3,
             keepdim=True,
-        ) / self.h_tot_ugrid.sum(dim=-3, keepdim=True)
-        v_bar_star = (v_star * self.h_tot_vgrid).sum(
+        ) / h_tot_ugrid.sum(dim=-3, keepdim=True)
+        v_bar_star = (v_star * h_tot_vgrid).sum(
             dim=-3,
             keepdim=True,
-        ) / self.h_tot_vgrid.sum(dim=-3, keepdim=True)
+        ) / h_tot_vgrid.sum(dim=-3, keepdim=True)
         rhs = (
             1.0
             / (self.g * self.dt * self.tau)
@@ -173,8 +177,13 @@ class SWFilterBarotropicExact(BaseSWFilterBarotropic):
             msg="Using barotropic filter in exact form.",
             trigger_level=2,
         )
-        coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]
-        coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
+        # Sum h on u grid
+        h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
+        # Sum h on v grid
+        h_tot_vgrid = self.h_ref_vgrid + convert.h_to_v(self.h, self.masks.h)
+
+        coef_ugrid = (h_tot_ugrid * self.masks.u)[0, 0]
+        coef_vgrid = (h_tot_vgrid * self.masks.v)[0, 0]
         lambd = 1.0 / (self.g * self.dt * self.tau)
         self.helm_solver = MG_Helmholtz(
             self.space.dx,
@@ -200,29 +209,32 @@ class SWFilterBarotropicExact(BaseSWFilterBarotropic):
         Returns:
             UVH: filtered dt_uvh
         """
+        # Sum h on u grid
+        h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
+        # Sum h on v grid
+        h_tot_vgrid = self.h_ref_vgrid + convert.h_to_v(self.h, self.masks.h)
+
         # compute RHS
         u_star = (self.u + self.dt * dt_uvh.u) / self.space.dx
         v_star = (self.v + self.dt * dt_uvh.v) / self.space.dy
-        u_bar_star = (u_star * self.h_tot_ugrid).sum(
+        u_bar_star = (u_star * h_tot_ugrid).sum(
             dim=-3,
             keepdim=True,
-        ) / self.h_tot_ugrid.sum(dim=-3, keepdim=True)
-        v_bar_star = (v_star * self.h_tot_vgrid).sum(
+        ) / h_tot_ugrid.sum(dim=-3, keepdim=True)
+        v_bar_star = (v_star * h_tot_vgrid).sum(
             dim=-3,
             keepdim=True,
-        ) / self.h_tot_vgrid.sum(dim=-3, keepdim=True)
+        ) / h_tot_vgrid.sum(dim=-3, keepdim=True)
         rhs = (
             1.0
             / (self.g * self.dt * self.tau)
             * (
-                torch.diff(self.h_tot_ugrid * u_bar_star, dim=-2)
-                / self.space.dx
-                + torch.diff(self.h_tot_vgrid * v_bar_star, dim=-1)
-                / self.space.dy
+                torch.diff(h_tot_ugrid * u_bar_star, dim=-2) / self.space.dx
+                + torch.diff(h_tot_vgrid * v_bar_star, dim=-1) / self.space.dy
             )
         )
-        coef_ugrid = (self.h_tot_ugrid * self.masks.u)[0, 0]
-        coef_vgrid = (self.h_tot_vgrid * self.masks.v)[0, 0]
+        coef_ugrid = (h_tot_ugrid * self.masks.u)[0, 0]
+        coef_vgrid = (h_tot_vgrid * self.masks.v)[0, 0]
         w_surf_imp = self.helm_solver.solve(rhs, coef_ugrid, coef_vgrid)
         # WIP
 
