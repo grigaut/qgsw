@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import numpy as np
 
 from qgsw.utils.sorting import sort_files
+from qgsw.variables.base import ParsedVariable
 
 try:
     from typing import Self
@@ -298,6 +299,10 @@ class RunOutput:
             for i in range(len(files))
         ]
 
+        self._vars = [
+            ParsedVariable(**var) for var in self._summary.output_vars
+        ]
+
     @cached_property
     def folder(self) -> Path:
         """Run output folder."""
@@ -309,16 +314,18 @@ class RunOutput:
         return self._summary
 
     @property
-    def output_vars(self) -> dict[str, str]:
+    def output_vars(self) -> list[ParsedVariable]:
         """Output variables."""
-        return self._summary.output_vars
+        return self._vars
 
     def __repr__(self) -> str:
         """Output Representation."""
+        vars_txt = "\n\t".join(str(var) for var in self.output_vars)
         msg_txts = [
             f"Simulation: {self._summary.configuration.io.name}.",
             f"Package version: {self._summary.qgsw_version}.",
             f"Folder: {self.folder}.",
+            f"Variables:{'\n\t'+vars_txt}",
         ]
         return "\n".join(msg_txts)
 
