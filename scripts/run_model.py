@@ -113,19 +113,18 @@ with Progress() as progress:
             description=rf"\[n={n:05d}/{n_steps:05d}]",
         )
         progress.advance(simulation)
+        # Save step
         if config.io.results.save and (n % freq_save == 0 or n == n_steps):
+            verbose.display(msg=f"[n={n:05d}/{n_steps:05d}]", trigger_level=1)
             directory = config.io.results.directory
             name = config.model.name_sc
-            print(f"[n={n:05d}/{n_steps:05d}] -> ", end="")  # noqa: T201
             model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
+
         model.step()
-
         t += dt
-
+        # Step log
         if (freq_log > 0 and n % freq_log == 0) or (n == n_steps):
-            verbose.display(
-                msg=rf"[n={n:05d}/{n_steps:05d}] -> " + model.io.print_step(),
-                trigger_level=1,
-            )
+            verbose.display(msg=model.io.print_step(), trigger_level=1)
             summary.register_step(n)
+
     summary.register_end()
