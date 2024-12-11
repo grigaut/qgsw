@@ -1,5 +1,7 @@
 """Verbose Decorators."""
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from typing import Any, TypeVar
 
@@ -115,16 +117,22 @@ class VerboseDisplayer:
         indent = "".join(["\t"] * (level) + [self._prefix] * (level > 0))
         return f"{indent}{msg}"
 
-    def display(self, msg: str, trigger_level: int) -> None:
+    def display(
+        self,
+        msg: str,
+        trigger_level: int,
+        end: str | None = None,
+    ) -> None:
         """Display verbose message.
 
         Args:
             msg (str): Message to display.
             trigger_level (int): Trigger level.
+            end (str | None): End of line text, to pass to `print`.
         """
         trigger = self._check_trigger_level(trigger_level=trigger_level)
         if self.level >= trigger:
-            print(self._indent(msg=msg, level=(trigger - 1)))  # noqa: T201
+            print(self._indent(msg=msg, level=(trigger - 1)), end=end)  # noqa: T201
 
     def is_mute(self) -> bool:
         return self.level <= 0
@@ -170,14 +178,15 @@ def get_level() -> int:
     return VERBOSE.level
 
 
-def display(msg: str, trigger_level: int) -> None:
+def display(msg: str, trigger_level: int, end: str | None = None) -> None:
     """Display verbose message.
 
     Args:
         msg (str): Message to display.
         trigger_level (int): Trigger level.
+        end (str | None): End of line text, to pass to `print`.
     """
-    return VERBOSE.display(msg=msg, trigger_level=trigger_level)
+    return VERBOSE.display(msg=msg, trigger_level=trigger_level, end=end)
 
 
 def is_mute() -> bool:
