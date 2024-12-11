@@ -38,7 +38,7 @@ class Variable:
 
     def __repr__(self) -> str:
         """Variable string representation."""
-        return f"Variable {self._name} [{self.unit}]: {self._description}"
+        return f"Variable {self._name}: {self._description} [{self.unit}]"
 
 
 class PrognosticVariable(Variable):

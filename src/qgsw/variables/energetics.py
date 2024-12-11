@@ -32,7 +32,7 @@ class KineticEnergy(DiagnosticVariable):
 
     _unit = "m²s⁻²"
     _name = "kinetic_energy"
-    _description = "Kinetic energy."
+    _description = "Kinetic energy"
 
     def __init__(
         self,
@@ -91,7 +91,7 @@ class ModalKineticEnergy(DiagnosticVariable):
 
     _unit = "m².s⁻²"
     _name = "ke_hat"
-    _description = "Modal kinetic energy."
+    _description = "Modal kinetic energy"
 
     def __init__(
         self,
@@ -171,7 +171,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
 
     _unit = "m².s⁻²"
     _name = "ape_hat"
-    _description = "Available potential energy."
+    _description = "Available potential energy"
 
     def __init__(
         self,
@@ -242,7 +242,7 @@ class ModalEnergy(DiagnosticVariable):
 
     _unit = "m².s-2"
     _name = "e_tot_hat"
-    _description = "Modal energy."
+    _description = "Modal energy"
 
     def __init__(
         self,
@@ -294,7 +294,7 @@ class TotalKineticEnergy(DiagnosticVariable):
 
     _unit = "m².s⁻²"
     _name = "ke_hat"
-    _description = " kinetic energy."
+    _description = " kinetic energy"
 
     def __init__(
         self,
@@ -365,7 +365,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
 
     _unit = "m².s⁻²"
     _name = "ape_hat"
-    _description = " available potential energy."
+    _description = " available potential energy"
 
     def __init__(
         self,
@@ -435,7 +435,7 @@ class TotalEnergy(DiagnosticVariable):
 
     _unit = "m².s-2"
     _name = "e_tot"
-    _description = "Total modal energy."
+    _description = "Total modal energy"
 
     def __init__(
         self,

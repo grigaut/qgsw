@@ -26,7 +26,7 @@ class PhysicalZonalVelocity(DiagnosticVariable):
 
     _unit = "m.s⁻¹"
     _name = "u_phys"
-    _description = "Physical zonal velocity."
+    _description = "Physical zonal velocity"
 
     def __init__(self, dx: float) -> None:
         """Instantiate the variable.
@@ -53,7 +53,7 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
 
     _unit = "m.s⁻¹"
     _name = "v_phys"
-    _description = "Physical meridional velocity."
+    _description = "Physical meridional velocity"
 
     def __init__(self, dy: float) -> None:
         """Instantiate the variable.
@@ -80,7 +80,7 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
 
     _unit = "m"
     _name = "h_phys"
-    _description = "Physical layer depth anomaly."
+    _description = "Physical layer depth anomaly"
 
     def __init__(self, ds: float) -> None:
         """Instantiate the variable.
@@ -107,7 +107,7 @@ class ZonalVelocityFlux(DiagnosticVariable):
 
     _unit = "s⁻¹"
     _name = "U"
-    _description = "Zonal velocity flux."
+    _description = "Zonal velocity flux"
 
     def __init__(self, dx: float) -> None:
         """Instantiate the variable.
@@ -134,7 +134,7 @@ class MeridionalVelocityFlux(DiagnosticVariable):
 
     _unit = "s⁻¹"
     _name = "V"
-    _description = "Meriodional velocity flux."
+    _description = "Meriodional velocity flux"
 
     def __init__(self, dy: float) -> None:
         """Instantiate the variable.
@@ -161,7 +161,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
 
     _unit = "m"
     _name = "eta"
-    _description = "Surface height anomaly."
+    _description = "Surface height anomaly"
 
     def __init__(self, h_phys: PhysicalLayerDepthAnomaly) -> None:
         """Instantiate variable.
@@ -204,7 +204,7 @@ class Vorticity(DiagnosticVariable):
 
     _unit = "m².s⁻¹"
     _name = "omega"
-    _description = "Vorticity."
+    _description = "Vorticity"
 
     def __init__(
         self,
@@ -253,7 +253,7 @@ class PhysicalVorticity(DiagnosticVariable):
 
     _unit = "s⁻¹"
     _name = "omega_phys"
-    _description = "Physical vorticity."
+    _description = "Physical vorticity"
 
     def __init__(self, vorticity: Vorticity, ds: float) -> None:
         """Instantiate the variable.
@@ -298,7 +298,7 @@ class Pressure(DiagnosticVariable):
 
     _unit = "m².s⁻²"
     _name = "p"
-    _description = "Pressure per unit of mass."
+    _description = "Pressure per unit of mass"
 
     def __init__(
         self,
@@ -347,7 +347,7 @@ class PotentialVorticity(DiagnosticVariable):
 
     _unit = "s⁻¹"
     _name = "pv"
-    _description = "Potential vorticity."
+    _description = "Potential vorticity"
 
     def __init__(
         self,
@@ -404,7 +404,7 @@ class StreamFunction(DiagnosticVariable):
 
     _unit = "m².s⁻¹"
     _name = "psi"
-    _description = "Stream function."
+    _description = "Stream function"
 
     def __init__(self, pressure: Pressure, f0: float) -> None:
         """Instantiate the variable.
