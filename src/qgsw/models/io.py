@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from qgsw.variables.base import (
         BoundDiagnosticVariable,
         PrognosticVariable,
+        Variable,
     )
 
 
@@ -43,6 +44,11 @@ class IO:
         """
         self._prog: list[PrognosticVariable] = [u, v, h]
         self._diag = set(args)
+
+    @property
+    def tracked_vars(self) -> set[Variable]:
+        """Tracked variables set."""
+        return self._diag | set(self._prog)
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
         """Raise an error if the saving file is invalid.
