@@ -16,7 +16,7 @@ class MeridionalVelocity(PrognosticVariable):
 
     _unit = "s⁻¹"
     _name = "v"
-    _description = "Contravariant zonal velocity"
+    _description = "Contravariant meriodional velocity"
 
 
 class LayerDepthAnomaly(PrognosticVariable):
