@@ -103,18 +103,16 @@ summary.register_start()
 prefix = config.model.prefix
 # Start runs
 with Progress() as progress:
-    if not verbose.is_mute():
-        simulation = progress.add_task(
-            rf"\[n=00000/{n_steps:05d}]",
-            total=n_steps,
-        )
+    simulation = progress.add_task(
+        rf"\[n=00000/{n_steps:05d}]",
+        total=n_steps,
+    )
     for n in range(n_steps + 1):
-        if not verbose.is_mute():
-            progress.update(
-                simulation,
-                description=rf"\[n={n:05d}/{n_steps:05d}]",
-            )
-            progress.advance(simulation)
+        progress.update(
+            simulation,
+            description=rf"\[n={n:05d}/{n_steps:05d}]",
+        )
+        progress.advance(simulation)
         if config.io.results.save and (n % freq_save == 0 or n == n_steps):
             directory = config.io.results.directory
             name = config.model.name_sc
