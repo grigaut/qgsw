@@ -300,11 +300,15 @@ class Pressure(DiagnosticVariable):
     _name = "p"
     _description = "Pressure per unit of mass."
 
-    def __init__(self, g_prime: float, eta: SurfaceHeightAnomaly) -> None:
+    def __init__(
+        self,
+        g_prime: torch.Tensor,
+        eta: SurfaceHeightAnomaly,
+    ) -> None:
         """Instantiate the pressure variable.
 
         Args:
-            g_prime (float): Reduced gravity
+            g_prime (torch.Tensor): Reduced gravity
             eta (SurfaceHeightAnomaly): Surface height anomaly variable.
         """
         self._g_prime = g_prime
