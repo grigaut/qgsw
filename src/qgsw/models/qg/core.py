@@ -24,6 +24,9 @@ from qgsw.variables import (
     UVH,
     PotentialVorticity,
     State,
+    TotalAvailablePotentialEnergy,
+    TotalEnergy,
+    TotalKineticEnergy,
     TotalModalAvailablePotentialEnergy,
     TotalModalEnergy,
     TotalModalKineticEnergy,
@@ -125,9 +128,24 @@ class QG(Model):
         return self._ape_hat.get()
 
     @property
+    def total_energy_hat(self) -> torch.Tensor:
+        """Total energy, shape: (n_ens)."""
+        return self._energy_hat.get()
+
+    @property
+    def ke(self) -> torch.Tensor:
+        """Modal kinetic energy, shape: (n_ens)."""
+        return self._ke.get()
+
+    @property
+    def ape(self) -> torch.Tensor:
+        """Modal available potential energy, shape: (n_ens)."""
+        return self._ape.get()
+
+    @property
     def total_energy(self) -> torch.Tensor:
         """Total energy, shape: (n_ens)."""
-        return self._total_energy.get()
+        return self._energy.get()
 
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set the bottom drag coefficient.
@@ -182,29 +200,45 @@ class QG(Model):
             self.space.area,
             self.beta_plane.f0,
         )
-        total_ke_hat = TotalModalKineticEnergy(
+        ke_hat = TotalModalKineticEnergy(
             self.A,
             self._psi,
+            self.H,
             self.space.dx,
             self.space.dy,
         )
-        total_ape_hat = TotalModalAvailablePotentialEnergy(
+        ape_hat = TotalModalAvailablePotentialEnergy(
             self.A,
             self._psi,
+            self._H,
             self.beta_plane.f0,
         )
-        total_energy = TotalModalEnergy(total_ke_hat, total_ape_hat)
+        energy_hat = TotalModalEnergy(ke_hat, ape_hat)
+        ke = TotalKineticEnergy(
+            self._psi,
+            self.H,
+            self.space.dx,
+            self.space.dy,
+        )
+        ape = TotalAvailablePotentialEnergy(
+            self.A,
+            self._psi,
+            self._H,
+            self.beta_plane.f0,
+        )
+        energy = TotalEnergy(ke, ape)
 
         self._pv = pv.bind(self._state)
-        self._ke_hat = total_ke_hat.bind(self._state)
-        self._ape_hat = total_ape_hat.bind(self._state)
-        self._total_energy = total_energy.bind(self._state)
+        self._ke_hat = ke_hat.bind(self._state)
+        self._ape_hat = ape_hat.bind(self._state)
+        self._energy_hat = energy_hat.bind(self._state)
+        self._ke = ke.bind(self._state)
+        self._ape = ape.bind(self._state)
+        self._energy = energy.bind(self._state)
 
         self.io.add_diagnostic_vars(
             self._pv,
-            self._ke_hat,
-            self._ape_hat,
-            self.total_energy,
+            self._energy,
         )
 
     def compute_A(  # noqa: N802

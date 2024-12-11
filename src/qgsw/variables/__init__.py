@@ -15,6 +15,8 @@ from qgsw.variables.dynamics import (
 )
 from qgsw.variables.energetics import (
     KineticEnergy,
+    TotalAvailablePotentialEnergy,
+    TotalEnergy,
     TotalKineticEnergy,
     TotalModalAvailablePotentialEnergy,
     TotalModalEnergy,
@@ -42,6 +44,8 @@ __all__ = [
     "State",
     "StreamFunction",
     "SurfaceHeightAnomaly",
+    "TotalAvailablePotentialEnergy",
+    "TotalEnergy",
     "TotalKineticEnergy",
     "TotalModalAvailablePotentialEnergy",
     "TotalModalEnergy",

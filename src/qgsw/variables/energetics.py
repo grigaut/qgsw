@@ -83,49 +83,6 @@ class KineticEnergy(DiagnosticVariable):
         return super().bind(state)
 
 
-class TotalKineticEnergy(DiagnosticVariable):
-    """Total Kinetic Energy."""
-
-    _unit = "m²s⁻²"
-    _name = "total_ke"
-    _description = "Total kinetic energy."
-
-    def __init__(self, kinetic_energy: KineticEnergy) -> None:
-        """Instantiate the kinetic energy measure.
-
-        Args:
-            kinetic_energy (KineticEnergy): Kinetic energy
-        """
-        self._ke = kinetic_energy
-
-    def compute(self, uvh: UVH) -> torch.Tensor:
-        """Compute total kinetic energy.
-
-        Args:
-            uvh (UVH): Prognostic variables.
-
-        Returns:
-            torch.Tensor: Total kinetic energy, shape: (n_ens).
-        """
-        return torch.sum(self._ke.compute(uvh), dim=[-1, -2, -3])
-
-    def bind(
-        self,
-        state: State,
-    ) -> BoundDiagnosticVariable[Self]:
-        """Bind the variable to a given state.
-
-        Args:
-            state (State): State to bind the variable to.
-
-        Returns:
-            BoundDiagnosticVariable: Bound variable.
-        """
-        # Bind the ke variable
-        self._ke = self._ke.bind(state)
-        return super().bind(state)
-
-
 class TotalModalKineticEnergy(DiagnosticVariable):
     """Compute total modal kinetic energy."""
 
@@ -137,6 +94,7 @@ class TotalModalKineticEnergy(DiagnosticVariable):
         self,
         A: torch.Tensor,  # noqa: N803
         stream_function: StreamFunction,
+        H: torch.Tensor,  # noqa: N803
         dx: float,
         dy: float,
     ) -> None:
@@ -146,13 +104,22 @@ class TotalModalKineticEnergy(DiagnosticVariable):
             A (torch.Tensor): Stetching matrix.
             stream_function (StreamFunction): Stream function diagnostic
             variable.
+            H (torch.Tensor): Layers reference depth.
             dx (float): Elementary distance in the X direction.
             dy (float): Elementary distance in the Y direction.
         """
         self._psi = stream_function
-        _, _, self._Cl2m = compute_layers_to_mode_decomposition(A)
         self._dx = dx
         self._dy = dy
+        # Decomposition of A
+        Cm2l, _, self._Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
+        # Compute W = Diag(H) / h_{tot}
+        W = torch.diag(H.squeeze()) / torch.sum(H)  # noqa: N806
+        # Compute Cl2m^{-T} @ W @ Cl2m⁻¹
+        Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
+        Cm2lT_W_Cm2l = Cm2l_T @ W @ Cm2l  # noqa: N806
+        # Since Cm2lT_W_Cm2l is diagonal
+        self._Cm2lT_W_Cm2l = torch.diag(Cm2lT_W_Cm2l)  # Vector
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
@@ -172,7 +139,12 @@ class TotalModalKineticEnergy(DiagnosticVariable):
         # Differentiate
         psi_hat_dx = torch.diff(psi_hat_pad_x, dim=-2) / self._dx
         psi_hat_dy = torch.diff(psi_hat_pad_y, dim=-1) / self._dy
-        return torch.sum(psi_hat_dx**2 + psi_hat_dy**2, dim=(-1, -2, -3))
+        psiT_CT_W_C_psi = torch.einsum(  # noqa: N806
+            "l,...lxy->...lxy",
+            self._Cm2lT_W_Cm2l,
+            (psi_hat_dx**2 + psi_hat_dy**2),
+        )
+        return 0.5 * torch.sum(psiT_CT_W_C_psi, dim=(-1, -2, -3))
 
     def bind(
         self,
@@ -202,6 +174,7 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
         self,
         A: torch.Tensor,  # noqa: N803
         stream_function: StreamFunction,
+        H: torch.Tensor,  # noqa: N803
         f0: float,
     ) -> None:
         """Instantiate the variable.
@@ -210,11 +183,19 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
             A (torch.Tensor): Stetching matrix.
             stream_function (StreamFunction): Stream function diagnostic
             variable.
+            H (torch.Tensor): Layers reference depth.
             f0 (float): Coriolis parameter.
         """
         self._psi = stream_function
         self._f0 = f0
-        _, self._lambd, self._Cl2m = compute_layers_to_mode_decomposition(A)
+        # Decomposition of A
+        Cm2l, lambd, self._Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
+        # Compute weight matrix
+        W = torch.diag(H.squeeze()) / torch.sum(H)  # noqa: N806
+        # Compute Cl2m^{-T} @ W @ Cl2m⁻¹ @ Λ
+        Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
+        lambd = lambd.squeeze()
+        self._Cm2lT_W_Cm2l_lambda = Cm2l_T @ W @ Cm2l @ lambd  # Vector
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
@@ -227,11 +208,14 @@ class TotalModalAvailablePotentialEnergy(DiagnosticVariable):
             shape: (n_ens).
         """
         psi = self._psi.compute(uvh)
-        p_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
-        return torch.sum(
-            self._f0**2 * self._lambd * p_hat**2,
-            dim=(-1, -2, -3),
+        psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
+        psiT_CT_W_C_lambda_psi = torch.einsum(  # noqa: N806
+            "l,...lxy->...lxy",
+            self._Cm2lT_W_Cm2l_lambda,
+            psi_hat**2,
         )
+        ape = torch.sum(psiT_CT_W_C_lambda_psi, dim=(-1, -2, -3))
+        return 0.5 * self._f0**2 * ape
 
     def bind(
         self,
@@ -298,5 +282,198 @@ class TotalModalEnergy(DiagnosticVariable):
         # Bind the ke variable
         self._ke = self._ke.bind(state)
         # Bind the _ape variable
-        self.__ape = self._ape.bind(state)
+        self._ape = self._ape.bind(state)
+        return super().bind(state)
+
+
+class TotalKineticEnergy(DiagnosticVariable):
+    """Compute total kinetic energy."""
+
+    _unit = "m².s⁻²"
+    _name = "ke_hat"
+    _description = " kinetic energy."
+
+    def __init__(
+        self,
+        stream_function: StreamFunction,
+        H: torch.Tensor,  # noqa: N803
+        dx: float,
+        dy: float,
+    ) -> None:
+        """Instantiate the variable.
+
+        Args:
+            A (torch.Tensor): Stetching matrix.
+            stream_function (StreamFunction): Stream function diagnostic
+            variable.
+            H (torch.Tensor): Layers reference depth.
+            dx (float): Elementary distance in the X direction.
+            dy (float): Elementary distance in the Y direction.
+        """
+        self._psi = stream_function
+        self._dx = dx
+        self._dy = dy
+        # Compute W = Diag(H) / h_{tot}
+        self._W = H.squeeze() / torch.sum(H)  # Vector
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Total modal kinetic energy, shape: (n_ens).
+        """
+        psi = self._psi.compute(uvh)
+        # Pad x with 0 on top
+        psi_pad_x = F.pad(psi, (0, 0, 0, 1))
+        # Pad y with 0 on the left
+        psi_pad_y = F.pad(psi, (0, 1, 0, 0))
+        # Differentiate
+        psi_dx = torch.diff(psi_pad_x, dim=-2) / self._dx
+        psi_dy = torch.diff(psi_pad_y, dim=-1) / self._dy
+        psiT_W_psi = torch.einsum(  # noqa: N806
+            "l,...lxy->...lxy",
+            self._W,
+            (psi_dx**2 + psi_dy**2),
+        )
+        return 0.5 * torch.sum(psiT_W_psi, dim=(-1, -2, -3))
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the psi variable
+        self._psi = self._psi.bind(state)
+        return super().bind(state)
+
+
+class TotalAvailablePotentialEnergy(DiagnosticVariable):
+    """Total modal available potential energy."""
+
+    _unit = "m².s⁻²"
+    _name = "ape_hat"
+    _description = " available potential energy."
+
+    def __init__(
+        self,
+        A: torch.Tensor,  # noqa: N803
+        stream_function: StreamFunction,
+        H: torch.Tensor,  # noqa: N803
+        f0: float,
+    ) -> None:
+        """Instantiate the variable.
+
+        Args:
+            A (torch.Tensor): Stetching matrix.
+            stream_function (StreamFunction): Stream function diagnostic
+            variable.
+            H (torch.Tensor): Layers reference depth.
+            f0 (float): Coriolis parameter.
+        """
+        self._psi = stream_function
+        self._f0 = f0
+        self._A = A
+        # Compute weight matrix
+        self._W = torch.diag(H.squeeze()) / torch.sum(H)  # Matrix
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Total modal avalaible potential energy,
+            shape: (n_ens).
+        """
+        psi = self._psi.compute(uvh)
+        W_A_psi = torch.einsum(  # noqa: N806
+            "lm,...mxy->...lxy",
+            self._W @ self._A,
+            psi,
+        )
+        psiT_W_A_psi = torch.einsum(  # noqa: N806
+            "...lxy,...lxy->...lxy",
+            psi,
+            W_A_psi,
+        )
+        ape = torch.sum(psiT_W_A_psi, dim=(-1, -2, -3))
+        return 0.5 * self._f0**2 * ape
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the psi variable
+        self._psi = self._psi.bind(state)
+        return super().bind(state)
+
+
+class TotalEnergy(DiagnosticVariable):
+    """Total modal energy."""
+
+    _unit = "m².s-2"
+    _name = "e_tot_hat"
+    _description = "Total modal energy."
+
+    def __init__(
+        self,
+        ke_hat: TotalKineticEnergy,
+        ape_hat: TotalAvailablePotentialEnergy,
+    ) -> None:
+        """Instantiate variable.
+
+        Args:
+            ke_hat (TotalKineticEnergy): Total modal kinetic energy
+            ape_hat (TotalAvailablePotentialEnergy): Total modal
+            available potential energy
+        """
+        self._ke = ke_hat
+        self._ape = ape_hat
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute total modal energy.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Total modal energy, shape: (n_ens)
+        """
+        return self._ke.compute(uvh) + self._ape.compute(uvh)
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the ke variable
+        self._ke = self._ke.bind(state)
+        # Bind the _ape variable
+        self._ape = self._ape.bind(state)
         return super().bind(state)
