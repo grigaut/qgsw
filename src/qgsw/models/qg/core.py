@@ -20,23 +20,23 @@ from qgsw.models.qg.stretching_matrix import (
 )
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.variables import (
-    UVH,
+from qgsw.variables.dynamics import PotentialVorticity
+from qgsw.variables.energetics import (
     ModalAvailablePotentialEnergy,
     ModalEnergy,
     ModalKineticEnergy,
-    PotentialVorticity,
-    State,
     TotalAvailablePotentialEnergy,
     TotalEnergy,
     TotalKineticEnergy,
 )
+from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.variables.state import State
 
 
 def G(  # noqa: N802

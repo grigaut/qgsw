@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from qgsw.variables import UVH
+from qgsw.variables.uvh import UVH
 
 
 def rk3_ssp(

@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from qgsw.variables import (
+from qgsw.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
