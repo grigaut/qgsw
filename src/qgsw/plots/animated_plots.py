@@ -300,6 +300,15 @@ class BaseAnimatedPlots(ABC, Generic[T]):
         self._set_figure()
         self.figure.show()
 
+    def retrieve_figure(self) -> go.Figure:
+        """Retrieve the figure.
+
+        Returns:
+            go.Figure: Figure
+        """
+        self._set_figure()
+        return self.figure
+
     def save_frame(self, frame_index: int, output_folder: Path) -> None:
         """Save a given frame.
 
