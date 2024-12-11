@@ -1,5 +1,7 @@
 """Staggered Grid Masks."""
 
+from typing import Self
+
 import torch
 import torch.nn.functional as F  # noqa: N812
 
@@ -32,7 +34,7 @@ class Masks:
 
         as well as the irregulare boundary points
         Example of mask:
-            Given the following 4_x3 domain:
+            Given the following 4x3 domain:
 
                 ^
 
@@ -419,6 +421,25 @@ class Masks:
         self.v_sten_wx_eq4 = self.v_sten_wx_eq4.type(self._mtype)
         self.v_sten_wx_gt4 = self.v_sten_wx_gt4.type(self._mtype)
         self.v_sten_wx_gt6 = self.v_sten_wx_gt6.type(self._mtype)
+
+    @classmethod
+    def empty(
+        cls,
+        nx: int,
+        ny: int,
+        device: torch.device,
+    ) -> Self:
+        """Create an empty mask.
+
+        Args:
+            nx (int): Number of points in the X direction.
+            ny (int): Number of points in the Y direction.
+            device (torch.device): Device.
+
+        Returns:
+            Self: Mask
+        """
+        return cls(torch.ones((nx, ny), device=device))
 
 
 if __name__ == "__main__":
