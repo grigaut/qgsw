@@ -1,11 +1,12 @@
 """Generate run summaries."""
 
+from __future__ import annotations
+
 import datetime
-from collections.abc import Iterator
 from functools import cached_property
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
@@ -19,7 +20,11 @@ except ImportError:
 import toml
 
 from qgsw.configs import Configuration
-from qgsw.models.io import IO
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from qgsw.models.io import IO
 
 
 class SummaryError(Exception):
@@ -78,8 +83,8 @@ class RunSummary:
     @property
     def qgsw_version(self) -> str:
         """QGSW version."""
-        if self._qgsw_version in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._qgsw_version]
+        if self._qgsw_version in self._summary:
+            return self._summary[self._qgsw_version]
         msg = "QGSW version not registered."
         raise SummaryError(msg)
 
@@ -307,6 +312,15 @@ class RunOutput:
     def output_vars(self) -> dict[str, str]:
         """Output variables."""
         return self._summary.output_vars
+
+    def __repr__(self) -> str:
+        """Output Representation."""
+        msg_txts = [
+            f"Simulation: {self._summary.configuration.io.name}.",
+            f"Package version: {self._summary.qgsw_version}.",
+            f"Folder: {self.folder}.",
+        ]
+        return "\n".join(msg_txts)
 
     def files(self) -> Iterator[Path]:
         """Sorted list of files.
