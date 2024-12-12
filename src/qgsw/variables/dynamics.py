@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
+
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F  # noqa: N812
