@@ -325,7 +325,7 @@ class RunOutput:
             f"Simulation: {self._summary.configuration.io.name}.",
             f"Package version: {self._summary.qgsw_version}.",
             f"Folder: {self.folder}.",
-            f"Variables:{'\n\t'+vars_txt}",
+            f"Variables:\n\t{vars_txt}",
         ]
         return "\n".join(msg_txts)
 
