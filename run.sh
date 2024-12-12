@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [ ! -d logs ]; then
-  mkdir -p logs;
-fi
-
-
 #OAR -n run-model
 #OAR -q production
 #OAR -l gpu=1,walltime=24
