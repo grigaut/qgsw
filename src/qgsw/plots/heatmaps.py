@@ -9,7 +9,7 @@ import plotly.colors as pco
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from qgsw.plots.animated_plots import BaseAnimatedMaps
+from qgsw.plots.animated_maps import BaseAnimatedMaps
 from qgsw.run_summary import RunOutput
 
 if TYPE_CHECKING:
