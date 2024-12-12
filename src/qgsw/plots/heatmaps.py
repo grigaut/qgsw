@@ -9,7 +9,7 @@ import plotly.colors as pco
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from qgsw.plots.animated_plots import BaseAnimatedPlots
+from qgsw.plots.animated_plots import BaseAnimatedMaps
 from qgsw.run_summary import RunOutput
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from qgsw.variables.base import ParsedVariable
 
 
-class AnimatedHeatmaps(BaseAnimatedPlots[np.ndarray]):
+class AnimatedHeatmaps(BaseAnimatedMaps[np.ndarray]):
     """Animated Heatmap with shared colorscale."""
 
     def __init__(

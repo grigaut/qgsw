@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class BaseAnimatedPlots(ABC, Generic[T]):
+class BaseAnimatedMaps(ABC, Generic[T]):
     """Animated Plot base class."""
 
     _is_set = False
