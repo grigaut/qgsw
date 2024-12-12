@@ -4,7 +4,7 @@ import torch
 
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs import DEVICE
-from qgsw.variables import UVH
+from qgsw.variables.uvh import UVH
 
 CFL_ADV = 0.5
 CFL_GRAVITY = 0.5

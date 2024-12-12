@@ -20,21 +20,21 @@ from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
-from qgsw.variables import (
-    UVH,
-    KineticEnergy,
+from qgsw.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
     PhysicalVorticity,
     PhysicalZonalVelocity,
     Pressure,
-    State,
     StreamFunction,
     SurfaceHeightAnomaly,
     Vorticity,
     ZonalVelocityFlux,
 )
+from qgsw.variables.energetics import KineticEnergy
+from qgsw.variables.state import State
+from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane

@@ -21,7 +21,7 @@ from qgsw.spatial.core.discretization import (
 )
 from qgsw.specs import DEVICE
 from qgsw.utils.gaussian_filtering import GaussianFilter2D
-from qgsw.variables import UVH
+from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane

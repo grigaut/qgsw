@@ -38,7 +38,7 @@ class Variable:
 
     def __repr__(self) -> str:
         """Variable string representation."""
-        return f"Variable {self._name} [{self.unit}]: {self._description}"
+        return f"Variable {self._name}: {self._description} [{self.unit}]"
 
 
 class PrognosticVariable(Variable):
@@ -201,3 +201,19 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         if state is not self._state:
             return self._var.bind(state)
         return self
+
+
+class ParsedVariable(Variable):
+    """Variable parsed from output file."""
+
+    def __init__(self, name: str, unit: str, description: str) -> None:
+        """Instantiate the variable.
+
+        Args:
+            name (str): Variable name.
+            unit (str): Variable unit.
+            description (str): Variable description.
+        """
+        self._name = name
+        self._unit = unit
+        self._description = description

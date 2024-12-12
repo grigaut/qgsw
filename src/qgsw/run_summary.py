@@ -1,15 +1,17 @@
 """Generate run summaries."""
 
+from __future__ import annotations
+
 import datetime
-from collections.abc import Iterator
 from functools import cached_property
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 
 from qgsw.utils.sorting import sort_files
+from qgsw.variables.base import ParsedVariable
 
 try:
     from typing import Self
@@ -19,6 +21,11 @@ except ImportError:
 import toml
 
 from qgsw.configs import Configuration
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from qgsw.models.io import IO
 
 
 class SummaryError(Exception):
@@ -36,6 +43,7 @@ class RunSummary:
     _total_steps = "n_steps"
     _n = "last_registered_step"
     _finished = "finished_run"
+    _variables = "output-vars"
 
     def __init__(self, run_params: dict[str, Any]) -> None:
         """Instantiate run summary.
@@ -50,6 +58,7 @@ class RunSummary:
             self._has_summary = False
             self._summary = {self._configuration: run_params}
             self._summary[self._summary_section] = {}
+            self._summary[self._summary_section][self._variables] = []
             self._summary[self._qgsw_version] = version("qgsw")
         self._files: list[Path] = []
         self._config = Configuration(self._summary[self._configuration])
@@ -65,10 +74,18 @@ class RunSummary:
         return self._summary_section in self._summary
 
     @property
+    def output_vars(self) -> list[dict[str, str]]:
+        """Output variables."""
+        if self._variables in self._summary[self._summary_section]:
+            return self._summary[self._summary_section][self._variables]
+        msg = "Output varibales not registered."
+        raise SummaryError(msg)
+
+    @property
     def qgsw_version(self) -> str:
-        """QGSW version.."""
-        if self._qgsw_version in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._qgsw_version]
+        """QGSW version."""
+        if self._qgsw_version in self._summary:
+            return self._summary[self._qgsw_version]
         msg = "QGSW version not registered."
         raise SummaryError(msg)
 
@@ -163,6 +180,24 @@ class RunSummary:
         self._summary[self._summary_section][self._finished] = True
         if self._files:
             self.update()
+
+    def register_outputs(self, io: IO) -> None:
+        """Register the model outputs.
+
+        Args:
+            io (IO): Input/Output manager.
+        """
+        if not self.configuration.io.results.save:
+            return
+        for var in io.tracked_vars:
+            var_dict = {
+                "name": var.name,
+                "unit": var.unit,
+                "description": var.description,
+            }
+            self._summary[self._summary_section][self._variables].append(
+                var_dict,
+            )
 
     def to_file(self, file: Path) -> None:
         """Save the summary into a file.
@@ -264,6 +299,10 @@ class RunOutput:
             for i in range(len(files))
         ]
 
+        self._vars = [
+            ParsedVariable(**var) for var in self._summary.output_vars
+        ]
+
     @cached_property
     def folder(self) -> Path:
         """Run output folder."""
@@ -273,6 +312,22 @@ class RunOutput:
     def summary(self) -> RunSummary:
         """Run summary."""
         return self._summary
+
+    @property
+    def output_vars(self) -> list[ParsedVariable]:
+        """Output variables."""
+        return self._vars
+
+    def __repr__(self) -> str:
+        """Output Representation."""
+        vars_txt = "\n\t".join(str(var) for var in self.output_vars)
+        msg_txts = [
+            f"Simulation: {self._summary.configuration.io.name}.",
+            f"Package version: {self._summary.qgsw_version}.",
+            f"Folder: {self.folder}.",
+            f"Variables:{'\n\t'+vars_txt}",
+        ]
+        return "\n".join(msg_txts)
 
     def files(self) -> Iterator[Path]:
         """Sorted list of files.
