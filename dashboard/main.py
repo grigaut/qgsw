@@ -23,16 +23,19 @@ layers_nb = run.summary.configuration.model.h.shape[0]
 
 st.write(run)
 
-var = st.selectbox("Variable to display", run.output_vars)
-layer = st.selectbox("Layer", list(range(layers_nb)))
+with st.form(key="var-form"):
+    var = st.selectbox("Variable to display", run.output_vars)
+    layer = st.selectbox("Layer", list(range(layers_nb)))
+    submit = st.form_submit_button("Display")
 
-plot = AnimatedHeatmapsFromRunFolders(
-    [run.folder],
-    field=var.name,
-    layers=layer,
-)
+if submit:
+    plot = AnimatedHeatmapsFromRunFolders(
+        [run.folder],
+        field=var.name,
+        layers=layer,
+    )
 
-fig = plot.retrieve_figure()
-fig.update_layout(height=750, width=500)
+    fig = plot.retrieve_figure()
+    fig.update_layout(height=750, width=500)
 
-st.plotly_chart(plot.retrieve_figure(), use_container_width=True)
+    st.plotly_chart(plot.retrieve_figure(), use_container_width=True)
