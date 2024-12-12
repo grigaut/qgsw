@@ -11,8 +11,13 @@ except ImportError:
     from typing_extensions import Self
 
 if TYPE_CHECKING:
+    import datetime
+    from collections.abc import Iterator
+
+    import numpy as np
     import torch
 
+    from qgsw.run_summary import OutputFile
     from qgsw.variables.state import State
     from qgsw.variables.uvh import UVH
 
@@ -211,14 +216,52 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
 class ParsedVariable(Variable):
     """Variable parsed from output file."""
 
-    def __init__(self, name: str, unit: str, description: str) -> None:
+    def __init__(
+        self,
+        name: str,
+        unit: str,
+        description: str,
+        outputs: list[OutputFile],
+    ) -> None:
         """Instantiate the variable.
 
         Args:
             name (str): Variable name.
             unit (str): Variable unit.
             description (str): Variable description.
+            outputs (list[OutputFile]): Ouputs files.
         """
         self._name = name
         self._unit = unit
         self._description = description
+        self._outputs = outputs
+
+    def _from_output(
+        self,
+        output: OutputFile,
+    ) -> np.ndarray:
+        return output.read()[self.name]
+
+    def datas(self) -> Iterator[np.ndarray]:
+        """Data from the outputs.
+
+        Yields:
+            Iterator[np.ndarray]: Data iterator.
+        """
+        return iter(self._from_output(output) for output in self._outputs)
+
+    def steps(self) -> Iterator[int]:
+        """Sorted list of steps.
+
+        Yields:
+            Iterator[float]: Steps iterator.
+        """
+        return (output.step for output in iter(self._outputs))
+
+    def timesteps(self) -> Iterator[datetime.timedelta]:
+        """Sorted list of timesteps.
+
+        Yields:
+            Iterator[float]: Timesteps iterator.
+        """
+        return (output.timestep for output in iter(self._outputs))

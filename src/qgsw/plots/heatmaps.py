@@ -15,6 +15,8 @@ from qgsw.run_summary import RunOutput
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from qgsw.variables.base import ParsedVariable
+
 
 class AnimatedHeatmaps(BaseAnimatedPlots[np.ndarray]):
     """Animated Heatmap with shared colorscale."""
@@ -178,10 +180,10 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         self._layers = self._set_layers(layers)
         super().__init__(
             [
-                self._read_data(run, self._layers[k])
+                self._read_data(run[field], self._layers[k])
                 for k, run in enumerate(self._runs)
             ],
-            frame_labels=self._compute_frame_labels(),
+            frame_labels=[f"{t.days} days" for t in self._runs[0].timesteps()],
         )
 
     @property
@@ -226,19 +228,13 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         Returns:
             go.heatmap.ColorBar: Colorbar.
         """
+        variable = self._runs[0][self._field]
+        legend = f"{variable.description} [{variable.unit}]"
         return (
             super()
             ._create_colorbar()
-            .update(title={"text": self.field, "side": "right"})
+            .update(title={"text": legend, "side": "right"})
         )
-
-    def _compute_frame_labels(self) -> list[str]:
-        """Compute the labels of the frames.
-
-        Returns:
-            list[str]: FRame labels list.
-        """
-        return [f"{ts.days} days" for ts in self._runs[0].timesteps()]
 
     def _check_compatibilities(self) -> None:
         """Ensure that timesteps are compatible.
@@ -278,14 +274,18 @@ class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
         msg = "`layers` parameter should be of type int or list[int]."
         raise ValueError(msg)
 
-    def _read_data(self, run: RunOutput, layer: int) -> list[np.ndarray]:
+    def _read_data(
+        self,
+        variable: ParsedVariable,
+        layer: int,
+    ) -> list[np.ndarray]:
         """Read the data from a file.
 
         Args:
-            run (RunOutput): run output.
+            variable (ParsedVariable): run output.
             layer (int): Layer to consider.
 
         Returns:
             np.ndarray: Data.
         """
-        return [data[self.field][0, layer].T for data in run.datas()]
+        return [data[0, layer].T for data in variable.datas()]

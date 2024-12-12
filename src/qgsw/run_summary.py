@@ -299,9 +299,10 @@ class RunOutput:
             for i in range(len(files))
         ]
 
-        self._vars = [
-            ParsedVariable(**var) for var in self._summary.output_vars
-        ]
+        self._vars = {
+            var["name"]: ParsedVariable(**var, outputs=self._outputs)
+            for var in self._summary.output_vars
+        }
 
     @cached_property
     def folder(self) -> Path:
@@ -316,7 +317,7 @@ class RunOutput:
     @property
     def output_vars(self) -> list[ParsedVariable]:
         """Output variables."""
-        return self._vars
+        return list(self._vars.values())
 
     def __repr__(self) -> str:
         """Output Representation."""
@@ -329,29 +330,35 @@ class RunOutput:
         ]
         return "\n".join(msg_txts)
 
-    def files(self) -> Iterator[Path]:
-        """Sorted list of files.
+    def __getitem__(self, key: str) -> ParsedVariable:
+        """Get variable based on its name.
+
+        Args:
+            key (str): Variable name.
 
         Returns:
-            Iterator[float]: Files iterator.
+            ParsedVariable: _description_
         """
-        return (output.path for output in self.outputs())
+        if key not in self._vars:
+            msg = f"Variables present in the output are {self._vars.keys()}."
+            raise KeyError(msg)
+        return self._vars[key]
 
     def steps(self) -> Iterator[int]:
         """Sorted list of steps.
 
-        Returns:
+        Yields:
             Iterator[float]: Steps iterator.
         """
-        return (output.step for output in self.outputs())
+        return (output.step for output in iter(self._outputs))
 
     def timesteps(self) -> Iterator[datetime.timedelta]:
         """Sorted list of timesteps.
 
-        Returns:
+        Yields:
             Iterator[float]: Timesteps iterator.
         """
-        return (output.timestep for output in self.outputs())
+        return (output.timestep for output in iter(self._outputs))
 
     def outputs(self) -> Iterator[OutputFile]:
         """Sorted outputs.
@@ -360,11 +367,3 @@ class RunOutput:
             Iterator[OutputFile]: Outputs iterator.
         """
         return iter(self._outputs)
-
-    def datas(self) -> Iterator[np.ndarray]:
-        """Sorted datas.
-
-        Returns:
-            Iterator[np.ndarray]: Datas iterators.
-        """
-        return (output.read() for output in self.outputs())
