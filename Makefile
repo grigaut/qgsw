@@ -47,7 +47,8 @@ ${VENV}:
 venv: ${VENV}
 
 install: ${VENV}
-	@${MAKE} logs
+	@mkdir -p logs
+	@chmod +x run.sh
 	@${PIP} install -e .
 
 install-dev: ${VENV}
