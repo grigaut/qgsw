@@ -4,8 +4,8 @@
 #OAR -q production
 #OAR -l gpu=1,walltime=24
 ###OAR --property cputype = 'Intel Xeon Silver 4214' OR cputype = 'Intel Xeon Gold 6248' OR cputype = 'Intel Xeon Silver 4114'
-#OAR -O outlog/OAR.%jobid%.stdout
-#OAR -E outlog/OAR.%jobid%.stderr
+#OAR -O ~/outlog/OAR.%jobid%.stdout
+#OAR -E ~/outlog/OAR.%jobid%.stderr
 
 # To run with arguments use quotes: "oarsub -S "./run_model.py --config=config.toml"
 
