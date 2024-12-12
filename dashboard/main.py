@@ -4,7 +4,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from qgsw.plots.heatmaps import AnimatedHeatmapsFromRunFolders
+from qgsw.plots.heatmaps import (
+    AnimatedHeatmaps,
+)
 from qgsw.run_summary import RunOutput
 
 ROOT = Path(__file__).parent.parent
@@ -29,7 +31,7 @@ with st.form(key="var-form"):
     submit = st.form_submit_button("Display")
 
 if submit:
-    plot = AnimatedHeatmapsFromRunFolders(
+    plot = AnimatedHeatmaps.from_run_folders(
         [run.folder],
         field=var.name,
         layers=layer,

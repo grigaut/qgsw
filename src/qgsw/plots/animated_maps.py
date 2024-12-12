@@ -7,7 +7,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+
+from qgsw.plots.base import BasePlot
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -15,15 +16,15 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class BaseAnimatedMaps(ABC, Generic[T]):
+class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
     """Animated Plot base class."""
 
     _is_set = False
+    _slider_prefix: str = "Frame: "
 
     def __init__(
         self,
         datas: list[list[T]],
-        frame_labels: list[str] | None = None,
     ) -> None:
         """Instantiate the plot.
 
@@ -35,66 +36,17 @@ class BaseAnimatedMaps(ABC, Generic[T]):
         Raises:
             ValueError: If frame_labels is incompatible with datas.
         """
-        self._check_lengths(datas)
+        super().__init__(datas=datas)
         self._n_frames = len(datas[0])
-        if frame_labels is None:
-            frame_labels = [str(i) for i in range(self.n_frames)]
-        if len(frame_labels) != self._n_frames:
-            msg = (
-                "Frames numbers must contains as many "
-                f"value as datas, hence {self._n_frames}"
-            )
-            raise ValueError(msg)
-        if len(set(frame_labels)) != self._n_frames:
-            msg = "frame_labels must contain unique values."
-        self._n_subplots = len(datas)
         # self._datas groups frames number and datas at the given step.
-        self._datas: list[tuple[str, list[T]]] = list(
-            zip(frame_labels, list(zip(*datas))),
+        self._datas = list(
+            zip([str(i) for i in range(self.n_frames)], list(zip(*datas))),
         )
-        self._frame_labels = frame_labels
-        self._fig = self._create_figure()
-
-    @property
-    def n_subplots(self) -> int:
-        """Number of subplots."""
-        return self._n_subplots
 
     @cached_property
     def n_frames(self) -> int:
         """Number of steps."""
         return self._n_frames
-
-    @cached_property
-    def n_cols(self) -> int:
-        """Number of columns."""
-        return min(3, self.n_subplots)
-
-    @cached_property
-    def n_rows(self) -> int:
-        """NUmber of rows."""
-        return (self.n_subplots - 1) // self.n_cols + 1
-
-    @property
-    def figure(self) -> go.Figure:
-        """Figure."""
-        return self._fig
-
-    def _check_lengths(self, datas: list[list[T]]) -> None:
-        """Check than the data length are matching."""
-        n_frames = len(datas[0])
-        if all(len(data) == n_frames for data in datas):
-            return
-        msg = "Different lengths for datas."
-        raise ValueError(msg)
-
-    def _create_figure(self) -> go.Figure:
-        """Create the Figure.
-
-        Returns:
-            go.Figure: Figure.
-        """
-        return make_subplots(rows=self.n_rows, cols=self.n_cols)
 
     def _create_play_button(self) -> go.layout.updatemenu.Button:
         """Create Play button.
@@ -168,10 +120,12 @@ class BaseAnimatedMaps(ABC, Generic[T]):
         Returns:
             go.Layout: Layout.
         """
-        return go.Layout(
+        layout = super()._create_layout()
+        layout.update(
             sliders=[self._create_slider()],
             updatemenus=[self._create_update_menu()],
         )
+        return layout
 
     def _create_slider_current_value(self) -> go.layout.slider.Currentvalue:
         """Create Slider current value.
@@ -181,7 +135,7 @@ class BaseAnimatedMaps(ABC, Generic[T]):
         """
         return go.layout.slider.Currentvalue(
             font={"size": 20},
-            prefix="Frame: ",
+            prefix=self._slider_prefix,
             visible=True,
             xanchor="center",
         )
@@ -217,36 +171,6 @@ class BaseAnimatedMaps(ABC, Generic[T]):
             y=0,
             steps=self._generate_steps(),
         )
-
-    def map_subplot_index_to_subplot_loc(
-        self,
-        subplot_index: int,
-    ) -> tuple[int, int]:
-        """Convert subplot index to subplot location.
-
-        Args:
-            subplot_index (int): Subplot index.
-
-        Returns:
-            tuple[int, int]: Row and column location within the plot.
-        """
-        return (subplot_index // self.n_cols + 1, subplot_index % 3 + 1)
-
-    def map_subplot_loc_to_subplot_index(self, loc: tuple[int, int]) -> int:
-        """Convert subplot location to subplot index.
-
-        Args:
-            loc (tuple[int, int]): Row and column location within the plot.
-
-        Returns:
-            int: Subplot index.
-        """
-        row, col = loc
-        return (row - 1) * self.n_cols + (col - 1)
-
-    @abstractmethod
-    def _add_traces(self) -> None:
-        """Initialize the traces."""
 
     def _generate_frames(self) -> list[go.Frame]:
         """Generate the frames.
@@ -288,26 +212,29 @@ class BaseAnimatedMaps(ABC, Generic[T]):
 
     def _set_figure(self) -> None:
         """Set the figure traces."""
-        if self._is_set:
-            return
-        self._add_traces()
-        self.figure.update_layout(self._create_layout())
+        super()._set_figure()
         self.figure.update(frames=self._generate_frames())
-        self._is_set = True
 
-    def show(self) -> None:
-        """Show the Figure."""
-        self._set_figure()
-        self.figure.show()
+    def set_frame_labels(self, frame_labels: list[str]) -> None:
+        """Set the frames labels.
 
-    def retrieve_figure(self) -> go.Figure:
-        """Retrieve the figure.
+        Args:
+            frame_labels (list[str]): List of frame labels.
 
-        Returns:
-            go.Figure: Figure
+        Raises:
+            ValueError: If the number of label is invalid.
         """
-        self._set_figure()
-        return self.figure
+        if len(frame_labels) != self._n_frames:
+            msg = (
+                "Frames numbers must contains as many "
+                f"value as datas, hence {self._n_frames}"
+            )
+            raise ValueError(msg)
+        if len(set(frame_labels)) != self._n_frames:
+            msg = "frame_labels must contain unique values."
+        self._datas: list[tuple[str, list[T]]] = [
+            (frame_labels[i], e[1]) for i, e in enumerate(self._datas)
+        ]
 
     def save_frame(self, frame_index: int, output_folder: Path) -> None:
         """Save a given frame.

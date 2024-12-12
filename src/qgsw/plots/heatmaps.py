@@ -4,27 +4,30 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
+
 import numpy as np
 import plotly.colors as pco
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
-from qgsw.plots.animated_maps import BaseAnimatedMaps
+from qgsw.plots.animated_maps import BaseAnimatedPlot
 from qgsw.run_summary import RunOutput
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qgsw.variables.base import ParsedVariable
 
-
-class AnimatedHeatmaps(BaseAnimatedMaps[np.ndarray]):
+class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
     """Animated Heatmap with shared colorscale."""
+
+    _color_bar_text = ""
 
     def __init__(
         self,
         datas: list[list[np.ndarray]],
-        frame_labels: list[str] | None = None,
     ) -> None:
         """Instantiate the plot.
 
@@ -34,7 +37,7 @@ class AnimatedHeatmaps(BaseAnimatedMaps[np.ndarray]):
             Defaults to None.
         """
         self._colorbar = self._create_colorbar()
-        super().__init__(datas, frame_labels)
+        super().__init__(datas)
 
     @property
     def colorbar(self) -> go.heatmap.ColorBar:
@@ -50,7 +53,7 @@ class AnimatedHeatmaps(BaseAnimatedMaps[np.ndarray]):
         return go.heatmap.ColorBar(
             exponentformat="e",
             showexponent="all",
-            title={"text": "", "side": "right"},
+            title={"text": self._color_bar_text, "side": "right"},
             thickness=50,
         )
 
@@ -155,137 +158,64 @@ class AnimatedHeatmaps(BaseAnimatedMaps[np.ndarray]):
         not_empty_vals = [arr[~np.isnan(arr)] for arr in not_empty_arrays]
         return max(np.max(np.abs(arr)) for arr in not_empty_vals)
 
-
-class AnimatedHeatmapsFromRunFolders(AnimatedHeatmaps):
-    """Animated heatmap from folders."""
-
-    def __init__(
-        self,
+    @classmethod
+    def from_run_folders(
+        cls,
         folders: list[Path | str],
-        field: str = "p",
+        field: str,
         layers: int | list[int] = 0,
-    ) -> None:
-        """Instantiate the plot.
+    ) -> Self:
+        """Instantiate the plot from a list of folders.
 
         Args:
-            folders (list[Path  |  str]): Folder to use for plotting.
-            field (str, optional): Field to plot. Defaults to "p".
-            layers (int | list[int], optional): Layer to plot.
-            If list, correspond to layer for each run and must have the same
-            length as folders. Defaults to 0.
-        """
-        self._runs = [RunOutput(folder=f) for f in folders]
-        self._check_compatibilities()
-        self._field = field
-        self._layers = self._set_layers(layers)
-        super().__init__(
-            [
-                self._read_data(run[field], self._layers[k])
-                for k, run in enumerate(self._runs)
-            ],
-            frame_labels=[f"{t.days} days" for t in self._runs[0].timesteps()],
-        )
-
-    @property
-    def field(self) -> str:
-        """Field to plot."""
-        return self._field
-
-    def _make_titles(self) -> list[str]:
-        """Create subplots titles.
-
-        Returns:
-            list[str]: List of titles.
-        """
-        return [
-            f"{run.summary.configuration.model.name} - Layer {self._layers[i]}"
-            for i, run in enumerate(self._runs)
-        ]
-
-    def _create_figure(self) -> go.Figure:
-        """Create the figure.
-
-        Returns:
-            go.Figure: Figure.
-        """
-        return make_subplots(
-            rows=self.n_rows,
-            cols=self.n_cols,
-            subplot_titles=self._make_titles(),
-        )
-
-    def _create_slider_current_value(self) -> go.layout.slider.Currentvalue:
-        """Create Slider current value and set prefix to 'Time'.
-
-        Returns:
-            go.layout.slider.Currentvalue: Slider current value.
-        """
-        return super()._create_slider_current_value().update(prefix="Time: ")
-
-    def _create_colorbar(self) -> go.heatmap.ColorBar:
-        """Create the colorbar.
-
-        Returns:
-            go.heatmap.ColorBar: Colorbar.
-        """
-        variable = self._runs[0][self._field]
-        legend = f"{variable.description} [{variable.unit}]"
-        return (
-            super()
-            ._create_colorbar()
-            .update(title={"text": legend, "side": "right"})
-        )
-
-    def _check_compatibilities(self) -> None:
-        """Ensure that timesteps are compatible.
+            folders (list[Path  |  str]): LIst of folders to use as source.
+            field (str): Field to display.
+            layers (int | list[int], optional): Layer(s) to display.
+            Defaults to 0.
 
         Raises:
-            ValueError: If timestep don't match.
-        """
-        dt0 = self._runs[0].summary.configuration.simulation.dt
-        dts = [run.summary.configuration.simulation.dt for run in self._runs]
-        if all(dt == dt0 for dt in dts):
-            return
-        msg = "Incompatible timesteps."
-        raise ValueError(msg)
-
-    def _set_layers(self, layers: int | list[int]) -> list[int]:
-        """Set the layers.
-
-        Args:
-            layers (int | list[int]): Layers.
-
-        Raises:
-            ValueError: If the layer list is not valid.
+            ValueError: If the timesteps are incompatible.
+            TypeError: If layers is neither int or list[int]
+            ValueError: If the layers length doesn't match run's
 
         Returns:
-            list[int]: List of layer to plot for every given run.
+            Self: AnimatedHeatmap.
         """
-        if isinstance(layers, int):
-            return [layers] * len(self._runs)
-        if isinstance(layers, list):
-            if len(layers) == len(self._runs):
-                return layers
-            msg = (
-                "The layers list should be of length "
-                f"{len(self._runs)} instead of {len(layers)}."
-            )
+        runs = [RunOutput(folder=f) for f in folders]
+        dt0 = runs[0].summary.configuration.simulation.dt
+        dts = [run.summary.configuration.simulation.dt for run in runs]
+        if not all(dt == dt0 for dt in dts):
+            msg = "Incompatible timesteps."
             raise ValueError(msg)
-        msg = "`layers` parameter should be of type int or list[int]."
-        raise ValueError(msg)
 
-    def _read_data(
-        self,
-        variable: ParsedVariable,
-        layer: int,
-    ) -> list[np.ndarray]:
-        """Read the data from a file.
+        if (not isinstance(layers, int)) and (not isinstance(layers, list)):
+            msg = "`layers` parameter should be of type int or list[int]."
+            raise TypeError(msg)
+        if isinstance(layers, list):
+            if len(layers) != len(runs):
+                msg = (
+                    "The layers list should be of length "
+                    f"{len(runs)} instead of {len(layers)}."
+                )
+                raise ValueError(msg)
+            ls = layers
+        else:
+            ls = [layers] * len(runs)
 
-        Args:
-            variable (ParsedVariable): run output.
-            layer (int): Layer to consider.
+        datas = [
+            [data[0, ls[k]].T for data in run[field].datas()]
+            for k, run in enumerate(runs)
+        ]
+        cls._slider_prefix = "Time: "
+        legend = f"{runs[0][field].description} [{runs[0][field].unit}]"
+        cls._color_bar_text = legend
+        plot = cls(datas=datas)
+        plot.set_subplot_titles(
+            [
+                f"{run.summary.configuration.model.name} - Layer {ls[i]}"
+                for i, run in enumerate(runs)
+            ],
+        )
+        plot.set_frame_labels([f"{t.days} days" for t in runs[0].timesteps()])
 
-        Returns:
-            np.ndarray: Data.
-        """
-        return [data[0, layer].T for data in variable.datas()]
+        return plot
