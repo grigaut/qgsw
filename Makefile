@@ -2,6 +2,7 @@ ifneq (,$(wildcard ./.env))
 	include .env
     export
 endif
+
 # Virtual Environment Management
 ifeq ($(OS), Windows_NT)
 	BIN = ${VENV}/Scripts/
@@ -22,41 +23,42 @@ PIP:=${BIN}/pip
 # Important Files
 REQUIREMENTS:=requirements.txt
 DEV_REQUIREMENTS:=requirements-dev.txt
+RUN_SCRIPT := run.sh
 
-# G5K runs
-# Zip file
-ZIP_FILE_ROOT := qgsw
-# Folders
-CONFIG := ./config
-SRC := src
-SCRIPTS := scripts
-# Files
-PYPROJECT := pyproject.toml
-MAKEFILE := Makefile
-ALPHA_COEFFICIENTS := data/coefficients.npz
+# Logs
+LOGS:=logs
 
 all:
 	@${MAKE} install-dev
 
 clean:
+	@${MAKE} clean-venv
+	@${MAKE} clean-logs
+
+clean-venv:
 	@${CONDA_EXE} env remove --prefix ${VENV}
+
+clean-logs:
+	@rm logs/*
+
 
 ${VENV}:
 	@${CONDA_EXE} env create --file=${ENVIRONMENT_FILE} --prefix=${VENV}
 
 venv: ${VENV}
 
-install: ${VENV}
-	@mkdir -p logs
-	@chmod +x run.sh
+${LOGS}:
+	@mkdir -p ${LOGS}
+
+install: ${VENV} ${LOGS}
+	@chmod +x ${RUN_SCRIPT}
 	@${PIP} install -e .
 
-install-dev: ${VENV}
+install-dev:
 	@${MAKE} install
 	@${PIP} install -r ${DEV_REQUIREMENTS}
 
 # GRID 5000 -----------------------------------------
 g5k-import-%:
 	scp -r ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${G5K_IMPORT_STORAGE}/$*
-
 # ---------------------------------------------------
