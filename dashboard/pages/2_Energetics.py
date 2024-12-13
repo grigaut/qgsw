@@ -46,7 +46,7 @@ if ens_wise:
         submit = st.form_submit_button("Display")
     if submit:
         plot = ScatterPlot.ensemble_wise_from_folders(
-            folders=[run.folder],
+            folders=[run.folder] * len(selected_vars),
             ensembles=ensembles,
             fields=[v.name for v in selected_vars],
         )
