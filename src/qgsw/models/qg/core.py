@@ -240,6 +240,9 @@ class QG(Model):
             self._pv,
             self._ke_hat,
             self._ape_hat,
+            self._energy_hat,
+            self._ke,
+            self._ape,
             self._energy,
         )
 
