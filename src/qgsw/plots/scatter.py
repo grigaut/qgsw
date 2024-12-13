@@ -135,7 +135,7 @@ class ScatterPlot(BasePlot[np.ndarray]):
             for k, run in enumerate(runs)
         ]
         cls._xaxis_title = "Time"
-        yaxis_title = f"{runs[0][fs[0]].description} [{runs[0][fs[0]].unit}]"
+        yaxis_title = f"{runs[0][fs[0]].unit}"
         cls._yaxis_title = yaxis_title
         plot = cls(datas=datas)
         traces_name = [
@@ -206,7 +206,7 @@ class ScatterPlot(BasePlot[np.ndarray]):
             for k, run in enumerate(runs)
         ]
         cls._xaxis_title = "Time"
-        yaxis_title = f"{runs[0][fs[0]].description} [{runs[0][fs[0]].unit}]"
+        yaxis_title = f"{runs[0][fs[0]].unit}"
         cls._yaxis_title = yaxis_title
         plot = cls(datas=datas)
         traces_name = [
