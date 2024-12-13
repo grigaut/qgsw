@@ -188,7 +188,8 @@ class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
         check_time_compatibility(*runs)
 
         if not all(run[field].scope.point_wise for run in runs):
-            msg = "The fields must be lev"
+            msg = "The fields must be level-wise."
+            raise ValueError(msg)
 
         # Validate ensembles structure
         if not (isinstance(ensembles, (int, list))):

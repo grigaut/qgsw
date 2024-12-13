@@ -61,6 +61,21 @@ class Scope(ABC):
         """Whether the scope is at least point-wise."""
         return self.ensemble_wise and self.level_wise and self.point_wise
 
+    @property
+    def stricly_ensemble_wise(self) -> bool:
+        """Whether the scope is stricly ensemble wise."""
+        return self.ensemble_wise_at_least and self.ensemble_wise_at_most
+
+    @property
+    def stricly_level_wise(self) -> bool:
+        """Whether the scope is stricly level wise."""
+        return self.level_wise_at_least and self.level_wise_at_most
+
+    @property
+    def stricly_point_wise(self) -> bool:
+        """Whether the scope is stricly point wise."""
+        return self.point_wise_at_least and self.point_wise_at_most
+
     def to_dict(self) -> dict[str, bool]:
         """Convert the scope to a dictionnary.
 

@@ -1,11 +1,13 @@
 """Profile plots."""
 
+from itertools import product
 from pathlib import Path
 
 import streamlit as st
 
 from qgsw.plots.scatter import ScatterPlot
 from qgsw.run_summary import RunOutput
+from qgsw.variables.utils import check_unit_compatibility
 
 ROOT = Path(__file__).parent.parent.parent
 OUTPUTS = ROOT.joinpath("output")
@@ -22,40 +24,44 @@ run = RunOutput(folder)
 
 st.write(run)
 
-vars_profile = [var for var in run.output_vars if var.scope.level_wise_at_most]
+ens_wise = st.toggle("Display ensemble-wise variables.")
 
-var = st.selectbox("Variable to display", vars_profile)
+if ens_wise:
+    vars_profile = [
+        v for v in run.output_vars if v.scope.stricly_ensemble_wise
+    ]
+else:
+    vars_profile = [v for v in run.output_vars if v.scope.stricly_level_wise]
 
-if var.scope.level_wise:
-    with st.form(key="var-form-level"):
-        levels_nb = run.summary.configuration.model.h.shape[0]
-        ls = list(range(levels_nb))
-        level = st.selectbox("Level", [*ls, "All"])
+selected_vars = st.multiselect("Variable to display", vars_profile)
+
+check_unit_compatibility(*selected_vars)
+
+if ens_wise:
+    with st.form(key="var-form-ensemble-wise"):
+        ensembles = [0] * len(selected_vars)
         submit = st.form_submit_button("Display")
-
-    if submit:
-        if level == "All":
-            folders = [run.folder] * levels_nb
-            levels = ls
-        else:
-            folders = [run.folder]
-            levels = [level]
-        plot = ScatterPlot.level_wise_from_folders(
-            folders=folders,
-            field=var.name,
-            ensembles=[0 for _ in folders],
-            levels=levels,
-        )
-elif var.scope.ensemble_wise:
-    with st.form(key="var-form-ensemble"):
-        ensembles = 0
-        submit = st.form_submit_button("Display")
-
     if submit:
         plot = ScatterPlot.ensemble_wise_from_folders(
             folders=[run.folder],
-            ensembles=0,
-            field=var.name,
+            ensembles=ensembles,
+            fields=[v.name for v in selected_vars],
+        )
+else:
+    with st.form(key="var-form-level-wise"):
+        levels_nb = run.summary.configuration.model.h.shape[0]
+        levels = list(range(levels_nb))
+        selected_levels = st.multiselect("Level(s)", levels)
+        submit = st.form_submit_button("Display")
+    if submit:
+        prod = list(product(selected_vars, selected_levels))
+        fs = [e[0].name for e in prod]
+        ls = [e[1] for e in prod]
+        plot = ScatterPlot.level_wise_from_folders(
+            folders=[run.folder] * len(fs),
+            fields=fs,
+            ensembles=[0] * len(fs),
+            levels=ls,
         )
 if submit:
     fig = plot.retrieve_figure()

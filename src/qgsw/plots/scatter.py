@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from qgsw.run_summary import RunOutput, check_time_compatibility
+from qgsw.variables.utils import check_unit_compatibility
 
 try:
     from typing import Self
@@ -60,15 +61,15 @@ class ScatterPlot(BasePlot[np.ndarray]):
     def level_wise_from_folders(
         cls,
         folders: list[Path | str],
-        field: str,
+        fields: str | list[str],
         ensembles: int | list[int] = 0,
         levels: int | list[int] = 0,
     ) -> Self:
-        """Instantiate the plot from a list of folders.
+        r"""Instantiate the plot from a list of folders.
 
         Args:
             folders (list[Path  |  str]): List of folders to use as source.
-            field (str): Field to display.
+            fields (str | list[str]): Field to display.
             ensembles (int | list[int], optional): Ensemble(s) to display.
             Defaults to 0.
             levels (int | list[int], optional): level(s) to display.
@@ -84,6 +85,22 @@ class ScatterPlot(BasePlot[np.ndarray]):
         """
         runs = [RunOutput(folder=f) for f in folders]
         check_time_compatibility(*runs)
+
+        if not isinstance(fields, str | list):
+            msg = "`fields` parameter should be of type str or list[str]."
+            raise TypeError(msg)
+        if isinstance(fields, list):
+            if len(fields) != len(runs):
+                msg = (
+                    "The fields list should be of length "
+                    f"{len(runs)} instead of {len(fields)}."
+                )
+                raise ValueError(msg)
+            fs = fields
+        else:
+            fs = [fields] * len(runs)
+
+        check_unit_compatibility(*[run[fs[k]] for k, run in enumerate(runs)])
 
         if not isinstance(ensembles, int | list):
             msg = "`ensembles` parameter should be of type int or list[int]."
@@ -114,15 +131,15 @@ class ScatterPlot(BasePlot[np.ndarray]):
             ls = [levels] * len(runs)
 
         datas = [
-            [data[es[k], ls[k]] for data in run[field].datas()]
+            [data[es[k], ls[k]] for data in run[fs[k]].datas()]
             for k, run in enumerate(runs)
         ]
         cls._xaxis_title = "Time"
-        yaxis_title = f"{runs[0][field].description} [{runs[0][field].unit}]"
+        yaxis_title = f"{runs[0][fs[0]].description} [{runs[0][fs[0]].unit}]"
         cls._yaxis_title = yaxis_title
         plot = cls(datas=datas)
         traces_name = [
-            f"{run[field].description} - Ens: {es[k]} - Level: {ls[k]}"
+            f"{run[fs[k]].description} - Ens: {es[k]} - Level: {ls[k]}"
             for k, run in enumerate(runs)
         ]
         plot.set_traces_name(traces_name)
@@ -132,14 +149,14 @@ class ScatterPlot(BasePlot[np.ndarray]):
     def ensemble_wise_from_folders(
         cls,
         folders: list[Path | str],
-        field: str,
+        fields: str,
         ensembles: int | list[int] = 0,
     ) -> Self:
         """Instantiate the plot from a list of folders.
 
         Args:
             folders (list[Path  |  str]): List of folders to use as source.
-            field (str): Field to display.
+            fields (str | list[str]): Field to display.
             ensembles (int | list[int], optional): Ensemble(s) to display.
             Defaults to 0.
 
@@ -153,6 +170,22 @@ class ScatterPlot(BasePlot[np.ndarray]):
         """
         runs = [RunOutput(folder=f) for f in folders]
         check_time_compatibility(*runs)
+
+        if not isinstance(fields, str | list):
+            msg = "`fields` parameter should be of type str or list[str]."
+            raise TypeError(msg)
+        if isinstance(fields, list):
+            if len(fields) != len(runs):
+                msg = (
+                    "The fields list should be of length "
+                    f"{len(runs)} instead of {len(fields)}."
+                )
+                raise ValueError(msg)
+            fs = fields
+        else:
+            fs = [fields] * len(runs)
+
+        check_unit_compatibility(*[run[fs[k]] for k, run in enumerate(runs)])
 
         if not isinstance(ensembles, int | list):
             msg = "`ensembles` parameter should be of type int or list[int]."
@@ -169,15 +202,15 @@ class ScatterPlot(BasePlot[np.ndarray]):
             es = [ensembles] * len(runs)
 
         datas = [
-            [data[es[k]] for data in run[field].datas()]
+            [data[es[k]] for data in run[fs[k]].datas()]
             for k, run in enumerate(runs)
         ]
         cls._xaxis_title = "Time"
-        yaxis_title = f"{runs[0][field].description} [{runs[0][field].unit}]"
+        yaxis_title = f"{runs[0][fs[0]].description} [{runs[0][fs[0]].unit}]"
         cls._yaxis_title = yaxis_title
         plot = cls(datas=datas)
         traces_name = [
-            f"{run[field].description} - Ens: {es[k]}"
+            f"{run[fs[k]].description} - Ens: {es[k]}"
             for k, run in enumerate(runs)
         ]
         plot.set_traces_name(traces_name)
