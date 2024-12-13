@@ -190,13 +190,8 @@ class RunSummary:
         if not self.configuration.io.results.save:
             return
         for var in io.tracked_vars:
-            var_dict = {
-                "name": var.name,
-                "unit": var.unit,
-                "description": var.description,
-            }
             self._summary[self._summary_section][self._variables].append(
-                var_dict,
+                var.to_dict(),
             )
 
     def to_file(self, file: Path) -> None:

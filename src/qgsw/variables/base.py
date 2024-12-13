@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 try:
     from typing import Self
@@ -30,6 +30,9 @@ class Variable:
     _unit: str
     _name: str
     _description: str
+    _ensemble_wise = True
+    _layer_mode_wise = True
+    _point_wise = True
 
     @property
     def unit(self) -> str:
@@ -46,9 +49,35 @@ class Variable:
         """Variable description."""
         return self._description
 
+    @property
+    def ensemble_wise(self) -> bool:
+        """Whether the variable is ensemble-wise or not."""
+        return self._ensemble_wise
+
+    @property
+    def layer_mode_wise(self) -> bool:
+        """Whether the variable is layer/mode-wise or not."""
+        return self._layer_mode_wise
+
+    @property
+    def point_wise(self) -> bool:
+        """Whether the variable is point-wise or not."""
+        return self._point_wise
+
     def __repr__(self) -> str:
         """Variable string representation."""
         return f"{self._description}: {self._name} [{self.unit}]"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert the variable to a dictionnary."""
+        return {
+            "name": self.name,
+            "unit": self.unit,
+            "description": self.description,
+            "ensemble_wise": self.ensemble_wise,
+            "layer_mode_wise": self.layer_mode_wise,
+            "point_wise": self.point_wise,
+        }
 
 
 class PrognosticVariable(Variable):
@@ -221,6 +250,9 @@ class ParsedVariable(Variable):
         name: str,
         unit: str,
         description: str,
+        ensemble_wise: bool,  # noqa: FBT001
+        layer_mode_wise: bool,  # noqa: FBT001
+        point_wise: bool,  # noqa: FBT001
         outputs: list[OutputFile],
     ) -> None:
         """Instantiate the variable.
@@ -229,11 +261,17 @@ class ParsedVariable(Variable):
             name (str): Variable name.
             unit (str): Variable unit.
             description (str): Variable description.
+            ensemble_wise (bool): Whether the variable is ensemble-wise.
+            layer_mode_wise (bool): Whether the variable is layer/mode-wise.
+            point_wise (bool): Whether the variable is point.
             outputs (list[OutputFile]): Ouputs files.
         """
         self._name = name
         self._unit = unit
         self._description = description
+        self._ensemble_wise = ensemble_wise
+        self._layer_mode_wise = layer_mode_wise
+        self._point_wise = point_wise
         self._outputs = outputs
 
     def _from_output(
