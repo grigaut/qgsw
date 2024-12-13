@@ -36,6 +36,7 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
         Raises:
             ValueError: If frame_labels is incompatible with datas.
         """
+        self._check_lengths(datas)
         super().__init__(datas=datas)
         self._n_frames = len(datas[0])
         # self._datas groups frames number and datas at the given step.
@@ -62,6 +63,14 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
     def n_frames(self) -> int:
         """Number of steps."""
         return self._n_frames
+
+    def _check_lengths(self, datas: list[T]) -> None:
+        """Check than the data length are matching."""
+        n_frames = len(datas[0])
+        if all(len(data) == n_frames for data in datas):
+            return
+        msg = "Different lengths for datas."
+        raise ValueError(msg)
 
     def _create_figure(
         self,

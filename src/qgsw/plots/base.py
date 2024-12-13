@@ -27,7 +27,6 @@ class BasePlot(ABC, Generic[T]):
         Args:
             datas (list[T]): List of datas to plot.
         """
-        self._check_lengths(datas)
         self._n_traces = len(datas)
         self._fig = self._create_figure()
 
@@ -40,14 +39,6 @@ class BasePlot(ABC, Generic[T]):
     def n_traces(self) -> int:
         """Number of traces."""
         return self._n_traces
-
-    def _check_lengths(self, datas: list[T]) -> None:
-        """Check than the data length are matching."""
-        n_frames = len(datas[0])
-        if all(len(data) == n_frames for data in datas):
-            return
-        msg = "Different lengths for datas."
-        raise ValueError(msg)
 
     def _create_figure(self) -> go.Figure:
         """Create the Figure.

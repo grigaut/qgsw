@@ -288,6 +288,14 @@ class ParsedVariable(Variable):
         """
         return (output.timestep for output in iter(self._outputs))
 
+    def seconds(self) -> Iterator[datetime.timedelta]:
+        """Sorted list of seconds.
+
+        Yields:
+            Iterator[float]: Seconds iterator.
+        """
+        return (output.second for output in iter(self._outputs))
+
     @classmethod
     def from_dict(cls, dic: dict, outputs: list[OutputFile]) -> Self:
         """Instantiate the variable from a dictionnary.

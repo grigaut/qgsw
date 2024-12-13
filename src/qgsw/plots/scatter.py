@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from qgsw.run_summary import RunOutput, check_time_compatibility
+from qgsw.run_summary import RunOutput
 from qgsw.variables.utils import check_unit_compatibility
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import plotly.graph_objects as go
@@ -32,21 +32,34 @@ class ScatterPlot(BasePlot[np.ndarray]):
         super().__init__(datas)
         self._datas = datas
         self._traces_name = [None for _ in range(self.n_traces)]
+        self._xs = [list(range(len(d))) for d in self._datas]
+
+    def set_xs(self, *xs: list[Any]) -> None:
+        """Set the xs of thetraces.
+
+        Args:
+            *xs (list[Any]): List of x values.
+        """
+        if any(len(xs[k]) != len(d) for k, d in enumerate(self._datas)):
+            msg = "xs's lengths must matchs the lengths of datas."
+            raise ValueError(msg)
+        self._xs = xs
 
     def _add_traces(self) -> None:
         for trace_nb in range(self.n_traces):
             self.figure.add_trace(
                 go.Scatter(
+                    x=self._xs[trace_nb],
                     y=self._datas[trace_nb],
                     name=self._traces_name[trace_nb],
                 ),
             )
 
-    def set_traces_name(self, traces_name: list[str]) -> None:
+    def set_traces_name(self, *traces_name: str) -> None:
         """Set the name of the traces.
 
         Args:
-            traces_name (list[str]): List of names.
+            *traces_name (str): List of names.
 
         Raises:
             ValueError: If the number of names
@@ -84,7 +97,6 @@ class ScatterPlot(BasePlot[np.ndarray]):
             Self: AnimatedHeatmap.
         """
         runs = [RunOutput(folder=f) for f in folders]
-        check_time_compatibility(*runs)
 
         if not isinstance(fields, str | list):
             msg = "`fields` parameter should be of type str or list[str]."
@@ -134,15 +146,17 @@ class ScatterPlot(BasePlot[np.ndarray]):
             [data[es[k], ls[k]] for data in run[fs[k]].datas()]
             for k, run in enumerate(runs)
         ]
-        cls._xaxis_title = "Time"
+        cls._xaxis_title = "Time [s]"
         yaxis_title = f"{runs[0][fs[0]].unit}"
         cls._yaxis_title = yaxis_title
         plot = cls(datas=datas)
-        traces_name = [
+        names = [
             f"{run[fs[k]].description} - Ens: {es[k]} - Level: {ls[k]}"
             for k, run in enumerate(runs)
         ]
-        plot.set_traces_name(traces_name)
+        plot.set_traces_name(*names)
+        xs = [list(run[fs[k]].seconds()) for k, run in enumerate(runs)]
+        plot.set_xs(*xs)
         return plot
 
     @classmethod
@@ -169,7 +183,6 @@ class ScatterPlot(BasePlot[np.ndarray]):
             Self: AnimatedHeatmap.
         """
         runs = [RunOutput(folder=f) for f in folders]
-        check_time_compatibility(*runs)
 
         if not isinstance(fields, str | list):
             msg = "`fields` parameter should be of type str or list[str]."
@@ -205,13 +218,15 @@ class ScatterPlot(BasePlot[np.ndarray]):
             [data[es[k]] for data in run[fs[k]].datas()]
             for k, run in enumerate(runs)
         ]
-        cls._xaxis_title = "Time"
+        cls._xaxis_title = "Time [s]"
         yaxis_title = f"{runs[0][fs[0]].unit}"
         cls._yaxis_title = yaxis_title
         plot = cls(datas=datas)
-        traces_name = [
+        names = [
             f"{run[fs[k]].description} - Ens: {es[k]}"
             for k, run in enumerate(runs)
         ]
-        plot.set_traces_name(traces_name)
+        plot.set_traces_name(*names)
+        xs = [list(run[fs[k]].seconds()) for k, run in enumerate(runs)]
+        plot.set_xs(*xs)
         return plot

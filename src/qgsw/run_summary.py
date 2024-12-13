@@ -258,6 +258,7 @@ class OutputFile(NamedTuple):
     """Output file wrapper."""
 
     step: int
+    second: float
     timestep: datetime.timedelta
     path: Path
 
@@ -287,10 +288,16 @@ class RunOutput:
         files = list(self.folder.glob(f"{prefix}*.npz"))
         steps, files = sort_files(files, prefix, ".npz")
         dt = self._summary.configuration.simulation.dt
-        timesteps = [datetime.timedelta(seconds=step * dt) for step in steps]
+        seconds = [step * dt for step in steps]
+        timesteps = [datetime.timedelta(seconds=sec) for sec in seconds]
 
         self._outputs = [
-            OutputFile(step=steps[i], timestep=timesteps[i], path=files[i])
+            OutputFile(
+                step=steps[i],
+                timestep=timesteps[i],
+                path=files[i],
+                second=seconds[i],
+            )
             for i in range(len(files))
         ]
 
@@ -354,6 +361,14 @@ class RunOutput:
             Iterator[float]: Timesteps iterator.
         """
         return (output.timestep for output in iter(self._outputs))
+
+    def seconds(self) -> Iterator[datetime.timedelta]:
+        """Sorted list of seconds.
+
+        Yields:
+            Iterator[float]: Seconds iterator.
+        """
+        return (output.second for output in iter(self._outputs))
 
     def outputs(self) -> Iterator[OutputFile]:
         """Sorted outputs.
