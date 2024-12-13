@@ -25,3 +25,6 @@ folder = st.selectbox("Data source", options=sources)
 run = RunOutput(folder)
 
 st.write(run)
+
+if not run.summary.is_finished:
+    st.warning("The simulation did not reach its end.", icon="⚠️")

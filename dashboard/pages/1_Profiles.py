@@ -25,6 +25,9 @@ levels_nb = run.summary.configuration.model.h.shape[0]
 
 st.write(run)
 
+if not run.summary.is_finished:
+    st.warning("The simulation did not reach its end.", icon="⚠️")
+
 vars_profile = [var for var in run.output_vars if var.scope.point_wise]
 
 var = st.selectbox("Variable to display", vars_profile)

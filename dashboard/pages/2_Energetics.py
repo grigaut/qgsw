@@ -24,6 +24,9 @@ run = RunOutput(folder)
 
 st.write(run)
 
+if not run.summary.is_finished:
+    st.warning("The simulation did not reach its end.", icon="⚠️")
+
 ens_wise = st.toggle("Display ensemble-wise variables.")
 
 if ens_wise:
