@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cached_property
 from importlib.metadata import version
 from pathlib import Path
@@ -295,7 +295,7 @@ class RunOutput:
         steps, files = sort_files(files, prefix, ".npz")
         dt = self._summary.configuration.simulation.dt
         seconds = [step * dt for step in steps]
-        timesteps = [datetime.timedelta(seconds=sec) for sec in seconds]
+        timesteps = [timedelta(seconds=sec) for sec in seconds]
 
         self._outputs = [
             OutputFile(
@@ -360,15 +360,15 @@ class RunOutput:
         """
         return (output.step for output in iter(self._outputs))
 
-    def timesteps(self) -> Iterator[datetime.timedelta]:
+    def timesteps(self) -> Iterator[timedelta]:
         """Sorted list of timesteps.
 
         Yields:
-            Iterator[float]: Timesteps iterator.
+            Iterator[datetime.timedelta]: Timesteps iterator.
         """
         return (output.timestep for output in iter(self._outputs))
 
-    def seconds(self) -> Iterator[datetime.timedelta]:
+    def seconds(self) -> Iterator[float]:
         """Sorted list of seconds.
 
         Yields:

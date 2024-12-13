@@ -285,11 +285,11 @@ class ParsedVariable(Variable):
         """Sorted list of timesteps.
 
         Yields:
-            Iterator[float]: Timesteps iterator.
+            Iterator[datetime.timedelta]: Timesteps iterator.
         """
         return (output.timestep for output in iter(self._outputs))
 
-    def seconds(self) -> Iterator[datetime.timedelta]:
+    def seconds(self) -> Iterator[float]:
         """Sorted list of seconds.
 
         Yields:
