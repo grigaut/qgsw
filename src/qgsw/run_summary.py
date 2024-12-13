@@ -160,7 +160,7 @@ class RunSummary:
         """Register the start of the simulation."""
         self.raise_if_not_writable()
         self._summary[self._summary_section][self._finished] = False
-        time_start = datetime.now().astimezone().isoformat(timespec="seconds")
+        time_start = datetime.now().astimezone().isoformat(" ", "seconds")
         self._summary[self._summary_section][self._time_start] = time_start
         if self._files:
             self.update()
@@ -182,7 +182,7 @@ class RunSummary:
         if self._summary_section not in self._summary:
             self._summary[self._summary_section] = {}
         self._summary[self._summary_section][self._finished] = True
-        time_end = datetime.now().astimezone().isoformat(timespec="seconds")
+        time_end = datetime.now().astimezone().isoformat(" ", "seconds")
         self._summary[self._summary_section][self._time_end] = time_end
         if self._files:
             self.update()

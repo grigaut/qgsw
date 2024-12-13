@@ -178,6 +178,7 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._unit = self._var.unit
         self._name = self._var.name
         self._description = self._var.description
+        self._scope = self._var.scope
 
     def __repr__(self) -> str:
         """Bound variable representation."""
