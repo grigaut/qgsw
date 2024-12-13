@@ -13,7 +13,7 @@ import numpy as np
 import plotly.colors as pco
 import plotly.graph_objects as go
 
-from qgsw.plots.animated_maps import BaseAnimatedPlot
+from qgsw.plots.animated_plots import BaseAnimatedPlot
 from qgsw.run_summary import RunOutput, check_time_compatibility
 
 if TYPE_CHECKING:
