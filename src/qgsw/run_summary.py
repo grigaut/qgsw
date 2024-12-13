@@ -131,6 +131,22 @@ class RunSummary:
         msg = "Run status not registered."
         raise SummaryError(msg)
 
+    @property
+    def started_at(self) -> str:
+        """Starting time."""
+        if self._time_start in self._summary[self._summary_section]:
+            return self._summary[self._summary_section][self._time_start]
+        return "Unknown."
+
+    @property
+    def ended_at(self) -> str:
+        """Ending time."""
+        if self._time_end in self._summary[self._summary_section]:
+            return self._summary[self._summary_section][self._time_end]
+        if not self.is_finished:
+            return "Uncomplete simulation."
+        return "Unknown."
+
     def raise_if_not_writable(self) -> None:
         """Raise an error is the configuration ins not writable.
 
@@ -332,6 +348,8 @@ class RunOutput:
         vars_txt = "\n\t".join(str(var) for var in self.output_vars)
         msg_txts = [
             f"Simulation: {self._summary.configuration.io.name}.",
+            f"Starting time: {self._summary.started_at}",
+            f"Ending time: {self._summary.ended_at}",
             f"Package version: {self._summary.qgsw_version}.",
             f"Folder: {self.folder}.",
             f"Variables:\n\t{vars_txt}",
