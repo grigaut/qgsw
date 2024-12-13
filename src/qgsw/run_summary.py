@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import datetime
+from datetime import datetime, timedelta
 from functools import cached_property
 from importlib.metadata import version
 from pathlib import Path
@@ -36,6 +36,8 @@ class RunSummary:
     """Run summary."""
 
     _summary_section = "run-summary"
+    _time_start = "time_start"
+    _time_end = "time_end"
     _qgsw_version = "qgsw_version"
     _configuration = "configuration"
     _duration = "total_duration"
@@ -129,6 +131,22 @@ class RunSummary:
         msg = "Run status not registered."
         raise SummaryError(msg)
 
+    @property
+    def started_at(self) -> str:
+        """Starting time."""
+        if self._time_start in self._summary[self._summary_section]:
+            return self._summary[self._summary_section][self._time_start]
+        return "Unknown."
+
+    @property
+    def ended_at(self) -> str:
+        """Ending time."""
+        if self._time_end in self._summary[self._summary_section]:
+            return self._summary[self._summary_section][self._time_end]
+        if not self.is_finished:
+            return "Uncomplete simulation."
+        return "Unknown."
+
     def raise_if_not_writable(self) -> None:
         """Raise an error is the configuration ins not writable.
 
@@ -158,6 +176,8 @@ class RunSummary:
         """Register the start of the simulation."""
         self.raise_if_not_writable()
         self._summary[self._summary_section][self._finished] = False
+        time_start = datetime.now().astimezone().isoformat(" ", "seconds")
+        self._summary[self._summary_section][self._time_start] = time_start
         if self._files:
             self.update()
 
@@ -178,6 +198,8 @@ class RunSummary:
         if self._summary_section not in self._summary:
             self._summary[self._summary_section] = {}
         self._summary[self._summary_section][self._finished] = True
+        time_end = datetime.now().astimezone().isoformat(" ", "seconds")
+        self._summary[self._summary_section][self._time_end] = time_end
         if self._files:
             self.update()
 
@@ -190,13 +212,8 @@ class RunSummary:
         if not self.configuration.io.results.save:
             return
         for var in io.tracked_vars:
-            var_dict = {
-                "name": var.name,
-                "unit": var.unit,
-                "description": var.description,
-            }
             self._summary[self._summary_section][self._variables].append(
-                var_dict,
+                var.to_dict(),
             )
 
     def to_file(self, file: Path) -> None:
@@ -263,6 +280,7 @@ class OutputFile(NamedTuple):
     """Output file wrapper."""
 
     step: int
+    second: float
     timestep: datetime.timedelta
     path: Path
 
@@ -292,16 +310,23 @@ class RunOutput:
         files = list(self.folder.glob(f"{prefix}*.npz"))
         steps, files = sort_files(files, prefix, ".npz")
         dt = self._summary.configuration.simulation.dt
-        timesteps = [datetime.timedelta(seconds=step * dt) for step in steps]
+        seconds = [step * dt for step in steps]
+        timesteps = [timedelta(seconds=sec) for sec in seconds]
 
         self._outputs = [
-            OutputFile(step=steps[i], timestep=timesteps[i], path=files[i])
+            OutputFile(
+                step=steps[i],
+                timestep=timesteps[i],
+                path=files[i],
+                second=seconds[i],
+            )
             for i in range(len(files))
         ]
 
-        self._vars = [
-            ParsedVariable(**var) for var in self._summary.output_vars
-        ]
+        self._vars = {
+            var["name"]: ParsedVariable.from_dict(var, outputs=self._outputs)
+            for var in self._summary.output_vars
+        }
 
     @cached_property
     def folder(self) -> Path:
@@ -316,42 +341,58 @@ class RunOutput:
     @property
     def output_vars(self) -> list[ParsedVariable]:
         """Output variables."""
-        return self._vars
+        return list(self._vars.values())
 
     def __repr__(self) -> str:
         """Output Representation."""
         vars_txt = "\n\t".join(str(var) for var in self.output_vars)
         msg_txts = [
             f"Simulation: {self._summary.configuration.io.name}.",
+            f"Starting time: {self._summary.started_at}",
+            f"Ending time: {self._summary.ended_at}",
             f"Package version: {self._summary.qgsw_version}.",
             f"Folder: {self.folder}.",
             f"Variables:\n\t{vars_txt}",
         ]
         return "\n".join(msg_txts)
 
-    def files(self) -> Iterator[Path]:
-        """Sorted list of files.
+    def __getitem__(self, key: str) -> ParsedVariable:
+        """Get variable based on its name.
+
+        Args:
+            key (str): Variable name.
 
         Returns:
-            Iterator[float]: Files iterator.
+            ParsedVariable: _description_
         """
-        return (output.path for output in self.outputs())
+        if key not in self._vars:
+            msg = f"Variables present in the output are {self._vars.keys()}."
+            raise KeyError(msg)
+        return self._vars[key]
 
     def steps(self) -> Iterator[int]:
         """Sorted list of steps.
 
-        Returns:
+        Yields:
             Iterator[float]: Steps iterator.
         """
-        return (output.step for output in self.outputs())
+        return (output.step for output in iter(self._outputs))
 
-    def timesteps(self) -> Iterator[datetime.timedelta]:
+    def timesteps(self) -> Iterator[timedelta]:
         """Sorted list of timesteps.
 
-        Returns:
-            Iterator[float]: Timesteps iterator.
+        Yields:
+            Iterator[datetime.timedelta]: Timesteps iterator.
         """
-        return (output.timestep for output in self.outputs())
+        return (output.timestep for output in iter(self._outputs))
+
+    def seconds(self) -> Iterator[float]:
+        """Sorted list of seconds.
+
+        Yields:
+            Iterator[float]: Seconds iterator.
+        """
+        return (output.second for output in iter(self._outputs))
 
     def outputs(self) -> Iterator[OutputFile]:
         """Sorted outputs.
@@ -361,10 +402,18 @@ class RunOutput:
         """
         return iter(self._outputs)
 
-    def datas(self) -> Iterator[np.ndarray]:
-        """Sorted datas.
 
-        Returns:
-            Iterator[np.ndarray]: Datas iterators.
-        """
-        return (output.read() for output in self.outputs())
+def check_time_compatibility(*runs: RunOutput) -> None:
+    """Check time compatibilities between run outputs.
+
+    Args:
+        *runs (RunOutput): Run outputs.
+
+    Raises:
+        ValueError: If the timestep don't match.
+    """
+    dt0 = runs[0].summary.configuration.simulation.dt
+    dts = [run.summary.configuration.simulation.dt for run in runs]
+    if not all(dt == dt0 for dt in dts):
+        msg = "Incompatible timesteps."
+        raise ValueError(msg)

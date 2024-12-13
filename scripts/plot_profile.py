@@ -5,7 +5,7 @@ from pathlib import Path
 
 import toml
 
-from qgsw.plots.heatmaps import AnimatedHeatmapsFromRunFolders
+from qgsw.plots.heatmaps import AnimatedHeatmaps
 
 ROOT = Path(__file__).parent.parent
 CONFIG_FILE = ROOT.joinpath("config/plot_profile.toml")
@@ -14,10 +14,11 @@ CONFIG_FILE = ROOT.joinpath("config/plot_profile.toml")
 with CONFIG_FILE.open() as f:
     config = toml.load(f)
 
-plot = AnimatedHeatmapsFromRunFolders(
+plot = AnimatedHeatmaps.from_point_wise_output(
     [Path(source["folder"]) for source in config["source"]],
     field=config["field"],
-    layers=[source["layer"] for source in config["source"]],
+    ensembles=[0 for _ in config["source"]],
+    levels=[source["level"] for source in config["source"]],
 )
 plot.show()
 
