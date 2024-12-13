@@ -43,6 +43,21 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
             zip([str(i) for i in range(self.n_frames)], list(zip(*datas))),
         )
 
+    @property
+    def n_subplots(self) -> int:
+        """Number of subplots."""
+        return self.n_traces
+
+    @cached_property
+    def n_rows(self) -> int:
+        """Number of rows."""
+        return (self.n_subplots - 1) // self.n_cols + 1
+
+    @cached_property
+    def n_cols(self) -> int:
+        """Number of columns."""
+        return min(3, self.n_subplots)
+
     @cached_property
     def n_frames(self) -> int:
         """Number of steps."""

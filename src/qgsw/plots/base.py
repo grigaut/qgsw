@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from functools import cached_property
 from typing import Generic, TypeVar
 
 import plotly.graph_objects as go
@@ -29,13 +28,8 @@ class BasePlot(ABC, Generic[T]):
             datas (list[T]): List of datas to plot.
         """
         self._check_lengths(datas)
-        self._n_subplots = len(datas)
+        self._n_traces = len(datas)
         self._fig = self._create_figure()
-
-    @cached_property
-    def n_cols(self) -> int:
-        """Number of columns."""
-        return min(3, self.n_subplots)
 
     @property
     def figure(self) -> go.Figure:
@@ -43,14 +37,9 @@ class BasePlot(ABC, Generic[T]):
         return self._fig
 
     @property
-    def n_subplots(self) -> int:
-        """Number of subplots."""
-        return self._n_subplots
-
-    @cached_property
-    def n_rows(self) -> int:
-        """NUmber of rows."""
-        return (self.n_subplots - 1) // self.n_cols + 1
+    def n_traces(self) -> int:
+        """Number of traces."""
+        return self._n_traces
 
     def _check_lengths(self, datas: list[T]) -> None:
         """Check than the data length are matching."""

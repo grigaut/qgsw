@@ -30,20 +30,38 @@ class ScatterPlot(BasePlot[np.ndarray]):
         """
         super().__init__(datas)
         self._datas = datas
+        self._traces_name = [None for _ in range(self.n_traces)]
 
     def _add_traces(self) -> None:
-        for subplot_index in range(self.n_subplots):
+        for trace_nb in range(self.n_traces):
             self.figure.add_trace(
                 go.Scatter(
-                    y=self._datas[subplot_index],
+                    y=self._datas[trace_nb],
+                    name=self._traces_name[trace_nb],
                 ),
             )
+
+    def set_traces_name(self, traces_name: list[str]) -> None:
+        """Set the name of the traces.
+
+        Args:
+            traces_name (list[str]): List of names.
+
+        Raises:
+            ValueError: If the number of names
+            doesn't match the number of traces.
+        """
+        if len(traces_name) != self.n_traces:
+            msg = f"There must be {self.n_traces} names."
+            raise ValueError(msg)
+        self._traces_name = traces_name
 
     @classmethod
     def level_wise_from_folders(
         cls,
         folders: list[Path | str],
         field: str,
+        ensembles: int | list[int] = 0,
         levels: int | list[int] = 0,
     ) -> Self:
         """Instantiate the plot from a list of folders.
@@ -51,7 +69,9 @@ class ScatterPlot(BasePlot[np.ndarray]):
         Args:
             folders (list[Path  |  str]): List of folders to use as source.
             field (str): Field to display.
-            levels (int | list[int], optional): Layer(s) to display.
+            ensembles (int | list[int], optional): Ensemble(s) to display.
+            Defaults to 0.
+            levels (int | list[int], optional): level(s) to display.
             Defaults to 0.
 
         Raises:
@@ -65,7 +85,21 @@ class ScatterPlot(BasePlot[np.ndarray]):
         runs = [RunOutput(folder=f) for f in folders]
         check_time_compatibility(*runs)
 
-        if (not isinstance(levels, int)) and (not isinstance(levels, list)):
+        if not isinstance(ensembles, int | list):
+            msg = "`ensembles` parameter should be of type int or list[int]."
+            raise TypeError(msg)
+        if isinstance(ensembles, list):
+            if len(ensembles) != len(runs):
+                msg = (
+                    "The ensembles list should be of length "
+                    f"{len(runs)} instead of {len(ensembles)}."
+                )
+                raise ValueError(msg)
+            es = ensembles
+        else:
+            es = [ensembles] * len(runs)
+
+        if not isinstance(levels, int | list):
             msg = "`levels` parameter should be of type int or list[int]."
             raise TypeError(msg)
         if isinstance(levels, list):
@@ -80,25 +114,34 @@ class ScatterPlot(BasePlot[np.ndarray]):
             ls = [levels] * len(runs)
 
         datas = [
-            [data[0, ls[k]] for data in run[field].datas()]
+            [data[es[k], ls[k]] for data in run[field].datas()]
             for k, run in enumerate(runs)
         ]
         cls._xaxis_title = "Time"
         yaxis_title = f"{runs[0][field].description} [{runs[0][field].unit}]"
         cls._yaxis_title = yaxis_title
-        return cls(datas=datas)
+        plot = cls(datas=datas)
+        traces_name = [
+            f"{run[field].description} - Ens: {es[k]} - Level: {ls[k]}"
+            for k, run in enumerate(runs)
+        ]
+        plot.set_traces_name(traces_name)
+        return plot
 
     @classmethod
     def ensemble_wise_from_folders(
         cls,
         folders: list[Path | str],
         field: str,
+        ensembles: int | list[int] = 0,
     ) -> Self:
         """Instantiate the plot from a list of folders.
 
         Args:
             folders (list[Path  |  str]): List of folders to use as source.
             field (str): Field to display.
+            ensembles (int | list[int], optional): Ensemble(s) to display.
+            Defaults to 0.
 
         Raises:
             ValueError: If the timesteps are incompatible.
@@ -110,8 +153,32 @@ class ScatterPlot(BasePlot[np.ndarray]):
         """
         runs = [RunOutput(folder=f) for f in folders]
         check_time_compatibility(*runs)
-        datas = [[data[0] for data in run[field].datas()] for run in runs]
+
+        if not isinstance(ensembles, int | list):
+            msg = "`ensembles` parameter should be of type int or list[int]."
+            raise TypeError(msg)
+        if isinstance(ensembles, list):
+            if len(ensembles) != len(runs):
+                msg = (
+                    "The ensembles list should be of length "
+                    f"{len(runs)} instead of {len(ensembles)}."
+                )
+                raise ValueError(msg)
+            es = ensembles
+        else:
+            es = [ensembles] * len(runs)
+
+        datas = [
+            [data[es[k]] for data in run[field].datas()]
+            for k, run in enumerate(runs)
+        ]
         cls._xaxis_title = "Time"
         yaxis_title = f"{runs[0][field].description} [{runs[0][field].unit}]"
         cls._yaxis_title = yaxis_title
-        return cls(datas=datas)
+        plot = cls(datas=datas)
+        traces_name = [
+            f"{run[field].description} - Ens: {es[k]}"
+            for k, run in enumerate(runs)
+        ]
+        plot.set_traces_name(traces_name)
+        return plot

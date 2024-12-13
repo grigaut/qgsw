@@ -1,8 +1,27 @@
 """Main Page."""
 
+from pathlib import Path
+
 import streamlit as st
 
-st.set_page_config("Dashboard")
+from qgsw.run_summary import RunOutput
+
+ROOT = Path(__file__).parent.parent
+OUTPUTS = ROOT.joinpath("output")
+
+local_sources = list(OUTPUTS.glob("local/*/_summary.toml"))
+g5k_sources = list(OUTPUTS.glob("g5k/*/_summary.toml"))
+sources = [file.parent for file in local_sources + g5k_sources]
+
+st.set_page_config("Dashboard", layout="wide")
 st.title("Dashboard")
-st.page_link(st.Page("pages/profiles.py"), label="## Profiles")
-st.page_link(st.Page("pages/energetics.py"), label="## Energetics")
+
+st.write("Display output from QGSW simulations.")
+
+st.write("# Explore outputs")
+
+folder = st.selectbox("Data source", options=sources)
+
+run = RunOutput(folder)
+
+st.write(run)

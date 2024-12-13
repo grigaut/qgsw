@@ -43,6 +43,7 @@ if var.scope.level_wise:
         plot = ScatterPlot.level_wise_from_folders(
             folders=folders,
             field=var.name,
+            ensembles=[0 for _ in folders],
             levels=levels,
         )
 elif var.scope.ensemble_wise:
@@ -53,6 +54,7 @@ elif var.scope.ensemble_wise:
     if submit:
         plot = ScatterPlot.ensemble_wise_from_folders(
             folders=[run.folder],
+            ensembles=0,
             field=var.name,
         )
 if submit:

@@ -42,6 +42,6 @@ if submit:
     )
 
     fig = plot.retrieve_figure()
-    fig.update_layout(height=750, width=500)
+    fig.update_layout(height=1000, width=800)
 
-    st.plotly_chart(plot.retrieve_figure(), use_container_width=True)
+    st.plotly_chart(plot.retrieve_figure(), use_container_width=False)
