@@ -7,6 +7,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from qgsw.plots.base import BasePlot
 
@@ -19,7 +20,6 @@ T = TypeVar("T")
 class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
     """Animated Plot base class."""
 
-    _is_set = False
     _slider_prefix: str = "Frame: "
 
     def __init__(
@@ -47,6 +47,54 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
     def n_frames(self) -> int:
         """Number of steps."""
         return self._n_frames
+
+    def _create_figure(
+        self,
+    ) -> go.Figure:
+        """Create the Figure.
+
+        Returns:
+            go.Figure: Figure.
+        """
+        return self.set_subplot_titles(None)
+
+    def set_subplot_titles(self, subplot_titles: list[str]) -> None:
+        """Set the subplot titles.
+
+        Args:
+            subplot_titles (list[str]): List of subplot titles.
+        """
+        self._fig = make_subplots(
+            rows=self.n_rows,
+            cols=self.n_cols,
+            subplot_titles=subplot_titles,
+        )
+
+    def map_subplot_index_to_subplot_loc(
+        self,
+        subplot_index: int,
+    ) -> tuple[int, int]:
+        """Convert subplot index to subplot location.
+
+        Args:
+            subplot_index (int): Subplot index.
+
+        Returns:
+            tuple[int, int]: Row and column location within the plot.
+        """
+        return (subplot_index // self.n_cols + 1, subplot_index % 3 + 1)
+
+    def map_subplot_loc_to_subplot_index(self, loc: tuple[int, int]) -> int:
+        """Convert subplot location to subplot index.
+
+        Args:
+            loc (tuple[int, int]): Row and column location within the plot.
+
+        Returns:
+            int: Subplot index.
+        """
+        row, col = loc
+        return (row - 1) * self.n_cols + (col - 1)
 
     def _create_play_button(self) -> go.layout.updatemenu.Button:
         """Create Play button.

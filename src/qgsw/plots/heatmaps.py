@@ -14,7 +14,7 @@ import plotly.colors as pco
 import plotly.graph_objects as go
 
 from qgsw.plots.animated_maps import BaseAnimatedPlot
-from qgsw.run_summary import RunOutput
+from qgsw.run_summary import RunOutput, check_time_compatibility
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -159,51 +159,68 @@ class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
         return max(np.max(np.abs(arr)) for arr in not_empty_vals)
 
     @classmethod
-    def from_run_folders(
+    def from_point_wise_output(
         cls,
         folders: list[Path | str],
         field: str,
-        layers: int | list[int] = 0,
+        ensembles: int | list[int] = 0,
+        levels: int | list[int] = 0,
     ) -> Self:
         """Instantiate the plot from a list of folders.
 
         Args:
             folders (list[Path  |  str]): LIst of folders to use as source.
             field (str): Field to display.
-            layers (int | list[int], optional): Layer(s) to display.
+            ensembles (int | list[int], optional): Ensemble(s) to display.
+            Defaults to 0.
+            levels (int | list[int], optional): Level(s) to display.
             Defaults to 0.
 
         Raises:
             ValueError: If the timesteps are incompatible.
-            TypeError: If layers is neither int or list[int]
-            ValueError: If the layers length doesn't match run's
+            TypeError: If levels is neither int or list[int]
+            ValueError: If the levels length doesn't match run's
 
         Returns:
             Self: AnimatedHeatmap.
         """
         runs = [RunOutput(folder=f) for f in folders]
-        dt0 = runs[0].summary.configuration.simulation.dt
-        dts = [run.summary.configuration.simulation.dt for run in runs]
-        if not all(dt == dt0 for dt in dts):
-            msg = "Incompatible timesteps."
-            raise ValueError(msg)
+        check_time_compatibility(*runs)
 
-        if (not isinstance(layers, int)) and (not isinstance(layers, list)):
-            msg = "`layers` parameter should be of type int or list[int]."
+        if not all(run[field].scope.point_wise for run in runs):
+            msg = "The fields must be lev"
+
+        # Validate ensembles structure
+        if not (isinstance(ensembles, (int, list))):
+            msg = "`ensembles` parameter should be of type int or list[int]."
             raise TypeError(msg)
-        if isinstance(layers, list):
-            if len(layers) != len(runs):
+        if isinstance(ensembles, list):
+            if len(ensembles) != len(runs):
                 msg = (
-                    "The layers list should be of length "
-                    f"{len(runs)} instead of {len(layers)}."
+                    "The ensembles list should be of length "
+                    f"{len(runs)} instead of {len(ensembles)}."
                 )
                 raise ValueError(msg)
-            ls = layers
+            es = ensembles
         else:
-            ls = [layers] * len(runs)
+            es = [ensembles] * len(runs)
+        # Validate levels structure
+        if not (isinstance(levels, (int, list))):
+            msg = "`levels` parameter should be of type int or list[int]."
+            raise TypeError(msg)
+        if isinstance(levels, list):
+            if len(levels) != len(runs):
+                msg = (
+                    "The levels list should be of length "
+                    f"{len(runs)} instead of {len(levels)}."
+                )
+                raise ValueError(msg)
+            ls = levels
+        else:
+            ls = [levels] * len(runs)
 
         datas = [
-            [data[0, ls[k]].T for data in run[field].datas()]
+            [data[es[k], ls[k]].T for data in run[field].datas()]
             for k, run in enumerate(runs)
         ]
         cls._slider_prefix = "Time: "

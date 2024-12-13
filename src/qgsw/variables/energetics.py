@@ -23,6 +23,7 @@ from qgsw.variables.dynamics import (
     StreamFunction,
     ZonalVelocityFlux,
 )
+from qgsw.variables.scope import EnsembleWise, LevelWise, PointWise
 from qgsw.variables.state import State
 from qgsw.variables.uvh import UVH
 
@@ -33,6 +34,7 @@ class KineticEnergy(DiagnosticVariable):
     _unit = "m²s⁻²"
     _name = "kinetic_energy"
     _description = "Kinetic energy"
+    _scope = PointWise()
 
     def __init__(
         self,
@@ -92,7 +94,7 @@ class ModalKineticEnergy(DiagnosticVariable):
     _unit = "m².s⁻²"
     _name = "ke_hat"
     _description = "Modal kinetic energy"
-    _point_wise = False
+    _scope = LevelWise()
 
     def __init__(
         self,
@@ -173,7 +175,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
     _unit = "m².s⁻²"
     _name = "ape_hat"
     _description = "Modal available potential energy"
-    _point_wise = False
+    _scope = LevelWise()
 
     def __init__(
         self,
@@ -245,7 +247,7 @@ class ModalEnergy(DiagnosticVariable):
     _unit = "m².s-2"
     _name = "e_tot_hat"
     _description = "Modal energy"
-    _point_wise = False
+    _scope = LevelWise()
 
     def __init__(
         self,
@@ -298,8 +300,7 @@ class TotalKineticEnergy(DiagnosticVariable):
     _unit = "m².s⁻²"
     _name = "ke"
     _description = "Kinetic energy"
-    _layer_mode_wise = False
-    _point_wise = False
+    _scope = EnsembleWise()
 
     def __init__(
         self,
@@ -371,8 +372,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
     _unit = "m².s⁻²"
     _name = "ape"
     _description = "Available potential energy"
-    _layer_mode_wise = False
-    _point_wise = False
+    _scope = EnsembleWise()
 
     def __init__(
         self,
@@ -443,8 +443,7 @@ class TotalEnergy(DiagnosticVariable):
     _unit = "m².s-²"
     _name = "e_tot"
     _description = "Total energy"
-    _layer_mode_wise = False
-    _point_wise = False
+    _scope = EnsembleWise()
 
     def __init__(
         self,

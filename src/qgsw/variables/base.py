@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from qgsw.variables.scope import PointWise, Scope
+
 try:
     from typing import Self
 except ImportError:
@@ -30,9 +32,7 @@ class Variable:
     _unit: str
     _name: str
     _description: str
-    _ensemble_wise = True
-    _layer_mode_wise = True
-    _point_wise = True
+    _scope: Scope
 
     @property
     def unit(self) -> str:
@@ -50,19 +50,9 @@ class Variable:
         return self._description
 
     @property
-    def ensemble_wise(self) -> bool:
-        """Whether the variable is ensemble-wise or not."""
-        return self._ensemble_wise
-
-    @property
-    def layer_mode_wise(self) -> bool:
-        """Whether the variable is layer/mode-wise or not."""
-        return self._layer_mode_wise
-
-    @property
-    def point_wise(self) -> bool:
-        """Whether the variable is point-wise or not."""
-        return self._point_wise
+    def scope(self) -> Scope:
+        """Variable scope."""
+        return self._scope
 
     def __repr__(self) -> str:
         """Variable string representation."""
@@ -70,18 +60,18 @@ class Variable:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the variable to a dictionnary."""
-        return {
+        var_dict = {
             "name": self.name,
             "unit": self.unit,
             "description": self.description,
-            "ensemble_wise": self.ensemble_wise,
-            "layer_mode_wise": self.layer_mode_wise,
-            "point_wise": self.point_wise,
         }
+        return var_dict | self._scope.to_dict()
 
 
 class PrognosticVariable(Variable):
     """Prognostic variable."""
+
+    _scope = PointWise()
 
     def __init__(self, initial: torch.Tensor) -> None:
         """Instantiate the variable.
@@ -250,9 +240,7 @@ class ParsedVariable(Variable):
         name: str,
         unit: str,
         description: str,
-        ensemble_wise: bool,  # noqa: FBT001
-        layer_mode_wise: bool,  # noqa: FBT001
-        point_wise: bool,  # noqa: FBT001
+        scope: Scope,
         outputs: list[OutputFile],
     ) -> None:
         """Instantiate the variable.
@@ -261,17 +249,13 @@ class ParsedVariable(Variable):
             name (str): Variable name.
             unit (str): Variable unit.
             description (str): Variable description.
-            ensemble_wise (bool): Whether the variable is ensemble-wise.
-            layer_mode_wise (bool): Whether the variable is layer/mode-wise.
-            point_wise (bool): Whether the variable is point.
+            scope (Scope): Variable scope.
             outputs (list[OutputFile]): Ouputs files.
         """
         self._name = name
         self._unit = unit
         self._description = description
-        self._ensemble_wise = ensemble_wise
-        self._layer_mode_wise = layer_mode_wise
-        self._point_wise = point_wise
+        self._scope = scope
         self._outputs = outputs
 
     def _from_output(
@@ -303,3 +287,22 @@ class ParsedVariable(Variable):
             Iterator[float]: Timesteps iterator.
         """
         return (output.timestep for output in iter(self._outputs))
+
+    @classmethod
+    def from_dict(cls, dic: dict, outputs: list[OutputFile]) -> Self:
+        """Instantiate the variable from a dictionnary.
+
+        Args:
+            dic (dict): Dictionnary to use.
+            outputs (list[OutputFile]): Ouputs files.
+
+        Returns:
+            Self: Parsed Variable.
+        """
+        return cls(
+            name=dic["name"],
+            unit=dic["unit"],
+            description=dic["description"],
+            scope=Scope.from_dict(dic),
+            outputs=outputs,
+        )

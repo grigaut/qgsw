@@ -295,7 +295,7 @@ class RunOutput:
         ]
 
         self._vars = {
-            var["name"]: ParsedVariable(**var, outputs=self._outputs)
+            var["name"]: ParsedVariable.from_dict(var, outputs=self._outputs)
             for var in self._summary.output_vars
         }
 
@@ -362,3 +362,19 @@ class RunOutput:
             Iterator[OutputFile]: Outputs iterator.
         """
         return iter(self._outputs)
+
+
+def check_time_compatibility(*runs: RunOutput) -> None:
+    """Check time compatibilities between run outputs.
+
+    Args:
+        *runs (RunOutput): Run outputs.
+
+    Raises:
+        ValueError: If the timestep don't match.
+    """
+    dt0 = runs[0].summary.configuration.simulation.dt
+    dts = [run.summary.configuration.simulation.dt for run in runs]
+    if not all(dt == dt0 for dt in dts):
+        msg = "Incompatible timesteps."
+        raise ValueError(msg)
