@@ -281,7 +281,7 @@ class OutputFile(NamedTuple):
 
     step: int
     second: float
-    timestep: datetime.timedelta
+    timestep: timedelta
     path: Path
 
     def read(self) -> np.ndarray:
