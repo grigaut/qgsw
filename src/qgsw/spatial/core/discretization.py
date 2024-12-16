@@ -714,7 +714,7 @@ class SpaceDiscretization3D:
                 f"     ├── Y: {self.ny} points "
                 f"- dy = {self.dy} {self.omega.xy_unit}"
             ),
-            f"     └── H: {self.nl} layers",
+            f"     └── H: {self.nl} layer{'s' if self.nl>1 else ''}",
         ]
         return "\n".join(msg_parts)
 

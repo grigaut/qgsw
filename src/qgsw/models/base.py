@@ -149,7 +149,10 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
                 f"         ├── Y: {self.space.ny} points - "
                 f"dy = {self.space.dy} {self.space.omega.xy_unit}"
             ),
-            f"         └── H: {self.space.nl} layers",
+            (
+                f"         └── H: {self.space.nl} "
+                f"layer{'s' if self.space.nl>1 else ''}"
+            ),
         ]
         return "\n".join(msg_parts)
 
