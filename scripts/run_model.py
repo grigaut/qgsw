@@ -97,6 +97,7 @@ n_steps = int(t_end / dt) + 1
 summary.register_outputs(model.io)
 summary.register_steps(t_end=t_end, dt=dt, n_steps=n_steps)
 
+verbose.display(msg=model.__repr__(), trigger_level=1)
 verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
 
 

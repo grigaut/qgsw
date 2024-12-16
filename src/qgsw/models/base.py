@@ -138,6 +138,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
                 f"├── Beta plane: f0 = {self.beta_plane.f0} "
                 f"- β = {self.beta_plane.beta}"
             ),
+            f"├── dt: {self.dt} s",
             "└── Space.",
             "    └── Dimensions:",
             (
