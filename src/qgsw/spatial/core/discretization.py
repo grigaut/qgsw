@@ -190,7 +190,7 @@ class SpaceDiscretization2D:
     def __repr__(self) -> str:
         """String representation of the Space."""
         msg_parts = [
-            "3D Space.",
+            "2D Space.",
             "└── Dimensions:",
             f"     ├── X: {self.nx} points - dx = {self.dx}",
             f"     └── Y: {self.ny} points - dy = {self.dy}",
