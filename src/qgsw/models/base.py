@@ -128,6 +128,30 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         self._set_utils(optimize)
         self._set_fluxes(optimize)
 
+    def __repr__(self) -> str:
+        """String representation of the model."""
+        msg_parts = [
+            f"Model: {self.__class__}",
+            f"├── Data type: {self.dtype}",
+            f"├── Device: {self.device}",
+            (
+                f"├── Beta plane: f0 = {self.beta_plane.f0} "
+                f"- β = {self.beta_plane.beta}"
+            ),
+            "└── Space.",
+            "    └── Dimensions:",
+            (
+                f"         ├── X: {self.space.nx} points - "
+                f"dx = {self.space.dx} {self.space.omega.xy_unit}"
+            ),
+            (
+                f"         ├── Y: {self.space.ny} points - "
+                f"dy = {self.space.dy} {self.space.omega.xy_unit}"
+            ),
+            f"         └── H: {self.space.nl} layers",
+        ]
+        return "\n".join(msg_parts)
+
     @property
     def io(self) -> IO:
         """Input/Output manager."""
