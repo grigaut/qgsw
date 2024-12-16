@@ -80,9 +80,10 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
         Returns:
             go.Figure: Figure.
         """
-        return self.set_subplot_titles(None)
+        self.set_subplot_titles(None)
+        return self._fig
 
-    def set_subplot_titles(self, subplot_titles: list[str]) -> None:
+    def set_subplot_titles(self, subplot_titles: list[str]) -> go.Figure:
         """Set the subplot titles.
 
         Args:
