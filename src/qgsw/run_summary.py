@@ -35,11 +35,11 @@ class SummaryError(Exception):
 class RunSummary:
     """Run summary."""
 
-    _summary_section = "run-summary"
+    _summary_file_name = "_summary.toml"
+    _config_file_name = "_config.toml"
     _time_start = "time_start"
     _time_end = "time_end"
     _qgsw_version = "qgsw_version"
-    _configuration = "configuration"
     _duration = "total_duration"
     _dt = "dt"
     _total_steps = "n_steps"
@@ -47,23 +47,27 @@ class RunSummary:
     _finished = "finished_run"
     _variables = "output-vars"
 
-    def __init__(self, run_params: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        run_params: dict[str, Any],
+        summary: dict[str, Any] | None = None,
+    ) -> None:
         """Instantiate run summary.
 
         Args:
             run_params (dict[str, Any]): Run parameters.
+            summary (dict[str, Any]): Run summary.
         """
-        if self._summary_section in run_params:
+        if summary is not None:
             self._has_summary = True
-            self._summary = run_params
+            self._summary = summary
         else:
             self._has_summary = False
-            self._summary = {self._configuration: run_params}
-            self._summary[self._summary_section] = {}
-            self._summary[self._summary_section][self._variables] = []
+            self._summary = {}
+            self._summary[self._variables] = []
             self._summary[self._qgsw_version] = version("qgsw")
         self._files: list[Path] = []
-        self._config = Configuration(self._summary[self._configuration])
+        self._config = Configuration(run_params)
 
     @property
     def configuration(self) -> Configuration:
@@ -71,15 +75,10 @@ class RunSummary:
         return self._config
 
     @property
-    def has_summary(self) -> bool:
-        """Whether the summary was built or not."""
-        return self._summary_section in self._summary
-
-    @property
     def output_vars(self) -> list[dict[str, str]]:
         """Output variables."""
-        if self._variables in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._variables]
+        if self._variables in self._summary:
+            return self._summary[self._variables]
         msg = "Output varibales not registered."
         raise SummaryError(msg)
 
@@ -94,55 +93,55 @@ class RunSummary:
     @property
     def duration(self) -> float:
         """Duration (in seconds)."""
-        if self._duration in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._duration]
+        if self._duration in self._summary:
+            return self._summary[self._duration]
         msg = "Duration not registered."
         raise SummaryError(msg)
 
     @property
     def dt(self) -> float:
         """Timestep (in seconds)."""
-        if self._dt in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._dt]
+        if self._dt in self._summary:
+            return self._summary[self._dt]
         msg = "Timestep not registered."
         raise SummaryError(msg)
 
     @property
     def total_steps(self) -> int:
         """Total Steps."""
-        if self._total_steps in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._total_steps]
+        if self._total_steps in self._summary:
+            return self._summary[self._total_steps]
         msg = "Total steps number not registered."
         raise SummaryError(msg)
 
     @property
     def last_step(self) -> int:
         """Last registered step."""
-        if self._n in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._n]
+        if self._n in self._summary:
+            return self._summary[self._n]
         msg = "No step registered."
         raise SummaryError(msg)
 
     @property
     def is_finished(self) -> bool:
         """Whether the run was finished or not."""
-        if self._finished in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._finished]
+        if self._finished in self._summary:
+            return self._summary[self._finished]
         msg = "Run status not registered."
         raise SummaryError(msg)
 
     @property
     def started_at(self) -> str:
         """Starting time."""
-        if self._time_start in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._time_start]
+        if self._time_start in self._summary:
+            return self._summary[self._time_start]
         return "Unknown."
 
     @property
     def ended_at(self) -> str:
         """Ending time."""
-        if self._time_end in self._summary[self._summary_section]:
-            return self._summary[self._summary_section][self._time_end]
+        if self._time_end in self._summary:
+            return self._summary[self._time_end]
         if not self.is_finished:
             return "Uncomplete simulation."
         return "Unknown."
@@ -166,18 +165,18 @@ class RunSummary:
             n_steps (int): Number of steps.
         """
         self.raise_if_not_writable()
-        self._summary[self._summary_section][self._duration] = t_end
-        self._summary[self._summary_section][self._dt] = dt
-        self._summary[self._summary_section][self._total_steps] = n_steps
+        self._summary[self._duration] = t_end
+        self._summary[self._dt] = dt
+        self._summary[self._total_steps] = n_steps
         if self._files:
             self.update()
 
     def register_start(self) -> None:
         """Register the start of the simulation."""
         self.raise_if_not_writable()
-        self._summary[self._summary_section][self._finished] = False
+        self._summary[self._finished] = False
         time_start = datetime.now().astimezone().isoformat(" ", "seconds")
-        self._summary[self._summary_section][self._time_start] = time_start
+        self._summary[self._time_start] = time_start
         if self._files:
             self.update()
 
@@ -188,18 +187,16 @@ class RunSummary:
             step (int): Number of the step.
         """
         self.raise_if_not_writable()
-        self._summary[self._summary_section][self._n] = step
+        self._summary[self._n] = step
         if self._files:
             self.update()
 
     def register_end(self) -> None:
         """Register the end of the simulation."""
         self.raise_if_not_writable()
-        if self._summary_section not in self._summary:
-            self._summary[self._summary_section] = {}
-        self._summary[self._summary_section][self._finished] = True
+        self._summary[self._finished] = True
         time_end = datetime.now().astimezone().isoformat(" ", "seconds")
-        self._summary[self._summary_section][self._time_end] = time_end
+        self._summary[self._time_end] = time_end
         if self._files:
             self.update()
 
@@ -212,28 +209,25 @@ class RunSummary:
         if not self.configuration.io.results.save:
             return
         for var in io.tracked_vars:
-            self._summary[self._summary_section][self._variables].append(
+            self._summary[self._variables].append(
                 var.to_dict(),
             )
 
-    def to_file(self, file: Path) -> None:
+    def to_file(self, folder: Path) -> None:
         """Save the summary into a file.
 
         Multiple calls will add as many files as required.
 
         Args:
-            file (Path): File to save in.
-
-        Raises:
-            SummaryError: If the file is not a TOML file.
+            folder (Path): Folder to save in.
         """
         self.raise_if_not_writable()
-        if file.suffix != ".toml":
-            msg = "Summary can only be saved into a .toml file."
-            raise SummaryError(msg)
-        toml.dump(self._summary, file.open("w"))
-        if file not in self._files:
-            self._files.append(file)
+        summary_file = folder.joinpath(self._summary_file_name)
+        toml.dump(self._summary, summary_file.open("w"))
+        if summary_file not in self._files:
+            self._files.append(summary_file)
+        config_file = folder.joinpath(self._config_file_name)
+        toml.dump(self._config.params, config_file.open("w"))
 
     def update(self) -> None:
         """Update the saved files.
@@ -252,20 +246,33 @@ class RunSummary:
             toml.dump(self._summary, file.open("w"))
 
     @classmethod
-    def from_file(cls, file: Path) -> Self:
+    def from_folder(cls, folder: Path) -> Self:
         """Create the summary from a TOML file.
 
         Args:
-            file (Path): File to create from.
+            folder (Path): Folder to create from.
 
         Returns:
             Self: Summary.
         """
-        return cls(run_params=toml.load(file))
+        config_file = folder.joinpath(cls._config_file_name)
+        if not config_file.is_file():
+            msg = f"No configuration file to load from at {config_file}."
+            raise SummaryError(msg)
+
+        run_params = toml.load(config_file)
+
+        summary_file = folder.joinpath(cls._summary_file_name)
+        if not summary_file.is_file():
+            return cls(run_params, None)
+
+        summary = toml.load(summary_file)
+
+        return cls(run_params, summary)
 
     @classmethod
     def from_configuration(cls, configuration: Configuration) -> Self:
-        """CReate the summary from a configuration.
+        """Create the summary from a configuration.
 
         Args:
             configuration (Configuration): Configuration.
@@ -273,7 +280,7 @@ class RunSummary:
         Returns:
             Self: Summary.
         """
-        return cls(run_params=configuration.params)
+        return cls(configuration.params, None)
 
 
 class OutputFile(NamedTuple):
@@ -281,7 +288,7 @@ class OutputFile(NamedTuple):
 
     step: int
     second: float
-    timestep: datetime.timedelta
+    timestep: timedelta
     path: Path
 
     def read(self) -> np.ndarray:
@@ -303,9 +310,7 @@ class RunOutput:
             folder (Path): Run output folder.
         """
         self._folder = Path(folder)
-        self._summary = RunSummary.from_file(
-            self.folder.joinpath("_summary.toml"),
-        )
+        self._summary = RunSummary.from_folder(self.folder)
         prefix = self.summary.configuration.model.prefix
         files = list(self.folder.glob(f"{prefix}*.npz"))
         steps, files = sort_files(files, prefix, ".npz")

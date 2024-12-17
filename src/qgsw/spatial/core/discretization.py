@@ -187,6 +187,22 @@ class SpaceDiscretization2D:
         self._u = u_grid
         self._v = v_grid
 
+    def __repr__(self) -> str:
+        """String representation of the Space."""
+        msg_parts = [
+            "2D Space.",
+            "└── Dimensions:",
+            (
+                f"     ├── X: {self.nx} points "
+                f"- dx = {self.dx} {self.omega.xy_unit}"
+            ),
+            (
+                f"     └── Y: {self.ny} points "
+                f"- dy = {self.dy} {self.omega.xy_unit}"
+            ),
+        ]
+        return "\n".join(msg_parts)
+
     @property
     def nx(self) -> int:
         """Number of points on the x direction."""
@@ -684,6 +700,23 @@ class SpaceDiscretization3D:
         self._h = h_grid
         self._u = u_grid
         self._v = v_grid
+
+    def __repr__(self) -> str:
+        """String representation of the Space."""
+        msg_parts = [
+            "3D Space.",
+            "└── Dimensions:",
+            (
+                f"     ├── X: {self.nx} points "
+                f"- dx = {self.dx} {self.omega.xy_unit}"
+            ),
+            (
+                f"     ├── Y: {self.ny} points "
+                f"- dy = {self.dy} {self.omega.xy_unit}"
+            ),
+            f"     └── H: {self.nl} layer{'s' if self.nl>1 else ''}",
+        ]
+        return "\n".join(msg_parts)
 
     @property
     def nx(self) -> int:
