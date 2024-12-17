@@ -9,6 +9,7 @@ from rich.progress import Progress
 from qgsw import verbose
 from qgsw.models.qg.core import QG
 from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.simulation.steps import Steps
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.spatial.units._units import METERS
 from qgsw.specs import DEVICE
@@ -131,25 +132,29 @@ verbose.display(msg=model_3l.__repr__(), trigger_level=1)
 verbose.display("\n[Model 1 Layer]", trigger_level=1)
 verbose.display(msg=model_1l.__repr__(), trigger_level=1)
 
-n_steps = t_end // dt + 1
+steps = Steps(t_end=t_end, dt=dt)
+
+ns = steps.simulation_steps()
+forks = steps.steps_from_interval(interval=3600 * 24 * 20)
+saves = steps.steps_from_interval(interval=3600 * 24 * 1)
+
 t = 0
-fork = -1
 save_dir = Path("output/local/assimilation")
 
 with Progress() as progress:
     simulation = progress.add_task(
-        rf"\[n=00000/{n_steps:05d}]",
-        total=n_steps,
+        rf"\[n=00000/{steps.n_tot:05d}]",
+        total=steps.n_tot,
     )
-    for n in range(n_steps + 1):
+    for n, fork, save in zip(ns, forks, saves):
         progress.update(
             simulation,
-            description=rf"\[n={n:05d}/{n_steps:05d}]",
+            description=rf"\[n={n:05d}/{steps.n_tot:05d}]",
         )
         progress.advance(simulation)
-        if abs(n * dt - (fork + 1) * dt * 24 * 20) < dt:
+        if save:
             verbose.display(
-                msg=f"[n={n:05d}/{n_steps:05d}] - Forked",
+                msg=f"[n={n:05d}/{steps.n_tot:05d}]",
                 trigger_level=1,
             )
             verbose.display(
@@ -162,13 +167,17 @@ with Progress() as progress:
                 trigger_level=1,
             )
             model_1l.io.save(save_dir.joinpath(f"model_1l_{n}.npz"))
+        if fork:
             uvh = model_3l.uvh
             model_1l.set_uvh(
                 torch.clone(uvh.u)[:, :1, ...],
                 torch.clone(uvh.v)[:, :1, ...],
                 torch.clone(uvh.h)[:, :1, ...],
             )
-            fork += 1
+            verbose.display(
+                msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
+                trigger_level=1,
+            )
 
         model_1l.step()
         model_3l.step()
