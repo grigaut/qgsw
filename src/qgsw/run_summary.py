@@ -20,7 +20,7 @@ except ImportError:
 
 import toml
 
-from qgsw.configs import Configuration
+from qgsw.configs.configurations import Configuration
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -67,7 +67,7 @@ class RunSummary:
             self._summary[self._variables] = []
             self._summary[self._qgsw_version] = version("qgsw")
         self._files: list[Path] = []
-        self._config = Configuration(run_params)
+        self._config = Configuration(**run_params)
 
     @property
     def configuration(self) -> Configuration:
@@ -280,7 +280,7 @@ class RunSummary:
         Returns:
             Self: Summary.
         """
-        return cls(configuration.params, None)
+        return cls(configuration.model_dump(), None)
 
 
 class OutputFile(NamedTuple):

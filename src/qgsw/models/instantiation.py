@@ -29,7 +29,7 @@ from qgsw.spatial.core.discretization import (
 from qgsw.utils import time_params
 
 if TYPE_CHECKING:
-    from qgsw.configs.core import Configuration
+    from qgsw.configs.configurations import Configuration
     from qgsw.perturbations.core import Perturbation
 
 
@@ -93,7 +93,7 @@ def instantiate_model(
         msg = f"Unsupported model type: {config.model.type}"
         raise UnrecognizedQGModelError(msg)
     model.slip_coef = config.physics.slip_coef
-    model.bottom_drag_coef = config.physics.bottom_drag_coef
+    model.bottom_drag_coef = config.physics.bottom_drag_coefficient
     if np.isnan(config.simulation.dt):
         model.dt = time_params.compute_dt(
             model.uvh,

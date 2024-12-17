@@ -8,7 +8,7 @@ import torch
 
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.spatial.conversion import deg_to_m_lat, deg_to_rad, km_to_m
-from qgsw.spatial.units._units import DEGREES, KILOMETERS, METERS, RADIANS
+from qgsw.spatial.units._units import Unit
 from qgsw.spatial.units.exceptions import UnitError
 
 if TYPE_CHECKING:
@@ -44,13 +44,13 @@ def compute_entire_beta_plane(
     Returns:
         torch.Tensor: Beta plane values in s⁻¹.
     """
-    if grid_2d.xy_unit == DEGREES:
+    if grid_2d.xy_unit == Unit.DEGREES:
         return _beta_plane_from_degree(
             latitude=grid_2d.xy.y,
             f0=compute_f0(grid_2d=grid_2d),
             beta=compute_beta(grid_2d=grid_2d),
         )
-    if grid_2d.xy_unit == RADIANS:
+    if grid_2d.xy_unit == Unit.RADIANS:
         return _beta_plane_from_radians(
             latitude=grid_2d.xy.y,
             f0=compute_f0(grid_2d=grid_2d),
@@ -75,15 +75,15 @@ def compute_beta_plane(
     Returns:
         torch.Tensor: Coriolis  values.
     """
-    if grid_2d.xy_unit == METERS:
+    if grid_2d.xy_unit == Unit.METERS:
         return _beta_plane_from_meters(y=grid_2d.xy.y, f0=f0, beta=beta)
-    if grid_2d.xy_unit == KILOMETERS:
+    if grid_2d.xy_unit == Unit.KILOMETERS:
         y = km_to_m(grid_2d.xy.y)
         return _beta_plane_from_meters(y=y, f0=f0, beta=beta)
-    if grid_2d.xy_unit == DEGREES:
+    if grid_2d.xy_unit == Unit.DEGREES:
         latitude = grid_2d.xy.y
         return _beta_plane_from_degree(latitude=latitude, f0=f0, beta=beta)
-    if grid_2d.xy_unit == RADIANS:
+    if grid_2d.xy_unit == Unit.RADIANS:
         latitude = grid_2d.xy.y
         return _beta_plane_from_radians(latitude=latitude, f0=f0, beta=beta)
     msg = f"Unable to compute beta plane from unit {grid_2d.xy_unit}."
@@ -156,9 +156,9 @@ def compute_f0(grid_2d: Grid2D) -> float:
     Returns:
         float: f0 value (value at the mean latitude) in s⁻¹.
     """
-    if grid_2d.xy_unit == RADIANS:
+    if grid_2d.xy_unit == Unit.RADIANS:
         return _compute_f0_from_radians(latitude_ref=grid_2d.xy.y.mean())
-    if grid_2d.xy_unit == DEGREES:
+    if grid_2d.xy_unit == Unit.DEGREES:
         latitude_ref = deg_to_rad(grid_2d.xy.y.mean())
         return _compute_f0_from_radians(latitude_ref=latitude_ref)
     msg = f"Unable to compute f0 using a {grid_2d.xy_unit} grid."
@@ -191,9 +191,9 @@ def compute_beta(grid_2d: Grid2D) -> float:
     Returns:
         float: beta value (value at the mean latitude) in m⁻¹.s⁻¹.
     """
-    if grid_2d.xy_unit == RADIANS:
+    if grid_2d.xy_unit == Unit.RADIANS:
         return _compute_beta_from_radians(latitude_ref=grid_2d.xy.y.mean())
-    if grid_2d.xy_unit == DEGREES:
+    if grid_2d.xy_unit == Unit.DEGREES:
         latitude_ref = deg_to_rad(grid_2d.xy.y.mean())
         return _compute_beta_from_radians(latitude_ref=latitude_ref)
     msg = f"Unable to compute beta using a {grid_2d.xy_unit} grid."

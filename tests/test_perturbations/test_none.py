@@ -4,7 +4,7 @@ import torch
 
 from qgsw.perturbations.none import NoPerturbation
 from qgsw.spatial.core.grid import Grid3D
-from qgsw.spatial.units._units import METERS
+from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
 
 
@@ -26,9 +26,9 @@ def test_no_perturbation() -> None:
             dtype=torch.float64,
         ),
         h=torch.linspace(0, 200, 3, device=DEVICE.get(), dtype=torch.float64),
-        x_unit=METERS,
-        y_unit=METERS,
-        zh_unit=METERS,
+        x_unit=Unit.METERS,
+        y_unit=Unit.METERS,
+        zh_unit=Unit.METERS,
     )
 
     perturbation = NoPerturbation()

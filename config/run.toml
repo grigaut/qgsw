@@ -1,0 +1,53 @@
+[io]
+name = "Two Layers Model"
+save = false
+output_directory = "results"
+[io.save_method]
+type = "quantity"           # "interval"
+quantity = 100
+# interval_duration = 3600  # seconds
+
+[physics]
+rho = 1000
+slip_coef = 1.0
+f0 = 9.375e-5           # mean coriolis (s^-1)
+beta = 0                # coriolis gradient (m^-1 s^-1)
+bottom_drag_coefficient = 0
+
+[simulation]
+duration = 23_893_334   # seconds
+dt = 26                 # in seconds
+
+[model]
+type = "QG"
+prefix = "results_step_"
+layers = [
+    200,
+    800
+]
+reduced_gravity = [
+    10.0,
+    5e-2
+]
+[model.collinearity_coef]
+# Section relevant for modified QG models only
+type = "constant" # 'constant' or 'changing'
+value = 0.1 # Only relevant for constant coefficients.
+source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficients.
+
+[space]
+nx = 192
+ny = 192
+unit = "meters"
+x_min = -500_000
+x_max = 500_000
+y_min = -500_000
+y_max = 500_000
+
+[windstress]
+type = "none"
+[windstress.data]
+
+[perturbation]
+type = "vortex-baroclinic"
+perturbation_magnitude = 1e-3

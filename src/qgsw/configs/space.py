@@ -11,13 +11,7 @@ from qgsw.configs import keys
 from qgsw.configs.base import _Config
 from qgsw.configs.exceptions import ConfigError
 from qgsw.spatial import conversion
-from qgsw.spatial.units._units import (
-    DEGREES,
-    KILOMETERS,
-    METERS,
-    RADIANS,
-    Unit,
-)
+from qgsw.spatial.units._units import Unit
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,10 +25,10 @@ class SpaceConfig(_Config):
     _ny: str = keys.SPACE["points nb y"]
 
     _conversion: ClassVar[dict[str, Callable[[float], float]]] = {
-        DEGREES.name: conversion.deg_to_m_lat,
-        KILOMETERS.name: conversion.km_to_m,
-        METERS.name: conversion.m_to_m,
-        RADIANS.name: conversion.rad_to_m,
+        Unit.DEGREES: conversion.deg_to_m_lat,
+        Unit.KILOMETERS: conversion.km_to_m,
+        Unit.METERS: conversion.m_to_m,
+        Unit.RADIANS: conversion.rad_to_m,
     }
 
     def __init__(self, params: dict[str, Any]) -> None:
@@ -73,16 +67,16 @@ class SpaceConfig(_Config):
     @property
     def lx(self) -> float:
         """Total distance along x (meters)."""
-        if np.isnan(self.box.x_max):
+        if np.isnan(self.x_max):
             return self._infer_lx()
-        conversion = self._conversion[self.box.unit.name]
-        return conversion(self.box.x_max - self.box.x_min)
+        conversion = self._conversion[self.unit.name]
+        return conversion(self.x_max - self.x_min)
 
     @property
     def ly(self) -> float:
         """Total distance along y (meters)."""
-        conversion = self._conversion[self.box.unit.name]
-        return conversion(self.box.y_max - self.box.y_min)
+        conversion = self._conversion[self.unit.name]
+        return conversion(self.y_max - self.y_min)
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Validate space parameters.
@@ -112,10 +106,10 @@ class BoxConfig(_Config):
     _y: str = keys.BOX["y"]
     _unit: str = keys.BOX["unit"]
     _units_mapping: ClassVar[dict[str, Unit]] = {
-        "deg": DEGREES,
-        "m": METERS,
-        "km": KILOMETERS,
-        "rad": RADIANS,
+        "deg": Unit.DEGREES,
+        "m": Unit.METERS,
+        "km": Unit.KILOMETERS,
+        "rad": Unit.RADIANS,
     }
 
     def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:

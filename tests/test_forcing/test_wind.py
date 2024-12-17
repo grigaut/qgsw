@@ -4,7 +4,7 @@ import torch
 
 from qgsw.forcing.wind import CosineZonalWindForcing
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
-from qgsw.spatial.units._units import METERS
+from qgsw.spatial.units._units import Unit
 
 
 def test_cosine_wind_forcing() -> None:
@@ -28,8 +28,8 @@ def test_cosine_wind_forcing() -> None:
     space = SpaceDiscretization2D.from_tensors(
         x=torch.linspace(0, lx, nx + 1, dtype=torch.float64, device="cpu"),
         y=torch.linspace(0, ly, ny + 1, dtype=torch.float64, device="cpu"),
-        x_unit=METERS,
-        y_unit=METERS,
+        x_unit=Unit.METERS,
+        y_unit=Unit.METERS,
     )
     wf = CosineZonalWindForcing(
         space,

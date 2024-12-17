@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.data.loaders import BathyLoader
-from qgsw.spatial.units._units import DEGREES, Unit
+from qgsw.spatial.units._units import Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class Bathymetry:
     """Bathymetry."""
 
-    _required_xy_unit: Unit = DEGREES
+    _required_xy_unit: Unit = Unit.DEGREES
 
     def __init__(
         self,

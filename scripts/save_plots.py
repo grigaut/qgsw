@@ -34,8 +34,8 @@ for plot_config in plots_config.values():
     for step in plot_config["steps"]:
         file = input_folder.joinpath(f"{config.model.prefix}{step}.npz")
 
-        x_min, x_max = config.space.box.x_min, config.space.box.x_max
-        y_min, y_max = config.space.box.y_min, config.space.box.y_max
+        x_min, x_max = config.space.x_min, config.space.x_max
+        y_min, y_max = config.space.y_min, config.space.y_max
 
         data = np.load(file)[field][0, layer, ...]
 
