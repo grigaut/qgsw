@@ -14,6 +14,7 @@ from qgsw.models.instantiation import instantiate_model
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary
+from qgsw.simulation.steps import Steps
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
 from qgsw.utils import time_params
 
@@ -90,15 +91,17 @@ if config.simulation.reference == "tau":
 else:
     t_end = config.simulation.duration
 
-freq_save = int(t_end / config.io.results.quantity / dt) + 1
-freq_log = int(t_end / 100 / dt) + 1
-n_steps = int(t_end / dt) + 1
+
+steps = Steps(t_end=t_end, dt=dt)
+ns = steps.simulation_steps()
+saves = steps.steps_from_total(config.io.results.quantity)
+logs = steps.steps_from_total(100)
 
 summary.register_outputs(model.io)
-summary.register_steps(t_end=t_end, dt=dt, n_steps=n_steps)
+summary.register_steps(t_end=t_end, dt=dt, n_steps=steps.n_tot)
 
 verbose.display(msg=model.__repr__(), trigger_level=1)
-verbose.display(msg=f"Total Duration: {t_end:.2f}", trigger_level=1)
+verbose.display(msg=f"Total Duration: {t_end:.2f} seconds", trigger_level=1)
 
 
 summary.register_start()
@@ -106,18 +109,21 @@ prefix = config.model.prefix
 # Start runs
 with Progress() as progress:
     simulation = progress.add_task(
-        rf"\[n=00000/{n_steps:05d}]",
-        total=n_steps,
+        rf"\[n=00000/{steps.n_tot:05d}]",
+        total=steps.n_tot,
     )
-    for n in range(n_steps + 1):
+    for n, save, log in zip(ns, saves, logs):
         progress.update(
             simulation,
-            description=rf"\[n={n:05d}/{n_steps:05d}]",
+            description=rf"\[n={n:05d}/{steps.n_tot:05d}]",
         )
         progress.advance(simulation)
         # Save step
-        if config.io.results.save and (n % freq_save == 0 or n == n_steps):
-            verbose.display(msg=f"[n={n:05d}/{n_steps:05d}]", trigger_level=1)
+        if config.io.results.save and save:
+            verbose.display(
+                msg=f"[n={n:05d}/{steps.n_tot:05d}]",
+                trigger_level=1,
+            )
             directory = config.io.results.directory
             name = config.model.name_sc
             model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
@@ -125,7 +131,11 @@ with Progress() as progress:
         model.step()
         t += dt
         # Step log
-        if (freq_log > 0 and n % freq_log == 0) or (n == n_steps):
+        if log:
+            verbose.display(
+                msg=f"[n={n:05d}/{steps.n_tot:05d}]",
+                trigger_level=1,
+            )
             verbose.display(msg=model.io.print_step(), trigger_level=1)
             summary.register_step(n)
 
