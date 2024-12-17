@@ -35,8 +35,7 @@ config = Configuration.from_file(CONFIG_PATH)
 summary = RunSummary.from_configuration(config)
 
 if config.io.results.save:
-    save_file = config.io.results.directory.joinpath("_summary.toml")
-    summary.to_file(save_file)
+    summary.to_file(config.io.results.directory)
 
 # Common Set-up
 ## Wind Forcing
