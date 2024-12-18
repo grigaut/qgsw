@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from qgsw.spatial.units._units import Unit
 from qgsw.variables.scope import EnsembleWise, LevelWise, PointWise
 
 try:
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 class PhysicalZonalVelocity(DiagnosticVariable):
     """Physical zonal velocity."""
 
-    _unit = "m.s⁻¹"
+    _unit = Unit.M1S_1
     _name = "u_phys"
     _description = "Physical zonal velocity"
     _scope = PointWise()
@@ -59,7 +60,7 @@ class PhysicalZonalVelocity(DiagnosticVariable):
 class PhysicalMeridionalVelocity(DiagnosticVariable):
     """Physical zonal velocity."""
 
-    _unit = "m.s⁻¹"
+    _unit = Unit.M1S_1
     _name = "v_phys"
     _description = "Physical meridional velocity"
     _scope = PointWise()
@@ -87,7 +88,7 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
 class PhysicalLayerDepthAnomaly(DiagnosticVariable):
     """Physical layer depth anomaly."""
 
-    _unit = "m"
+    _unit = Unit.M
     _name = "h_phys"
     _description = "Physical layer depth anomaly"
     _scope = PointWise()
@@ -115,7 +116,7 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
 class ZonalVelocityFlux(DiagnosticVariable):
     """Velocity flux."""
 
-    _unit = "s⁻¹"
+    _unit = Unit.S_1
     _name = "U"
     _description = "Zonal velocity flux"
     _scope = PointWise()
@@ -143,7 +144,7 @@ class ZonalVelocityFlux(DiagnosticVariable):
 class MeridionalVelocityFlux(DiagnosticVariable):
     """Velocity flux."""
 
-    _unit = "s⁻¹"
+    _unit = Unit.S_1
     _name = "V"
     _description = "Meriodional velocity flux"
     _scope = PointWise()
@@ -171,7 +172,7 @@ class MeridionalVelocityFlux(DiagnosticVariable):
 class SurfaceHeightAnomaly(DiagnosticVariable):
     """Surface height anomaly."""
 
-    _unit = "m"
+    _unit = Unit.M
     _name = "eta"
     _description = "Surface height anomaly"
     _scope = PointWise()
@@ -215,7 +216,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
 class Vorticity(DiagnosticVariable):
     """Vorticity Diagnostic Variable."""
 
-    _unit = "m².s⁻¹"
+    _unit = Unit.M2S_1
     _name = "omega"
     _description = "Vorticity"
     _scope = PointWise()
@@ -265,7 +266,7 @@ class Vorticity(DiagnosticVariable):
 class PhysicalVorticity(DiagnosticVariable):
     """Physical vorticity."""
 
-    _unit = "s⁻¹"
+    _unit = Unit.S_1
     _name = "omega_phys"
     _description = "Physical vorticity"
     _scope = PointWise()
@@ -311,7 +312,7 @@ class PhysicalVorticity(DiagnosticVariable):
 class Pressure(DiagnosticVariable):
     """Pressure."""
 
-    _unit = "m².s⁻²"
+    _unit = Unit.M2S_2
     _name = "p"
     _description = "Pressure per unit of mass"
     _scope = PointWise()
@@ -361,7 +362,7 @@ class Pressure(DiagnosticVariable):
 class PotentialVorticity(DiagnosticVariable):
     """Potential Vorticity."""
 
-    _unit = "s⁻¹"
+    _unit = Unit.S_1
     _name = "pv"
     _description = "Potential vorticity"
     _scope = PointWise()
@@ -419,7 +420,7 @@ class PotentialVorticity(DiagnosticVariable):
 class StreamFunction(DiagnosticVariable):
     """Stream function variable."""
 
-    _unit = "m².s⁻¹"
+    _unit = Unit.M2S_1
     _name = "psi"
     _description = "Stream function"
     _scope = PointWise()
@@ -462,7 +463,7 @@ class StreamFunction(DiagnosticVariable):
 class Enstrophy(DiagnosticVariable):
     """Layer-wise enstrophy."""
 
-    _unit = "s⁻²"
+    _unit = Unit.S_2
     _name = "enstrophy"
     _description = "Layer-wise enstrophy"
     _scope = LevelWise()
@@ -502,7 +503,7 @@ class Enstrophy(DiagnosticVariable):
 class TotalEnstrophy(Enstrophy):
     """Total enstrophy."""
 
-    _unit = "s⁻²"
+    _unit = Unit.S_2
     _name = "enstrophy_tot"
     _description = "Total enstrophy"
     _scope = EnsembleWise()

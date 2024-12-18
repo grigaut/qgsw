@@ -14,6 +14,7 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
+from qgsw.spatial.units._units import Unit
 from qgsw.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
@@ -31,7 +32,7 @@ from qgsw.variables.uvh import UVH
 class KineticEnergy(DiagnosticVariable):
     """Kinetic Energy Variable."""
 
-    _unit = "m²s⁻²"
+    _unit = Unit.M2S_2
     _name = "kinetic_energy"
     _description = "Kinetic energy"
     _scope = PointWise()
@@ -91,7 +92,7 @@ class KineticEnergy(DiagnosticVariable):
 class ModalKineticEnergy(DiagnosticVariable):
     """Compute modal kinetic energy."""
 
-    _unit = "m².s⁻²"
+    _unit = Unit.M2S_2
     _name = "ke_hat"
     _description = "Modal kinetic energy"
     _scope = LevelWise()
@@ -175,7 +176,7 @@ class ModalKineticEnergy(DiagnosticVariable):
 class ModalAvailablePotentialEnergy(DiagnosticVariable):
     """Modal available potential energy."""
 
-    _unit = "m².s⁻²"
+    _unit = Unit.M2S_2
     _name = "ape_hat"
     _description = "Modal available potential energy"
     _scope = LevelWise()
@@ -252,7 +253,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
 class ModalEnergy(DiagnosticVariable):
     """Modal energy."""
 
-    _unit = "m².s-2"
+    _unit = Unit.M2S_2
     _name = "e_tot_hat"
     _description = "Modal energy"
     _scope = LevelWise()
@@ -305,7 +306,7 @@ class ModalEnergy(DiagnosticVariable):
 class TotalKineticEnergy(DiagnosticVariable):
     """Compute total kinetic energy."""
 
-    _unit = "m².s⁻²"
+    _unit = Unit.M2S_2
     _name = "ke"
     _description = "Kinetic energy"
     _scope = EnsembleWise()
@@ -380,7 +381,7 @@ class TotalKineticEnergy(DiagnosticVariable):
 class TotalAvailablePotentialEnergy(DiagnosticVariable):
     """Total modal available potential energy."""
 
-    _unit = "m².s⁻²"
+    _unit = Unit.M2S_2
     _name = "ape"
     _description = "Available potential energy"
     _scope = EnsembleWise()
@@ -454,7 +455,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
 class TotalEnergy(DiagnosticVariable):
     """Total modal energy."""
 
-    _unit = "m².s-²"
+    _unit = Unit.M2S_2
     _name = "e_tot"
     _description = "Total energy"
     _scope = EnsembleWise()

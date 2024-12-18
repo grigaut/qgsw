@@ -22,7 +22,7 @@ def compute_coriolis_parameter(
     Returns:
         torch.Tensor: (nx, ny) Coriolis parameter value tensor.
     """
-    if grid_2d.xy_unit != Unit.RADIANS:
+    if grid_2d.xy_unit != Unit.RAD:
         msg = f"Unable to compute beta plane from {grid_2d.xy_unit} grid."
         raise UnitError(msg)
 

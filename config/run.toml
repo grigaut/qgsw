@@ -39,7 +39,7 @@ source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficient
 [space]
 nx = 192
 ny = 192
-unit = "meters"
+unit = "m"
 x_min = -500_000
 x_max = 500_000
 y_min = -500_000

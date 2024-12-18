@@ -1080,7 +1080,7 @@ class SpaceDiscretization3D:
             h=model_config.h,
             x_unit=grid_config.unit,
             y_unit=grid_config.unit,
-            zh_unit=Unit.METERS,
+            zh_unit=Unit.M,
         )
 
     @classmethod

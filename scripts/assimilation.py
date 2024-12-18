@@ -45,9 +45,9 @@ space_2d = SpaceDiscretization2D.from_config(config.space)
 
 h_coords_ref = Coordinates1D(
     points=config.simulation.reference.h,
-    unit=Unit.METERS,
+    unit=Unit.M,
 )
-h_coords = Coordinates1D(points=config.model.h, unit=Unit.METERS)
+h_coords = Coordinates1D(points=config.model.h, unit=Unit.M)
 
 space_3d_ref = space_2d.add_h(h_coords_ref)
 space_3d_model = space_2d.add_h(h_coords)

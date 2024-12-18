@@ -5,12 +5,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+from qgsw.spatial.units._units import Unit
 from qgsw.variables.scope import PointWise, Scope
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
+
 
 if TYPE_CHECKING:
     import datetime
@@ -29,13 +31,13 @@ T = TypeVar("T")
 class Variable:
     """Variable."""
 
-    _unit: str
+    _unit: Unit
     _name: str
     _description: str
     _scope: Scope
 
     @property
-    def unit(self) -> str:
+    def unit(self) -> Unit:
         """Variable unit."""
         return self._unit
 
@@ -263,7 +265,7 @@ class ParsedVariable(Variable):
             outputs (list[OutputFile]): Ouputs files.
         """
         self._name = name
-        self._unit = unit
+        self._unit = Unit(unit)
         self._description = description
         self._scope = scope
         self._outputs = outputs
