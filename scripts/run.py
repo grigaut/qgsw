@@ -7,7 +7,7 @@ import torch
 from rich.progress import Progress
 
 from qgsw import verbose
-from qgsw.configs.configurations import Configuration
+from qgsw.configs.core import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
 from qgsw.perturbations import Perturbation

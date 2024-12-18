@@ -1,100 +1,104 @@
-"""Input-Output Configuration Tools."""
+"""Input/Output Configuration."""
 
 from __future__ import annotations
 
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Literal
 
-from qgsw.configs import keys
-from qgsw.configs.base import _Config
+from pydantic import (
+    BaseModel,
+    Field,
+    PositiveFloat,
+)
+
 from qgsw.utils.storage import get_absolute_storage_path
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-class IOConfig(_Config):
-    """Input-Output configuration."""
+    from qgsw.simulation.steps import Steps
 
-    section: str = keys.IO["section"]
-    _name: str = keys.IO["name"]
-    _log: str = keys.IO["log performance"]
 
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate IOConfig.
+class IOConfig(BaseModel):
+    """Input/Output ."""
 
-        Args:
-            params (dict[str, Any]): IO configuration dictionnary.
-        """
-        super().__init__(params)
-        self._res = OutputsConfig.parse(params)
+    name: str
+    output: IntervalSaveConfig | QuantitySaveConfig | None = Field(
+        None,
+        discriminator="type",
+    )
 
-    @property
-    def name(self) -> str:
-        """Run name."""
-        return self._params[self._name]
 
-    @property
-    def name_sc(self) -> str:
-        """Snake-cased name."""
-        return self.name.lower().replace(" ", "_")
+class IntervalSaveConfig(BaseModel):
+    """Interval save configuration."""
+
+    type: Literal["interval"]
+    save: bool
+    interval_duration: PositiveFloat
+    directory_str: str = Field(
+        alias="directory",
+    )
 
     @cached_property
-    def results(self) -> OutputsConfig:
-        """Results saving configuration."""
-        return OutputsConfig.parse(self.params)
-
-    @property
-    def log_performance(self) -> bool:
-        """Whether to log performances or not."""
-        return self._params[self._log]
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate IO paramaters.
-
-        Args:
-            params (dict[str, Any]): IO configuration dictionnary.
-
-        Returns:
-            dict[str, Any]: IO configuration dictionnary.
-        """
-        return super()._validate_params(params)
-
-
-class OutputsConfig(_Config):
-    """Plots Configuration."""
-
-    section: str = keys.OUTPUT["section"]
-    _save: str = keys.OUTPUT["save"]
-    _dir: str = keys.OUTPUT["directory"]
-    _quantity: str = keys.OUTPUT["quantity"]
-
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate plots configuration object.
-
-        Args:
-            params (dict[str, Any]): Configuration parameters.
-        """
-        super().__init__(params)
-
-    @property
-    def save(self) -> bool:
-        """Whether to save the plots or not."""
-        return self.params[self._save]
-
-    @property
     def directory(self) -> Path:
-        """Directory in which to save the results."""
-        directory = get_absolute_storage_path(Path(self.params[self._dir]))
-        if self.save and not directory.is_dir():
+        """Output directory."""
+        directory = get_absolute_storage_path(Path(self.directory_str))
+        if not directory.is_dir():
             directory.mkdir()
             gitignore = directory.joinpath(".gitignore")
             with gitignore.open("w") as file:
                 file.write("*")
         return directory
 
-    @property
-    def quantity(self) -> int:
-        """Number of outputs."""
-        return self.params[self._quantity]
+    def get_saving_steps(self, steps: Steps) -> Iterator[bool]:
+        """Get saving steps.
 
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        return super()._validate_params(params)
+        Args:
+            steps (Steps): Steps manager.
+
+        Yields:
+            Iterator[bool]: Boolean iterator with the same length as the one
+            returned by `simulation_steps`, True when the corresponding step
+            matches the interval, always ends with True.
+        """
+        if not self.save:
+            return (False for _ in steps.simulation_steps())
+        return steps.steps_from_interval(interval=self.interval_duration)
+
+
+class QuantitySaveConfig(BaseModel):
+    """Quantity save configuration."""
+
+    type: Literal["quantity"]
+    save: bool
+    quantity: PositiveFloat
+    directory_str: str = Field(
+        alias="directory",
+    )
+
+    @cached_property
+    def directory(self) -> Path:
+        """Output directory."""
+        directory = get_absolute_storage_path(Path(self.directory_str))
+        if not directory.is_dir():
+            directory.mkdir()
+            gitignore = directory.joinpath(".gitignore")
+            with gitignore.open("w") as file:
+                file.write("*")
+        return directory
+
+    def get_saving_steps(self, steps: Steps) -> Iterator[bool]:
+        """Get saving steps.
+
+        Args:
+            steps (Steps): Steps manager.
+
+        Yields:
+            Iterator[bool]: Boolean iterator with the same length as the one
+            returned by `simulation_steps`, True when the corresponding step is
+            selected, always ends with True. May include one additional step.
+        """
+        if not self.save:
+            return (False for _ in steps.simulation_steps())
+        return steps.steps_from_total(total=self.quantity)

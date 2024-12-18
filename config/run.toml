@@ -47,7 +47,6 @@ y_max = 500_000
 
 [windstress]
 type = "none"
-[windstress.data]
 
 [perturbation]
 type = "vortex-baroclinic"

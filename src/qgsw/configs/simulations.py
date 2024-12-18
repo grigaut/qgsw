@@ -1,39 +1,29 @@
-"""Run configuration."""
+"""Simulations configurations."""
 
-from typing import Any
+from __future__ import annotations
 
-from qgsw.configs import keys
-from qgsw.configs.base import _Config
+from typing import Literal
+
+from pydantic import (
+    BaseModel,
+    PositiveFloat,
+)
+
+from qgsw.configs.models import ModelConfig  # noqa: TCH001
 
 
-class SimulationConfig(_Config):
-    """Simulation configuration."""
+class ModelRunSimulationConfig(BaseModel):
+    """Model run simulaton configuration."""
 
-    section: str = keys.SIMULATION["section"]
-    _duration: str = keys.SIMULATION["duration"]
-    _ref: str = keys.SIMULATION["reference"]
-    _tau: str = keys.SIMULATION["tau"]
-    _dt: str = keys.SIMULATION["timestep"]
+    kind: Literal["simple-run"]
+    duration: PositiveFloat
+    dt: PositiveFloat
 
-    @property
-    def dt(self) -> float:
-        """Timestep."""
-        return self.params[self._dt]
 
-    @property
-    def duration(self) -> float:
-        """Simulation duration, relative unit."""
-        return self.params[self._duration]
+class AssimilationSimulationConfig(BaseModel):
+    """Assimilation simulation configuration."""
 
-    @property
-    def reference(self) -> str:
-        """Refernce Time, whether 'tau' or 'sec'."""
-        return self.params[self._ref]
-
-    @property
-    def tau(self) -> float:
-        """Simulation Tau, in f0⁻¹."""
-        return self.params[self._tau]
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        return super()._validate_params(params)
+    kind: Literal["assimilation"]
+    duration: PositiveFloat
+    dt: PositiveFloat
+    reference: ModelConfig

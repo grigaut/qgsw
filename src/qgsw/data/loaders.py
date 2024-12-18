@@ -5,7 +5,7 @@ from __future__ import annotations
 import urllib.request
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 
 try:
     from typing import Self
@@ -16,9 +16,8 @@ import numpy as np
 import torch
 
 from qgsw import verbose
-from qgsw.configs.base import _Config, _DataConfig
 from qgsw.configs.bathymetry import BathyDataConfig
-from qgsw.configs.windstress import WindStressConfig
+from qgsw.configs.windstress import WindStressConfig, WindStressDataConfig
 from qgsw.data.preprocessing import (
     BathyPreprocessor,
     Preprocessor,
@@ -28,12 +27,10 @@ from qgsw.data.preprocessing import (
 )
 from qgsw.data.readers import Reader
 
-if TYPE_CHECKING:
-    from qgsw.configs.windstress import WindStressDataConfig
-
 Data = TypeVar("Data")
 Preprocess = TypeVar("Preprocess", bound=Preprocessor)
-Config = TypeVar("Config", bound=_Config)
+DataConfig = BathyDataConfig | WindStressDataConfig
+Config = TypeVar("Config", bound=DataConfig)
 
 
 class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
@@ -86,7 +83,7 @@ class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
         return self.output_folder.joinpath(filename)
 
     @abstractmethod
-    def _set_config(self, config: Config) -> _DataConfig:
+    def _set_config(self, config: Config) -> DataConfig:
         """Set filepath."""
 
     def retrieve(self) -> Data:

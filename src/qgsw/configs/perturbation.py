@@ -1,29 +1,15 @@
-"""Perturbation-related configuration."""
+"""Pertubation configuration."""
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import (
+    BaseModel,
+    NonNegativeFloat,
+)
 
-from qgsw.configs import keys
-from qgsw.configs.base import _Config
 
+class PerturbationConfig(BaseModel):
+    """Perturbation configuration."""
 
-class PerturbationConfig(_Config):
-    """Perturbation Configuration."""
-
-    section: str = keys.PERTURBATION["section"]
-    _type: str = keys.PERTURBATION["type"]
-    _perturbation: str = keys.PERTURBATION["perturbation magnitude"]
-
-    @property
-    def type(self) -> str:
-        """Perturbation Type."""
-        return self.params[self._type]
-
-    @property
-    def perturbation_magnitude(self) -> str:
-        """Perturbation perturbation magnitude."""
-        return self.params[self._perturbation]
-
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        return super()._validate_params(params)
+    type: str
+    perturbation_magnitude: NonNegativeFloat

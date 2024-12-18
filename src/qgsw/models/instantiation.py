@@ -29,7 +29,7 @@ from qgsw.spatial.core.discretization import (
 from qgsw.utils import time_params
 
 if TYPE_CHECKING:
-    from qgsw.configs.configurations import Configuration
+    from qgsw.configs.core import Configuration
     from qgsw.perturbations.core import Perturbation
 
 

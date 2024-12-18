@@ -103,7 +103,7 @@ from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs.configurations import SpaceConfig
+    from qgsw.configs.core import SpaceConfig
     from qgsw.configs.models import ModelConfig
 
 

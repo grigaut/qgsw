@@ -20,7 +20,7 @@ except ImportError:
 
 import toml
 
-from qgsw.configs.configurations import Configuration
+from qgsw.configs.core import Configuration
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
