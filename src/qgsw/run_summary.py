@@ -227,7 +227,10 @@ class RunSummary:
         if summary_file not in self._files:
             self._files.append(summary_file)
         config_file = folder.joinpath(self._config_file_name)
-        toml.dump(self._config.model_dump(), config_file.open("w"))
+        toml.dump(
+            self._config.model_dump(by_alias=True),
+            config_file.open("w"),
+        )
 
     def update(self) -> None:
         """Update the saved files.
@@ -280,7 +283,7 @@ class RunSummary:
         Returns:
             Self: Summary.
         """
-        return cls(configuration.model_dump(), None)
+        return cls(configuration.model_dump(by_alias=True), None)
 
 
 class OutputFile(NamedTuple):

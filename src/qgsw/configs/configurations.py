@@ -9,8 +9,8 @@ except ImportError:
 
 
 from functools import cached_property
-from pathlib import Path  # noqa: TCH003
-from typing import TYPE_CHECKING, Any, Literal
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
 import toml
 import torch
@@ -24,7 +24,7 @@ from pydantic import (
 )
 
 from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.units._units import Unit  # noqa: TCH001
+from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
 from qgsw.utils.storage import get_absolute_storage_path
 
@@ -93,11 +93,21 @@ class PhysicsConfig(BaseModel):
         return BetaPlane(f0=self.f0, beta=self.beta)
 
 
-class SimulationConfig(BaseModel):
-    """Simulation configuration."""
+class ModelRunSimulationConfig(BaseModel):
+    """Model run simulaton configuration."""
 
+    kind: Literal["simple-run"]
     duration: PositiveFloat
     dt: PositiveFloat
+
+
+class AssimilationSimulationConfig(BaseModel):
+    """Assimilation simulation configuration."""
+
+    kind: Literal["assimilation"]
+    duration: PositiveFloat
+    dt: PositiveFloat
+    reference: ModelConfig
 
 
 class IOConfig(BaseModel):
@@ -116,21 +126,20 @@ class IntervalSaveConfig(BaseModel):
     type: Literal["interval"]
     save: bool
     interval_duration: PositiveFloat
-    directory: Path
+    directory_str: str = Field(
+        alias="directory",
+    )
 
-    def model_post_init(self, __context: Any) -> None:  # noqa: ANN401
-        """Perform initialization after `__init__`."""
-        if not self.save:
-            return super().model_post_init(__context)
-
-        self.directory = get_absolute_storage_path(self.directory)
-
-        if not self.directory.is_dir():
-            self.directory.mkdir()
-            gitignore = self.directory.joinpath(".gitignore")
+    @cached_property
+    def directory(self) -> Path:
+        """Output directory."""
+        directory = get_absolute_storage_path(Path(self.directory_str))
+        if not directory.is_dir():
+            directory.mkdir()
+            gitignore = directory.joinpath(".gitignore")
             with gitignore.open("w") as file:
                 file.write("*")
-        return super().model_post_init(__context)
+        return directory
 
     def get_saving_steps(self, steps: Steps) -> Iterator[bool]:
         """Get saving steps.
@@ -154,21 +163,20 @@ class QuantitySaveConfig(BaseModel):
     type: Literal["quantity"]
     save: bool
     quantity: PositiveFloat
-    directory: Path
+    directory_str: str = Field(
+        alias="directory",
+    )
 
-    def model_post_init(self, __context: Any) -> None:  # noqa: ANN401
-        """Perform initialization after `__init__`."""
-        if not self.save:
-            return super().model_post_init(__context)
-
-        self.directory = get_absolute_storage_path(self.directory)
-
-        if not self.directory.is_dir():
-            self.directory.mkdir()
-            gitignore = self.directory.joinpath(".gitignore")
+    @cached_property
+    def directory(self) -> Path:
+        """Output directory."""
+        directory = get_absolute_storage_path(Path(self.directory_str))
+        if not directory.is_dir():
+            directory.mkdir()
+            gitignore = directory.joinpath(".gitignore")
             with gitignore.open("w") as file:
                 file.write("*")
-        return super().model_post_init(__context)
+        return directory
 
     def get_saving_steps(self, steps: Steps) -> Iterator[bool]:
         """Get saving steps.
@@ -191,11 +199,16 @@ class SpaceConfig(BaseModel):
 
     nx: PositiveInt
     ny: PositiveInt
-    unit: Unit
+    unit_str: str = Field(alias="unit")
     x_min: float
     x_max: float
     y_min: float
     y_max: float
+
+    @cached_property
+    def unit(self) -> Unit:
+        """Space Unit."""
+        return Unit(self.unit_str)
 
 
 class WindStressConfig(BaseModel):
@@ -218,7 +231,9 @@ class Configuration(BaseModel):
 
     io: IOConfig
     physics: PhysicsConfig
-    simulation: SimulationConfig
+    simulation: ModelRunSimulationConfig | AssimilationSimulationConfig = (
+        Field(discriminator="kind")
+    )
     model: ModelConfig
     space: SpaceConfig
     windstress: WindStressConfig

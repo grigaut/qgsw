@@ -15,7 +15,7 @@ def get_storage_path(key: str = "STORAGE") -> Path:
         Path: $STORAGE from .env or $PWD if no STORAGE environment variable.
     """
     if key in os.environ:
-        return Path(os.environ[key])
+        return Path(os.environ[key]).absolute()
     msg = f"Impossible to read the {key} from environment variables."
     raise StorageError(msg)
 
@@ -34,4 +34,4 @@ def get_absolute_storage_path(path: Path) -> Path:
             return path
         msg = f"Path {path} is absolute, use relative path instead."
         raise StorageError(msg)
-    return get_storage_path().joinpath(path)
+    return get_storage_path().joinpath(path).absolute()

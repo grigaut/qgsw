@@ -230,7 +230,7 @@ class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
         plot = cls(datas=datas)
         plot.set_subplot_titles(
             [
-                f"{run.summary.configuration.model.name} - Layer {ls[i]}"
+                f"{run.summary.configuration.io.name} - Layer {ls[i]}"
                 for i, run in enumerate(runs)
             ],
         )

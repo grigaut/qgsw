@@ -1,7 +1,7 @@
 [io]
 name = "Two Layers Model"
 [io.output]
-save=true
+save=false
 type = "quantity"           # "interval"
 quantity = 100
 # interval_duration = 3600  # seconds
@@ -15,7 +15,8 @@ beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
 [simulation]
-duration = 100_000 # 2_389_333.3   # seconds
+kind = "simple-run"
+duration = 2_389_333.3   # seconds
 dt = 26                 # in seconds
 
 [model]
