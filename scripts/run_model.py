@@ -3,7 +3,6 @@
 import argparse
 from pathlib import Path
 
-import numpy as np
 import torch
 from rich.progress import Progress
 
@@ -16,7 +15,6 @@ from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
 from qgsw.spatial.dim_3 import SpaceDiscretization3D
-from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
@@ -31,11 +29,11 @@ args = parser.parse_args()
 
 ROOT_PATH = Path(__file__).parent.parent
 CONFIG_PATH = ROOT_PATH.joinpath(args.config)
-config = Configuration.from_file(CONFIG_PATH)
+config = Configuration.from_toml(CONFIG_PATH)
 summary = RunSummary.from_configuration(config)
 
-if config.io.results.save:
-    summary.to_file(config.io.results.directory)
+if config.io.output.save:
+    summary.to_file(config.io.output.directory)
 
 # Common Set-up
 ## Wind Forcing
@@ -77,23 +75,12 @@ model.set_wind_forcing(taux, tauy)
 t = 0
 dt = model.dt
 
-if config.simulation.reference == "tau":
-    if np.isnan(config.simulation.tau):
-        tau = time_params.compute_tau(model.omega, model.space)
-    else:
-        tau = config.simulation.tau / config.physics.f0
-    verbose.display(
-        msg=f"tau = {tau *config.physics.f0:.2f} f0⁻¹",
-        trigger_level=1,
-    )
-    t_end = config.simulation.duration * tau
-else:
-    t_end = config.simulation.duration
+t_end = config.simulation.duration
 
 
 steps = Steps(t_end=t_end, dt=dt)
 ns = steps.simulation_steps()
-saves = steps.steps_from_total(config.io.results.quantity)
+saves = config.io.output.get_saving_steps(steps)
 logs = steps.steps_from_total(100)
 
 summary.register_outputs(model.io)
@@ -118,13 +105,12 @@ with Progress() as progress:
         )
         progress.advance(simulation)
         # Save step
-        if config.io.results.save and save:
+        if save:
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}]",
                 trigger_level=1,
             )
-            directory = config.io.results.directory
-            name = config.model.name_sc
+            directory = config.io.output.directory
             model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
 
         model.step()

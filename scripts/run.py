@@ -32,8 +32,8 @@ CONFIG_PATH = ROOT_PATH.joinpath(args.config)
 config = Configuration.from_toml(CONFIG_PATH)
 summary = RunSummary.from_configuration(config)
 
-if config.io.save:
-    summary.to_file(config.io.output_directory)
+if config.io.output.save:
+    summary.to_file(config.io.output.directory)
 
 # Common Set-up
 ## Wind Forcing
@@ -80,7 +80,7 @@ t_end = config.simulation.duration
 
 steps = Steps(t_end=t_end, dt=dt)
 ns = steps.simulation_steps()
-saves = steps.steps_from_total(config.io.save_method.quantity)
+saves = config.io.output.get_saving_steps(steps)
 logs = steps.steps_from_total(100)
 
 summary.register_outputs(model.io)
@@ -105,12 +105,12 @@ with Progress() as progress:
         )
         progress.advance(simulation)
         # Save step
-        if config.io.save and save:
+        if save:
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}]",
                 trigger_level=1,
             )
-            directory = config.io.output_directory
+            directory = config.io.output.directory
             model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
 
         model.step()

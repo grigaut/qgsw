@@ -206,7 +206,7 @@ class RunSummary:
         Args:
             io (IO): Input/Output manager.
         """
-        if not self.configuration.io.results.save:
+        if not self.configuration.io.output.save:
             return
         for var in io.tracked_vars:
             self._summary[self._variables].append(
@@ -227,7 +227,7 @@ class RunSummary:
         if summary_file not in self._files:
             self._files.append(summary_file)
         config_file = folder.joinpath(self._config_file_name)
-        toml.dump(self._config.params, config_file.open("w"))
+        toml.dump(self._config.model_dump(), config_file.open("w"))
 
     def update(self) -> None:
         """Update the saved files.

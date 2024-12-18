@@ -2,22 +2,18 @@
 
 from __future__ import annotations
 
-from functools import cached_property
-from typing import Literal
-
-import toml
-import torch
-
-from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.specs import DEVICE
-
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
 
-from pathlib import Path  # noqa: TCH003
 
+from functools import cached_property
+from pathlib import Path  # noqa: TCH003
+from typing import TYPE_CHECKING, Any, Literal
+
+import toml
+import torch
 from pydantic import (
     BaseModel,
     Field,
@@ -27,7 +23,15 @@ from pydantic import (
     PositiveInt,
 )
 
+from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.units._units import Unit  # noqa: TCH001
+from qgsw.specs import DEVICE
+from qgsw.utils.storage import get_absolute_storage_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from qgsw.simulation.steps import Steps
 
 
 class ModelConfig(BaseModel):
@@ -100,9 +104,7 @@ class IOConfig(BaseModel):
     """Input/Output ."""
 
     name: str
-    save: bool
-    output_directory: Path | None = None
-    save_method: IntervalSaveConfig | QuantitySaveConfig | None = Field(
+    output: IntervalSaveConfig | QuantitySaveConfig | None = Field(
         None,
         discriminator="type",
     )
@@ -112,14 +114,76 @@ class IntervalSaveConfig(BaseModel):
     """Interval save configuration."""
 
     type: Literal["interval"]
+    save: bool
     interval_duration: PositiveFloat
+    directory: Path
+
+    def model_post_init(self, __context: Any) -> None:  # noqa: ANN401
+        """Perform initialization after `__init__`."""
+        if not self.save:
+            return super().model_post_init(__context)
+
+        self.directory = get_absolute_storage_path(self.directory)
+
+        if not self.directory.is_dir():
+            self.directory.mkdir()
+            gitignore = self.directory.joinpath(".gitignore")
+            with gitignore.open("w") as file:
+                file.write("*")
+        return super().model_post_init(__context)
+
+    def get_saving_steps(self, steps: Steps) -> Iterator[bool]:
+        """Get saving steps.
+
+        Args:
+            steps (Steps): Steps manager.
+
+        Yields:
+            Iterator[bool]: Boolean iterator with the same length as the one
+            returned by `simulation_steps`, True when the corresponding step
+            matches the interval, always ends with True.
+        """
+        if not self.save:
+            return (False for _ in steps.simulation_steps())
+        return steps.steps_from_interval(interval=self.interval_duration)
 
 
 class QuantitySaveConfig(BaseModel):
     """Quantity save configuration."""
 
     type: Literal["quantity"]
+    save: bool
     quantity: PositiveFloat
+    directory: Path
+
+    def model_post_init(self, __context: Any) -> None:  # noqa: ANN401
+        """Perform initialization after `__init__`."""
+        if not self.save:
+            return super().model_post_init(__context)
+
+        self.directory = get_absolute_storage_path(self.directory)
+
+        if not self.directory.is_dir():
+            self.directory.mkdir()
+            gitignore = self.directory.joinpath(".gitignore")
+            with gitignore.open("w") as file:
+                file.write("*")
+        return super().model_post_init(__context)
+
+    def get_saving_steps(self, steps: Steps) -> Iterator[bool]:
+        """Get saving steps.
+
+        Args:
+            steps (Steps): Steps manager.
+
+        Yields:
+            Iterator[bool]: Boolean iterator with the same length as the one
+            returned by `simulation_steps`, True when the corresponding step is
+            selected, always ends with True. May include one additional step.
+        """
+        if not self.save:
+            return (False for _ in steps.simulation_steps())
+        return steps.steps_from_total(total=self.quantity)
 
 
 class SpaceConfig(BaseModel):
