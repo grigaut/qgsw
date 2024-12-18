@@ -57,6 +57,15 @@ class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
             thickness=50,
         )
 
+    def set_colorbar_text(self, text: str) -> None:
+        """Set the colorbar text.
+
+        Args:
+            text (str): Colorbar text.
+        """
+        self._color_bar_text = text
+        self._colorbar = self._create_colorbar()
+
     def _add_traces(self) -> None:
         """Initialize the traces."""
         zmax = self._compute_zmax(self._datas[0][1])

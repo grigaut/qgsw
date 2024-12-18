@@ -83,6 +83,14 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
         self.set_subplot_titles(None)
         return self._fig
 
+    def set_slider_prefix(self, text: str) -> None:
+        """Set the slider prefix.
+
+        Args:
+            text (str): Slider prefix.
+        """
+        self._slider_prefix = text
+
     def set_subplot_titles(self, subplot_titles: list[str]) -> go.Figure:
         """Set the subplot titles.
 
