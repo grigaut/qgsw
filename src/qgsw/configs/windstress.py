@@ -1,6 +1,6 @@
 """WindStress configuration."""
 
-# ruff: noqa: TCH001, UP007
+# ruff: noqa: UP007
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ class WindStressConfig(BaseModel):
     type: str
     magnitude: Union[NonNegativeFloat, None] = None
     drag_coefficient: Union[NonNegativeFloat, None] = None
-    data: WindStressDataConfig | None = None
+    data: Union[WindStressDataConfig, None] = None
 
 
 class WindStressDataConfig(BaseModel):

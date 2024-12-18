@@ -1,8 +1,10 @@
 """Bathymetry configuration."""
 
+# ruff: noqa: UP007
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -21,7 +23,7 @@ class BathyConfig(BaseModel):
     lake_min_area: PositiveFloat
     island_min_area: PositiveFloat
     interpolation_method: str
-    data: BathyDataConfig | None = None
+    data: Union[BathyDataConfig, None] = None
 
 
 class BathyDataConfig(BaseModel):
