@@ -21,6 +21,7 @@ from qgsw.models.parameters import ModelParamChecker
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
 from qgsw.variables.dynamics import (
+    Enstrophy,
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
@@ -29,6 +30,7 @@ from qgsw.variables.dynamics import (
     Pressure,
     StreamFunction,
     SurfaceHeightAnomaly,
+    TotalEnstrophy,
     Vorticity,
     ZonalVelocityFlux,
 )
@@ -222,6 +224,16 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         return self._V.get()
 
     @property
+    def enstrophy(self) -> torch.Tensor:
+        """Level-wise enstrophy."""
+        return self._enstrophy.get()
+
+    @property
+    def enstrophy_tot(self) -> torch.Tensor:
+        """Ensemble-wise enstrophy."""
+        return self._enstrophy_tot.get()
+
+    @property
     def k_energy(self) -> torch.Tensor:
         """Physical meriodional velocity."""
         return self._k_energy.get()
@@ -320,6 +332,8 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
         omega_phys = PhysicalVorticity(omega, ds=self.space.area)
+        enstrophy = Enstrophy(omega_phys)
+        enstrophy_tot = TotalEnstrophy(omega_phys)
         eta = SurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta=eta)
         psi = StreamFunction(pressure=p, f0=self.beta_plane.f0)
@@ -332,6 +346,8 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         self._V = V.bind(state)
         self._omega = omega.bind(state)
         self._omega_phys = omega_phys.bind(state)
+        self._enstrophy = enstrophy.bind(state)
+        self._enstrophy_tot = enstrophy_tot.bind(state)
         self._eta = eta.bind(state)
         self._p = p.bind(state)
         self._psi = psi.bind(state)
@@ -344,6 +360,8 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
             self._omega_phys,
             self._p,
             self._psi,
+            self._enstrophy,
+            self._enstrophy_tot,
         )
 
     def set_physical_uvh(
