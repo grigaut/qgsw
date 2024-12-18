@@ -193,11 +193,11 @@ class SpaceDiscretization2D:
             "└── Dimensions:",
             (
                 f"     ├── X: {self.nx} points "
-                f"- dx = {self.dx} {self.omega.xy_unit}"
+                f"- dx = {self.dx} {self.omega.xy_unit.value}"
             ),
             (
                 f"     └── Y: {self.ny} points "
-                f"- dy = {self.dy} {self.omega.xy_unit}"
+                f"- dy = {self.dy} {self.omega.xy_unit.value}"
             ),
         ]
         return "\n".join(msg_parts)
@@ -707,11 +707,11 @@ class SpaceDiscretization3D:
             "└── Dimensions:",
             (
                 f"     ├── X: {self.nx} points "
-                f"- dx = {self.dx} {self.omega.xy_unit}"
+                f"- dx = {self.dx} {self.omega.xy_unit.value}"
             ),
             (
                 f"     ├── Y: {self.ny} points "
-                f"- dy = {self.dy} {self.omega.xy_unit}"
+                f"- dy = {self.dy} {self.omega.xy_unit.value}"
             ),
             f"     └── H: {self.nl} layer{'s' if self.nl>1 else ''}",
         ]

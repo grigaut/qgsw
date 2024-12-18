@@ -60,7 +60,7 @@ if submit_points:
         [f"Reference - Level {level}", f"Model - Level {level}"],
     )
     plot_points.set_colorbar_text(
-        f"{run[var_name].description} [{run[var_name].unit}]",
+        f"{run[var_name].description} [{run[var_name].unit.value}]",
     )
     plot_points.set_slider_prefix("Time: ")
     plot_points.set_figure_size(800, 1000)
@@ -108,7 +108,7 @@ if submit_levels:
 
     plot_levels = ScatterPlot(datas=datas_ref + datas)
     plot_levels.set_xaxis_title("Time [s]")
-    plot_levels.set_yaxis_title(f"[{selected_vars_levels[0].unit}]")
+    plot_levels.set_yaxis_title(f"[{selected_vars_levels[0].unit.value}]")
     plot_levels.set_traces_name(*names_refs, *names)
     plot_levels.set_figure_size(height=750, width=500)
     xs = [
@@ -155,7 +155,9 @@ if submit_ensemble:
 
     plot_ensembles = ScatterPlot(datas=datas_ref + datas)
     plot_ensembles.set_xaxis_title("Time [s]")
-    plot_ensembles.set_yaxis_title(f"[{selected_vars_ensembles[0].unit}]")
+    plot_ensembles.set_yaxis_title(
+        f"[{selected_vars_ensembles[0].unit.value}]",
+    )
     plot_ensembles.set_traces_name(*names_refs, *names)
     plot_ensembles.set_figure_size(height=750, width=500)
     xs = [list(run[var.name].seconds()) for var in selected_vars_ensembles]

@@ -234,7 +234,7 @@ class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
             for k, run in enumerate(runs)
         ]
         cls._slider_prefix = "Time: "
-        legend = f"{runs[0][field].description} [{runs[0][field].unit}]"
+        legend = f"{runs[0][field].description} [{runs[0][field].unit.value}]"
         cls._color_bar_text = legend
         plot = cls(datas=datas)
         plot.set_subplot_titles(

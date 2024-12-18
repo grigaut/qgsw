@@ -58,7 +58,7 @@ class Variable:
 
     def __repr__(self) -> str:
         """Variable string representation."""
-        return f"{self._description}: {self._name} [{self.unit}]"
+        return f"{self._description}: {self._name} [{self.unit.value}]"
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the variable to a dictionnary."""

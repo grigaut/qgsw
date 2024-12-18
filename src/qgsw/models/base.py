@@ -145,11 +145,11 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
             "    └── Dimensions:",
             (
                 f"         ├── X: {self.space.nx} points - "
-                f"dx = {self.space.dx} {self.space.omega.xy_unit}"
+                f"dx = {self.space.dx} {self.space.omega.xy_unit.value}"
             ),
             (
                 f"         ├── Y: {self.space.ny} points - "
-                f"dy = {self.space.dy} {self.space.omega.xy_unit}"
+                f"dy = {self.space.dy} {self.space.omega.xy_unit.value}"
             ),
             (
                 f"         └── H: {self.space.nl} "
