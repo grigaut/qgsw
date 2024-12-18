@@ -1,10 +1,10 @@
 """Configurations."""
 
-# ruff: noqa: TCH001
+# ruff: noqa: TCH001, UP007
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from qgsw.configs.io import IOConfig
 from qgsw.configs.models import ModelConfig
@@ -37,9 +37,10 @@ class Configuration(BaseModel):
 
     io: IOConfig
     physics: PhysicsConfig
-    simulation: ModelRunSimulationConfig | AssimilationSimulationConfig = (
-        Field(discriminator="kind")
-    )
+    simulation: Union[
+        ModelRunSimulationConfig,
+        AssimilationSimulationConfig,
+    ] = Field(discriminator="kind")
     model: ModelConfig
     space: SpaceConfig
     windstress: WindStressConfig

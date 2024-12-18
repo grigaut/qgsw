@@ -1,10 +1,12 @@
 """Input/Output Configuration."""
 
+# ruff: noqa: UP007
+
 from __future__ import annotations
 
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Union
 
 from pydantic import (
     BaseModel,
@@ -24,7 +26,7 @@ class IOConfig(BaseModel):
     """Input/Output ."""
 
     name: str
-    output: IntervalSaveConfig | QuantitySaveConfig | None = Field(
+    output: Union[IntervalSaveConfig, QuantitySaveConfig, None] = Field(
         None,
         discriminator="type",
     )

@@ -1,8 +1,10 @@
 """WindStress configuration."""
 
+# ruff: noqa: TCH001, UP007
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -18,8 +20,8 @@ class WindStressConfig(BaseModel):
     """Windstress configuration."""
 
     type: str
-    magnitude: NonNegativeFloat | None = None
-    drag_coefficient: NonNegativeFloat | None = None
+    magnitude: Union[NonNegativeFloat, None] = None
+    drag_coefficient: Union[NonNegativeFloat, None] = None
     data: WindStressDataConfig | None = None
 
 

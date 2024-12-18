@@ -5,7 +5,7 @@ from __future__ import annotations
 import urllib.request
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Union
 
 try:
     from typing import Self
@@ -29,7 +29,7 @@ from qgsw.data.readers import Reader
 
 Data = TypeVar("Data")
 Preprocess = TypeVar("Preprocess", bound=Preprocessor)
-DataConfig = BathyDataConfig | WindStressDataConfig
+DataConfig = Union[BathyDataConfig, WindStressDataConfig]
 Config = TypeVar("Config", bound=DataConfig)
 
 

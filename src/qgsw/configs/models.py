@@ -1,9 +1,10 @@
 """Model Configuration."""
 
+# ruff: noqa: TCH001, UP007
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Literal
+from typing import Literal, Union
 
 import torch
 from pydantic import (
@@ -23,9 +24,11 @@ class ModelConfig(BaseModel):
     prefix: str
     layers: list[PositiveFloat]
     reduced_gravity: list[PositiveFloat]
-    collinearity_coef: (
-        ConstantCollinearityCoefConfig | ChangingCollinearityCoefConfig | None
-    ) = Field(None, discriminator="type")
+    collinearity_coef: Union[
+        ConstantCollinearityCoefConfig,
+        ChangingCollinearityCoefConfig,
+        None,
+    ] = Field(None, discriminator="type")
 
     @cached_property
     def h(self) -> torch.Tensor:
