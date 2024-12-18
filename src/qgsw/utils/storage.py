@@ -30,6 +30,8 @@ def get_absolute_storage_path(path: Path) -> Path:
         Path: Absolute storage path.
     """
     if path.is_absolute():
+        if path.is_relative_to(get_storage_path()):
+            return path
         msg = f"Path {path} is absolute, use relative path instead."
         raise StorageError(msg)
     return get_storage_path().joinpath(path)
