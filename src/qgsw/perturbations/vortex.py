@@ -34,7 +34,7 @@ class RankineVortex2D:
     """2D Rankine Vortex."""
 
     _norm_factor: int = 100
-    _required_xy_unit: Unit = Unit.METERS
+    _required_xy_unit: Unit = Unit.M
 
     def __init__(
         self,

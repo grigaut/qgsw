@@ -494,7 +494,7 @@ class SpaceDiscretization2D:
         Returns:
             SpaceDiscretization3D: 3D Grids.
         """
-        omega_3d = self.h.add_h(h=h)
+        omega_3d = self._omega.add_h(h=h)
         h_3d = self._h.add_h(h=h)
         u_3d = self._u.add_h(h=h)
         v_3d = self._v.add_h(h=h)
@@ -1080,7 +1080,7 @@ class SpaceDiscretization3D:
             h=model_config.h,
             x_unit=grid_config.unit,
             y_unit=grid_config.unit,
-            zh_unit=Unit.METERS,
+            zh_unit=Unit.M,
         )
 
     @classmethod

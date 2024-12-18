@@ -1,11 +1,11 @@
 [io]
-name = "Two Layers Model"
+name = "Assimilation."
 [io.output]
-save=true
-type = "quantity"           # "interval"
-quantity = 100
-# interval_duration = 3600  # seconds
-directory = "results"
+save = true
+type = "interval"           # "interval"
+# quantity = 100
+interval_duration = 86_400  # seconds
+directory = "assimilation"
 
 [physics]
 rho = 1000
@@ -16,13 +16,23 @@ bottom_drag_coefficient = 0
 
 [simulation]
 kind = "assimilation"
-duration = 100_000 # 2_389_333.3   # seconds
-dt = 26                 # in seconds
+duration = 31_536_000       # seconds
+dt = 3600                   # seconds
+fork_interval = 1_728_000   # seconds
+startup_file = "output/g5k/double_gyre_qg/results_step_87600.npz"
 [simulation.reference]
 type = "QG"
 prefix = "reference_step_"
-layers = [400,1100,2600]
-reduced_gravity = [9.81,0.025,0.0125]
+layers = [
+    400,
+    1100,
+    2600,
+]
+reduced_gravity = [
+    9.81,
+    0.025,
+    0.0125
+]
 
 [model]
 type = "QG"
@@ -33,25 +43,19 @@ layers = [
 reduced_gravity = [
     9.81
 ]
-[model.collinearity_coef]
-# Section relevant for modified QG models only
-type = "constant" # 'constant' or 'changing'
-value = 0.1 # Only relevant for constant coefficients.
-source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficients.
 
 [space]
-nx = 192
-ny = 192
-unit = "meters"
-x_min = -500_000
-x_max = 500_000
-y_min = -500_000
-y_max = 500_000
+nx = 128
+ny = 256
+unit = "m"
+x_min = 0
+x_max = 2_560_000
+y_min = 0
+y_max = 5_120_000
 
 [windstress]
 type = "none"
-[windstress.data]
 
 [perturbation]
-type = "vortex-baroclinic"
+type = "none"
 perturbation_magnitude = 1e-3

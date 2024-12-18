@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 class Bathymetry:
     """Bathymetry."""
 
-    _required_xy_unit: Unit = Unit.DEGREES
+    _required_xy_unit: Unit = Unit.DEG
 
     def __init__(
         self,

@@ -26,9 +26,9 @@ def test_no_perturbation() -> None:
             dtype=torch.float64,
         ),
         h=torch.linspace(0, 200, 3, device=DEVICE.get(), dtype=torch.float64),
-        x_unit=Unit.METERS,
-        y_unit=Unit.METERS,
-        zh_unit=Unit.METERS,
+        x_unit=Unit.M,
+        y_unit=Unit.M,
+        zh_unit=Unit.M,
     )
 
     perturbation = NoPerturbation()

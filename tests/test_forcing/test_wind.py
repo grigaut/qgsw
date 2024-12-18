@@ -28,8 +28,8 @@ def test_cosine_wind_forcing() -> None:
     space = SpaceDiscretization2D.from_tensors(
         x=torch.linspace(0, lx, nx + 1, dtype=torch.float64, device="cpu"),
         y=torch.linspace(0, ly, ny + 1, dtype=torch.float64, device="cpu"),
-        x_unit=Unit.METERS,
-        y_unit=Unit.METERS,
+        x_unit=Unit.M,
+        y_unit=Unit.M,
     )
     wf = CosineZonalWindForcing(
         space,

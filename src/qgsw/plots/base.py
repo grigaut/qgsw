@@ -48,6 +48,31 @@ class BasePlot(ABC, Generic[T]):
         """
         return go.Figure()
 
+    def set_xaxis_title(self, text: str) -> None:
+        """Set the xaxis title.
+
+        Args:
+            text (str): xaxis title.
+        """
+        self._xaxis_title = text
+
+    def set_yaxis_title(self, text: str) -> None:
+        """Set the yaxis title.
+
+        Args:
+            text (str): yaxis title.
+        """
+        self._yaxis_title = text
+
+    def set_figure_size(self, width: int, height: int) -> None:
+        """Set the figure size.
+
+        Args:
+            width (int): Figure width
+            height (int): Figure geight
+        """
+        self.figure.update_layout(height=height, width=width)
+
     def _create_xaxis(self) -> go.layout.XAxis:
         return go.layout.XAxis(title=self._xaxis_title)
 

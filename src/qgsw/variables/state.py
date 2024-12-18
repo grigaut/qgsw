@@ -9,7 +9,6 @@ try:
 except ImportError:
     from typing_extensions import Self
 
-import torch
 
 from qgsw.variables.prognostic import (
     LayerDepthAnomaly,
@@ -19,6 +18,8 @@ from qgsw.variables.prognostic import (
 from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
+    import torch
+
     from qgsw.variables.base import BoundDiagnosticVariable
 
 
@@ -123,7 +124,7 @@ class State:
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
-        """Instaitate a steady state with zero-filled prognostic variables.
+        """Instantiate a steady state with zero-filled prognostic variables.
 
         Args:
             n_ens (int): Number of ensembles.
@@ -136,22 +137,7 @@ class State:
         Returns:
             Self: State.
         """
-        h = torch.zeros(
-            (n_ens, nl, nx, ny),
-            dtype=dtype,
-            device=device,
-        )
-        u = torch.zeros(
-            (n_ens, nl, nx + 1, ny),
-            dtype=dtype,
-            device=device,
-        )
-        v = torch.zeros(
-            (n_ens, nl, nx, ny + 1),
-            dtype=dtype,
-            device=device,
-        )
-        return cls.from_tensors(u, v, h)
+        return cls(UVH.steady(n_ens, nl, nx, ny, dtype, device))
 
     @classmethod
     def from_tensors(

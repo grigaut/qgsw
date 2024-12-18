@@ -21,8 +21,8 @@ def test_omega_grid() -> None:
     space = SpaceDiscretization2D.from_tensors(
         x=torch.linspace(0, lx, nx + 1, dtype=torch.float64, device="cpu"),
         y=torch.linspace(0, ly, ny + 1, dtype=torch.float64, device="cpu"),
-        x_unit=Unit.METERS,
-        y_unit=Unit.METERS,
+        x_unit=Unit.M,
+        y_unit=Unit.M,
     )
     assert (space.omega.xy.x == x).all()
     assert (space.omega.xy.y == y).all()

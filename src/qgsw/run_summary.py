@@ -306,15 +306,17 @@ class OutputFile(NamedTuple):
 class RunOutput:
     """Run output."""
 
-    def __init__(self, folder: Path) -> None:
+    def __init__(self, folder: Path, prefix: str | None = None) -> None:
         """Instantiate run output.
 
         Args:
             folder (Path): Run output folder.
+            prefix (str | None): Prefix to use to select files.
         """
         self._folder = Path(folder)
         self._summary = RunSummary.from_folder(self.folder)
-        prefix = self.summary.configuration.model.prefix
+        if prefix is None:
+            prefix = self.summary.configuration.model.prefix
         files = list(self.folder.glob(f"{prefix}*.npz"))
         steps, files = sort_files(files, prefix, ".npz")
         dt = self._summary.configuration.simulation.dt
