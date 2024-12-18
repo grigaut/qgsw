@@ -19,7 +19,7 @@ cd $SRCDIR
 
 date
 
-.venv/bin/python3 scripts/run_model.py $@
+.venv/bin/python3 scripts/run.py $@
 
 date
 
