@@ -1,147 +1,143 @@
 """Data assimilation pipeline."""
 
+import argparse
 from pathlib import Path
 
-import numpy as np
 import torch
 from rich.progress import Progress
 
 from qgsw import verbose
+from qgsw.configs.core import Configuration
 from qgsw.models.qg.core import QG
-from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.spatial.core.discretization import (
+    SpaceDiscretization2D,
+    SpaceDiscretization3D,
+)
 from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
+from qgsw.variables.uvh import UVH
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
-t_end = 31_536_000
-dt = 3600
 
-x_min = 0
-x_max = 2_560_000
-
-y_min = 0
-y_max = 5_120_000
-
-nx = 128
-ny = 256
-
-x = torch.linspace(
-    x_min,
-    x_max,
-    nx + 1,
-    dtype=torch.float64,
-    device=DEVICE.get(),
+parser = argparse.ArgumentParser(description="Retrieve Configuration file.")
+parser.add_argument(
+    "--config",
+    default="config/assimilation.toml",
+    help="Configuration File Path (from qgsw root level)",
 )
-y = torch.linspace(
-    y_min,
-    y_max,
-    ny + 1,
-    dtype=torch.float64,
-    device=DEVICE.get(),
+args = parser.parse_args()
+
+
+ROOT_PATH = Path(__file__).parent.parent
+CONFIG_PATH = ROOT_PATH.joinpath(args.config)
+config = Configuration.from_toml(CONFIG_PATH)
+summary = RunSummary.from_configuration(config)
+
+if config.io.output.save:
+    summary.to_file(config.io.output.directory)
+
+space_2d = SpaceDiscretization2D.from_config(config.space)
+
+h_coords_ref = Coordinates1D(
+    points=config.simulation.reference.h,
+    unit=Unit.METERS,
 )
-h_3l = torch.tensor(
-    [400, 1100, 2600],
-    dtype=torch.float64,
-    device=DEVICE.get(),
-)
-h_1l = torch.tensor(
-    [4100],
-    dtype=torch.float64,
-    device=DEVICE.get(),
+h_coords = Coordinates1D(points=config.model.h, unit=Unit.METERS)
+
+space_3d_ref = space_2d.add_h(h_coords_ref)
+space_3d_model = space_2d.add_h(h_coords)
+
+tmp = SpaceDiscretization3D.from_config(
+    config.space,
+    config.model,
 )
 
-space_3l = SpaceDiscretization3D.from_tensors(
-    x_unit=Unit.METERS,
-    y_unit=Unit.METERS,
-    zh_unit=Unit.METERS,
-    x=x,
-    y=y,
-    h=h_3l,
+model_ref = QG(
+    space_3d_ref,
+    config.simulation.reference.g_prime.unsqueeze(-1).unsqueeze(-1),
+    config.physics.beta_plane,
 )
 
-space_1l = SpaceDiscretization3D.from_tensors(
-    x_unit=Unit.METERS,
-    y_unit=Unit.METERS,
-    zh_unit=Unit.METERS,
-    x=x,
-    y=y,
-    h=h_1l,
+model = QG(
+    space_3d_model,
+    config.model.g_prime.unsqueeze(-1).unsqueeze(-1),
+    config.physics.beta_plane,
 )
 
-g_prime_3l = torch.tensor(
-    [9.81, 0.025, 0.0125],
-    dtype=torch.float64,
-    device=DEVICE.get(),
+model_ref.slip_coef = 1.0
+model_ref.bottom_drag_coef = 3.60577e-8
+model_ref.dt = config.simulation.dt
+
+model.slip_coef = 1.0
+model.bottom_drag_coef = 3.60577e-8
+model.dt = config.simulation.dt
+
+verbose.display("\n[Reference Model]", trigger_level=1)
+verbose.display(msg=model_ref.__repr__(), trigger_level=1)
+verbose.display("\n[Model]", trigger_level=1)
+verbose.display(msg=model.__repr__(), trigger_level=1)
+
+nl_ref = model_ref.space.nl
+nl = model.space.nl
+nx = model.space.nx
+ny = model.space.ny
+
+dtype = torch.float64
+device = DEVICE.get()
+
+if (startup_file := config.simulation.startup_file) is None:
+    uvh0 = UVH.steady(
+        n_ens=1,
+        nl=nl_ref,
+        nx=config.space.nx,
+        ny=config.space.ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+else:
+    uvh0 = UVH.from_file(startup_file, dtype=dtype, device=device)
+    horizontal_shape = uvh0.h.shape[-2:]
+    if horizontal_shape != (nx, ny):
+        msg = (
+            f"Horizontal shape {horizontal_shape} from {startup_file}"
+            f" should be ({nx},{ny})."
+        )
+        raise ValueError(msg)
+
+model_ref.set_uvh(
+    uvh0.u[:, :nl_ref, ...],
+    uvh0.v[:, :nl_ref, ...],
+    uvh0.h[:, :nl_ref, ...],
+)
+model.set_uvh(
+    uvh0.u[:, :nl, ...],
+    uvh0.v[:, :nl, ...],
+    uvh0.h[:, :nl, ...],
 )
 
-g_prime_1l = torch.tensor(
-    [9.81],
-    dtype=torch.float64,
-    device=DEVICE.get(),
-)
-
-model_3l = QG(
-    space_3l,
-    g_prime_3l.unsqueeze(-1).unsqueeze(-1),
-    BetaPlane(f0=9.375e-5, beta=1.754e-11),
-)
-
-model_1l = QG(
-    space_1l,
-    g_prime_1l.unsqueeze(-1).unsqueeze(-1),
-    BetaPlane(f0=9.375e-5, beta=1.754e-11),
-)
-
-model_3l.slip_coef = 1.0
-model_3l.bottom_drag_coef = 3.60577e-8
-model_3l.dt = dt
-
-model_1l.slip_coef = 1.0
-model_1l.bottom_drag_coef = 3.60577e-8
-model_1l.dt = dt
-
-file0 = np.load("output/g5k/double_gyre_qg_long/results_step_157698.npz")
-
-model_3l.set_uvh(
-    torch.tensor(file0["u"], dtype=torch.float64, device=DEVICE.get()),
-    torch.tensor(file0["v"], dtype=torch.float64, device=DEVICE.get()),
-    torch.tensor(file0["h"], dtype=torch.float64, device=DEVICE.get()),
-)
-model_1l.set_uvh(
-    torch.tensor(file0["u"], dtype=torch.float64, device=DEVICE.get())[
-        :,
-        :1,
-        ...,
-    ],
-    torch.tensor(file0["v"], dtype=torch.float64, device=DEVICE.get())[
-        :,
-        :1,
-        ...,
-    ],
-    torch.tensor(file0["h"], dtype=torch.float64, device=DEVICE.get())[
-        :,
-        :1,
-        ...,
-    ],
-)
-verbose.display("\n[Model 3 Layers]", trigger_level=1)
-verbose.display(msg=model_3l.__repr__(), trigger_level=1)
-verbose.display("\n[Model 1 Layer]", trigger_level=1)
-verbose.display(msg=model_1l.__repr__(), trigger_level=1)
+dt = config.simulation.dt
+t_end = config.simulation.duration
 
 steps = Steps(t_end=t_end, dt=dt)
 
 ns = steps.simulation_steps()
-forks = steps.steps_from_interval(interval=3600 * 24 * 20)
-saves = steps.steps_from_interval(interval=3600 * 24 * 1)
+forks = steps.steps_from_interval(interval=config.simulation.fork_interval)
+saves = config.io.output.get_saving_steps(steps)
+
+summary.register_outputs(model.io)
+summary.register_steps(t_end=t_end, dt=dt, n_steps=steps.n_tot)
 
 t = 0
-save_dir = Path("output/local/assimilation")
 
+summary.register_start()
+prefix_ref = config.simulation.reference.prefix
+prefix = config.model.prefix
+output_dir = config.io.output.directory
 with Progress() as progress:
     simulation = progress.add_task(
         rf"\[n=00000/{steps.n_tot:05d}]",
@@ -159,27 +155,31 @@ with Progress() as progress:
                 trigger_level=1,
             )
             verbose.display(
-                msg=f"Model 3 Layers: {model_3l.io.print_step()}",
+                msg="[Reference Model]: ",
                 trigger_level=1,
+                end="",
             )
-            model_3l.io.save(save_dir.joinpath(f"model_3l_{n}.npz"))
+            # Save Reference Model
+            model_ref.io.save(output_dir.joinpath(f"{prefix_ref}{n}.npz"))
             verbose.display(
-                msg=f"Model 1 Layer: {model_1l.io.print_step()}",
+                msg="[     Model     ]: ",
                 trigger_level=1,
+                end="",
             )
-            model_1l.io.save(save_dir.joinpath(f"model_1l_{n}.npz"))
+            # Save Model
+            model.io.save(output_dir.joinpath(f"{prefix}{n}.npz"))
         if fork:
-            uvh = model_3l.uvh
-            model_1l.set_uvh(
-                torch.clone(uvh.u)[:, :1, ...],
-                torch.clone(uvh.v)[:, :1, ...],
-                torch.clone(uvh.h)[:, :1, ...],
+            uvh = model_ref.uvh
+            model.set_uvh(
+                torch.clone(uvh.u)[:, :nl, ...],
+                torch.clone(uvh.v)[:, :nl, ...],
+                torch.clone(uvh.h)[:, :nl, ...],
             )
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
                 trigger_level=1,
             )
 
-        model_1l.step()
-        model_3l.step()
+        model_ref.step()
+        model.step()
         t += dt

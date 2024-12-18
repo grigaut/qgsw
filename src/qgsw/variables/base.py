@@ -67,6 +67,15 @@ class Variable:
         }
         return var_dict | self._scope.to_dict()
 
+    @classmethod
+    def get_name(cls) -> str:
+        """Retrieve the name of the variable.
+
+        Returns:
+            str: Variable name.
+        """
+        return cls._name
+
 
 class PrognosticVariable(Variable):
     """Prognostic variable."""
