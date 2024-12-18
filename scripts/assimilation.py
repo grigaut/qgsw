@@ -168,6 +168,7 @@ with Progress() as progress:
             )
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.npz"))
+            summary.register_step(n)
         if fork:
             uvh = model_ref.uvh
             model.set_uvh(
@@ -183,3 +184,5 @@ with Progress() as progress:
         model_ref.step()
         model.step()
         t += dt
+
+    summary.register_end()
