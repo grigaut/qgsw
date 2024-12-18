@@ -1,9 +1,9 @@
 """Units."""
 
-from enum import StrEnum
+from enum import Enum
 
 
-class Unit(StrEnum):
+class Unit(Enum):
     """Unit."""
 
     M = "m"
