@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from qgsw.variables.scope import PointWise
+from qgsw.variables.scope import EnsembleWise, LevelWise, PointWise
 
 try:
     from typing import Self
@@ -457,3 +457,63 @@ class StreamFunction(DiagnosticVariable):
         # Bind the pressure variable
         self._p = self._p.bind(state)
         return super().bind(state)
+
+
+class Enstrophy(DiagnosticVariable):
+    """Layer-wise enstrophy."""
+
+    _unit = "s⁻²"
+    _name = "enstrophy"
+    _description = "Layer-wise enstrophy"
+    _scope = LevelWise()
+
+    def __init__(self, vorticity_phys: PhysicalVorticity) -> None:
+        """Instantiate the variable.
+
+        Args:
+            vorticity_phys (PhysicalVorticity): Physical vorticity.
+        """
+        self._vorticity = vorticity_phys
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Enstrophy.
+        """
+        return torch.sum(self._vorticity.compute(uvh) ** 2, dim=(-1, -2))
+
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a state.
+
+        Args:
+            state (State): State.
+
+        Returns:
+            BoundDiagnosticVariable[Self]: Bound variable.
+        """
+        self._vorticity.bind(state)
+        return super().bind(state)
+
+
+class TotalEnstrophy(Enstrophy):
+    """Total enstrophy."""
+
+    _unit = "s⁻²"
+    _name = "enstrophy_tot"
+    _description = "Total enstrophy"
+    _scope = EnsembleWise()
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Enstrophy.
+        """
+        return torch.sum(self._vorticity.compute(uvh) ** 2, dim=(-1, -2, -3))
