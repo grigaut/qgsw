@@ -1,109 +1,60 @@
 """Model Configuration."""
 
+from __future__ import annotations
+
 from functools import cached_property
-from typing import Any, ClassVar
+from typing import Literal
 
 import torch
+from pydantic import (
+    BaseModel,
+    Field,
+    FilePath,
+    PositiveFloat,
+)
 
-from qgsw.configs import keys
-from qgsw.configs.alpha import CollinearityCoefficientConfig
-from qgsw.configs.base import _Config
-from qgsw.configs.exceptions import ConfigError
 from qgsw.specs import DEVICE
 
 
-class ModelConfig(_Config):
+class ModelConfig(BaseModel):
     """Model configuration."""
 
-    _collinearity_allowed: ClassVar[list[str]] = [
-        "QGCollinearSF",
-    ]
-
-    section: str = keys.MODELS["section"]
-    section_several: str = keys.MODELS["section several"]
-    _type: str = keys.MODELS["type"]
-    _name: str = keys.MODELS["name"]
-    _h: str = keys.MODELS["layers"]
-    _g_prime: str = keys.MODELS["reduced gravity"]
-    _prefix: str = keys.MODELS["prefix"]
-    _alpha: str = keys.MODELS["collinearity coef"]
-
-    def __init__(self, params: dict[str, Any]) -> None:
-        """Instantiate ModelConfig.
-
-        Args:
-            params (dict[str, Any]): Script Configuration dictionnary.
-        """
-        super().__init__(params)
-
-    @property
-    def type(self) -> str:
-        """Model type."""
-        return self.params[self._type]
-
-    @property
-    def name(self) -> str:
-        """Model name."""
-        return self.params[self._name]
-
-    @property
-    def name_sc(self) -> str:
-        """Model name in Snake Case."""
-        return self.name.lower().replace(" ", "_")
-
-    @property
-    def h(self) -> torch.Tensor:
-        """Values of layers thickness (h)."""
-        nl = len(self.params[self._h])
-        h = torch.zeros(
-            size=(nl, 1, 1),
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-        h[:, 0, 0] = torch.Tensor(self.params[self._h])
-        return torch.Tensor(self.params[self._h]).to(
-            device=DEVICE.get(),
-            dtype=torch.float64,
-        )
-
-    @property
-    def g_prime(self) -> torch.Tensor:
-        """Values of reduced gravity (g')."""
-        return torch.Tensor(self.params[self._g_prime]).to(
-            device=DEVICE.get(),
-            dtype=torch.float64,
-        )
-
-    @property
-    def prefix(self) -> int:
-        """Prefix."""
-        return self.params[self._prefix]
+    type: str
+    prefix: str
+    layers: list[PositiveFloat]
+    reduced_gravity: list[PositiveFloat]
+    collinearity_coef: (
+        ConstantCollinearityCoefConfig | ChangingCollinearityCoefConfig | None
+    ) = Field(None, discriminator="type")
 
     @cached_property
-    def collinearity_coef(self) -> CollinearityCoefficientConfig:
-        """Collinearity coeffciient configuration."""
-        return CollinearityCoefficientConfig.parse(self.params)
+    def h(self) -> torch.Tensor:
+        """Vertical layers."""
+        return torch.tensor(
+            self.layers,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
 
-    def _validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Validate that H and g' shapes match.
+    @cached_property
+    def g_prime(self) -> torch.Tensor:
+        """Reduced gravity."""
+        return torch.tensor(
+            self.reduced_gravity,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
 
-        Args:
-            params (dict[str, Any]): Configuration Parameters.
 
-        Raises:
-            ConfigError: H and g' shapes don't match.
+class ConstantCollinearityCoefConfig(BaseModel):
+    """Constant collinearity model configuration."""
 
-        Returns:
-            dict[str, Any]: Layers Configuration.
-        """
-        h_shape = len(params[self._h])
-        g_prime_shape = len(params[self._g_prime])
+    type: Literal["constant"]
+    value: float
 
-        if h_shape != g_prime_shape:
-            msg = (
-                f"H shape ({h_shape}) and "
-                f"g' 's shape ({g_prime_shape}) don't match."
-            )
-            raise ConfigError(msg)
 
-        return super()._validate_params(params)
+class ChangingCollinearityCoefConfig(BaseModel):
+    """Changing collinearity coefficient configuration."""
+
+    type: Literal["changing"]
+    source_file: FilePath

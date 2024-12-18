@@ -4,7 +4,7 @@ import torch
 
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION
 from qgsw.spatial.core.grid import Grid2D
-from qgsw.spatial.units._units import RADIANS
+from qgsw.spatial.units._units import Unit
 from qgsw.spatial.units.exceptions import UnitError
 
 
@@ -22,7 +22,7 @@ def compute_coriolis_parameter(
     Returns:
         torch.Tensor: (nx, ny) Coriolis parameter value tensor.
     """
-    if grid_2d.xy_unit != RADIANS:
+    if grid_2d.xy_unit != Unit.RADIANS:
         msg = f"Unable to compute beta plane from {grid_2d.xy_unit} grid."
         raise UnitError(msg)
 

@@ -93,7 +93,7 @@ def instantiate_model(
         msg = f"Unsupported model type: {config.model.type}"
         raise UnrecognizedQGModelError(msg)
     model.slip_coef = config.physics.slip_coef
-    model.bottom_drag_coef = config.physics.bottom_drag_coef
+    model.bottom_drag_coef = config.physics.bottom_drag_coefficient
     if np.isnan(config.simulation.dt):
         model.dt = time_params.compute_dt(
             model.uvh,

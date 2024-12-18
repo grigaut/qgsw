@@ -11,9 +11,10 @@ from qgsw.models.qg.core import QG
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.simulation.steps import Steps
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
-from qgsw.spatial.units._units import METERS
+from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
 
+torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
 
 t_end = 31_536_000
@@ -54,18 +55,18 @@ h_1l = torch.tensor(
 )
 
 space_3l = SpaceDiscretization3D.from_tensors(
-    x_unit=METERS,
-    y_unit=METERS,
-    zh_unit=METERS,
+    x_unit=Unit.METERS,
+    y_unit=Unit.METERS,
+    zh_unit=Unit.METERS,
     x=x,
     y=y,
     h=h_3l,
 )
 
 space_1l = SpaceDiscretization3D.from_tensors(
-    x_unit=METERS,
-    y_unit=METERS,
-    zh_unit=METERS,
+    x_unit=Unit.METERS,
+    y_unit=Unit.METERS,
+    zh_unit=Unit.METERS,
     x=x,
     y=y,
     h=h_1l,

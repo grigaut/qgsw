@@ -99,13 +99,12 @@ except ImportError:
 import torch
 
 from qgsw.spatial.core.grid import Grid2D, Grid3D
-from qgsw.spatial.units._units import METERS
+from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
+    from qgsw.configs.core import SpaceConfig
     from qgsw.configs.models import ModelConfig
-    from qgsw.configs.space import SpaceConfig
-    from qgsw.spatial.units._units import Unit
 
 
 class MeshesInstanciationError(Exception):
@@ -537,15 +536,15 @@ class SpaceDiscretization2D:
             Self: Corresponding SpaceDiscretization2D.
         """
         x = torch.linspace(
-            grid_config.box.x_min,
-            grid_config.box.x_max,
+            grid_config.x_min,
+            grid_config.x_max,
             grid_config.nx + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
         y = torch.linspace(
-            grid_config.box.y_min,
-            grid_config.box.y_max,
+            grid_config.y_min,
+            grid_config.y_max,
             grid_config.ny + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
@@ -553,8 +552,8 @@ class SpaceDiscretization2D:
         return cls.from_tensors(
             x=x,
             y=y,
-            x_unit=grid_config.box.unit,
-            y_unit=grid_config.box.unit,
+            x_unit=grid_config.unit,
+            y_unit=grid_config.unit,
         )
 
     @classmethod
@@ -1062,15 +1061,15 @@ class SpaceDiscretization3D:
             Self: Corresponding 3D Grid.
         """
         x = torch.linspace(
-            grid_config.box.x_min,
-            grid_config.box.x_max,
+            grid_config.x_min,
+            grid_config.x_max,
             grid_config.nx + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
         y = torch.linspace(
-            grid_config.box.y_min,
-            grid_config.box.y_max,
+            grid_config.y_min,
+            grid_config.y_max,
             grid_config.ny + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
@@ -1079,9 +1078,9 @@ class SpaceDiscretization3D:
             x=x,
             y=y,
             h=model_config.h,
-            x_unit=grid_config.box.unit,
-            y_unit=grid_config.box.unit,
-            zh_unit=METERS,
+            x_unit=grid_config.unit,
+            y_unit=grid_config.unit,
+            zh_unit=Unit.METERS,
         )
 
     @classmethod

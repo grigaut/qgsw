@@ -21,7 +21,7 @@ from qgsw.perturbations.base import (
     _Perturbation,
 )
 from qgsw.spatial.core.grid import Grid2D, Grid3D
-from qgsw.spatial.units._units import METERS, Unit
+from qgsw.spatial.units._units import Unit
 from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
 
@@ -34,7 +34,7 @@ class RankineVortex2D:
     """2D Rankine Vortex."""
 
     _norm_factor: int = 100
-    _required_xy_unit: Unit = METERS
+    _required_xy_unit: Unit = Unit.METERS
 
     def __init__(
         self,

@@ -1,9 +1,10 @@
 [io]
 name = "Two Layers Model"
-performance_log = false
 [io.output]
-save_results = false
+save=false
+type = "quantity"           # "interval"
 quantity = 100
+# interval_duration = 3600  # seconds
 directory = "results"
 
 [physics]
@@ -14,20 +15,18 @@ beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
 [simulation]
-duration = 8 # units of Tau
-reference= 'tau' # 'tau' or 'sec'
-tau = 28 # in f0⁻¹, if nan: Tau is automatically computed
-dt = 26 # in s, if nan: dt is automatically computed
+kind = "simple-run"
+duration = 2_389_333.3   # seconds
+dt = 26                 # in seconds
 
 [model]
-name = "Two Layers"
-prefix = "results_step_"
 type = "QG"
-h = [
+prefix = "results_step_"
+layers = [
     200,
     800
 ]
-g_prime = [
+reduced_gravity = [
     10.0,
     5e-2
 ]
@@ -40,21 +39,14 @@ source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficient
 [space]
 nx = 192
 ny = 192
-box_unit = "m"
-[space.box]
-unit = "m"
-[space.box.x]
-min = -500_000
-max = 500_000
-[space.box.y]
-min = -500_000
-max = 500_000
+unit = "meters"
+x_min = -500_000
+x_max = 500_000
+y_min = -500_000
+y_max = 500_000
 
 [windstress]
 type = "none"
-magnitude = nan # (Pa m-1 kg s-2)
-drag_coefficient = nan
-[windstress.data]
 
 [perturbation]
 type = "vortex-baroclinic"
