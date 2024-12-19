@@ -41,6 +41,11 @@ class IO:
         """
         self._prog: list[PrognosticVariable] = [u, v, h]
 
+    @property
+    def prognostic_vars(self) -> list[PrognosticVariable]:
+        """Prognostic variables."""
+        return self._prog
+
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
         """Raise an error if the saving file is invalid.
 

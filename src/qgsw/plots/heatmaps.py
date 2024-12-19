@@ -13,8 +13,8 @@ import numpy as np
 import plotly.colors as pco
 import plotly.graph_objects as go
 
+from qgsw.output import RunOutput, check_time_compatibility
 from qgsw.plots.animated_plots import BaseAnimatedPlot
-from qgsw.run_summary import RunOutput, check_time_compatibility
 
 if TYPE_CHECKING:
     from pathlib import Path

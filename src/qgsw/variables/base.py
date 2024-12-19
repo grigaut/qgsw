@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     import numpy as np
     import torch
 
-    from qgsw.run_summary import OutputFile
+    from qgsw.output import OutputFile
     from qgsw.variables.state import State
     from qgsw.variables.uvh import UVH
 

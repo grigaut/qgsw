@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from qgsw.run_summary import RunOutput
+from qgsw.output import RunOutput
 from qgsw.variables.utils import check_unit_compatibility
 
 try:

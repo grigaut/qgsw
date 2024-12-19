@@ -5,11 +5,11 @@ from pathlib import Path
 
 import streamlit as st
 
+from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,
 )
 from qgsw.plots.scatter import ScatterPlot
-from qgsw.run_summary import RunOutput
 from qgsw.variables.utils import check_unit_compatibility
 
 ROOT = Path(__file__).parent.parent.parent

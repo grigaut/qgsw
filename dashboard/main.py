@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from qgsw.run_summary import RunOutput
+from qgsw.output import RunOutput
 
 ROOT = Path(__file__).parent.parent
 OUTPUTS = ROOT.joinpath("output")
