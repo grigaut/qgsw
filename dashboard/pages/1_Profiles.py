@@ -61,7 +61,7 @@ if submit_pts:
     txt = f"{selected_var_pts.description}[{selected_var_pts.unit.value}]"
     plot_pts.set_colorbar_text(txt)
     plot_pts.set_subplot_titles(
-        f"{run.summary.configuration.io.name} - Level {level}",
+        [f"{run.summary.configuration.io.name} - Level {level}"],
     )
     plot_pts.set_frame_labels([f"{t.days} days" for t in run.timesteps()])
 
