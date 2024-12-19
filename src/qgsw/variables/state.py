@@ -79,6 +79,23 @@ class State:
         """List of diagnostic variables."""
         return self._diag
 
+    def __getitem__(self, name: str) -> BoundDiagnosticVariable:
+        """Get bound variables.
+
+        Args:
+            name (str): Varibale name
+
+        Raises:
+            KeyError: If the name does not correspond to a variable.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable
+        """
+        if name not in self.diag_vars:
+            msg = f"Bound variables are {', '.join(self.diag_vars.values())}."
+            raise KeyError(msg)
+        return self.diag_vars[name]
+
     def update(
         self,
         u: torch.Tensor,
