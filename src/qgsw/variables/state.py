@@ -79,8 +79,12 @@ class State:
         """List of diagnostic variables."""
         return self._diag
 
-    def __repr__(self) -> str:
-        """String representation of State."""
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
+
+        Returns:
+            list[str]: String representation parts.
+        """
         msg_prognostic = [
             "State",
             "└── Prognostic Variables",
@@ -89,7 +93,7 @@ class State:
             f"\t└── {self.h}",
         ]
         if not self.diag_vars:
-            return "\n".join(msg_prognostic)
+            return msg_prognostic
         chars = msg_prognostic[1].split()
         chars[0] = "├──"
         msg_prognostic[1] = " ".join(chars)
@@ -99,7 +103,11 @@ class State:
         chars = msg_diagnostic[-1].split()
         chars[0] = "\t└──"
         msg_diagnostic[-1] = " ".join(chars)
-        return "\n".join(msg_prognostic + msg_diagnostic)
+        return msg_prognostic + msg_diagnostic
+
+    def __repr__(self) -> str:
+        """String representation of State."""
+        return "\n".join(self.get_repr_parts())
 
     def __getitem__(self, name: str) -> BoundDiagnosticVariable:
         """Get bound variables.

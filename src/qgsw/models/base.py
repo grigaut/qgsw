@@ -115,8 +115,12 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         self._set_utils(optimize)
         self._set_fluxes(optimize)
 
-    def __repr__(self) -> str:
-        """String representation of the model."""
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
+
+        Returns:
+            list[str]: String representation parts.
+        """
         msg_parts = [
             f"Model: {self.__class__}",
             f"├── Data type: {self.dtype}",
@@ -126,22 +130,18 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
                 f"- β = {self.beta_plane.beta}"
             ),
             f"├── dt: {self.dt} s",
-            "└── Space.",
-            "    └── Dimensions:",
-            (
-                f"         ├── X: {self.space.nx} points - "
-                f"dx = {self.space.dx} {self.space.omega.xy_unit.value}"
-            ),
-            (
-                f"         ├── Y: {self.space.ny} points - "
-                f"dy = {self.space.dy} {self.space.omega.xy_unit.value}"
-            ),
-            (
-                f"         └── H: {self.space.nl} "
-                f"layer{'s' if self.space.nl>1 else ''}"
-            ),
         ]
-        return "\n".join(msg_parts)
+        space_repr_ = self.space.get_repr_parts()
+        space_repr = ["├── " + space_repr_.pop(0)]
+        space_repr = space_repr + ["\t" + txt for txt in space_repr_]
+        state_repr_ = self._state.get_repr_parts()
+        state_repr = ["└── " + state_repr_.pop(0)]
+        state_repr = state_repr + ["\t" + txt for txt in state_repr_]
+        return msg_parts + space_repr + state_repr
+
+    def __repr__(self) -> str:
+        """String representation of the model."""
+        return "\n".join(self.get_repr_parts())
 
     @property
     def io(self) -> IO:
