@@ -73,7 +73,7 @@ def test_nested_bound_variables() -> None:
     # Update state
     state.update(state.u.get(), state.v.get(), state.h.get() + 2)
     # Assert all variables must be updated
-    assert all(not var.up_to_date for var in state.diag_vars)
+    assert all(not var.up_to_date for var in state.diag_vars.values())
     # Compute the value of eta
     eta2 = eta_bound.get()
     # Assert eta has changed

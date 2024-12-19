@@ -75,7 +75,7 @@ class State:
         return self._h
 
     @property
-    def diag_vars(self) -> list[BoundDiagnosticVariable]:
+    def diag_vars(self) -> dict[str, BoundDiagnosticVariable]:
         """List of diagnostic variables."""
         return self._diag
 
@@ -96,7 +96,7 @@ class State:
 
     def _updated(self) -> None:
         """Update diagnostic variables."""
-        for var in self.diag_vars:
+        for var in self.diag_vars.values():
             var.outdated()
 
     def add_bound_diagnostic_variable(
@@ -108,11 +108,13 @@ class State:
         Args:
             variable (BoundDiagnosticVariable): Variable.
         """
-        self._diag.add(variable)
+        if variable.name in self.diag_vars:
+            return
+        self._diag[variable.name] = variable
 
     def unbind(self) -> None:
         """Unbind all variables from state."""
-        self._diag: set[BoundDiagnosticVariable] = set()
+        self._diag: dict[str, BoundDiagnosticVariable] = {}
 
     @classmethod
     def steady(
