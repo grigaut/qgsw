@@ -20,28 +20,13 @@ from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
-from qgsw.variables.dynamics import (
-    Enstrophy,
-    MeridionalVelocityFlux,
-    PhysicalLayerDepthAnomaly,
-    PhysicalMeridionalVelocity,
-    PhysicalVorticity,
-    PhysicalZonalVelocity,
-    Pressure,
-    StreamFunction,
-    SurfaceHeightAnomaly,
-    TotalEnstrophy,
-    Vorticity,
-    ZonalVelocityFlux,
-)
-from qgsw.variables.energetics import KineticEnergy
 from qgsw.variables.state import State
-from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
     from qgsw.specs._utils import Device
+    from qgsw.variables.uvh import UVH
 
 
 class Model(ModelParamChecker, metaclass=ABCMeta):
@@ -183,61 +168,6 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         """State Variable h: Layers Thickness."""
         return self._state.h.get()
 
-    @property
-    def uvh_phys(self) -> UVH:
-        """Physical prognostic variables."""
-        return UVH(self._u_phys.get(), self._v_phys.get(), self._h_phys.get())
-
-    @property
-    def omega(self) -> torch.Tensor:
-        """Vorticity."""
-        return self._omega.get()
-
-    @property
-    def omega_phys(self) -> torch.Tensor:
-        """Physical vorticity."""
-        return self._omega_phys.get()
-
-    @property
-    def eta(self) -> torch.Tensor:
-        """Surface height anomaly."""
-        return self._eta.get()
-
-    @property
-    def p(self) -> torch.Tensor:
-        """Pressure."""
-        return self._p.get()
-
-    @property
-    def psi(self) -> torch.Tensor:
-        """Stream function."""
-        return self._psi.get()
-
-    @property
-    def U(self) -> torch.Tensor:  # noqa: N802
-        """Flux of u."""
-        return self._U.get()
-
-    @property
-    def V(self) -> torch.Tensor:  # noqa: N802
-        """Flux of v."""
-        return self._V.get()
-
-    @property
-    def enstrophy(self) -> torch.Tensor:
-        """Level-wise enstrophy."""
-        return self._enstrophy.get()
-
-    @property
-    def enstrophy_tot(self) -> torch.Tensor:
-        """Ensemble-wise enstrophy."""
-        return self._enstrophy_tot.get()
-
-    @property
-    def k_energy(self) -> torch.Tensor:
-        """Physical meriodional velocity."""
-        return self._k_energy.get()
-
     @ModelParamChecker.slip_coef.setter
     def slip_coef(self, slip_coef: float) -> None:
         """Timestep setter."""
@@ -323,46 +253,6 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
 
     def _create_diagnostic_vars(self, state: State) -> None:
         state.unbind()
-        self.io.remove_diagnostic_vars()
-
-        u_phys = PhysicalZonalVelocity(dx=self.space.dx)
-        v_phys = PhysicalMeridionalVelocity(dy=self.space.dy)
-        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.area)
-        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
-        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
-        omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
-        omega_phys = PhysicalVorticity(omega, ds=self.space.area)
-        enstrophy = Enstrophy(omega_phys)
-        enstrophy_tot = TotalEnstrophy(omega_phys)
-        eta = SurfaceHeightAnomaly(h_phys=h_phys)
-        p = Pressure(g_prime=self.g_prime, eta=eta)
-        psi = StreamFunction(pressure=p, f0=self.beta_plane.f0)
-        k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
-
-        self._u_phys = u_phys.bind(state)
-        self._v_phys = v_phys.bind(state)
-        self._h_phys = h_phys.bind(state)
-        self._U = U.bind(state)
-        self._V = V.bind(state)
-        self._omega = omega.bind(state)
-        self._omega_phys = omega_phys.bind(state)
-        self._enstrophy = enstrophy.bind(state)
-        self._enstrophy_tot = enstrophy_tot.bind(state)
-        self._eta = eta.bind(state)
-        self._p = p.bind(state)
-        self._psi = psi.bind(state)
-        self._k_energy = k_energy.bind(state)
-
-        self.io.add_diagnostic_vars(
-            self._u_phys,
-            self._v_phys,
-            self._h_phys,
-            self._omega_phys,
-            self._p,
-            self._psi,
-            self._enstrophy,
-            self._enstrophy_tot,
-        )
 
     def set_physical_uvh(
         self,

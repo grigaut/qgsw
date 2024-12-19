@@ -13,9 +13,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from qgsw.variables.base import (
-        BoundDiagnosticVariable,
         PrognosticVariable,
-        Variable,
     )
     from qgsw.variables.prognostic import (
         LayerDepthAnomaly,
@@ -32,7 +30,6 @@ class IO:
         u: ZonalVelocity,
         v: MeridionalVelocity,
         h: LayerDepthAnomaly,
-        *args: BoundDiagnosticVariable,
     ) -> None:
         """Instantiate the object.
 
@@ -43,12 +40,6 @@ class IO:
             *args (BoundDiagnosticVariable): Diagnostic variableS.
         """
         self._prog: list[PrognosticVariable] = [u, v, h]
-        self._diag = set(args)
-
-    @property
-    def tracked_vars(self) -> set[Variable]:
-        """Tracked variables set."""
-        return self._diag | set(self._prog)
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
         """Raise an error if the saving file is invalid.
@@ -74,10 +65,6 @@ class IO:
             var.name: var.get().cpu().numpy().astype("float32")
             for var in self._prog
         }
-        to_save |= {
-            var.name: var.get().cpu().numpy().astype("float32")
-            for var in self._diag
-        }
         np.savez(
             file=output_file,
             **to_save,
@@ -87,14 +74,6 @@ class IO:
             msg=f"Saved {', '.join(list(to_save.keys()))} to {output_file}.",
             trigger_level=1,
         )
-
-    def add_diagnostic_vars(self, *args: BoundDiagnosticVariable) -> None:
-        """Add a diagnostic varibale to track.
-
-        Args:
-            *args (BoundDiagnosticVariable): Diagnostic variable.
-        """
-        self._diag |= set(args)
 
     def print_step(self) -> str:
         """Printable informations of the prognostic variables.
@@ -111,7 +90,3 @@ class IO:
                 f"{var.name}: mean: {data_mean:+.3E}, max: {data_max:+.3E}",
             )
         return " - ".join(snippets)
-
-    def remove_diagnostic_vars(self) -> None:
-        """Remove diagnostic variables tracking."""
-        self._diag = set()

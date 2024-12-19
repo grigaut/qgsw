@@ -15,11 +15,21 @@ from qgsw.models.core import finite_diff, schemes
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.variables.dynamics import (
+    MeridionalVelocityFlux,
+    PhysicalLayerDepthAnomaly,
+    Pressure,
+    SurfaceHeightAnomaly,
+    Vorticity,
+    ZonalVelocityFlux,
+)
+from qgsw.variables.energetics import KineticEnergy
 from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.variables.state import State
 
 
 def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -156,6 +166,23 @@ class SW(Model):
         dv[..., -1, :, :] += -self.bottom_drag_coef * uvh.v[..., -1, :, 1:-1]
         return du, dv
 
+    def _create_diagnostic_vars(self, state: State) -> None:
+        super()._create_diagnostic_vars(state)
+
+        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.area)
+        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
+        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
+        omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
+        eta = SurfaceHeightAnomaly(h_phys=h_phys)
+        p = Pressure(g_prime=self.g_prime, eta=eta)
+        k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
+
+        U.bind(state)
+        V.bind(state)
+        omega.bind(state)
+        p.bind(state)
+        k_energy.bind(state)
+
     def update(self, uvh: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
 
@@ -181,20 +208,25 @@ class SW(Model):
         """
         # Zonal velocity -> corresponds to the v grid
         # Has no value on the boundary of the v grid
-        U_m = self.points_to_surfaces(self.U)  # noqa: N806
+        U = self._state[ZonalVelocityFlux.get_name()].get()  # noqa: N806
+        U_m = self.points_to_surfaces(U)  # noqa: N806
         # Meridional velocity -> corresponds to the u grid
         # Has no value on the boundary of the u grid
-        V_m = self.points_to_surfaces(self.V)  # noqa: N806
+        V = self._state[MeridionalVelocityFlux.get_name()].get()  # noqa: N806
+        V_m = self.points_to_surfaces(V)  # noqa: N806
 
         # Vortex-force + Coriolis
-        omega_v_m = self._fluxes.w_y(self.omega[..., 1:-1, :], V_m)
-        omega_u_m = self._fluxes.w_x(self.omega[..., 1:-1], U_m)
+        omega = self._state[Vorticity.get_name()].get()
+        omega_v_m = self._fluxes.w_y(omega[..., 1:-1, :], V_m)
+        omega_u_m = self._fluxes.w_x(omega[..., 1:-1], U_m)
 
         dt_u = omega_v_m + self.fstar_ugrid[..., 1:-1, :] * V_m
         dt_v = -(omega_u_m + self.fstar_vgrid[..., 1:-1] * U_m)
 
         # grad pressure + k_energy
-        ke_pressure = self.k_energy + self.p
+        k_energy = self._state[KineticEnergy.get_name()].get()
+        pressure = self._state[Pressure.get_name()].get()
+        ke_pressure = k_energy + pressure
         dt_u -= torch.diff(ke_pressure, dim=-2) + self.dx_p_ref
         dt_v -= torch.diff(ke_pressure, dim=-1) + self.dy_p_ref
 
@@ -223,9 +255,11 @@ class SW(Model):
         """
         h_tot = self.h_ref + h
         # Compute (h_tot x V)
-        h_tot_flux_y = self._fluxes.h_y(h_tot, self.V[..., 1:-1])
+        V = self._state[MeridionalVelocityFlux.get_name()].get()  # noqa: N806
+        h_tot_flux_y = self._fluxes.h_y(h_tot, V[..., 1:-1])
         # Compute (h_tot x U)
-        h_tot_flux_x = self._fluxes.h_x(h_tot, self.U[..., 1:-1, :])
+        U = self._state[ZonalVelocityFlux.get_name()].get()  # noqa: N806
+        h_tot_flux_x = self._fluxes.h_x(h_tot, U[..., 1:-1, :])
         # Compute -∇⋅(h_tot u) = ∂_x (h_tot x U) + ∂_y (h_tot x V)
         div_no_flux = -finite_diff.div_nofluxbc(h_tot_flux_x, h_tot_flux_y)
         # Apply h mask
