@@ -8,13 +8,56 @@ from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
+import torch
 
+from qgsw.masks import Masks
+from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.run_summary import RunSummary
+from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.specs import DEVICE
 from qgsw.utils.sorting import sort_files
-from qgsw.variables.base import ParsedVariable
+from qgsw.variables.dynamics import (
+    Enstrophy,
+    MeridionalVelocityFlux,
+    PhysicalLayerDepthAnomaly,
+    PhysicalMeridionalVelocity,
+    PhysicalVorticity,
+    PhysicalZonalVelocity,
+    PotentialVorticity,
+    Pressure,
+    StreamFunction,
+    SurfaceHeightAnomaly,
+    TotalEnstrophy,
+    Vorticity,
+    ZonalVelocityFlux,
+)
+from qgsw.variables.energetics import (
+    ModalAvailablePotentialEnergy,
+    ModalEnergy,
+    ModalKineticEnergy,
+    TotalAvailablePotentialEnergy,
+    TotalEnergy,
+    TotalKineticEnergy,
+)
+from qgsw.variables.prognostic import (
+    LayerDepthAnomaly,
+    MeridionalVelocity,
+    ZonalVelocity,
+)
+from qgsw.variables.state import State
+from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.variables.base import (
+        BoundDiagnosticVariable,
+        DiagnosticVariable,
+        PrognosticVariable,
+    )
 
 
 class OutputFile(NamedTuple):
@@ -24,14 +67,36 @@ class OutputFile(NamedTuple):
     second: float
     timestep: timedelta
     path: Path
+    dtype = torch.float64
+    device = DEVICE.get()
 
-    def read(self) -> np.ndarray:
+    def read(self) -> UVH:
         """Read the file data.
 
         Returns:
-            np.ndarray: Data.
+            UVh: Data.
         """
-        return np.load(file=self.path)
+        data = np.load(file=self.path)
+        u = torch.tensor(data[ZonalVelocity.get_name()])
+        v = torch.tensor(data[MeridionalVelocity.get_name()])
+        h = torch.tensor(data[LayerDepthAnomaly.get_name()])
+        return UVH(
+            u.to(dtype=self.dtype, device=self.device),
+            v.to(dtype=self.dtype, device=self.device),
+            h.to(dtype=self.dtype, device=self.device),
+        )
+
+    def update_state(self, state: State) -> State:
+        """Update a given state.
+
+        Args:
+            state (State): State.
+
+        Returns:
+            State: Updated state
+        """
+        state.uvh = self.read()
+        return state
 
 
 class RunOutput:
@@ -63,11 +128,9 @@ class RunOutput:
             )
             for i in range(len(files))
         ]
-
-        self._vars = {
-            var["name"]: ParsedVariable.from_dict(var, outputs=self._outputs)
-            for var in self._summary.output_vars
-        }
+        self._state = State(
+            self._outputs[0].read(),
+        )
 
     @cached_property
     def folder(self) -> Path:
@@ -80,14 +143,23 @@ class RunOutput:
         return self._summary
 
     @property
-    def output_vars(self) -> list[ParsedVariable]:
-        """Output variables."""
-        return list(self._vars.values())
+    def state(self) -> State:
+        """State."""
+        return self._state
 
-    def __repr__(self) -> str:
-        """Output Representation."""
-        vars_txt = "\n\t".join(str(var) for var in self.output_vars)
-        msg_txts = [
+    @property
+    def vars(self) -> list[PrognosticVariable | BoundDiagnosticVariable]:
+        """Variable from state."""
+        return list(self.state.vars.values())
+
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
+
+        Returns:
+            list[str]: String representation parts.
+        """
+        vars_txt = "\n\t".join(str(var) for var in self._state.vars.values())
+        return [
             f"Simulation: {self._summary.configuration.io.name}.",
             f"Starting time: {self._summary.started_at}",
             f"Ending time: {self._summary.ended_at}",
@@ -95,21 +167,24 @@ class RunOutput:
             f"Folder: {self.folder}.",
             f"Variables:\n\t{vars_txt}",
         ]
-        return "\n".join(msg_txts)
 
-    def __getitem__(self, key: str) -> ParsedVariable:
+    def __repr__(self) -> str:
+        """Output Representation."""
+        return "\n".join(self.get_repr_parts())
+
+    def __getitem__(self, key: str) -> Iterator[torch.Tensor]:
         """Get variable based on its name.
 
         Args:
             key (str): Variable name.
 
-        Returns:
-            ParsedVariable: _description_
+        Yields:
+            Iterator[torch.tensor]: Values of a given variable.
         """
-        if key not in self._vars:
-            msg = f"Variables present in the output are {self._vars.keys()}."
-            raise KeyError(msg)
-        return self._vars[key]
+        return (
+            output.update_state(self.state)[key].get()
+            for output in self.outputs()
+        )
 
     def steps(self) -> Iterator[int]:
         """Sorted list of steps.
@@ -143,6 +218,14 @@ class RunOutput:
         """
         return iter(self._outputs)
 
+    def with_variable(self, variable: DiagnosticVariable) -> None:
+        """Add a variable to the state.
+
+        Args:
+            variable (DiagnosticVariable): Variable to consider.
+        """
+        variable.bind(self._state)
+
 
 def check_time_compatibility(*runs: RunOutput) -> None:
     """Check time compatibilities between run outputs.
@@ -158,3 +241,77 @@ def check_time_compatibility(*runs: RunOutput) -> None:
     if not all(dt == dt0 for dt in dts):
         msg = "Incompatible timesteps."
         raise ValueError(msg)
+
+
+def add_qg_variables(
+    run_output: RunOutput,
+    physics_config: PhysicsConfig,
+    space_config: SpaceConfig,
+    model_config: ModelConfig,
+    dtype: torch.dtype,
+    device: torch.device,
+) -> RunOutput:
+    """Add QG variables to run output.
+
+    Args:
+        run_output (RunOutput): Run output.
+        physics_config (PhysicsConfig): Physics configuration
+        space_config (SpaceConfig): Space configuration
+        model_config (ModelConfig): Model configuration
+        dtype (torch.dtype): Data type
+        device (torch.device): Device
+
+    Returns:
+        RunOutput: Updated run output
+    """
+    space = SpaceDiscretization3D.from_config(space_config, model_config)
+    dx = space.dx
+    dy = space.dy
+    ds = space.area
+    H = model_config.h  # noqa: N806
+    g_prime = model_config.g_prime
+    A = compute_A(H, g_prime, dtype, device)  # noqa: N806
+    u_phys = PhysicalZonalVelocity(dx)
+    v_phys = PhysicalMeridionalVelocity(dy)
+    h_phys = PhysicalLayerDepthAnomaly(ds)
+    U = ZonalVelocityFlux(dx)  # noqa: N806
+    V = MeridionalVelocityFlux(dy)  # noqa: N806
+    vorticity = Vorticity(
+        Masks.empty(space.nx, space.ny, device),
+        slip_coef=physics_config.slip_coef,
+    )
+    vorticity_phys = PhysicalVorticity(vorticity, ds)
+    enstrophy = Enstrophy(vorticity_phys)
+    enstrophy_tot = TotalEnstrophy(vorticity_phys)
+    eta = SurfaceHeightAnomaly(h_phys)
+    p = Pressure(g_prime, eta)
+    psi = StreamFunction(p, physics_config.f0)
+    pv = PotentialVorticity(vorticity, H * ds, ds, physics_config.f0)
+    ke_hat = ModalKineticEnergy(A, psi, H, dx, dy)
+    ape_hat = ModalAvailablePotentialEnergy(A, psi, H, physics_config.f0)
+    energy_hat = ModalEnergy(ke_hat, ape_hat)
+    ke = TotalKineticEnergy(psi, H, dx, dy)
+    ape = TotalAvailablePotentialEnergy(A, psi, H, physics_config.f0)
+    energy = TotalEnergy(ke, ape)
+
+    run_output.with_variable(u_phys)
+    run_output.with_variable(v_phys)
+    run_output.with_variable(h_phys)
+    run_output.with_variable(U)
+    run_output.with_variable(V)
+    run_output.with_variable(vorticity)
+    run_output.with_variable(vorticity_phys)
+    run_output.with_variable(enstrophy)
+    run_output.with_variable(enstrophy_tot)
+    run_output.with_variable(eta)
+    run_output.with_variable(p)
+    run_output.with_variable(psi)
+    run_output.with_variable(pv)
+    run_output.with_variable(ke_hat)
+    run_output.with_variable(ape_hat)
+    run_output.with_variable(energy_hat)
+    run_output.with_variable(ke)
+    run_output.with_variable(ape)
+    run_output.with_variable(energy)
+
+    return run_output

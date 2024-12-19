@@ -20,7 +20,7 @@ from qgsw.variables.uvh import UVH
 if TYPE_CHECKING:
     import torch
 
-    from qgsw.variables.base import BoundDiagnosticVariable
+    from qgsw.variables.base import BoundDiagnosticVariable, PrognosticVariable
 
 
 class State:
@@ -45,6 +45,11 @@ class State:
         self._u = ZonalVelocity(uvh.u)
         self._v = MeridionalVelocity(uvh.v)
         self._h = LayerDepthAnomaly(uvh.h)
+        self._prog = {
+            ZonalVelocity.get_name(): self._u,
+            MeridionalVelocity.get_name(): self._v,
+            LayerDepthAnomaly.get_name(): self._h,
+        }
 
     @property
     def uvh(self) -> UVH:
@@ -75,9 +80,19 @@ class State:
         return self._h
 
     @property
-    def diag_vars(self) -> dict[str, BoundDiagnosticVariable]:
+    def vars(self) -> dict[str, PrognosticVariable | BoundDiagnosticVariable]:
         """List of diagnostic variables."""
+        return self._prog | self._diag
+
+    @property
+    def diag_vars(self) -> dict[str, BoundDiagnosticVariable]:
+        """Diagnostic variables."""
         return self._diag
+
+    @property
+    def prog_vars(self) -> dict[str, BoundDiagnosticVariable]:
+        """Prognostic variables."""
+        return self._prog
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -121,10 +136,10 @@ class State:
         Returns:
             BoundDiagnosticVariable: Bound variable
         """
-        if name not in self.diag_vars:
-            msg = f"Bound variables are {', '.join(self.diag_vars.values())}."
+        if name not in self.vars:
+            msg = f"Variables are {', '.join(self.vars.values())}."
             raise KeyError(msg)
-        return self.diag_vars[name]
+        return self.vars[name]
 
     def update(
         self,
@@ -157,7 +172,7 @@ class State:
         """
         if variable.name in self.diag_vars:
             return
-        self._diag[variable.name] = variable
+        self.diag_vars[variable.name] = variable
 
     def unbind(self) -> None:
         """Unbind all variables from state."""
