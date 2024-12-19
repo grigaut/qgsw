@@ -263,8 +263,13 @@ def add_qg_variables(
     dy = space.dy
     ds = space.area
     H = model_config.h.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)  # noqa: N806
-    g_prime = model_config.g_prime
-    A = compute_A(H.squeeze((0, -3, -2)), g_prime, dtype, device)  # noqa: N806
+    g_prime = model_config.g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+    A = compute_A(  # noqa: N806
+        H.squeeze((0, -3, -2)),
+        g_prime.squeeze((0, -3, -2)),
+        dtype,
+        device,
+    )
     u_phys = PhysicalZonalVelocity(dx)
     v_phys = PhysicalMeridionalVelocity(dy)
     h_phys = PhysicalLayerDepthAnomaly(ds)
