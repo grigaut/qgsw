@@ -141,7 +141,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
 
     def __repr__(self) -> str:
         """String representation of the model."""
-        return "\n".join(self.get_repr_parts())
+        return "\n[Model]\n" + "\n".join(self.get_repr_parts())
 
     @property
     def io(self) -> IO:

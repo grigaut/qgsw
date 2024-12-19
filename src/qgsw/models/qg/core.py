@@ -147,6 +147,34 @@ class QG(Model):
         self.sw.n_ens = n_ens
         return super()._set_n_ens(n_ens)
 
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
+
+        Returns:
+            list[str]: String representation parts.
+        """
+        msg_parts = [
+            f"Model: {self.__class__}",
+            f"├── Data type: {self.dtype}",
+            f"├── Device: {self.device}",
+            (
+                f"├── Beta plane: f0 = {self.beta_plane.f0} "
+                f"- β = {self.beta_plane.beta}"
+            ),
+            f"├── dt: {self.dt} s",
+        ]
+        space_repr_ = self.space.get_repr_parts()
+        space_repr = ["├── " + space_repr_.pop(0)]
+        space_repr = space_repr + ["\t" + txt for txt in space_repr_]
+        state_repr_ = self._state.get_repr_parts()
+        state_repr = ["├── " + state_repr_.pop(0)]
+        state_repr = state_repr + ["\t" + txt for txt in state_repr_]
+        sw_repr_ = self.sw.get_repr_parts()
+        sw_repr = ["└── Core " + sw_repr_.pop(0)]
+        sw_repr = sw_repr + ["\t" + txt for txt in sw_repr_]
+
+        return msg_parts + space_repr + state_repr + sw_repr
+
     def compute_A(  # noqa: N802
         self,
         H: torch.Tensor,  # noqa: N803

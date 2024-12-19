@@ -707,7 +707,7 @@ class SpaceDiscretization3D:
             list[str]: String representation parts.
         """
         return [
-            "3D Space.",
+            "3D Space",
             "└── Dimensions:",
             (
                 f"\t├── X: {self.nx} points "
