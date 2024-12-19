@@ -78,8 +78,35 @@ class Variable:
         """
         return cls._name
 
+    @classmethod
+    def get_description(cls) -> str:
+        """Retrieve the description of the variable.
 
-class PrognosticVariable(Variable):
+        Returns:
+            str: Variable description.
+        """
+        return cls._description
+
+    @classmethod
+    def get_scope(cls) -> str:
+        """Retrieve the scope of the variable.
+
+        Returns:
+            str: Variable description.
+        """
+        return cls._scope
+
+    @classmethod
+    def get_unit(cls) -> str:
+        """Retrieve the unit of the variable.
+
+        Returns:
+            str: Variable unit.
+        """
+        return cls._unit
+
+
+class PrognosticVariable(ABC, Variable):
     """Prognostic variable."""
 
     _scope = PointWise()
@@ -143,10 +170,6 @@ class PrognosticVariable(Variable):
 class DiagnosticVariable(Variable, ABC):
     """Diagnostic Variable Base Class."""
 
-    def __repr__(self) -> str:
-        """Variable representation."""
-        return super().__repr__() + " (Diagnostic)"
-
     @abstractmethod
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
@@ -190,10 +213,6 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._name = self._var.name
         self._description = self._var.description
         self._scope = self._var.scope
-
-    def __repr__(self) -> str:
-        """Bound variable representation."""
-        return "Bound " + self._var.__repr__()
 
     @property
     def up_to_date(self) -> bool:

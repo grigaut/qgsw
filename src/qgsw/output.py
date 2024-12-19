@@ -19,6 +19,9 @@ from qgsw.utils.sorting import sort_files
 from qgsw.variables.dynamics import (
     Enstrophy,
     MeridionalVelocityFlux,
+    ParsedLayerDepthAnomaly,
+    ParsedMeridionalVelocity,
+    ParsedZonalVelocity,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
     PhysicalVorticity,
@@ -39,11 +42,6 @@ from qgsw.variables.energetics import (
     TotalEnergy,
     TotalKineticEnergy,
 )
-from qgsw.variables.prognostic import (
-    LayerDepthAnomaly,
-    MeridionalVelocity,
-    ZonalVelocity,
-)
 from qgsw.variables.state import State
 from qgsw.variables.uvh import UVH
 
@@ -53,11 +51,7 @@ if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
-    from qgsw.variables.base import (
-        BoundDiagnosticVariable,
-        DiagnosticVariable,
-        PrognosticVariable,
-    )
+    from qgsw.variables.base import DiagnosticVariable
 
 
 class OutputFile(NamedTuple):
@@ -77,26 +71,14 @@ class OutputFile(NamedTuple):
             UVh: Data.
         """
         data = np.load(file=self.path)
-        u = torch.tensor(data[ZonalVelocity.get_name()])
-        v = torch.tensor(data[MeridionalVelocity.get_name()])
-        h = torch.tensor(data[LayerDepthAnomaly.get_name()])
+        u = torch.tensor(data[ParsedZonalVelocity.get_name()])
+        v = torch.tensor(data[ParsedMeridionalVelocity.get_name()])
+        h = torch.tensor(data[ParsedLayerDepthAnomaly.get_name()])
         return UVH(
             u.to(dtype=self.dtype, device=self.device),
             v.to(dtype=self.dtype, device=self.device),
             h.to(dtype=self.dtype, device=self.device),
         )
-
-    def update_state(self, state: State) -> State:
-        """Update a given state.
-
-        Args:
-            state (State): State.
-
-        Returns:
-            State: Updated state
-        """
-        state.uvh = self.read()
-        return state
 
 
 class RunOutput:
@@ -131,6 +113,11 @@ class RunOutput:
         self._state = State(
             self._outputs[0].read(),
         )
+        self._vars: dict[str, DiagnosticVariable] = {
+            ParsedZonalVelocity.get_name(): ParsedZonalVelocity(),
+            ParsedMeridionalVelocity.get_name(): ParsedMeridionalVelocity(),
+            ParsedLayerDepthAnomaly.get_name(): ParsedZonalVelocity(),
+        }
 
     @cached_property
     def folder(self) -> Path:
@@ -148,9 +135,9 @@ class RunOutput:
         return self._state
 
     @property
-    def vars(self) -> list[PrognosticVariable | BoundDiagnosticVariable]:
+    def vars(self) -> list[DiagnosticVariable]:
         """Variable from state."""
-        return list(self.state.vars.values())
+        return list(self._vars.values())
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -158,7 +145,7 @@ class RunOutput:
         Returns:
             list[str]: String representation parts.
         """
-        vars_txt = "\n\t".join(str(var) for var in self._state.vars.values())
+        vars_txt = "\n\t".join(str(var) for var in self.vars)
         return [
             f"Simulation: {self._summary.configuration.io.name}.",
             f"Starting time: {self._summary.started_at}",
@@ -181,10 +168,7 @@ class RunOutput:
         Yields:
             Iterator[torch.tensor]: Values of a given variable.
         """
-        return (
-            output.update_state(self.state)[key].get()
-            for output in self.outputs()
-        )
+        return (self._vars[key].compute(out.read()) for out in self.outputs())
 
     def steps(self) -> Iterator[int]:
         """Sorted list of steps.
@@ -224,7 +208,7 @@ class RunOutput:
         Args:
             variable (DiagnosticVariable): Variable to consider.
         """
-        variable.bind(self._state)
+        self._vars[variable.name] = variable
 
 
 def check_time_compatibility(*runs: RunOutput) -> None:
@@ -250,7 +234,7 @@ def add_qg_variables(
     model_config: ModelConfig,
     dtype: torch.dtype,
     device: torch.device,
-) -> RunOutput:
+) -> None:
     """Add QG variables to run output.
 
     Args:
@@ -260,17 +244,14 @@ def add_qg_variables(
         model_config (ModelConfig): Model configuration
         dtype (torch.dtype): Data type
         device (torch.device): Device
-
-    Returns:
-        RunOutput: Updated run output
     """
     space = SpaceDiscretization3D.from_config(space_config, model_config)
     dx = space.dx
     dy = space.dy
     ds = space.area
-    H = model_config.h  # noqa: N806
+    H = model_config.h.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)  # noqa: N806
     g_prime = model_config.g_prime
-    A = compute_A(H, g_prime, dtype, device)  # noqa: N806
+    A = compute_A(H.squeeze((0, -3, -2)), g_prime, dtype, device)  # noqa: N806
     u_phys = PhysicalZonalVelocity(dx)
     v_phys = PhysicalMeridionalVelocity(dy)
     h_phys = PhysicalLayerDepthAnomaly(ds)
@@ -313,5 +294,3 @@ def add_qg_variables(
     run_output.with_variable(ke)
     run_output.with_variable(ape)
     run_output.with_variable(energy)
-
-    return run_output
