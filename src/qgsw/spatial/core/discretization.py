@@ -700,22 +700,29 @@ class SpaceDiscretization3D:
         self._u = u_grid
         self._v = v_grid
 
-    def __repr__(self) -> str:
-        """String representation of the Space."""
-        msg_parts = [
-            "3D Space.",
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
+
+        Returns:
+            list[str]: String representation parts.
+        """
+        return [
+            "3D Space",
             "└── Dimensions:",
             (
-                f"     ├── X: {self.nx} points "
+                f"\t├── X: {self.nx} points "
                 f"- dx = {self.dx} {self.omega.xy_unit.value}"
             ),
             (
-                f"     ├── Y: {self.ny} points "
+                f"\t├── Y: {self.ny} points "
                 f"- dy = {self.dy} {self.omega.xy_unit.value}"
             ),
-            f"     └── H: {self.nl} layer{'s' if self.nl>1 else ''}",
+            f"\t└── H: {self.nl} layer{'s' if self.nl>1 else ''}",
         ]
-        return "\n".join(msg_parts)
+
+    def __repr__(self) -> str:
+        """String representation of the Space."""
+        return "\n".join(self.get_repr_parts())
 
     @property
     def nx(self) -> int:

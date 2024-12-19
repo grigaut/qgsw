@@ -20,15 +20,6 @@ from qgsw.models.qg.stretching_matrix import (
 )
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.variables.dynamics import PotentialVorticity
-from qgsw.variables.energetics import (
-    ModalAvailablePotentialEnergy,
-    ModalEnergy,
-    ModalKineticEnergy,
-    TotalAvailablePotentialEnergy,
-    TotalEnergy,
-    TotalKineticEnergy,
-)
 from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
@@ -36,7 +27,6 @@ if TYPE_CHECKING:
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
-    from qgsw.variables.state import State
 
 
 def G(  # noqa: N802
@@ -112,41 +102,6 @@ class QG(Model):
         """Core Shallow Water Model."""
         return self._core
 
-    @property
-    def pv(self) -> torch.Tensor:
-        """Potential Vorticity."""
-        return self._pv.get()
-
-    @property
-    def ke_hat(self) -> torch.Tensor:
-        """Modal kinetic energy, shape: (n_ens, nl)."""
-        return self._ke_hat.get()
-
-    @property
-    def ape_hat(self) -> torch.Tensor:
-        """Modal available potential energy, shape: (n_ens, nl)."""
-        return self._ape_hat.get()
-
-    @property
-    def total_energy_hat(self) -> torch.Tensor:
-        """Total energy, shape: (n_ens, nl)."""
-        return self._energy_hat.get()
-
-    @property
-    def ke(self) -> torch.Tensor:
-        """Modal kinetic energy, shape: (n_ens)."""
-        return self._ke.get()
-
-    @property
-    def ape(self) -> torch.Tensor:
-        """Modal available potential energy, shape: (n_ens)."""
-        return self._ape.get()
-
-    @property
-    def total_energy(self) -> torch.Tensor:
-        """Total energy, shape: (n_ens)."""
-        return self._energy.get()
-
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set the bottom drag coefficient.
 
@@ -192,59 +147,33 @@ class QG(Model):
         self.sw.n_ens = n_ens
         return super()._set_n_ens(n_ens)
 
-    def _create_diagnostic_vars(self, state: State) -> None:
-        super()._create_diagnostic_vars(state)
-        pv = PotentialVorticity(
-            self._omega,
-            self.h_ref,
-            self.space.area,
-            self.beta_plane.f0,
-        )
-        ke_hat = ModalKineticEnergy(
-            self.A,
-            self._psi,
-            self.H,
-            self.space.dx,
-            self.space.dy,
-        )
-        ape_hat = ModalAvailablePotentialEnergy(
-            self.A,
-            self._psi,
-            self._H,
-            self.beta_plane.f0,
-        )
-        energy_hat = ModalEnergy(ke_hat, ape_hat)
-        ke = TotalKineticEnergy(
-            self._psi,
-            self.H,
-            self.space.dx,
-            self.space.dy,
-        )
-        ape = TotalAvailablePotentialEnergy(
-            self.A,
-            self._psi,
-            self._H,
-            self.beta_plane.f0,
-        )
-        energy = TotalEnergy(ke, ape)
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
 
-        self._pv = pv.bind(self._state)
-        self._ke_hat = ke_hat.bind(self._state)
-        self._ape_hat = ape_hat.bind(self._state)
-        self._energy_hat = energy_hat.bind(self._state)
-        self._ke = ke.bind(self._state)
-        self._ape = ape.bind(self._state)
-        self._energy = energy.bind(self._state)
+        Returns:
+            list[str]: String representation parts.
+        """
+        msg_parts = [
+            f"Model: {self.__class__}",
+            f"├── Data type: {self.dtype}",
+            f"├── Device: {self.device}",
+            (
+                f"├── Beta plane: f0 = {self.beta_plane.f0} "
+                f"- β = {self.beta_plane.beta}"
+            ),
+            f"├── dt: {self.dt} s",
+        ]
+        space_repr_ = self.space.get_repr_parts()
+        space_repr = ["├── " + space_repr_.pop(0)]
+        space_repr = space_repr + ["\t" + txt for txt in space_repr_]
+        state_repr_ = self._state.get_repr_parts()
+        state_repr = ["├── " + state_repr_.pop(0)]
+        state_repr = state_repr + ["\t" + txt for txt in state_repr_]
+        sw_repr_ = self.sw.get_repr_parts()
+        sw_repr = ["└── Core " + sw_repr_.pop(0)]
+        sw_repr = sw_repr + ["\t" + txt for txt in sw_repr_]
 
-        self.io.add_diagnostic_vars(
-            self._pv,
-            self._ke_hat,
-            self._ape_hat,
-            self._energy_hat,
-            self._ke,
-            self._ape,
-            self._energy,
-        )
+        return msg_parts + space_repr + state_repr + sw_repr
 
     def compute_A(  # noqa: N802
         self,

@@ -2,37 +2,26 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
-
-import numpy as np
 import plotly.colors as pco
 import plotly.graph_objects as go
+import torch
 
 from qgsw.plots.animated_plots import BaseAnimatedPlot
-from qgsw.run_summary import RunOutput, check_time_compatibility
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
-class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
+class AnimatedHeatmaps(BaseAnimatedPlot[torch.Tensor]):
     """Animated Heatmap with shared colorscale."""
 
     _color_bar_text = ""
 
     def __init__(
         self,
-        datas: list[list[np.ndarray]],
+        datas: list[list[torch.Tensor]],
     ) -> None:
         """Instantiate the plot.
 
         Args:
-            datas (list[list[np.ndarray]]): Data list.
+            datas (list[list[torch.Tensor]]): Data list.
             frame_labels (list[str] | None, optional): Frames names.
             Defaults to None.
         """
@@ -135,114 +124,40 @@ class AnimatedHeatmaps(BaseAnimatedPlot[np.ndarray]):
             method="animate",
         )
 
-    def _compute_showscales(self, arrays: list[np.ndarray]) -> list[bool]:
+    def _compute_showscales(self, arrays: list[torch.Tensor]) -> list[bool]:
         """Compute which trace to show scale of.
 
         Args:
-            arrays (list[np.ndarray]): List of data arrays.
+            arrays (list[torch.Tensor]): List of data arrays.
 
         Returns:
             list[bool]: True on the index of scale to show, False elsewhere.
         """
-        not_empty_arrays = [~np.isnan(array).all() for array in arrays]
-        find_first = np.cumsum(not_empty_arrays)
-        remove_trailing = np.cumsum(find_first)
+        not_empty_arrays = torch.tensor(
+            [~torch.isnan(array).all() for array in arrays],
+        )
+        find_first = torch.cumsum(not_empty_arrays, 0)
+        remove_trailing = torch.cumsum(find_first, 0)
         return [bool(res) for res in (remove_trailing == 1)]
 
-    def _compute_zmax(self, arrays: list[np.ndarray]) -> float:
+    def _compute_zmax(self, arrays: list[torch.Tensor]) -> float:
         """Compute maxiumal value over al ist of arrays, without nans.
 
         Args:
-            arrays (list[np.ndarray]): List of arrays to find the max of.
+            arrays (list[torch.Tensor]): List of arrays to find the max of.
 
         Returns:
             float: Maximum values over the arrays, np.nan only if all array
             are entirely made of nans.
         """
         not_empty_arrays = [
-            array for array in arrays if ~np.isnan(array).all()
+            array for array in arrays if ~torch.isnan(array).all()
         ]
         if not not_empty_arrays:
-            return np.nan
-        not_empty_vals = [arr[~np.isnan(arr)] for arr in not_empty_arrays]
-        return max(np.max(np.abs(arr)) for arr in not_empty_vals)
-
-    @classmethod
-    def from_point_wise_output(
-        cls,
-        folders: list[Path | str],
-        field: str,
-        ensembles: int | list[int] = 0,
-        levels: int | list[int] = 0,
-    ) -> Self:
-        """Instantiate the plot from a list of folders.
-
-        Args:
-            folders (list[Path  |  str]): LIst of folders to use as source.
-            field (str): Field to display.
-            ensembles (int | list[int], optional): Ensemble(s) to display.
-            Defaults to 0.
-            levels (int | list[int], optional): Level(s) to display.
-            Defaults to 0.
-
-        Raises:
-            ValueError: If the timesteps are incompatible.
-            TypeError: If levels is neither int or list[int]
-            ValueError: If the levels length doesn't match run's
-
-        Returns:
-            Self: AnimatedHeatmap.
-        """
-        runs = [RunOutput(folder=f) for f in folders]
-        check_time_compatibility(*runs)
-
-        if not all(run[field].scope.point_wise for run in runs):
-            msg = "The fields must be level-wise."
-            raise ValueError(msg)
-
-        # Validate ensembles structure
-        if not (isinstance(ensembles, (int, list))):
-            msg = "`ensembles` parameter should be of type int or list[int]."
-            raise TypeError(msg)
-        if isinstance(ensembles, list):
-            if len(ensembles) != len(runs):
-                msg = (
-                    "The ensembles list should be of length "
-                    f"{len(runs)} instead of {len(ensembles)}."
-                )
-                raise ValueError(msg)
-            es = ensembles
-        else:
-            es = [ensembles] * len(runs)
-        # Validate levels structure
-        if not (isinstance(levels, (int, list))):
-            msg = "`levels` parameter should be of type int or list[int]."
-            raise TypeError(msg)
-        if isinstance(levels, list):
-            if len(levels) != len(runs):
-                msg = (
-                    "The levels list should be of length "
-                    f"{len(runs)} instead of {len(levels)}."
-                )
-                raise ValueError(msg)
-            ls = levels
-        else:
-            ls = [levels] * len(runs)
-
-        datas = [
-            [data[es[k], ls[k]].T for data in run[field].datas()]
-            for k, run in enumerate(runs)
-        ]
-        cls._slider_prefix = "Time: "
-        legend = f"{runs[0][field].description} [{runs[0][field].unit.value}]"
-        cls._color_bar_text = legend
-        plot = cls(datas=datas)
-        plot.set_subplot_titles(
-            [
-                f"{run.summary.configuration.io.name} - Layer {ls[i]}"
-                for i, run in enumerate(runs)
-            ],
+            return torch.nan
+        not_empty_vals = [arr[~torch.isnan(arr)] for arr in not_empty_arrays]
+        return (
+            max(torch.max(torch.abs(arr)) for arr in not_empty_vals)
+            .cpu()
+            .item()
         )
-        plot.set_frame_labels([f"{t.days} days" for t in runs[0].timesteps()])
-
-        return plot

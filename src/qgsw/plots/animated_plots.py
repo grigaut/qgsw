@@ -91,7 +91,7 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
         """
         self._slider_prefix = text
 
-    def set_subplot_titles(self, subplot_titles: list[str]) -> go.Figure:
+    def set_subplot_titles(self, subplot_titles: list[str]) -> None:
         """Set the subplot titles.
 
         Args:
@@ -326,10 +326,12 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
         """
         self._set_figure()
         figure = self._create_figure()
+        figure.update_xaxes(self._create_xaxis())
+        figure.update_yaxes(self._create_yaxis())
         frame = self._compute_frame(frame_index)
         rows_cols = [
             self.map_subplot_index_to_subplot_loc(i)
-            for i in range(self._n_subplots)
+            for i in range(self.n_subplots)
         ]
         figure.add_traces(
             frame.data,
@@ -338,6 +340,6 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
         )
         figure.write_image(
             output_folder.joinpath(
-                f"frame_{self._frame_labels[frame_index]}.png",
+                f"frame_{self._datas[frame_index][0]}.png",
             ),
         )

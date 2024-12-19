@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from qgsw.spatial.units._units import Unit
+from qgsw.variables.prognostic import (
+    LayerDepthAnomaly,
+    MeridionalVelocity,
+    ZonalVelocity,
+)
 from qgsw.variables.scope import EnsembleWise, LevelWise, PointWise
 
 try:
@@ -518,3 +523,63 @@ class TotalEnstrophy(Enstrophy):
             torch.Tensor: Enstrophy.
         """
         return torch.sum(self._vorticity.compute(uvh) ** 2, dim=(-1, -2, -3))
+
+
+class ParsedZonalVelocity(DiagnosticVariable):
+    """Parsed zonal velocity."""
+
+    _unit = ZonalVelocity.get_unit()
+    _name = ZonalVelocity.get_name()
+    _description = ZonalVelocity.get_description()
+    _scope = ZonalVelocity.get_scope()
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            uvh (UVH): Prognostic varibales values.
+
+        Returns:
+            torch.Tensor: Value.
+        """
+        return uvh.u
+
+
+class ParsedMeridionalVelocity(DiagnosticVariable):
+    """Meridional Velocity."""
+
+    _unit = MeridionalVelocity.get_unit()
+    _name = MeridionalVelocity.get_name()
+    _description = MeridionalVelocity.get_description()
+    _scope = MeridionalVelocity.get_scope()
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            uvh (UVH): Prognostic varibales values.
+
+        Returns:
+            torch.Tensor: Value.
+        """
+        return uvh.v
+
+
+class ParsedLayerDepthAnomaly(DiagnosticVariable):
+    """Layer Depth Anomaly."""
+
+    _unit = LayerDepthAnomaly.get_unit()
+    _name = LayerDepthAnomaly.get_name()
+    _description = LayerDepthAnomaly.get_description()
+    _scope = LayerDepthAnomaly.get_scope()
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            uvh (UVH): Prognostic varibales values.
+
+        Returns:
+            torch.Tensor: Value.
+        """
+        return uvh.h

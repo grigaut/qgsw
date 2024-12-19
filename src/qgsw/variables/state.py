@@ -20,7 +20,7 @@ from qgsw.variables.uvh import UVH
 if TYPE_CHECKING:
     import torch
 
-    from qgsw.variables.base import BoundDiagnosticVariable
+    from qgsw.variables.base import BoundDiagnosticVariable, PrognosticVariable
 
 
 class State:
@@ -45,6 +45,11 @@ class State:
         self._u = ZonalVelocity(uvh.u)
         self._v = MeridionalVelocity(uvh.v)
         self._h = LayerDepthAnomaly(uvh.h)
+        self._prog = {
+            ZonalVelocity.get_name(): self._u,
+            MeridionalVelocity.get_name(): self._v,
+            LayerDepthAnomaly.get_name(): self._h,
+        }
 
     @property
     def uvh(self) -> UVH:
@@ -75,9 +80,66 @@ class State:
         return self._h
 
     @property
-    def diag_vars(self) -> list[BoundDiagnosticVariable]:
+    def vars(self) -> dict[str, PrognosticVariable | BoundDiagnosticVariable]:
         """List of diagnostic variables."""
+        return self._prog | self._diag
+
+    @property
+    def diag_vars(self) -> dict[str, BoundDiagnosticVariable]:
+        """Diagnostic variables."""
         return self._diag
+
+    @property
+    def prog_vars(self) -> dict[str, BoundDiagnosticVariable]:
+        """Prognostic variables."""
+        return self._prog
+
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
+
+        Returns:
+            list[str]: String representation parts.
+        """
+        msg_prognostic = [
+            "State",
+            "└── Prognostic Variables",
+            f"\t├── {self.u}",
+            f"\t├── {self.v}",
+            f"\t└── {self.h}",
+        ]
+        if not self.diag_vars:
+            return msg_prognostic
+        chars = msg_prognostic[1].split()
+        chars[0] = "├──"
+        msg_prognostic[1] = " ".join(chars)
+        msg_diagnostic = [
+            "└── Diagnostic Variables",
+        ] + [f"\t├── {var}" for var in self.diag_vars.values()]
+        chars = msg_diagnostic[-1].split()
+        chars[0] = "\t└──"
+        msg_diagnostic[-1] = " ".join(chars)
+        return msg_prognostic + msg_diagnostic
+
+    def __repr__(self) -> str:
+        """String representation of State."""
+        return "\n".join(self.get_repr_parts())
+
+    def __getitem__(self, name: str) -> BoundDiagnosticVariable:
+        """Get bound variables.
+
+        Args:
+            name (str): Varibale name
+
+        Raises:
+            KeyError: If the name does not correspond to a variable.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable
+        """
+        if name not in self.vars:
+            msg = f"Variables are {', '.join(self.vars.values())}."
+            raise KeyError(msg)
+        return self.vars[name]
 
     def update(
         self,
@@ -96,7 +158,7 @@ class State:
 
     def _updated(self) -> None:
         """Update diagnostic variables."""
-        for var in self.diag_vars:
+        for var in self.diag_vars.values():
             var.outdated()
 
     def add_bound_diagnostic_variable(
@@ -108,11 +170,13 @@ class State:
         Args:
             variable (BoundDiagnosticVariable): Variable.
         """
-        self._diag.add(variable)
+        if variable.name in self.diag_vars:
+            return
+        self.diag_vars[variable.name] = variable
 
     def unbind(self) -> None:
         """Unbind all variables from state."""
-        self._diag: set[BoundDiagnosticVariable] = set()
+        self._diag: dict[str, BoundDiagnosticVariable] = {}
 
     @classmethod
     def steady(
