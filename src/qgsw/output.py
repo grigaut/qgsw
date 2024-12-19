@@ -139,6 +139,17 @@ class RunOutput:
         """Variable from state."""
         return list(self._vars.values())
 
+    def get_var(self, var_name: str) -> DiagnosticVariable:
+        """Get variable.
+
+        Args:
+            var_name (str): Variable name.
+
+        Returns:
+            DiagnosticVariable: Variable.
+        """
+        return self._vars[var_name]
+
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
 
@@ -159,16 +170,18 @@ class RunOutput:
         """Output Representation."""
         return "\n".join(self.get_repr_parts())
 
-    def __getitem__(self, key: str) -> Iterator[torch.Tensor]:
+    def __getitem__(self, var_name: str) -> Iterator[torch.Tensor]:
         """Get variable based on its name.
 
         Args:
-            key (str): Variable name.
+            var_name (str): Variable name.
 
         Yields:
             Iterator[torch.tensor]: Values of a given variable.
         """
-        return (self._vars[key].compute(out.read()) for out in self.outputs())
+        return (
+            self._vars[var_name].compute(out.read()) for out in self.outputs()
+        )
 
     def steps(self) -> Iterator[int]:
         """Sorted list of steps.
