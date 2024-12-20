@@ -7,7 +7,8 @@ import torch
 
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
-from qgsw.output import RunOutput, add_qg_variables
+from qgsw.fields.variables.variable_sets import create_qg_variable_set
+from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,
 )
@@ -27,8 +28,7 @@ folder = st.selectbox("Data source", options=sources)
 
 run = RunOutput(folder)
 config = run.summary.configuration
-add_qg_variables(
-    run,
+vars_dict = create_qg_variable_set(
     config.physics,
     config.space,
     config.model,
@@ -44,7 +44,7 @@ if not run.summary.is_finished:
 
 st.title("Point-wise variables")
 
-vars_pts = [var for var in run.vars if var.scope == Scope.POINT_WISE]
+vars_pts = [var for var in vars_dict.values() if var.scope == Scope.POINT_WISE]
 
 selected_var_pts = st.selectbox("Variable to display", vars_pts)
 
@@ -53,7 +53,9 @@ with st.form(key="var-form"):
     submit_pts = st.form_submit_button("Display")
 
 if submit_pts:
-    data = [d[0, level].T.cpu() for d in run[selected_var_pts.name]]
+    uvhs = (output.read() for output in run.outputs())
+    values = (selected_var_pts.compute(uvh) for uvh in uvhs)
+    data = [d[0, level].T.cpu() for d in values]
 
     plot_pts = AnimatedHeatmaps(
         [data],
@@ -72,7 +74,7 @@ if submit_pts:
 
 st.title("Level-wise variables")
 
-vars_lvl = [v for v in run.vars if v.scope == Scope.LEVEL_WISE]
+vars_lvl = [v for v in vars_dict.values() if v.scope == Scope.LEVEL_WISE]
 
 selected_vars_lvl = st.multiselect("Variable to display", vars_lvl)
 
@@ -87,7 +89,13 @@ with st.form(key="var-form-level-wise"):
     submit_lvl = st.form_submit_button("Display")
 if submit_lvl:
     datas = [
-        [d[0, level].cpu() for d in run[var.name]]
+        [
+            d[0, level].cpu()
+            for d in (
+                var.compute(uvh)
+                for uvh in (output.read() for output in run.outputs())
+            )
+        ]
         for level in selected_lvl
         for var in selected_vars_lvl
     ]
@@ -108,7 +116,7 @@ if submit_lvl:
 
 st.title("Ensemble-wise variables")
 
-vars_ens = [v for v in run.vars if v.scope == Scope.ENSEMBLE_WISE]
+vars_ens = [v for v in vars_dict.values() if v.scope == Scope.ENSEMBLE_WISE]
 
 selected_vars_ens = st.multiselect("Variable to display", vars_ens)
 
@@ -119,7 +127,16 @@ if not check_unit_compatibility(*selected_vars_ens):
 with st.form(key="var-form-ensemble-wise"):
     submit_ens = st.form_submit_button("Display")
 if submit_ens:
-    datas = [[d[0].cpu() for d in run[var.name]] for var in selected_vars_ens]
+    datas = [
+        [
+            d[0].cpu()
+            for d in (
+                var.compute(uvh)
+                for uvh in (output.read() for output in run.outputs())
+            )
+        ]
+        for var in selected_vars_ens
+    ]
     plot_ens = ScatterPlot(datas)
     plot_ens.set_xaxis_title("Time [s]")
     plot_ens.set_yaxis_title(f"[{selected_vars_ens[0].unit.value}]")

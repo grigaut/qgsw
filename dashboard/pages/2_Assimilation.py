@@ -7,7 +7,8 @@ import torch
 
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
-from qgsw.output import RunOutput, add_qg_variables
+from qgsw.fields.variables.variable_sets import create_qg_variable_set
+from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import AnimatedHeatmaps
 from qgsw.plots.scatter import ScatterPlot
 from qgsw.specs import DEVICE
@@ -30,8 +31,8 @@ if run.summary.configuration.simulation.kind != "assimilation":
     st.stop()
 
 config = run.summary.configuration
-add_qg_variables(
-    run,
+
+vars_dict = create_qg_variable_set(
     config.physics,
     config.space,
     config.model,
@@ -42,15 +43,14 @@ st.write(run)
 
 prefix_ref = run.summary.configuration.simulation.reference.prefix
 run_ref = RunOutput(folder, prefix=prefix_ref)
-add_qg_variables(
-    run_ref,
+
+vars_dict_ref = create_qg_variable_set(
     config.physics,
     config.space,
     config.simulation.reference,
     torch.float64,
     DEVICE.get(),
 )
-
 levels_nb = run.summary.configuration.model.h.shape[0]
 
 
@@ -60,17 +60,22 @@ if not run.summary.is_finished:
 
 st.title("Point-wise variables")
 
-vars_pts = [var for var in run.vars if var.scope == Scope.POINT_WISE]
+vars_pts = [var for var in vars_dict.values() if var.scope == Scope.POINT_WISE]
 
 selected_var_pts = st.selectbox("Variable to display", vars_pts)
+selected_var_pts_ref = vars_dict_ref[selected_var_pts.name]
 
 with st.form(key="var-form"):
     level = st.selectbox("Level", list(range(levels_nb)))
     submit_pts = st.form_submit_button("Display")
 
 if submit_pts:
-    data_ref = [d[0, level].T.cpu() for d in run_ref[selected_var_pts.name]]
-    data = [d[0, level].T.cpu() for d in run[selected_var_pts.name]]
+    uvhs_ref = (output.read() for output in run_ref.outputs())
+    values_ref = (selected_var_pts_ref.compute(uvh) for uvh in uvhs_ref)
+    data_ref = [d[0, level].T.cpu() for d in values_ref]
+    uvhs = (output.read() for output in run.outputs())
+    values = (selected_var_pts.compute(uvh) for uvh in uvhs)
+    data = [d[0, level].T.cpu() for d in values]
 
     plot_pts = AnimatedHeatmaps(
         [data_ref, data],
@@ -87,9 +92,10 @@ if submit_pts:
 
 st.title("Level-wise variables")
 
-vars_lvl = [v for v in run.vars if v.scope == Scope.LEVEL_WISE]
+vars_lvl = [v for v in vars_dict.values() if v.scope == Scope.LEVEL_WISE]
 
 selected_vars_lvl = st.multiselect("Variable to display", vars_lvl)
+selected_vars_lvl_ref = [vars_dict_ref[v.name] for v in selected_vars_lvl]
 
 if not check_unit_compatibility(*selected_vars_lvl):
     st.error("Selected variables don't have the same unit.")
@@ -104,7 +110,13 @@ with st.form(key="var-form-level-wise"):
 
 if submit_lvl:
     datas = [
-        [d[0, level].cpu() for d in run_ref[var.name]]
+        [
+            d[0, level].cpu()
+            for d in (
+                var.compute(uvh)
+                for uvh in (output.read() for output in run.outputs())
+            )
+        ]
         for level in selected_lvl
         for var in selected_vars_lvl
     ]
@@ -114,9 +126,15 @@ if submit_lvl:
         for var in selected_vars_lvl
     ]
     datas_ref = [
-        [d[0, level].cpu() for d in run_ref[var.name]]
+        [
+            d[0, level].cpu()
+            for d in (
+                var.compute(uvh)
+                for uvh in (output.read() for output in run_ref.outputs())
+            )
+        ]
         for level in selected_lvl
-        for var in selected_vars_lvl
+        for var in selected_vars_lvl_ref
     ]
     names_ref = [
         f"{var.description} - Ens: 0 - Level: {level} (reference)"
@@ -139,9 +157,10 @@ if submit_lvl:
 
 st.title("Ensemble-wise variables")
 
-vars_ens = [v for v in run.vars if v.scope == Scope.ENSEMBLE_WISE]
+vars_ens = [v for v in vars_dict.values() if v.scope == Scope.ENSEMBLE_WISE]
 
 selected_vars_ens = st.multiselect("Variable to display", vars_ens)
+selected_vars_ens_ref = [vars_dict_ref[v.name] for v in selected_vars_ens]
 
 if not check_unit_compatibility(*selected_vars_ens):
     st.error("Selected variables don't have the same unit.")
@@ -151,10 +170,26 @@ with st.form(key="var-form-ensemble-wise"):
     submit_ensemble = st.form_submit_button("Display")
 
 if submit_ensemble:
-    datas = [[d[0].cpu() for d in run[var.name]] for var in selected_vars_ens]
+    datas = [
+        [
+            d[0].cpu()
+            for d in (
+                var.compute(uvh)
+                for uvh in (output.read() for output in run.outputs())
+            )
+        ]
+        for var in selected_vars_ens
+    ]
     names = [f"{var.description} - Ens: 0" for var in selected_vars_ens]
     datas_ref = [
-        [d[0].cpu() for d in run_ref[var.name]] for var in selected_vars_ens
+        [
+            d[0].cpu()
+            for d in (
+                var.compute(uvh)
+                for uvh in (output.read() for output in run_ref.outputs())
+            )
+        ]
+        for var in selected_vars_ens_ref
     ]
     names_ref = [
         f"{var.description} - Ens: 0 (reference)" for var in selected_vars_ens

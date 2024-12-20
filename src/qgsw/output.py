@@ -11,46 +11,17 @@ import numpy as np
 import torch
 
 from qgsw.fields.variables.dynamics import (
-    Enstrophy,
     LayerDepthAnomalyDiag,
     MeridionalVelocityDiag,
-    MeridionalVelocityFlux,
-    PhysicalLayerDepthAnomaly,
-    PhysicalMeridionalVelocity,
-    PhysicalVorticity,
-    PhysicalZonalVelocity,
-    PotentialVorticity,
-    Pressure,
-    StreamFunction,
-    SurfaceHeightAnomaly,
-    TotalEnstrophy,
-    Vorticity,
     ZonalVelocityDiag,
-    ZonalVelocityFlux,
-)
-from qgsw.fields.variables.energetics import (
-    ModalAvailablePotentialEnergy,
-    ModalEnergy,
-    ModalKineticEnergy,
-    TotalAvailablePotentialEnergy,
-    TotalEnergy,
-    TotalKineticEnergy,
 )
 from qgsw.fields.variables.uvh import UVH
-from qgsw.masks import Masks
-from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.run_summary import RunSummary
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 from qgsw.utils.sorting import sort_files
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from qgsw.configs.models import ModelConfig
-    from qgsw.configs.physics import PhysicsConfig
-    from qgsw.configs.space import SpaceConfig
-    from qgsw.fields.variables.base import DiagnosticVariable
 
 
 class OutputFile(NamedTuple):
@@ -109,11 +80,6 @@ class RunOutput:
             )
             for i in range(len(files))
         ]
-        self._vars: dict[str, DiagnosticVariable] = {
-            ZonalVelocityDiag.get_name(): ZonalVelocityDiag(),
-            MeridionalVelocityDiag.get_name(): MeridionalVelocityDiag(),
-            LayerDepthAnomalyDiag.get_name(): ZonalVelocityDiag(),
-        }
 
     @cached_property
     def folder(self) -> Path:
@@ -125,54 +91,23 @@ class RunOutput:
         """Run summary."""
         return self._summary
 
-    @property
-    def vars(self) -> list[DiagnosticVariable]:
-        """Variable from state."""
-        return list(self._vars.values())
-
-    def get_var(self, var_name: str) -> DiagnosticVariable:
-        """Get variable.
-
-        Args:
-            var_name (str): Variable name.
-
-        Returns:
-            DiagnosticVariable: Variable.
-        """
-        return self._vars[var_name]
-
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
 
         Returns:
             list[str]: String representation parts.
         """
-        vars_txt = "\n\t".join(str(var) for var in self.vars)
         return [
             f"Simulation: {self._summary.configuration.io.name}.",
             f"Starting time: {self._summary.started_at}",
             f"Ending time: {self._summary.ended_at}",
             f"Package version: {self._summary.qgsw_version}.",
             f"Folder: {self.folder}.",
-            f"Variables:\n\t{vars_txt}",
         ]
 
     def __repr__(self) -> str:
         """Output Representation."""
         return "\n".join(self.get_repr_parts())
-
-    def __getitem__(self, var_name: str) -> Iterator[torch.Tensor]:
-        """Get variable based on its name.
-
-        Args:
-            var_name (str): Variable name.
-
-        Yields:
-            Iterator[torch.tensor]: Values of a given variable.
-        """
-        return (
-            self._vars[var_name].compute(out.read()) for out in self.outputs()
-        )
 
     def steps(self) -> Iterator[int]:
         """Sorted list of steps.
@@ -206,14 +141,6 @@ class RunOutput:
         """
         return iter(self._outputs)
 
-    def with_variable(self, variable: DiagnosticVariable) -> None:
-        """Add a variable to the state.
-
-        Args:
-            variable (DiagnosticVariable): Variable to consider.
-        """
-        self._vars[variable.name] = variable
-
 
 def check_time_compatibility(*runs: RunOutput) -> None:
     """Check time compatibilities between run outputs.
@@ -229,77 +156,3 @@ def check_time_compatibility(*runs: RunOutput) -> None:
     if not all(dt == dt0 for dt in dts):
         msg = "Incompatible timesteps."
         raise ValueError(msg)
-
-
-def add_qg_variables(
-    run_output: RunOutput,
-    physics_config: PhysicsConfig,
-    space_config: SpaceConfig,
-    model_config: ModelConfig,
-    dtype: torch.dtype,
-    device: torch.device,
-) -> None:
-    """Add QG variables to run output.
-
-    Args:
-        run_output (RunOutput): Run output.
-        physics_config (PhysicsConfig): Physics configuration
-        space_config (SpaceConfig): Space configuration
-        model_config (ModelConfig): Model configuration
-        dtype (torch.dtype): Data type
-        device (torch.device): Device
-    """
-    space = SpaceDiscretization3D.from_config(space_config, model_config)
-    dx = space.dx
-    dy = space.dy
-    ds = space.area
-    H = model_config.h.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)  # noqa: N806
-    g_prime = model_config.g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-    A = compute_A(  # noqa: N806
-        H.squeeze((0, -3, -2)),
-        g_prime.squeeze((0, -3, -2)),
-        dtype,
-        device,
-    )
-    u_phys = PhysicalZonalVelocity(dx)
-    v_phys = PhysicalMeridionalVelocity(dy)
-    h_phys = PhysicalLayerDepthAnomaly(ds)
-    U = ZonalVelocityFlux(dx)  # noqa: N806
-    V = MeridionalVelocityFlux(dy)  # noqa: N806
-    vorticity = Vorticity(
-        Masks.empty(space.nx, space.ny, device),
-        slip_coef=physics_config.slip_coef,
-    )
-    vorticity_phys = PhysicalVorticity(vorticity, ds)
-    eta = SurfaceHeightAnomaly(h_phys)
-    p = Pressure(g_prime, eta)
-    psi = StreamFunction(p, physics_config.f0)
-    pv = PotentialVorticity(vorticity_phys, H * ds, ds, physics_config.f0)
-    enstrophy = Enstrophy(pv)
-    enstrophy_tot = TotalEnstrophy(pv)
-    ke_hat = ModalKineticEnergy(A, psi, H, dx, dy)
-    ape_hat = ModalAvailablePotentialEnergy(A, psi, H, physics_config.f0)
-    energy_hat = ModalEnergy(ke_hat, ape_hat)
-    ke = TotalKineticEnergy(psi, H, dx, dy)
-    ape = TotalAvailablePotentialEnergy(A, psi, H, physics_config.f0)
-    energy = TotalEnergy(ke, ape)
-
-    run_output.with_variable(u_phys)
-    run_output.with_variable(v_phys)
-    run_output.with_variable(h_phys)
-    run_output.with_variable(U)
-    run_output.with_variable(V)
-    run_output.with_variable(vorticity)
-    run_output.with_variable(vorticity_phys)
-    run_output.with_variable(enstrophy)
-    run_output.with_variable(enstrophy_tot)
-    run_output.with_variable(eta)
-    run_output.with_variable(p)
-    run_output.with_variable(psi)
-    run_output.with_variable(pv)
-    run_output.with_variable(ke_hat)
-    run_output.with_variable(ape_hat)
-    run_output.with_variable(energy_hat)
-    run_output.with_variable(ke)
-    run_output.with_variable(ape)
-    run_output.with_variable(energy)
