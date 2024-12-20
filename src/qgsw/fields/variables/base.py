@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from qgsw.fields.base import Field
-from qgsw.fields.variables.scope import PointWise
+from qgsw.fields.scope import PointWise
 
 try:
     from typing import Self

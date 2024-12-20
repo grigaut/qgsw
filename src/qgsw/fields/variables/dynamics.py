@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from qgsw.fields.scope import EnsembleWise, LevelWise, PointWise
 from qgsw.fields.variables.prognostic import (
     LayerDepthAnomaly,
     MeridionalVelocity,
     ZonalVelocity,
 )
-from qgsw.fields.variables.scope import EnsembleWise, LevelWise, PointWise
 from qgsw.spatial.units._units import Unit
 
 try:

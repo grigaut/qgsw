@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 
 import torch
 
+from qgsw.fields.scope import EnsembleWise, LevelWise, PointWise
 from qgsw.fields.variables.base import DiagnosticVariable, Variable
-from qgsw.fields.variables.scope import EnsembleWise, LevelWise, PointWise
 from qgsw.fields.variables.uvh import UVH
 
 

@@ -8,6 +8,7 @@ except ImportError:
 import torch
 import torch.nn.functional as F  # noqa: N812
 
+from qgsw.fields.scope import EnsembleWise, LevelWise, PointWise
 from qgsw.fields.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
@@ -17,7 +18,6 @@ from qgsw.fields.variables.dynamics import (
     StreamFunction,
     ZonalVelocityFlux,
 )
-from qgsw.fields.variables.scope import EnsembleWise, LevelWise, PointWise
 from qgsw.fields.variables.state import State
 from qgsw.fields.variables.uvh import UVH
 from qgsw.masks import Masks

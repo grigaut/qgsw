@@ -1,6 +1,6 @@
 """Base class for fields."""
 
-from qgsw.fields.variables.scope import Scope
+from qgsw.fields.scope import Scope
 
 
 class Field:
