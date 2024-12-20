@@ -5,6 +5,7 @@ from pathlib import Path
 import streamlit as st
 import torch
 
+from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
 from qgsw.output import RunOutput, add_qg_variables
 from qgsw.plots.heatmaps import AnimatedHeatmaps
@@ -59,7 +60,7 @@ if not run.summary.is_finished:
 
 st.title("Point-wise variables")
 
-vars_pts = [var for var in run.vars if var.scope.point_wise]
+vars_pts = [var for var in run.vars if var.scope == Scope.POINT_WISE]
 
 selected_var_pts = st.selectbox("Variable to display", vars_pts)
 
@@ -86,7 +87,7 @@ if submit_pts:
 
 st.title("Level-wise variables")
 
-vars_lvl = [v for v in run.vars if v.scope.stricly_level_wise]
+vars_lvl = [v for v in run.vars if v.scope == Scope.LEVEL_WISE]
 
 selected_vars_lvl = st.multiselect("Variable to display", vars_lvl)
 
@@ -138,7 +139,7 @@ if submit_lvl:
 
 st.title("Ensemble-wise variables")
 
-vars_ens = [v for v in run.vars if v.scope.stricly_ensemble_wise]
+vars_ens = [v for v in run.vars if v.scope == Scope.ENSEMBLE_WISE]
 
 selected_vars_ens = st.multiselect("Variable to display", vars_ens)
 

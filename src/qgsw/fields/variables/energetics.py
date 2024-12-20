@@ -8,7 +8,7 @@ except ImportError:
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw.fields.scope import EnsembleWise, LevelWise, PointWise
+from qgsw.fields.scope import Scope
 from qgsw.fields.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
@@ -35,7 +35,7 @@ class KineticEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "kinetic_energy"
     _description = "Kinetic energy"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(
         self,
@@ -95,7 +95,7 @@ class ModalKineticEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ke_hat"
     _description = "Modal kinetic energy"
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(
         self,
@@ -179,7 +179,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ape_hat"
     _description = "Modal available potential energy"
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(
         self,
@@ -256,7 +256,7 @@ class ModalEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "e_tot_hat"
     _description = "Modal energy"
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(
         self,
@@ -309,7 +309,7 @@ class TotalKineticEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ke"
     _description = "Kinetic energy"
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(
         self,
@@ -384,7 +384,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ape"
     _description = "Available potential energy"
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(
         self,
@@ -458,7 +458,7 @@ class TotalEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "e_tot"
     _description = "Total energy"
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(
         self,

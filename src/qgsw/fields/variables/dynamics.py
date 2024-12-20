@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from qgsw.fields.scope import EnsembleWise, LevelWise, PointWise
+from qgsw.fields.scope import Scope
 from qgsw.fields.variables.prognostic import (
     LayerDepthAnomaly,
     MeridionalVelocity,
@@ -40,7 +40,7 @@ class PhysicalZonalVelocity(DiagnosticVariable):
     _unit = Unit.M1S_1
     _name = "u_phys"
     _description = "Physical zonal velocity"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, dx: float) -> None:
         """Instantiate the variable.
@@ -68,7 +68,7 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
     _unit = Unit.M1S_1
     _name = "v_phys"
     _description = "Physical meridional velocity"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, dy: float) -> None:
         """Instantiate the variable.
@@ -96,7 +96,7 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
     _unit = Unit.M
     _name = "h_phys"
     _description = "Physical layer depth anomaly"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, ds: float) -> None:
         """Instantiate the variable.
@@ -124,7 +124,7 @@ class ZonalVelocityFlux(DiagnosticVariable):
     _unit = Unit.S_1
     _name = "U"
     _description = "Zonal velocity flux"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, dx: float) -> None:
         """Instantiate the variable.
@@ -152,7 +152,7 @@ class MeridionalVelocityFlux(DiagnosticVariable):
     _unit = Unit.S_1
     _name = "V"
     _description = "Meriodional velocity flux"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, dy: float) -> None:
         """Instantiate the variable.
@@ -180,7 +180,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
     _unit = Unit.M
     _name = "eta"
     _description = "Surface height anomaly"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, h_phys: PhysicalLayerDepthAnomaly) -> None:
         """Instantiate variable.
@@ -224,7 +224,7 @@ class Vorticity(DiagnosticVariable):
     _unit = Unit.M2S_1
     _name = "omega"
     _description = "Vorticity"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(
         self,
@@ -273,7 +273,7 @@ class PhysicalVorticity(DiagnosticVariable):
     _unit = Unit.S_1
     _name = "omega_phys"
     _description = "Physical vorticity"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, vorticity: Vorticity, ds: float) -> None:
         """Instantiate the variable.
@@ -319,7 +319,7 @@ class Pressure(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "p"
     _description = "Pressure per unit of mass"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(
         self,
@@ -369,7 +369,7 @@ class PotentialVorticity(DiagnosticVariable):
     _unit = Unit.S_1
     _name = "pv"
     _description = "Potential vorticity"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(
         self,
@@ -427,7 +427,7 @@ class StreamFunction(DiagnosticVariable):
     _unit = Unit.M2S_1
     _name = "psi"
     _description = "Stream function"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, pressure: Pressure, f0: float) -> None:
         """Instantiate the variable.
@@ -470,7 +470,7 @@ class Enstrophy(DiagnosticVariable):
     _unit = Unit.S_2
     _name = "enstrophy"
     _description = "Layer-wise enstrophy"
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(self, pv: PotentialVorticity) -> None:
         """Instantiate the variable.
@@ -510,7 +510,7 @@ class TotalEnstrophy(Enstrophy):
     _unit = Unit.S_2
     _name = "enstrophy_tot"
     _description = "Total enstrophy"
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.

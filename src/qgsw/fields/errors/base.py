@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 import torch
 
-from qgsw.fields.scope import EnsembleWise, LevelWise, PointWise
+from qgsw.fields.scope import Scope
 from qgsw.fields.variables.base import DiagnosticVariable, Variable
 from qgsw.fields.variables.uvh import UVH
 
@@ -12,7 +12,7 @@ from qgsw.fields.variables.uvh import UVH
 class EnsembleWiseError(ABC, Variable):
     """Base class for ensemble-wise errors."""
 
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(self, variable: DiagnosticVariable) -> None:
         """Instantiate the error.
@@ -23,7 +23,7 @@ class EnsembleWiseError(ABC, Variable):
         Raises:
             ValueError: If the variable scope is invalid.
         """
-        if not variable.scope.point_wise_at_least:
+        if variable.scope != Scope.ENSEMBLE_WISE:
             msg = "Only point wise variable are supported for such error."
             raise ValueError(msg)
         self._var = variable
@@ -62,7 +62,7 @@ class EnsembleWiseError(ABC, Variable):
 class LevelWiseError(ABC, Variable):
     """Base class for level-wise errors."""
 
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(self, variable: DiagnosticVariable) -> None:
         """Instantiate the error.
@@ -73,7 +73,7 @@ class LevelWiseError(ABC, Variable):
         Raises:
             ValueError: If the variable scope is invalid.
         """
-        if not variable.scope.level_wise_at_least:
+        if variable.scope != Scope.LEVEL_WISE:
             msg = "Only point wise variable are supported for such error."
             raise ValueError(msg)
         self._var = variable
@@ -124,7 +124,7 @@ class LevelWiseError(ABC, Variable):
 class PointWiseError(ABC, Variable):
     """Base class for point-wise errors."""
 
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, variable: DiagnosticVariable) -> None:
         """Instantiate the error.
@@ -135,7 +135,7 @@ class PointWiseError(ABC, Variable):
         Raises:
             ValueError: If the variable scope is invalid.
         """
-        if not variable.scope.ensemble_wise_at_least:
+        if variable.scope != Scope.POINT_WISE:
             msg = "Only point wise variable are supported for such error."
             raise ValueError(msg)
         self._var = variable

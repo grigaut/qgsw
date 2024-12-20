@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from qgsw.fields.base import Field
-from qgsw.fields.scope import PointWise
+from qgsw.fields.scope import Scope
 
 try:
     from typing import Self
@@ -40,12 +40,11 @@ class Variable(Field):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the variable to a dictionnary."""
-        var_dict = {
+        return {
             "name": self.name,
             "unit": self.unit,
             "description": self.description,
         }
-        return var_dict | self._scope.to_dict()
 
     @classmethod
     def get_unit(cls) -> Unit:
@@ -60,7 +59,7 @@ class Variable(Field):
 class PrognosticVariable(ABC, Variable):
     """Prognostic variable."""
 
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(self, initial: torch.Tensor) -> None:
         """Instantiate the variable.
