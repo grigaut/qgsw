@@ -5,7 +5,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from qgsw.spatial.units._units import Unit
 from qgsw.variables.scope import PointWise, Scope
 
 try:
@@ -15,13 +14,9 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    import datetime
-    from collections.abc import Iterator
-
-    import numpy as np
     import torch
 
-    from qgsw.output import OutputFile
+    from qgsw.spatial.units._units import Unit
     from qgsw.variables.state import State
     from qgsw.variables.uvh import UVH
 
@@ -261,87 +256,3 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         if state is not self._state:
             return self._var.bind(state)
         return self
-
-
-class ParsedVariable(Variable):
-    """Variable parsed from output file."""
-
-    def __init__(
-        self,
-        name: str,
-        unit: str,
-        description: str,
-        scope: Scope,
-        outputs: list[OutputFile],
-    ) -> None:
-        """Instantiate the variable.
-
-        Args:
-            name (str): Variable name.
-            unit (str): Variable unit.
-            description (str): Variable description.
-            scope (Scope): Variable scope.
-            outputs (list[OutputFile]): Ouputs files.
-        """
-        self._name = name
-        self._unit = Unit(unit)
-        self._description = description
-        self._scope = scope
-        self._outputs = outputs
-
-    def _from_output(
-        self,
-        output: OutputFile,
-    ) -> np.ndarray:
-        return output.read()[self.name]
-
-    def datas(self) -> Iterator[np.ndarray]:
-        """Data from the outputs.
-
-        Yields:
-            Iterator[np.ndarray]: Data iterator.
-        """
-        return iter(self._from_output(output) for output in self._outputs)
-
-    def steps(self) -> Iterator[int]:
-        """Sorted list of steps.
-
-        Yields:
-            Iterator[float]: Steps iterator.
-        """
-        return (output.step for output in iter(self._outputs))
-
-    def timesteps(self) -> Iterator[datetime.timedelta]:
-        """Sorted list of timesteps.
-
-        Yields:
-            Iterator[datetime.timedelta]: Timesteps iterator.
-        """
-        return (output.timestep for output in iter(self._outputs))
-
-    def seconds(self) -> Iterator[float]:
-        """Sorted list of seconds.
-
-        Yields:
-            Iterator[float]: Seconds iterator.
-        """
-        return (output.second for output in iter(self._outputs))
-
-    @classmethod
-    def from_dict(cls, dic: dict, outputs: list[OutputFile]) -> Self:
-        """Instantiate the variable from a dictionnary.
-
-        Args:
-            dic (dict): Dictionnary to use.
-            outputs (list[OutputFile]): Ouputs files.
-
-        Returns:
-            Self: Parsed Variable.
-        """
-        return cls(
-            name=dic["name"],
-            unit=dic["unit"],
-            description=dic["description"],
-            scope=Scope.from_dict(dic),
-            outputs=outputs,
-        )

@@ -473,13 +473,13 @@ class Enstrophy(DiagnosticVariable):
     _description = "Layer-wise enstrophy"
     _scope = LevelWise()
 
-    def __init__(self, vorticity_phys: PhysicalVorticity) -> None:
+    def __init__(self, pv: PotentialVorticity) -> None:
         """Instantiate the variable.
 
         Args:
-            vorticity_phys (PhysicalVorticity): Physical vorticity.
+            pv (PotentialVorticity): Physical vorticity.
         """
-        self._vorticity = vorticity_phys
+        self._pv = pv
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
@@ -490,7 +490,7 @@ class Enstrophy(DiagnosticVariable):
         Returns:
             torch.Tensor: Enstrophy.
         """
-        return torch.sum(self._vorticity.compute(uvh) ** 2, dim=(-1, -2))
+        return 0.5 * torch.sum(self._pv.compute(uvh) ** 2, dim=(-1, -2))
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a state.
@@ -501,7 +501,7 @@ class Enstrophy(DiagnosticVariable):
         Returns:
             BoundDiagnosticVariable[Self]: Bound variable.
         """
-        self._vorticity.bind(state)
+        self._pv.bind(state)
         return super().bind(state)
 
 
@@ -522,11 +522,11 @@ class TotalEnstrophy(Enstrophy):
         Returns:
             torch.Tensor: Enstrophy.
         """
-        return torch.sum(self._vorticity.compute(uvh) ** 2, dim=(-1, -2, -3))
+        return 0.5 * torch.sum(self._pv.compute(uvh) ** 2, dim=(-1, -2, -3))
 
 
-class ParsedZonalVelocity(DiagnosticVariable):
-    """Parsed zonal velocity."""
+class ZonalVelocityDiag(DiagnosticVariable):
+    """Diagnostic zonal velocity."""
 
     _unit = ZonalVelocity.get_unit()
     _name = ZonalVelocity.get_name()
@@ -545,8 +545,8 @@ class ParsedZonalVelocity(DiagnosticVariable):
         return uvh.u
 
 
-class ParsedMeridionalVelocity(DiagnosticVariable):
-    """Meridional Velocity."""
+class MeridionalVelocityDiag(DiagnosticVariable):
+    """Diagnostic Meridional Velocity."""
 
     _unit = MeridionalVelocity.get_unit()
     _name = MeridionalVelocity.get_name()
@@ -565,8 +565,8 @@ class ParsedMeridionalVelocity(DiagnosticVariable):
         return uvh.v
 
 
-class ParsedLayerDepthAnomaly(DiagnosticVariable):
-    """Layer Depth Anomaly."""
+class LayerDepthAnomalyDiag(DiagnosticVariable):
+    """Diagnostic Layer Depth Anomaly."""
 
     _unit = LayerDepthAnomaly.get_unit()
     _name = LayerDepthAnomaly.get_name()
