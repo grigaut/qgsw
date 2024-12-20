@@ -373,7 +373,7 @@ class PotentialVorticity(DiagnosticVariable):
 
     def __init__(
         self,
-        vorticity: PhysicalVorticity,
+        vorticity_phys: PhysicalVorticity,
         h_ref: torch.Tensor,
         area: float,
         f0: float,
@@ -381,7 +381,7 @@ class PotentialVorticity(DiagnosticVariable):
         """Instantiate variable.
 
         Args:
-            vorticity (PhysicalVorticity): Physical vorticity.
+            vorticity_phys (PhysicalVorticity): Physical vorticity.
             h_ref (torch.Tensor): Reference heights.
             area (float): Elementary area.
             f0 (float): Coriolis parameter.
@@ -389,7 +389,7 @@ class PotentialVorticity(DiagnosticVariable):
         self._h_ref = h_ref
         self._area = area
         self._f0 = f0
-        self._vorticity = vorticity
+        self._vorticity_phys = vorticity_phys
         self._interp = OptimizableFunction(points_to_surfaces)
 
     def compute(self, uvh: UVH) -> torch.Tensor:
@@ -401,8 +401,8 @@ class PotentialVorticity(DiagnosticVariable):
         Returns:
             torch.Tensor: Value
         """
-        vorticity = self._interp(self._vorticity.compute(uvh))
-        return vorticity - self._f0 * uvh.h / self._h_ref
+        vorticity_phys = self._interp(self._vorticity_phys.compute(uvh))
+        return vorticity_phys - self._f0 * uvh.h / self._h_ref
 
     def bind(
         self,
@@ -416,8 +416,8 @@ class PotentialVorticity(DiagnosticVariable):
         Returns:
             BoundDiagnosticVariable: Bound variable.
         """
-        # Bind the vorticity variable
-        self._vorticity = self._vorticity.bind(state)
+        # Bind the vorticity_phys variable
+        self._vorticity_phys = self._vorticity_phys.bind(state)
         return super().bind(state)
 
 
