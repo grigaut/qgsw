@@ -165,10 +165,10 @@ class QG(Model):
         ]
         space_repr_ = self.space.get_repr_parts()
         space_repr = ["├── " + space_repr_.pop(0)]
-        space_repr = space_repr + ["\t" + txt for txt in space_repr_]
+        space_repr = space_repr + ["│\t" + txt for txt in space_repr_]
         state_repr_ = self._state.get_repr_parts()
         state_repr = ["├── " + state_repr_.pop(0)]
-        state_repr = state_repr + ["\t" + txt for txt in state_repr_]
+        state_repr = state_repr + ["│\t" + txt for txt in state_repr_]
         sw_repr_ = self.sw.get_repr_parts()
         sw_repr = ["└── Core " + sw_repr_.pop(0)]
         sw_repr = sw_repr + ["\t" + txt for txt in sw_repr_]

@@ -100,25 +100,27 @@ class State:
         Returns:
             list[str]: String representation parts.
         """
-        msg_prognostic = [
-            "State",
-            "└── Prognostic Variables",
-            f"\t├── {self.u}",
-            f"\t├── {self.v}",
-            f"\t└── {self.h}",
-        ]
         if not self.diag_vars:
-            return msg_prognostic
-        chars = msg_prognostic[1].split()
-        chars[0] = "├──"
-        msg_prognostic[1] = " ".join(chars)
-        msg_diagnostic = [
+            return [
+                "State",
+                "└── Prognostic Variables",
+                f"\t├── {self.u}",
+                f"\t├── {self.v}",
+                f"\t└── {self.h}",
+            ]
+        txt = [
+            "State",
+            "├── Prognostic Variables",
+            f"│\t├── {self.u}",
+            f"│\t├── {self.v}",
+            f"│\t└── {self.h}",
             "└── Diagnostic Variables",
-        ] + [f"\t├── {var}" for var in self.diag_vars.values()]
-        chars = msg_diagnostic[-1].split()
+        ]
+        txt_end = [f"\t├── {var}" for var in self.diag_vars.values()]
+        chars = txt_end.pop(-1).split()
         chars[0] = "\t└──"
-        msg_diagnostic[-1] = " ".join(chars)
-        return msg_prognostic + msg_diagnostic
+        txt_end.append(" ".join(chars))
+        return txt + txt_end
 
     def __repr__(self) -> str:
         """String representation of State."""
