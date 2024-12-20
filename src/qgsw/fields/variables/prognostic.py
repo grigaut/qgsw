@@ -7,17 +7,17 @@ from qgsw.spatial.units._units import Unit
 class ZonalVelocity(PrognosticVariable):
     """Zonal Velocity."""
 
-    _unit = Unit.S_1
+    _unit = Unit.M2S_1
     _name = "u"
-    _description = "Contravariant zonal velocity"
+    _description = "Covariant zonal velocity"
 
 
 class MeridionalVelocity(PrognosticVariable):
     """Meridional Velocity."""
 
-    _unit = Unit.S_1
+    _unit = Unit.M2S_1
     _name = "v"
-    _description = "Contravariant meriodional velocity"
+    _description = "Covariant meriodional velocity"
 
 
 class LayerDepthAnomaly(PrognosticVariable):
