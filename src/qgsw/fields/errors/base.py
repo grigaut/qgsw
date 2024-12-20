@@ -4,12 +4,13 @@ from abc import ABC, abstractmethod
 
 import torch
 
+from qgsw.fields.base import Field
 from qgsw.fields.scope import Scope
-from qgsw.fields.variables.base import DiagnosticVariable, Variable
+from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.uvh import UVH
 
 
-class EnsembleWiseError(ABC, Variable):
+class EnsembleWiseError(ABC, Field):
     """Base class for ensemble-wise errors."""
 
     _scope = Scope.ENSEMBLE_WISE
@@ -59,7 +60,7 @@ class EnsembleWiseError(ABC, Variable):
         return self._compute(uvh, uvh_ref)
 
 
-class LevelWiseError(ABC, Variable):
+class LevelWiseError(ABC, Field):
     """Base class for level-wise errors."""
 
     _scope = Scope.LEVEL_WISE
@@ -121,7 +122,7 @@ class LevelWiseError(ABC, Variable):
         return torch.mean(self._compute(uvh, uvh_ref), dim=(-1))
 
 
-class PointWiseError(ABC, Variable):
+class PointWiseError(ABC, Field):
     """Base class for point-wise errors."""
 
     _scope = Scope.POINT_WISE
