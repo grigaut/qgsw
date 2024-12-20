@@ -60,5 +60,5 @@ install-dev:
 
 # GRID 5000 -----------------------------------------
 g5k-import-%:
-	scp -r ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${G5K_IMPORT_STORAGE}/$*
+	rsync -avzP ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${G5K_IMPORT_STORAGE}
 # ---------------------------------------------------
