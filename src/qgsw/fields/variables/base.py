@@ -21,8 +21,6 @@ if TYPE_CHECKING:
     from qgsw.fields.variables.uvh import UVH
     from qgsw.spatial.units._units import Unit
 
-T = TypeVar("T")
-
 
 class Variable(Field):
     """Variable."""
@@ -65,7 +63,7 @@ class PrognosticVariable(ABC, Variable):
         """Instantiate the variable.
 
         Args:
-            initial (T): Initial value.
+            initial (torch.Tensor): Initial value.
         """
         self._data = initial
 
