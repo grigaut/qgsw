@@ -8,6 +8,18 @@ except ImportError:
 import torch
 import torch.nn.functional as F  # noqa: N812
 
+from qgsw.fields.scope import Scope
+from qgsw.fields.variables.base import (
+    BoundDiagnosticVariable,
+    DiagnosticVariable,
+)
+from qgsw.fields.variables.dynamics import (
+    MeridionalVelocityFlux,
+    StreamFunction,
+    ZonalVelocityFlux,
+)
+from qgsw.fields.variables.state import State
+from qgsw.fields.variables.uvh import UVH
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff
 from qgsw.models.core.utils import OptimizableFunction
@@ -15,18 +27,6 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.spatial.units._units import Unit
-from qgsw.variables.base import (
-    BoundDiagnosticVariable,
-    DiagnosticVariable,
-)
-from qgsw.variables.dynamics import (
-    MeridionalVelocityFlux,
-    StreamFunction,
-    ZonalVelocityFlux,
-)
-from qgsw.variables.scope import EnsembleWise, LevelWise, PointWise
-from qgsw.variables.state import State
-from qgsw.variables.uvh import UVH
 
 
 class KineticEnergy(DiagnosticVariable):
@@ -35,7 +35,7 @@ class KineticEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "kinetic_energy"
     _description = "Kinetic energy"
-    _scope = PointWise()
+    _scope = Scope.POINT_WISE
 
     def __init__(
         self,
@@ -95,7 +95,7 @@ class ModalKineticEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ke_hat"
     _description = "Modal kinetic energy"
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(
         self,
@@ -179,7 +179,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ape_hat"
     _description = "Modal available potential energy"
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(
         self,
@@ -256,7 +256,7 @@ class ModalEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "e_tot_hat"
     _description = "Modal energy"
-    _scope = LevelWise()
+    _scope = Scope.LEVEL_WISE
 
     def __init__(
         self,
@@ -309,7 +309,7 @@ class TotalKineticEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ke"
     _description = "Kinetic energy"
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(
         self,
@@ -384,7 +384,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "ape"
     _description = "Available potential energy"
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(
         self,
@@ -458,7 +458,7 @@ class TotalEnergy(DiagnosticVariable):
     _unit = Unit.M2S_2
     _name = "e_tot"
     _description = "Total energy"
-    _scope = EnsembleWise()
+    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(
         self,

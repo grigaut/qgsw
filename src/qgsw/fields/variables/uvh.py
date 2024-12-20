@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from qgsw.variables.prognostic import (
+from qgsw.fields.variables.prognostic import (
     LayerDepthAnomaly,
     MeridionalVelocity,
     ZonalVelocity,

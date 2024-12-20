@@ -10,12 +10,7 @@ from typing import TYPE_CHECKING
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw.models.base import Model
-from qgsw.models.core import finite_diff, schemes
-from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.core import grid_conversion as convert
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
-from qgsw.variables.dynamics import (
+from qgsw.fields.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     Pressure,
@@ -23,13 +18,18 @@ from qgsw.variables.dynamics import (
     Vorticity,
     ZonalVelocityFlux,
 )
-from qgsw.variables.energetics import KineticEnergy
-from qgsw.variables.uvh import UVH
+from qgsw.fields.variables.energetics import KineticEnergy
+from qgsw.fields.variables.uvh import UVH
+from qgsw.models.base import Model
+from qgsw.models.core import finite_diff, schemes
+from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.spatial.core import grid_conversion as convert
+from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 if TYPE_CHECKING:
+    from qgsw.fields.variables.state import State
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
-    from qgsw.variables.state import State
 
 
 def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:

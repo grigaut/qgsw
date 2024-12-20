@@ -10,17 +10,20 @@ except ImportError:
     from typing_extensions import Self
 
 
-from qgsw.variables.prognostic import (
+from qgsw.fields.variables.prognostic import (
     LayerDepthAnomaly,
     MeridionalVelocity,
     ZonalVelocity,
 )
-from qgsw.variables.uvh import UVH
+from qgsw.fields.variables.uvh import UVH
 
 if TYPE_CHECKING:
     import torch
 
-    from qgsw.variables.base import BoundDiagnosticVariable, PrognosticVariable
+    from qgsw.fields.variables.base import (
+        BoundDiagnosticVariable,
+        PrognosticVariable,
+    )
 
 
 class State:

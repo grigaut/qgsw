@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.fields.variables.uvh import UVH
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.parameters import ModelParamChecker
@@ -16,7 +17,6 @@ from qgsw.models.sw.core import SW
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
-from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane

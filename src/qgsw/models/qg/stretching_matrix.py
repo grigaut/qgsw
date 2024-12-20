@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import torch
 
-from qgsw.specs import DEVICE
-
 
 def compute_A(  # noqa: N802
     H: torch.Tensor,  # noqa: N803
     g_prime: torch.Tensor,
     dtype: torch.dtype,
-    device: str = DEVICE.get(),
+    device: torch.device,
 ) -> torch.Tensor:
     """Compute the stretching operator matrix A.
 

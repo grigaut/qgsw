@@ -3,20 +3,20 @@
 import pytest
 import torch
 
-from qgsw.models.qg.stretching_matrix import compute_A
-from qgsw.variables.dynamics import (
+from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     Pressure,
     StreamFunction,
     SurfaceHeightAnomaly,
 )
-from qgsw.variables.energetics import (
+from qgsw.fields.variables.energetics import (
     ModalAvailablePotentialEnergy,
     ModalKineticEnergy,
     TotalAvailablePotentialEnergy,
     TotalKineticEnergy,
 )
-from qgsw.variables.uvh import UVH
+from qgsw.fields.variables.uvh import UVH
+from qgsw.models.qg.stretching_matrix import compute_A
 
 
 @pytest.fixture

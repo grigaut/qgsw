@@ -12,10 +12,10 @@ from qgsw.models.exceptions import InvalidSavingFileError
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from qgsw.variables.base import (
+    from qgsw.fields.variables.base import (
         PrognosticVariable,
     )
-    from qgsw.variables.prognostic import (
+    from qgsw.fields.variables.prognostic import (
         LayerDepthAnomaly,
         MeridionalVelocity,
         ZonalVelocity,
