@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from qgsw.variables.base import Variable
+    from qgsw.fields.variables.base import Variable
 
 
 def check_unit_compatibility(*variables: Variable) -> bool:

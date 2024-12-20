@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from qgsw.fields.variables.uvh import UVH
 from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
@@ -21,7 +22,6 @@ from qgsw.spatial.core.discretization import (
 )
 from qgsw.specs import DEVICE
 from qgsw.utils.gaussian_filtering import GaussianFilter2D
-from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane

@@ -10,6 +10,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.fields.variables.state import State
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -20,13 +21,12 @@ from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
-from qgsw.variables.state import State
 
 if TYPE_CHECKING:
+    from qgsw.fields.variables.uvh import UVH
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
     from qgsw.specs._utils import Device
-    from qgsw.variables.uvh import UVH
 
 
 class Model(ModelParamChecker, metaclass=ABCMeta):

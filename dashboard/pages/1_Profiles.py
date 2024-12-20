@@ -5,13 +5,13 @@ from pathlib import Path
 import streamlit as st
 import torch
 
+from qgsw.fields.variables.utils import check_unit_compatibility
 from qgsw.output import RunOutput, add_qg_variables
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,
 )
 from qgsw.plots.scatter import ScatterPlot
 from qgsw.specs import DEVICE
-from qgsw.variables.utils import check_unit_compatibility
 
 ROOT = Path(__file__).parent.parent.parent
 OUTPUTS = ROOT.joinpath("output")

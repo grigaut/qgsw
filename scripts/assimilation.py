@@ -8,6 +8,7 @@ from rich.progress import Progress
 
 from qgsw import verbose
 from qgsw.configs.core import Configuration
+from qgsw.fields.variables.uvh import UVH
 from qgsw.models.qg.core import QG
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
@@ -18,7 +19,6 @@ from qgsw.spatial.core.discretization import (
 )
 from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
-from qgsw.variables.uvh import UVH
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)

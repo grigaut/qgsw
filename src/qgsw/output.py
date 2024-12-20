@@ -10,13 +10,7 @@ from typing import TYPE_CHECKING, NamedTuple
 import numpy as np
 import torch
 
-from qgsw.masks import Masks
-from qgsw.models.qg.stretching_matrix import compute_A
-from qgsw.run_summary import RunSummary
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
-from qgsw.specs import DEVICE
-from qgsw.utils.sorting import sort_files
-from qgsw.variables.dynamics import (
+from qgsw.fields.variables.dynamics import (
     Enstrophy,
     LayerDepthAnomalyDiag,
     MeridionalVelocityDiag,
@@ -34,7 +28,7 @@ from qgsw.variables.dynamics import (
     ZonalVelocityDiag,
     ZonalVelocityFlux,
 )
-from qgsw.variables.energetics import (
+from qgsw.fields.variables.energetics import (
     ModalAvailablePotentialEnergy,
     ModalEnergy,
     ModalKineticEnergy,
@@ -42,7 +36,13 @@ from qgsw.variables.energetics import (
     TotalEnergy,
     TotalKineticEnergy,
 )
-from qgsw.variables.uvh import UVH
+from qgsw.fields.variables.uvh import UVH
+from qgsw.masks import Masks
+from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.run_summary import RunSummary
+from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.specs import DEVICE
+from qgsw.utils.sorting import sort_files
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
-    from qgsw.variables.base import DiagnosticVariable
+    from qgsw.fields.variables.base import DiagnosticVariable
 
 
 class OutputFile(NamedTuple):
@@ -274,7 +274,7 @@ def add_qg_variables(
     eta = SurfaceHeightAnomaly(h_phys)
     p = Pressure(g_prime, eta)
     psi = StreamFunction(p, physics_config.f0)
-    pv = PotentialVorticity(vorticity, H * ds, ds, physics_config.f0)
+    pv = PotentialVorticity(vorticity_phys, H * ds, ds, physics_config.f0)
     enstrophy = Enstrophy(pv)
     enstrophy_tot = TotalEnstrophy(pv)
     ke_hat = ModalKineticEnergy(A, psi, H, dx, dy)

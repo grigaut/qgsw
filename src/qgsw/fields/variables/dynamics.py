@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from qgsw.spatial.units._units import Unit
-from qgsw.variables.prognostic import (
+from qgsw.fields.variables.prognostic import (
     LayerDepthAnomaly,
     MeridionalVelocity,
     ZonalVelocity,
 )
-from qgsw.variables.scope import EnsembleWise, LevelWise, PointWise
+from qgsw.fields.variables.scope import EnsembleWise, LevelWise, PointWise
+from qgsw.spatial.units._units import Unit
 
 try:
     from typing import Self
@@ -20,18 +20,18 @@ from typing import TYPE_CHECKING
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw.models.core.finite_diff import reverse_cumsum
-from qgsw.models.core.utils import OptimizableFunction
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.variables.base import (
+from qgsw.fields.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
 )
+from qgsw.models.core.finite_diff import reverse_cumsum
+from qgsw.models.core.utils import OptimizableFunction
+from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
+    from qgsw.fields.variables.state import State
+    from qgsw.fields.variables.uvh import UVH
     from qgsw.masks import Masks
-    from qgsw.variables.state import State
-    from qgsw.variables.uvh import UVH
 
 
 class PhysicalZonalVelocity(DiagnosticVariable):

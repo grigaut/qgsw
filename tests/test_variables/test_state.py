@@ -2,12 +2,12 @@
 
 import torch
 
-from qgsw.variables.dynamics import (
+from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     SurfaceHeightAnomaly,
 )
-from qgsw.variables.state import State
-from qgsw.variables.uvh import UVH
+from qgsw.fields.variables.state import State
+from qgsw.fields.variables.uvh import UVH
 
 
 def test_init_update() -> None:

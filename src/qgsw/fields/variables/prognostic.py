@@ -1,7 +1,7 @@
 """Prognostic variables."""
 
+from qgsw.fields.variables.base import PrognosticVariable
 from qgsw.spatial.units._units import Unit
-from qgsw.variables.base import PrognosticVariable
 
 
 class ZonalVelocity(PrognosticVariable):

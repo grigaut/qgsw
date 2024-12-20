@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from qgsw.fields.variables.uvh import UVH
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -20,7 +21,6 @@ from qgsw.models.qg.stretching_matrix import (
 )
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
     from collections.abc import Callable
