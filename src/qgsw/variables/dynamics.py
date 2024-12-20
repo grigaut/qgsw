@@ -259,13 +259,12 @@ class Vorticity(DiagnosticVariable):
         dy_u = torch.diff(u_, dim=-1)
         curl_uv = dx_v - dy_u
         alpha = 2 * (1 - self._slip_coef)
-        omega: torch.Tensor = (
+        return (
             self._w_valid * curl_uv
             + self._w_cornerout_bound * (1 - self._slip_coef) * curl_uv
             + self._w_vertical_bound * alpha * dx_v
             - self._w_horizontal_bound * alpha * dy_u
         )
-        return omega
 
 
 class PhysicalVorticity(DiagnosticVariable):

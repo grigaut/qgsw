@@ -83,20 +83,20 @@ class Variable:
         return cls._description
 
     @classmethod
-    def get_scope(cls) -> str:
+    def get_scope(cls) -> Scope:
         """Retrieve the scope of the variable.
 
         Returns:
-            str: Variable description.
+            Scope: Variable scope.
         """
         return cls._scope
 
     @classmethod
-    def get_unit(cls) -> str:
+    def get_unit(cls) -> Unit:
         """Retrieve the unit of the variable.
 
         Returns:
-            str: Variable unit.
+            Unit: Variable unit.
         """
         return cls._unit
 
@@ -244,7 +244,7 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         """
         self._up_to_date = False
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+    def bind(self, state: State) -> BoundDiagnosticVariable[DiagVar]:
         """Bind the variable to another state if required.
 
         Args:
