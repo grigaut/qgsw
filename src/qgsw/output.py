@@ -18,10 +18,9 @@ from qgsw.specs import DEVICE
 from qgsw.utils.sorting import sort_files
 from qgsw.variables.dynamics import (
     Enstrophy,
+    LayerDepthAnomalyDiag,
+    MeridionalVelocityDiag,
     MeridionalVelocityFlux,
-    ParsedLayerDepthAnomaly,
-    ParsedMeridionalVelocity,
-    ParsedZonalVelocity,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
     PhysicalVorticity,
@@ -32,6 +31,7 @@ from qgsw.variables.dynamics import (
     SurfaceHeightAnomaly,
     TotalEnstrophy,
     Vorticity,
+    ZonalVelocityDiag,
     ZonalVelocityFlux,
 )
 from qgsw.variables.energetics import (
@@ -42,7 +42,6 @@ from qgsw.variables.energetics import (
     TotalEnergy,
     TotalKineticEnergy,
 )
-from qgsw.variables.state import State
 from qgsw.variables.uvh import UVH
 
 if TYPE_CHECKING:
@@ -71,9 +70,9 @@ class OutputFile(NamedTuple):
             UVh: Data.
         """
         data = np.load(file=self.path)
-        u = torch.tensor(data[ParsedZonalVelocity.get_name()])
-        v = torch.tensor(data[ParsedMeridionalVelocity.get_name()])
-        h = torch.tensor(data[ParsedLayerDepthAnomaly.get_name()])
+        u = torch.tensor(data[ZonalVelocityDiag.get_name()])
+        v = torch.tensor(data[MeridionalVelocityDiag.get_name()])
+        h = torch.tensor(data[LayerDepthAnomalyDiag.get_name()])
         return UVH(
             u.to(dtype=self.dtype, device=self.device),
             v.to(dtype=self.dtype, device=self.device),
@@ -110,13 +109,10 @@ class RunOutput:
             )
             for i in range(len(files))
         ]
-        self._state = State(
-            self._outputs[0].read(),
-        )
         self._vars: dict[str, DiagnosticVariable] = {
-            ParsedZonalVelocity.get_name(): ParsedZonalVelocity(),
-            ParsedMeridionalVelocity.get_name(): ParsedMeridionalVelocity(),
-            ParsedLayerDepthAnomaly.get_name(): ParsedZonalVelocity(),
+            ZonalVelocityDiag.get_name(): ZonalVelocityDiag(),
+            MeridionalVelocityDiag.get_name(): MeridionalVelocityDiag(),
+            LayerDepthAnomalyDiag.get_name(): ZonalVelocityDiag(),
         }
 
     @cached_property
@@ -128,11 +124,6 @@ class RunOutput:
     def summary(self) -> RunSummary:
         """Run summary."""
         return self._summary
-
-    @property
-    def state(self) -> State:
-        """State."""
-        return self._state
 
     @property
     def vars(self) -> list[DiagnosticVariable]:
@@ -284,8 +275,8 @@ def add_qg_variables(
     p = Pressure(g_prime, eta)
     psi = StreamFunction(p, physics_config.f0)
     pv = PotentialVorticity(vorticity, H * ds, ds, physics_config.f0)
-    enstrophy = Enstrophy(pv, H)
-    enstrophy_tot = TotalEnstrophy(pv, H)
+    enstrophy = Enstrophy(pv)
+    enstrophy_tot = TotalEnstrophy(pv)
     ke_hat = ModalKineticEnergy(A, psi, H, dx, dy)
     ape_hat = ModalAvailablePotentialEnergy(A, psi, H, physics_config.f0)
     energy_hat = ModalEnergy(ke_hat, ape_hat)
