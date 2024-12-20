@@ -6,7 +6,8 @@ from pathlib import Path
 import toml
 import torch
 
-from qgsw.output import RunOutput, add_qg_variables, check_time_compatibility
+from qgsw.fields.variables.variable_sets import create_qg_variable_set
+from qgsw.output import RunOutput, check_time_compatibility
 from qgsw.plots.heatmaps import AnimatedHeatmaps
 from qgsw.specs import DEVICE
 
@@ -19,26 +20,29 @@ with CONFIG_FILE.open() as f:
 
 runs = [RunOutput(source["folder"]) for source in config["source"]]
 check_time_compatibility(*runs)
-[
-    add_qg_variables(
-        run,
+
+variables = [
+    create_qg_variable_set(
         run.summary.configuration.physics,
         run.summary.configuration.space,
         run.summary.configuration.model,
         torch.float64,
         DEVICE.get(),
-    )
+    )[config["field"]]
     for run in runs
 ]
-var = runs[0].get_var(config["field"])
 datas = [
-    [d[0, config["source"][k]["level"]].T.cpu() for d in run[config["field"]]]
+    [
+        variables[k]
+        .compute(output.read())[0, config["source"][k]["level"]]
+        .T.cpu()
+        for output in run.outputs()
+    ]
     for k, run in enumerate(runs)
 ]
-
 plot = AnimatedHeatmaps(datas)
 plot.set_slider_prefix("Time: ")
-txt = f"{var.description}[{var.unit.value}]"
+txt = f"{variables[0].description}[{variables[0].unit.value}]"
 plot.set_colorbar_text(txt)
 plot.set_subplot_titles(
     [
