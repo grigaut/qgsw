@@ -1,4 +1,4 @@
-name: Run Tests
+name: Run tests and perform linting
 on:
   pull_request:
 
@@ -21,3 +21,16 @@ jobs:
         run: python -m pip install nox
       - name: Run Nox
         run: python -m nox
+  Linting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone code
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install ruff
+        run: python -m pip install ruff
+      - name: Run ruff
+        run: python -m ruff check --force-exclude
