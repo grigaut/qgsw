@@ -53,7 +53,6 @@ def test_2D_to_3D(  # noqa: N802
         x_unit=Unit.M,
         y_unit=Unit.M,
     )
-    space_3d = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
     space_ref = SpaceDiscretization3D.from_tensors(
         x_unit=Unit.M,
         y_unit=Unit.M,
@@ -62,6 +61,8 @@ def test_2D_to_3D(  # noqa: N802
         y=Y,
         h=H,
     )
+    space_3d = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
+
     assert (space_3d.omega.xyh.x == space_ref.omega.xyh.x).all()
     assert (space_3d.omega.xyh.y == space_ref.omega.xyh.y).all()
     assert (space_3d.omega.xyh.h == space_ref.omega.xyh.h).all()
@@ -74,3 +75,32 @@ def test_2D_to_3D(  # noqa: N802
     assert (space_3d.h.xyh.x == space_ref.h.xyh.x).all()
     assert (space_3d.h.xyh.y == space_ref.h.xyh.y).all()
     assert (space_3d.h.xyh.h == space_ref.h.xyh.h).all()
+
+
+def test_2D_and_3D_horizontal(  # noqa: N802
+    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],  # noqa: N803
+) -> None:
+    """Test 2D to 3D space conversion."""
+    X, Y, H = X_Y_H  # noqa: N806
+    space_2d = SpaceDiscretization2D.from_tensors(
+        x=X,
+        y=Y,
+        x_unit=Unit.M,
+        y_unit=Unit.M,
+    )
+    space_ref = SpaceDiscretization3D.from_tensors(
+        x_unit=Unit.M,
+        y_unit=Unit.M,
+        zh_unit=Unit.M,
+        x=X,
+        y=Y,
+        h=H,
+    )
+    assert (space_2d.omega.xy.x == space_ref.omega.xyh.x).all()
+    assert (space_2d.omega.xy.y == space_ref.omega.xyh.y).all()
+    assert (space_2d.u.xy.x == space_ref.u.xyh.x).all()
+    assert (space_2d.u.xy.y == space_ref.u.xyh.y).all()
+    assert (space_2d.v.xy.x == space_ref.v.xyh.x).all()
+    assert (space_2d.v.xy.y == space_ref.v.xyh.y).all()
+    assert (space_2d.h.xy.x == space_ref.h.xyh.x).all()
+    assert (space_2d.h.xy.y == space_ref.h.xyh.y).all()
