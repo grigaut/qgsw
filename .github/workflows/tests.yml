@@ -5,8 +5,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
         with:
+            python-version: 3.12
             auto-activate-base: true
+      - run: echo $CONDA/bin >> $GITHUB_PATH
       - name: Install nox
         run: conda install nox
       - name: Run Nox
