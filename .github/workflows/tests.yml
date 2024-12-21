@@ -1,0 +1,16 @@
+name: Run Tests
+run-name: ${{ github.actor }} is performing tests
+on: [push]
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: conda-incubator/setup-miniconda@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install nox
+        run: pip install nox
+      - name: Run Nox
+        run: python -m nox
