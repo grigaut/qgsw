@@ -21,7 +21,6 @@ endif
 PYTHON:= ${BIN}/python
 PIP:=${BIN}/pip
 # Important Files
-REQUIREMENTS:=requirements.txt
 DEV_REQUIREMENTS:=requirements-dev.txt
 RUN_SCRIPT := run.sh
 
