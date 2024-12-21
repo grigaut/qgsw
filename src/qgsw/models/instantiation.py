@@ -26,6 +26,7 @@ from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
     keep_top_layer,
 )
+from qgsw.specs import DEVICE
 from qgsw.utils import time_params
 
 if TYPE_CHECKING:
@@ -136,6 +137,7 @@ def _instantiate_sw(
         space_3d.h.xyh.h[:, 0, 0],
         config.model.g_prime.unsqueeze(1).unsqueeze(1)[:, 0, 0],
         torch.float64,
+        device=DEVICE.get(),
     )
     uvh0 = G(
         p0,
