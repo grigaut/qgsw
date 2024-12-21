@@ -7,12 +7,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: conda-incubator/setup-miniconda@v3
         with:
+            activate-environment: test
             channels: conda-forge
             auto-activate-base: true
-      - run: |
-          conda info
-          conda list
-      # - name: Install nox
-      #   run: $CONDA/bin/conda install nox
-      # - name: Run Nox
-      #   run: $CONDA/bin/python -m nox
+      - name: Install nox
+        run: $CONDA/ens/test/python -m pip install nox
+      - name: Run Nox
+        run: $CONDA/ens/test/python -m nox
