@@ -105,6 +105,7 @@ from qgsw.specs import DEVICE
 if TYPE_CHECKING:
     from qgsw.configs.core import SpaceConfig
     from qgsw.configs.models import ModelConfig
+    from qgsw.spatial.core.coordinates import Coordinates1D
 
 
 class MeshesInstanciationError(Exception):
@@ -485,11 +486,11 @@ class SpaceDiscretization2D:
         msg = "All grids xy units must correspond."
         raise MeshesInstanciationError(msg)
 
-    def add_h(self, h: torch.Tensor) -> SpaceDiscretization3D:
+    def add_h(self, h: Coordinates1D) -> SpaceDiscretization3D:
         """Switch to 3D Grids adding layers thickness.
 
         Args:
-            h (torch.Tensor): Layers thickness.
+            h (Coordinates1D): Layers thickness coordinates.
 
         Returns:
             SpaceDiscretization3D: 3D Grids.
