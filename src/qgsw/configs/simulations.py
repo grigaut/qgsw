@@ -13,7 +13,7 @@ from pydantic import (
     PositiveFloat,
 )
 
-from qgsw.configs.models import ModelConfig  # noqa: TCH001
+from qgsw.configs.models import ModelConfig  # noqa: TC001
 
 
 class SimulationConfig(BaseModel):

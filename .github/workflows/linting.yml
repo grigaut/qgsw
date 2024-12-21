@@ -1,9 +1,9 @@
-name: Run Tests
+name: Ruff Linting
 on:
   pull_request:
 
 jobs:
-  Tests:
+  Linting:
     runs-on: ubuntu-latest
     steps:
       - name: Clone code

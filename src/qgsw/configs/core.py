@@ -1,6 +1,6 @@
 """Configurations."""
 
-# ruff: noqa: TCH001, UP007
+# ruff: noqa: TC001, UP007
 
 from __future__ import annotations
 
