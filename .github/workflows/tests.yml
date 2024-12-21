@@ -12,4 +12,4 @@ jobs:
       - name: Install nox
         run: $CONDA/bin/conda install nox
       - name: Run Nox
-        run: nox
+        run: $CONDA/bin/python -m nox
