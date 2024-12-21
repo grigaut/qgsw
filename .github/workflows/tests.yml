@@ -1,15 +1,21 @@
 name: Run Tests
-on: [push]
+on:
+  push:
+    branches:
+      - main
 jobs:
   Tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: conda-incubator/setup-miniconda@v3
+      - name: Clone code
+        uses: actions/checkout@v4
+      - name: Install Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
             auto-update-conda: true
             channels: conda-forge
-      - uses: actions/setup-python@v5
+      - name: Install Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - name: Install nox
