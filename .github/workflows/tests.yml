@@ -12,6 +12,6 @@ jobs:
             channels: conda-forge
             auto-activate-base: true
       - name: Install nox
-        run: $CONDA/ens/test/python -m pip install nox
+        run: $CONDA/ens/test/bin/python -m pip install nox
       - name: Run Nox
-        run: $CONDA/ens/test/python -m nox
+        run: $CONDA/ens/test/bin/python -m nox
