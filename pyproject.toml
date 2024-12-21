@@ -25,10 +25,6 @@ lint.ignore = [
     "INP001",
     # Too many arguments to function call
     "PLR0913",
-    # Missing type annotation for `self` in method
-    "ANN101",
-    # Missing type annotation for `cls` in classmethod
-    "ANN102",
 ]
 lint.unfixable = [
     # Remove unused-imports
@@ -38,7 +34,7 @@ lint.unfixable = [
     # Use {key} in {dict} instead of {key} in {dict}.keys()
     "SIM118",
     # move to type-checking block
-    "TCH003",
+    "TC001",
     # found comented-out code
     "ERA001",
 ]
