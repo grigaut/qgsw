@@ -2,10 +2,9 @@ name: Run Tests
 run-name: ${{ github.actor }} is performing tests
 on: [push]
 jobs:
-  Explore-GitHub-Actions:
+  Tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: conda-incubator/setup-miniconda@v3
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
