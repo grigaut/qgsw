@@ -9,7 +9,10 @@ jobs:
         with:
             channels: conda-forge
             auto-activate-base: true
-      - name: Install nox
-        run: $CONDA/bin/conda install nox
-      - name: Run Nox
-        run: $CONDA/bin/python -m nox
+      - run: |
+          conda info
+          conda list
+      # - name: Install nox
+      #   run: $CONDA/bin/conda install nox
+      # - name: Run Nox
+      #   run: $CONDA/bin/python -m nox
