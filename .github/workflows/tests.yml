@@ -7,9 +7,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
             auto-activate-base: true
-      - run: echo $CONDA_PREFIX
-      - run: conda install -c conda-forge subprocess32
       - name: Install nox
-        run: python -m pip install nox
+        run: conda install nox
       - name: Run Nox
-        run: python -m nox
+        run: nox
