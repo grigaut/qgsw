@@ -27,7 +27,7 @@ def pressure() -> Pressure:
 
 
 def test_RMSE(pressure: Pressure) -> None:  # noqa: N802
-    """Test that RMSE."""
+    """Test RMSE."""
     n_ens = 1
     nl = 2
     nx = 8
