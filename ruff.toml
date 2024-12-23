@@ -28,6 +28,3 @@ unfixable = [
 ]
 [lint.pydocstyle]
 convention = "google"
-
-[format]
-skip-magic-trailing-comma = true
