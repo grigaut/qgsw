@@ -20,6 +20,8 @@ repos:
         require_serial: true
         additional_dependencies: []
         minimum_pre_commit_version: "2.9.2"
+        fail_fast: true
+        verbose: true
 
       - id: ruff-format
         name: ruff-format
@@ -31,6 +33,8 @@ repos:
         require_serial: true
         additional_dependencies: []
         minimum_pre_commit_version: "2.9.2"
+        fail_fast: true
+        verbose: true
 
       - id: pytest
         name: pytest
@@ -39,3 +43,5 @@ repos:
         types: [python]
         pass_filenames: false
         always_run: true
+        fail_fast: true
+        verbose: true
