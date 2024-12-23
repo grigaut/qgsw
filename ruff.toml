@@ -1,0 +1,33 @@
+line-length = 79
+target-version = "py39"
+extend-exclude = ["*.ipynb"]
+
+[lint]
+select = ["ALL"]
+ignore = [
+    # bandit
+    "S",
+    # do not assign a lambda expression, use a def
+    "E731",
+    # implicit-namespace-package
+    "INP001",
+    # Too many arguments to function call
+    "PLR0913",
+]
+unfixable = [
+    # Remove unused-imports
+    "F401",
+    # Variable assigned but never used
+    "F841",
+    # Use {key} in {dict} instead of {key} in {dict}.keys()
+    "SIM118",
+    # move to type-checking block
+    "TC001",
+    # found comented-out code
+    "ERA001",
+]
+[lint.pydocstyle]
+convention = "google"
+
+[format]
+skip-magic-trailing-comma = true
