@@ -9,6 +9,7 @@ from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
 from qgsw.spatial.units._units import Unit
+from qgsw.specs import DEVICE
 
 
 @pytest.fixture
@@ -19,9 +20,9 @@ def X_Y_H() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:  # noqa: N802
     ly = 5120.0e3
     ny = 256
 
-    X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device="cpu")  # noqa: N806
-    Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device="cpu")  # noqa:N806
-    H = torch.tensor([1, 3, 1], dtype=torch.float64, device="cpu")  # noqa:N806
+    X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device=DEVICE.get())  # noqa: N806
+    Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device=DEVICE.get())  # noqa:N806
+    H = torch.tensor([1, 3, 1], dtype=torch.float64, device=DEVICE.get())  # noqa:N806
 
     return X, Y, H
 

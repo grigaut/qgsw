@@ -11,6 +11,7 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.state import UVH, State
+from qgsw.specs import DEVICE
 
 
 @pytest.fixture
@@ -22,9 +23,21 @@ def state() -> State:
     nx = 10
     ny = 10
     # Initialization
-    u = torch.rand((n_ens, nl, nx + 1, ny), dtype=torch.float64, device="cpu")
-    v = torch.rand((n_ens, nl, nx, ny + 1), dtype=torch.float64, device="cpu")
-    h = torch.rand((n_ens, nl, nx, ny), dtype=torch.float64, device="cpu")
+    u = torch.rand(
+        (n_ens, nl, nx + 1, ny),
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    v = torch.rand(
+        (n_ens, nl, nx, ny + 1),
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    h = torch.rand(
+        (n_ens, nl, nx, ny),
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
     return State(UVH(u, v, h))
 
 

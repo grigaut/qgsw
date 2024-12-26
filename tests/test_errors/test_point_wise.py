@@ -10,13 +10,14 @@ from qgsw.fields.variables.dynamics import (
     SurfaceHeightAnomaly,
 )
 from qgsw.fields.variables.uvh import UVH
+from qgsw.specs import DEVICE
 
 
 @pytest.fixture
 def pressure() -> Pressure:
     """Pressure."""
     g_prime = (
-        torch.tensor([10, 0.05], dtype=torch.float64, device="cpu")
+        torch.tensor([10, 0.05], dtype=torch.float64, device=DEVICE.get())
         .unsqueeze(0)
         .unsqueeze(-1)
         .unsqueeze(-1)
@@ -35,9 +36,21 @@ def test_RMSE(pressure: Pressure) -> None:  # noqa: N802
 
     rmse = RMSE(pressure, pressure)
     uvh = UVH(
-        torch.rand((n_ens, nl, nx, ny), dtype=torch.float64, device="cpu"),
-        torch.rand((n_ens, nl, nx, ny), dtype=torch.float64, device="cpu"),
-        torch.rand((n_ens, nl, nx, ny), dtype=torch.float64, device="cpu"),
+        torch.rand(
+            (n_ens, nl, nx, ny),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        torch.rand(
+            (n_ens, nl, nx, ny),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        torch.rand(
+            (n_ens, nl, nx, ny),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
     )
 
     assert rmse.compute_point_wise(uvh, uvh).shape == (n_ens, nl, nx, ny)
@@ -49,9 +62,21 @@ def test_RMSE(pressure: Pressure) -> None:  # noqa: N802
     assert (rmse.compute_ensemble_wise(uvh, uvh) == 0).all()
 
     uvh_ref = UVH(
-        torch.rand((n_ens, nl, nx, ny), dtype=torch.float64, device="cpu"),
-        torch.rand((n_ens, nl, nx, ny), dtype=torch.float64, device="cpu"),
-        torch.rand((n_ens, nl, nx, ny), dtype=torch.float64, device="cpu"),
+        torch.rand(
+            (n_ens, nl, nx, ny),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        torch.rand(
+            (n_ens, nl, nx, ny),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        torch.rand(
+            (n_ens, nl, nx, ny),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
     )
 
     p = pressure.compute(uvh)

@@ -29,6 +29,18 @@ from qgsw.models.qg.stretching_matrix import (
 from qgsw.spatial.units._units import Unit
 
 
+def compute_W(H: torch.Tensor) -> torch.Tensor:  # noqa: N802, N803
+    """Compute the weight matrix.
+
+    Args:
+        H (torch.Tensor): Layers reference depths.
+
+    Returns:
+        torch.Tensor: Weight Matrix
+    """
+    return torch.diag(H) / torch.sum(H)
+
+
 class KineticEnergy(DiagnosticVariable):
     """Kinetic Energy Variable."""
 
@@ -121,10 +133,7 @@ class ModalKineticEnergy(DiagnosticVariable):
         # Decomposition of A
         Cm2l, _, self._Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
         # Compute W = Diag(H) / h_{tot}
-        if (H_squeeze := H.squeeze()).shape:  # noqa: N806
-            W = torch.diag(H_squeeze) / torch.sum(H)  # noqa: N806
-        else:
-            W = torch.diag(H.squeeze().unsqueeze(0)) / torch.sum(H)  # noqa: N806
+        W = compute_W(H)  # noqa: N806
         # Compute Cl2m^{-T} @ W @ Cl2m⁻¹
         Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
         Cm2lT_W_Cm2l = Cm2l_T @ W @ Cm2l  # noqa: N806
@@ -202,15 +211,9 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
         # Decomposition of A
         Cm2l, lambd, self._Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
         # Compute weight matrix
-        if (H_squeeze := H.squeeze()).shape:  # noqa: N806
-            W = torch.diag(H_squeeze) / torch.sum(H)  # noqa: N806
-        else:
-            W = torch.diag(H.squeeze().unsqueeze(0)) / torch.sum(H)  # noqa: N806
+        W = compute_W(H)  # noqa: N806
         # Compute Cl2m^{-T} @ W @ Cl2m⁻¹ @ Λ
         Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
-        lambd = lambd.squeeze()
-        if not lambd.shape:
-            lambd = lambd.unsqueeze(0)
         self._Cm2lT_W_Cm2l_lambda = Cm2l_T @ W @ Cm2l @ lambd  # Vector
 
     def compute(self, uvh: UVH) -> torch.Tensor:
@@ -332,10 +335,7 @@ class TotalKineticEnergy(DiagnosticVariable):
         self._dx = dx
         self._dy = dy
         # Compute W = Diag(H) / h_{tot}
-        if (H_squeeze := H.squeeze()).shape:  # noqa: N806
-            self._W = H_squeeze / torch.sum(H)
-        else:
-            self._W = H.squeeze().unsqueeze(0) / torch.sum(H)
+        self._W = torch.diag(compute_W(H))  # Vector
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
@@ -406,10 +406,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
         self._f0 = f0
         self._A = A
         # Compute weight matrix
-        if (H_squeeze := H.squeeze()).shape:  # noqa: N806
-            self._W = torch.diag(H_squeeze) / torch.sum(H)
-        else:
-            self._W = torch.diag(H.squeeze().unsqueeze(0)) / torch.sum(H)
+        self._W = compute_W(H)  # Matrix
 
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.

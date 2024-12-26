@@ -5,6 +5,7 @@ import torch
 from qgsw.forcing.wind import CosineZonalWindForcing
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.units._units import Unit
+from qgsw.specs import DEVICE
 
 
 def test_cosine_wind_forcing() -> None:
@@ -15,8 +16,20 @@ def test_cosine_wind_forcing() -> None:
     ny = 256
 
     x, y = torch.meshgrid(
-        torch.linspace(0, lx, nx + 1, dtype=torch.float64, device="cpu"),
-        torch.linspace(0, ly, ny + 1, dtype=torch.float64, device="cpu"),
+        torch.linspace(
+            0,
+            lx,
+            nx + 1,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        torch.linspace(
+            0,
+            ly,
+            ny + 1,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
         indexing="ij",
     )
     rho = 1000
@@ -26,8 +39,20 @@ def test_cosine_wind_forcing() -> None:
     taux = tau0 * torch.cos(2 * torch.pi * (y_ugrid - ly / 2) / ly)[1:-1, :]
 
     space = SpaceDiscretization2D.from_tensors(
-        x=torch.linspace(0, lx, nx + 1, dtype=torch.float64, device="cpu"),
-        y=torch.linspace(0, ly, ny + 1, dtype=torch.float64, device="cpu"),
+        x=torch.linspace(
+            0,
+            lx,
+            nx + 1,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        y=torch.linspace(
+            0,
+            ly,
+            ny + 1,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
         x_unit=Unit.M,
         y_unit=Unit.M,
     )
@@ -38,5 +63,5 @@ def test_cosine_wind_forcing() -> None:
     )
     taux_, tauy_ = wf.compute()
 
-    assert (taux == taux_).all()
+    assert torch.isclose(taux, taux_).all()
     assert tauy_ == 0

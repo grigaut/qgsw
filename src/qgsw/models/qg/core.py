@@ -94,7 +94,8 @@ class QG(Model):
         )
         self._core = self._init_core_model(optimize=optimize)
         decomposition = compute_layers_to_mode_decomposition(self.A)
-        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        self.Cm2l, lambd, self.Cl2m = decomposition
+        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
         self.set_helmholtz_solver(self.lambd)
 
     @property
