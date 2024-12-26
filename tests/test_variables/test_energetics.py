@@ -14,6 +14,7 @@ from qgsw.fields.variables.energetics import (
     ModalKineticEnergy,
     TotalAvailablePotentialEnergy,
     TotalKineticEnergy,
+    compute_W,
 )
 from qgsw.fields.variables.uvh import UVH
 from qgsw.models.qg.stretching_matrix import compute_A
@@ -104,3 +105,17 @@ def test_energy_equality(
     ape = ape_var.compute(uvh)
     ape_hat = torch.sum(ape_hat_var.compute(uvh), dim=-1)
     assert torch.isclose(ape, ape_hat, rtol=1e-13, atol=0).all()
+
+
+@pytest.mark.parametrize(
+    ("H"),
+    [
+        (torch.tensor([100], dtype=torch.float64, device="cpu")),
+        (torch.tensor([200, 800], dtype=torch.float64, device="cpu")),
+    ],
+)
+def test_W_shape(H: torch.Tensor) -> None:  # noqa: N802, N803
+    """Test W shape."""
+    W = compute_W(H)  # noqa: N806
+    assert W.shape == (H.shape[0], H.shape[0])
+    assert torch.diag(W).shape == H.shape

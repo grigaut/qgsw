@@ -64,11 +64,11 @@ def create_qg_variable_set(
     dx = space.dx
     dy = space.dy
     ds = space.area
-    H = model_config.h.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)  # noqa: N806
-    g_prime = model_config.g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+    H = model_config.h  # noqa: N806
+    g_prime = model_config.g_prime
     A = compute_A(  # noqa: N806
-        H.squeeze((0, -3, -2)),
-        g_prime.squeeze((0, -3, -2)),
+        H,
+        g_prime,
         dtype,
         device,
     )
@@ -86,9 +86,14 @@ def create_qg_variable_set(
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)
     eta = SurfaceHeightAnomaly(h_phys)
-    p = Pressure(g_prime, eta)
+    p = Pressure(g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1), eta)
     psi = StreamFunction(p, physics_config.f0)
-    pv = PotentialVorticity(vorticity_phys, H * ds, ds, physics_config.f0)
+    pv = PotentialVorticity(
+        vorticity_phys,
+        H.unsqueeze(0).unsqueeze(-1).unsqueeze(-1) * ds,
+        ds,
+        physics_config.f0,
+    )
     enstrophy = Enstrophy(pv)
     enstrophy_tot = TotalEnstrophy(pv)
     ke_hat = ModalKineticEnergy(A, psi, H, dx, dy)
