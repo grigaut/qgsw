@@ -61,7 +61,7 @@ def compute_layers_to_mode_decomposition(
     # layer-to-mode and mode-to-layer matrices
     lambd_r, R = torch.linalg.eig(A)  # noqa: N806
     _, L = torch.linalg.eig(A.T)  # noqa: N806
-    lambd: torch.Tensor = lambd_r.real.reshape((1, A.shape[0], 1, 1))
+    lambd: torch.Tensor = lambd_r.real
     R, L = R.real, L.real  # noqa: N806
     # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
     # layer to mode

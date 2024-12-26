@@ -208,9 +208,6 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
             W = torch.diag(H.squeeze().unsqueeze(0)) / torch.sum(H)  # noqa: N806
         # Compute Cl2m^{-T} @ W @ Cl2m⁻¹ @ Λ
         Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
-        lambd = lambd.squeeze()
-        if not lambd.shape:
-            lambd = lambd.unsqueeze(0)
         self._Cm2lT_W_Cm2l_lambda = Cm2l_T @ W @ Cm2l @ lambd  # Vector
 
     def compute(self, uvh: UVH) -> torch.Tensor:

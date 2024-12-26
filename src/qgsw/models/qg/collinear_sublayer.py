@@ -173,7 +173,8 @@ class QGCollinearSF(_QGCollinearSublayer):
         """Update the stretching operator matrix."""
         self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
         decomposition = compute_layers_to_mode_decomposition(self.A)
-        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        self.Cm2l, lambd, self.Cl2m = decomposition
+        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
         self.set_helmholtz_solver(self.lambd)
         self._create_diagnostic_vars(self._state)
 
@@ -239,7 +240,8 @@ class QGCollinearPV(_QGCollinearSublayer):
         # Two layers stretching operator for QoG inversion
         A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
         decomposition = compute_layers_to_mode_decomposition(A_2l)
-        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        self.Cm2l, lambd, self.Cl2m = decomposition
+        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
         # Two layers helmholtz solver
         self.set_helmholtz_solver(self.lambd)
         # One layer stretching operator for G
@@ -311,7 +313,8 @@ class QGSmoothCollinearSF(_QGCollinearSublayer):
         # Two layers stretching operator for QoG inversion
         A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
         decomposition = compute_layers_to_mode_decomposition(A_2l)
-        self.Cm2l, self.lambd, self.Cl2m = decomposition
+        self.Cm2l, lambd, self.Cl2m = decomposition
+        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
         # Two layers helmholtz solver
         self.set_helmholtz_solver(self.lambd)
         # One layer stretching operator for G

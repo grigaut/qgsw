@@ -3,7 +3,10 @@
 import pytest
 import torch
 
-from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.stretching_matrix import (
+    compute_A,
+    compute_layers_to_mode_decomposition,
+)
 
 
 @pytest.mark.parametrize(
@@ -33,8 +36,8 @@ from qgsw.models.qg.stretching_matrix import compute_A
     ],
 )
 def test_stretching_matrix(
-    H: torch.dtype,  # noqa: N803
-    g_prime: torch.dtype,
+    H: torch.Tensor,  # noqa: N803
+    g_prime: torch.Tensor,
     reference: torch.Tensor,
 ) -> None:
     """Test streching matrix computation."""
@@ -45,3 +48,22 @@ def test_stretching_matrix(
         "cpu",
     )
     assert torch.isclose(reference, A).all()
+
+
+@pytest.mark.parametrize(
+    ("H", "g_prime"),
+    [
+        (torch.tensor([100]), torch.tensor([10])),
+        (torch.tensor([200, 800]), torch.tensor([10, 0.05])),
+    ],
+)
+def test_layer_to_mode_decomposition(
+    H: torch.Tensor,  # noqa: N803
+    g_prime: torch.Tensor,
+) -> None:
+    """Test layer to mode decomposition shapes."""
+    A = compute_A(H, g_prime, torch.float64, "cpu")  # noqa: N806
+    Cm2l, lambd, Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
+    assert Cm2l.shape == (H.shape[0], H.shape[0])
+    assert lambd.shape == H.shape
+    assert Cl2m.shape == (H.shape[0], H.shape[0])
