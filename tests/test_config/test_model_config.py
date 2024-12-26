@@ -6,8 +6,6 @@ import torch
 from qgsw.configs.models import ModelConfig
 from qgsw.specs import DEVICE
 
-DEVICE.set_manually("cpu")
-
 
 @pytest.fixture
 def model_config() -> ModelConfig:
@@ -35,5 +33,5 @@ def test_h_g_prime_dtype(model_config: ModelConfig) -> None:
 
 def test_h_g_prime_device(model_config: ModelConfig) -> None:
     """Test H and g' device."""
-    assert model_config.h.device == DEVICE.get()
-    assert model_config.g_prime.device == DEVICE.get()
+    assert model_config.h.device.type == DEVICE.get().type
+    assert model_config.g_prime.device.type == DEVICE.get().type

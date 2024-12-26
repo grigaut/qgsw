@@ -7,6 +7,7 @@ from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
 )
+from qgsw.specs import DEVICE
 
 
 @pytest.mark.parametrize(
@@ -18,7 +19,7 @@ from qgsw.models.qg.stretching_matrix import (
             torch.tensor(
                 [[1 / (100 * 10)]],
                 dtype=torch.float64,
-                device="cpu",
+                device=DEVICE.get(),
             ),
         ),
         (
@@ -30,7 +31,7 @@ from qgsw.models.qg.stretching_matrix import (
                     [-1 / (800 * 0.05), 1 / (800 * 0.05)],
                 ],
                 dtype=torch.float64,
-                device="cpu",
+                device=DEVICE.get(),
             ),
         ),
     ],
@@ -45,7 +46,7 @@ def test_stretching_matrix(
         H,
         g_prime,
         torch.float64,
-        "cpu",
+        DEVICE.get(),
     )
     assert torch.isclose(reference, A).all()
 
@@ -62,7 +63,7 @@ def test_layer_to_mode_decomposition(
     g_prime: torch.Tensor,
 ) -> None:
     """Test layer to mode decomposition shapes."""
-    A = compute_A(H, g_prime, torch.float64, "cpu")  # noqa: N806
+    A = compute_A(H, g_prime, torch.float64, DEVICE.get())  # noqa: N806
     Cm2l, lambd, Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
     assert Cm2l.shape == (H.shape[0], H.shape[0])
     assert lambd.shape == H.shape

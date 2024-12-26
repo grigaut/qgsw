@@ -18,6 +18,7 @@ from qgsw.fields.variables.energetics import (
 )
 from qgsw.fields.variables.uvh import UVH
 from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.specs import DEVICE
 
 
 @pytest.fixture
@@ -44,7 +45,7 @@ def H() -> torch.Tensor:  # noqa: N802
     h1 = 200
     h2 = 800
 
-    return torch.tensor([h1, h2], dtype=torch.float64, device="cpu")
+    return torch.tensor([h1, h2], dtype=torch.float64, device=DEVICE.get())
 
 
 @pytest.fixture
@@ -52,13 +53,13 @@ def g_prime() -> torch.Tensor:
     """Reduced gravity."""
     g1 = 10
     g2 = 0.05
-    return torch.tensor([g1, g2], dtype=torch.float64, device="cpu")
+    return torch.tensor([g1, g2], dtype=torch.float64, device=DEVICE.get())
 
 
 @pytest.fixture
 def A(H: torch.Tensor, g_prime: torch.Tensor) -> torch.Tensor:  # noqa: N802, N803
     """Strecthing matrix."""
-    return compute_A(H, g_prime, dtype=torch.float64, device="cpu")
+    return compute_A(H, g_prime, dtype=torch.float64, device=DEVICE.get())
 
 
 @pytest.fixture
@@ -95,9 +96,17 @@ def test_energy_equality(
     ape_hat_var = ModalAvailablePotentialEnergy(A, psi, H, f0)
 
     uvh = UVH(
-        torch.rand((ne, nl, nx + 1, ny), dtype=torch.float64, device="cpu"),
-        torch.rand((ne, nl, nx, ny + 1), dtype=torch.float64, device="cpu"),
-        torch.rand((ne, nl, nx, ny), dtype=torch.float64, device="cpu"),
+        torch.rand(
+            (ne, nl, nx + 1, ny),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        torch.rand(
+            (ne, nl, nx, ny + 1),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        torch.rand((ne, nl, nx, ny), dtype=torch.float64, device=DEVICE.get()),
     )
     ke = ke_var.compute(uvh)
     ke_hat = torch.sum(ke_hat_var.compute(uvh), dim=-1)
@@ -110,8 +119,8 @@ def test_energy_equality(
 @pytest.mark.parametrize(
     ("H"),
     [
-        (torch.tensor([100], dtype=torch.float64, device="cpu")),
-        (torch.tensor([200, 800], dtype=torch.float64, device="cpu")),
+        (torch.tensor([100], dtype=torch.float64, device=DEVICE.get())),
+        (torch.tensor([200, 800], dtype=torch.float64, device=DEVICE.get())),
     ],
 )
 def test_W_shape(H: torch.Tensor) -> None:  # noqa: N802, N803

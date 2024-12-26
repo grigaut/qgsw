@@ -8,6 +8,7 @@ from qgsw.fields.variables.dynamics import (
 )
 from qgsw.fields.variables.state import State
 from qgsw.fields.variables.uvh import UVH
+from qgsw.specs import DEVICE
 
 
 def test_init_update() -> None:
@@ -16,7 +17,14 @@ def test_init_update() -> None:
     nl = 2
     nx = 10
     ny = 10
-    state = State.steady(n_ens, nl, nx, ny, dtype=torch.float64, device="cpu")
+    state = State.steady(
+        n_ens,
+        nl,
+        nx,
+        ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
 
     u = state.u.get()
     v = state.v.get()
@@ -54,7 +62,7 @@ def test_init_update() -> None:
 def test_nested_bound_variables() -> None:
     """Verify the behavior of nested variables."""
     # Define state
-    state = State.steady(1, 2, 10, 10, torch.float64, "cpu")
+    state = State.steady(1, 2, 10, 10, torch.float64, DEVICE.get())
     # Define variables
     h = PhysicalLayerDepthAnomaly(ds=1)
     eta = SurfaceHeightAnomaly(h_phys=h)
