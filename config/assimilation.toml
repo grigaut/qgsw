@@ -5,7 +5,7 @@ save = true
 type = "interval"           # "interval"
 # quantity = 100
 interval_duration = 86_400  # seconds
-directory = "assimilation_qg_alpha_0_5"
+directory = "assimilation"
 
 [physics]
 rho = 1000
@@ -35,19 +35,14 @@ reduced_gravity = [
 ]
 
 [model]
-type = "QGCollinearSF"
+type = "QG"
 prefix = "results_step_"
 layers = [
-    400,
-    1100,
+    4100
 ]
 reduced_gravity = [
-    9.81,
-    0.025
+    9.81
 ]
-[model.collinearity_coef]
-type="constant"
-value=0.5
 
 [space]
 nx = 128
