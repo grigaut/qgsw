@@ -214,62 +214,72 @@ class Fluxes:
             masks (Masks): Masks.
             optimize (bool, optional): Whether to optimize the flux functions. Defaults to True.
         """
-        h_y = lambda h, v: flux(
-            h,
-            v,
-            dim=-1,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=masks.v_sten_hy_eq2[..., 1:-1],
-            mask_4=masks.v_sten_hy_eq4[..., 1:-1],
-            mask_6=masks.v_sten_hy_gt6[..., 1:-1],
-        )
-        h_x = lambda h, u: flux(
-            h,
-            u,
-            dim=-2,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=masks.u_sten_hx_eq2[..., 1:-1, :],
-            mask_4=masks.u_sten_hx_eq4[..., 1:-1, :],
-            mask_6=masks.u_sten_hx_gt6[..., 1:-1, :],
-        )
 
-        w_y = lambda w, v_ugrid: flux(
-            w,
-            v_ugrid,
-            dim=-1,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=masks.u_sten_wy_eq2[..., 1:-1, :],
-            mask_4=masks.u_sten_wy_eq4[..., 1:-1, :],
-            mask_6=masks.u_sten_wy_gt4[..., 1:-1, :],
-        )
-        w_x = lambda w, u_vgrid: flux(
-            w,
-            u_vgrid,
-            dim=-2,
-            n_points=6,
-            rec_func_2=reconstruction.linear2_centered,
-            rec_func_4=reconstruction.wenoz4_left,
-            rec_func_6=reconstruction.wenoz6_left,
-            mask_2=masks.v_sten_wx_eq2[..., 1:-1],
-            mask_4=masks.v_sten_wx_eq4[..., 1:-1],
-            mask_6=masks.v_sten_wx_gt6[..., 1:-1],
-        )
+        def h_flux_y(h: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
+            return flux(
+                h,
+                v,
+                dim=-1,
+                n_points=6,
+                rec_func_2=reconstruction.linear2_centered,
+                rec_func_4=reconstruction.wenoz4_left,
+                rec_func_6=reconstruction.wenoz6_left,
+                mask_2=masks.v_sten_hy_eq2[..., 1:-1],
+                mask_4=masks.v_sten_hy_eq4[..., 1:-1],
+                mask_6=masks.v_sten_hy_gt6[..., 1:-1],
+            )
+
+        def h_flux_x(h: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+            return flux(
+                h,
+                u,
+                dim=-2,
+                n_points=6,
+                rec_func_2=reconstruction.linear2_centered,
+                rec_func_4=reconstruction.wenoz4_left,
+                rec_func_6=reconstruction.wenoz6_left,
+                mask_2=masks.u_sten_hx_eq2[..., 1:-1, :],
+                mask_4=masks.u_sten_hx_eq4[..., 1:-1, :],
+                mask_6=masks.u_sten_hx_gt6[..., 1:-1, :],
+            )
+
+        def omega_flux_y(
+            w: torch.Tensor, v_ugrid: torch.Tensor
+        ) -> torch.Tensor:
+            return flux(
+                w,
+                v_ugrid,
+                dim=-1,
+                n_points=6,
+                rec_func_2=reconstruction.linear2_centered,
+                rec_func_4=reconstruction.wenoz4_left,
+                rec_func_6=reconstruction.wenoz6_left,
+                mask_2=masks.u_sten_wy_eq2[..., 1:-1, :],
+                mask_4=masks.u_sten_wy_eq4[..., 1:-1, :],
+                mask_6=masks.u_sten_wy_gt4[..., 1:-1, :],
+            )
+
+        def omega_flux_x(w: torch.Tensor, u_vgrid: torch.Tensor):
+            return flux(
+                w,
+                u_vgrid,
+                dim=-2,
+                n_points=6,
+                rec_func_2=reconstruction.linear2_centered,
+                rec_func_4=reconstruction.wenoz4_left,
+                rec_func_6=reconstruction.wenoz6_left,
+                mask_2=masks.v_sten_wx_eq2[..., 1:-1],
+                mask_4=masks.v_sten_wx_eq4[..., 1:-1],
+                mask_6=masks.v_sten_wx_gt6[..., 1:-1],
+            )
+
         if optimize:
-            self.h_x = OptimizableFunction(h_x)
-            self.h_y = OptimizableFunction(h_y)
-            self.w_x = OptimizableFunction(w_x)
-            self.w_y = OptimizableFunction(w_y)
+            self.h_x = OptimizableFunction(h_flux_x)
+            self.h_y = OptimizableFunction(h_flux_y)
+            self.w_x = OptimizableFunction(omega_flux_x)
+            self.w_y = OptimizableFunction(omega_flux_y)
         else:
-            self.h_x = h_x
-            self.h_y = h_y
-            self.w_x = w_x
-            self.w_y = w_y
+            self.h_x = h_flux_x
+            self.h_y = h_flux_y
+            self.w_x = omega_flux_x
+            self.w_y = omega_flux_y
