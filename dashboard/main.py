@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import streamlit as st
+import toml
 
 from qgsw.output import RunOutput
 
@@ -25,6 +26,9 @@ folder = st.selectbox("Data source", options=sources)
 run = RunOutput(folder)
 
 st.write(run)
+
+with st.expander("Detailed Configuration", expanded=True):
+    st.write(toml.load(run.folder.joinpath("_config.toml").open("r")))
 
 if not run.summary.is_finished:
     st.warning("The simulation did not reach its end.", icon="⚠️")
