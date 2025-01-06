@@ -3,21 +3,23 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import torch
 from rich.progress import Progress
 
 from qgsw import verbose
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.uvh import UVH
-from qgsw.models.qg.core import QG
+from qgsw.forcing.wind import WindForcing
+from qgsw.models.instantiation import instantiate_model
+from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
-from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
 )
-from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
+from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
@@ -40,36 +42,65 @@ summary = RunSummary.from_configuration(config)
 if config.io.output.save:
     summary.to_file(config.io.output.directory)
 
+
+# Common Set-up
+## Wind Forcing
+wind = WindForcing.from_config(config.windstress, config.space, config.physics)
+taux, tauy = wind.compute()
+## Rossby
+Ro = 0.1
+
+# Model Set-up
+## Vortex
+perturbation = Perturbation.from_config(
+    perturbation_config=config.perturbation,
+)
 space_2d = SpaceDiscretization2D.from_config(config.space)
 
-h_coords_ref = Coordinates1D(
-    points=config.simulation.reference.h,
-    unit=Unit.M,
-)
-h_coords = Coordinates1D(points=config.model.h, unit=Unit.M)
-
-space_3d_ref = space_2d.add_h(h_coords_ref)
-space_3d_model = space_2d.add_h(h_coords)
-
-model_ref = QG(
-    space_3d_ref,
-    config.simulation.reference.g_prime.unsqueeze(-1).unsqueeze(-1),
+model_ref = instantiate_model(
+    config.simulation.reference,
     config.physics.beta_plane,
+    space_2d,
+    perturbation,
+    Ro=0.1,
 )
 
-model = QG(
-    space_3d_model,
-    config.model.g_prime.unsqueeze(-1).unsqueeze(-1),
+model_ref.slip_coef = config.physics.slip_coef
+model_ref.bottom_drag_coef = config.physics.bottom_drag_coefficient
+if np.isnan(config.simulation.dt):
+    model_ref.dt = time_params.compute_dt(
+        model_ref.uvh,
+        model_ref.space,
+        model_ref.g_prime,
+        model_ref.H,
+    )
+else:
+    model_ref.dt = config.simulation.dt
+model_ref.compute_time_derivatives(model_ref.uvh)
+model_ref.set_wind_forcing(taux, tauy)
+
+model = instantiate_model(
+    config.model,
     config.physics.beta_plane,
+    space_2d,
+    perturbation,
+    Ro=0.1,
 )
 
-model_ref.slip_coef = 1.0
-model_ref.bottom_drag_coef = 3.60577e-8
-model_ref.dt = config.simulation.dt
+model.slip_coef = config.physics.slip_coef
+model.bottom_drag_coef = config.physics.bottom_drag_coefficient
+if np.isnan(config.simulation.dt):
+    model.dt = time_params.compute_dt(
+        model.uvh,
+        model.space,
+        model.g_prime,
+        model.H,
+    )
+else:
+    model.dt = config.simulation.dt
+model.compute_time_derivatives(model.uvh)
+model.set_wind_forcing(taux, tauy)
 
-model.slip_coef = 1.0
-model.bottom_drag_coef = 3.60577e-8
-model.dt = config.simulation.dt
 
 verbose.display("\n[Reference Model]", trigger_level=1)
 verbose.display(msg=model_ref.__repr__(), trigger_level=1)
@@ -114,7 +145,7 @@ model.set_uvh(
     uvh0.h[:, :nl, ...],
 )
 
-dt = config.simulation.dt
+dt = model.dt
 t_end = config.simulation.duration
 
 steps = Steps(t_end=t_end, dt=dt)
