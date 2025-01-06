@@ -93,8 +93,12 @@ def test_model_stretching_matrix(
 @pytest.mark.parametrize(
     ("H", "g_prime"),
     [
-        (torch.tensor([100]), torch.tensor([10])),
-        (torch.tensor([200, 800]), torch.tensor([10, 0.05])),
+        pytest.param(torch.tensor([100]), torch.tensor([10]), id="one-layer"),
+        pytest.param(
+            torch.tensor([200, 800]),
+            torch.tensor([10, 0.05]),
+            id="two-layers",
+        ),
     ],
 )
 def test_layer_to_mode_decomposition(
