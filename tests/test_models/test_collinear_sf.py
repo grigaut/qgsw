@@ -67,6 +67,22 @@ def test_g_prime_shape(
     assert model.g_prime.shape == (1, 1, 1)
 
 
+def test_UVH_shape(  # noqa: N802
+    space_2d: SpaceDiscretization2D,
+    H: torch.Tensor,  # noqa: N803
+    g_prime: torch.Tensor,
+) -> None:
+    """Check UVH shape."""
+    model = QGCollinearSF(
+        space_2d,
+        H,
+        g_prime,
+    )
+    assert model.u.shape[1] == 1
+    assert model.v.shape[1] == 1
+    assert model.h.shape[1] == 1
+
+
 def test_stretching_matrix_shape(
     space_2d: SpaceDiscretization2D,
     H: torch.Tensor,  # noqa: N803
