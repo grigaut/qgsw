@@ -289,7 +289,7 @@ class ModelParamChecker:
         name = self.__class__.__name__
         verbose.display(
             f"{name}: H set to {h}",
-            trigger_level=1,
+            trigger_level=2,
         )
 
     def _set_g_prime(self, g_prime: torch.Tensor) -> None:
@@ -308,7 +308,7 @@ class ModelParamChecker:
         name = self.__class__.__name__
         verbose.display(
             f"{name}: g' set to {g_prime}",
-            trigger_level=1,
+            trigger_level=2,
         )
 
     def _set_taux(self, taux: torch.Tensor | float) -> None:

@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import torch
 from rich.progress import Progress
 
@@ -14,7 +15,8 @@ from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
-from qgsw.spatial.dim_3 import SpaceDiscretization3D
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
+from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 verbose.set_level(2)
@@ -48,28 +50,43 @@ perturbation = Perturbation.from_config(
     perturbation_config=config.perturbation,
 )
 ## Grid
-space = SpaceDiscretization3D.from_config(config.space, config.model)
+space_2d = SpaceDiscretization2D.from_config(config.space)
+## Set model parameters
+
+model = instantiate_model(
+    model_config=config.model,
+    beta_plane=config.physics.beta_plane,
+    space_2d=space_2d,
+    perturbation=perturbation,
+    Ro=Ro,
+)
+
+model.slip_coef = config.physics.slip_coef
+model.bottom_drag_coef = config.physics.bottom_drag_coefficient
+if np.isnan(config.simulation.dt):
+    model.dt = time_params.compute_dt(
+        model.uvh,
+        model.space,
+        model.g_prime,
+        model.H,
+    )
+else:
+    model.dt = config.simulation.dt
+model.compute_time_derivatives(model.uvh)
+model.set_wind_forcing(taux, tauy)
+
 ## Compute Burger Number
 Bu = compute_burger(
     g=config.model.g_prime[0],
     h_scale=config.model.h[0],
     f0=config.physics.f0,
-    length_scale=perturbation.compute_scale(space.omega),
+    length_scale=perturbation.compute_scale(model.space.omega),
 )
 verbose.display(
     msg=f"Burger Number: {Bu:.2f}",
     trigger_level=1,
 )
 
-## Set model parameters
-
-model = instantiate_model(
-    config=config,
-    space_3d=space,
-    perturbation=perturbation,
-    Ro=Ro,
-)
-model.set_wind_forcing(taux, tauy)
 
 ## time params
 t = 0
