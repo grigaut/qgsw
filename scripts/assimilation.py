@@ -15,7 +15,6 @@ from qgsw.simulation.steps import Steps
 from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
-    SpaceDiscretization3D,
 )
 from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
@@ -51,11 +50,6 @@ h_coords = Coordinates1D(points=config.model.h, unit=Unit.M)
 
 space_3d_ref = space_2d.add_h(h_coords_ref)
 space_3d_model = space_2d.add_h(h_coords)
-
-tmp = SpaceDiscretization3D.from_config(
-    config.space,
-    config.model,
-)
 
 model_ref = QG(
     space_3d_ref,

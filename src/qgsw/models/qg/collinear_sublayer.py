@@ -14,52 +14,52 @@ from qgsw.models.qg.core import QG
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.models.sw.core import SW
-from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.core.discretization import (
-    SpaceDiscretization3D,
-    keep_top_layer,
-)
 from qgsw.specs import DEVICE
 from qgsw.utils.gaussian_filtering import GaussianFilter2D
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import (
+        SpaceDiscretization2D,
+    )
 
 
 class _QGCollinearSublayer(QG):
     """Collinear QG Model."""
 
     _supported_layers_nb: int
-    _coefficient: float = 0.01
+    _coefficient: float
+    _A: torch.Tensor
 
     def __init__(
         self,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
-        coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         """Collinear Sublayer Stream Function.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Collinearity coefficient.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         Model.__init__(
             self,
-            space_3d=space_3d,
+            space_2d=space_2d,
+            H=H,
             g_prime=g_prime,
-            beta_plane=beta_plane,
             optimize=optimize,
         )
-        self._core = self._init_core_model(optimize=optimize)
-        self.coefficient = coefficient
+        self._core = self._init_core_model(
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            optimize=optimize,
+        )
 
     @property
     def coefficient(self) -> Coefficient:
@@ -78,12 +78,12 @@ class _QGCollinearSublayer(QG):
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
         """Layers thickness."""
-        return self._H[0, ...].unsqueeze(0)
+        return self._H[:1, ...]
 
     @property
     def g_prime(self) -> torch.Tensor:
         """Reduced Gravity."""
-        return self._g_prime[0, ...].unsqueeze(0)
+        return self._g_prime[:1, ...]
 
     def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.
@@ -116,57 +116,32 @@ class _QGCollinearSublayer(QG):
         else:
             self._coefficient = coefficient
 
-    def _init_core_model(self, optimize: bool) -> SW:  # noqa: FBT001
-        """Initialize the core Shallow Water model.
-
-        Args:
-            optimize (bool): Wehether to optimize the model functions or not.
-
-        Returns:
-            SW: Core model.
-        """
-        return SW(
-            space_3d=keep_top_layer(self._space),
-            g_prime=self.g_prime,
-            beta_plane=self.beta_plane,
-            optimize=optimize,
-        )
-
 
 class QGCollinearSF(_QGCollinearSublayer):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _supported_layers_nb: int = 2
-    _coefficient = 0.01
+    _beta_plane_set = False
+    _coefficient_set = False
 
-    def __init__(
-        self,
-        space_3d: SpaceDiscretization3D,
-        g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
-        coefficient: float | Coefficient = _coefficient,
-        optimize: bool = True,  # noqa: FBT001, FBT002
-    ) -> None:
-        """Collinear Sublayer Stream Function.
+    @Model.beta_plane.setter
+    def beta_plane(self, beta_plane: BetaPlane) -> None:
+        """Beta-plane setter."""
+        Model.beta_plane.fset(self, beta_plane)
+        self.sw.beta_plane = beta_plane
+        self._beta_plane_set = True
+        if self._coefficient_set:
+            self.set_helmholtz_solver(self.lambd)
+            self._create_diagnostic_vars(self._state)
 
-        Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Collinearity coefficient.
-            optimize (bool, optional): Whether to precompile functions or
-            not. Defaults to True.
-        """
-        super().__init__(
-            space_3d=space_3d,
-            g_prime=g_prime,
-            beta_plane=beta_plane,
-            coefficient=coefficient,
-            optimize=optimize,
-        )
+    @_QGCollinearSublayer.coefficient.setter
+    def coefficient(self, coefficient: BetaPlane) -> None:
+        """Beta-plane setter."""
+        _QGCollinearSublayer.coefficient.fset(self, coefficient)
 
     def _set_coefficient(self, coefficient: float | Coefficient) -> None:
         super()._set_coefficient(coefficient)
+        self._coefficient_set = True
         self._update_A()
 
     def _update_A(self) -> None:  # noqa: N802
@@ -174,9 +149,10 @@ class QGCollinearSF(_QGCollinearSublayer):
         self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
         decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, lambd, self.Cl2m = decomposition
-        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
-        self.set_helmholtz_solver(self.lambd)
-        self._create_diagnostic_vars(self._state)
+        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
+        if self._beta_plane_set:
+            self.set_helmholtz_solver(self.lambd)
+            self._create_diagnostic_vars(self._state)
 
     def compute_A(  # noqa: N802
         self,
@@ -216,32 +192,29 @@ class QGCollinearPV(_QGCollinearSublayer):
     """Modified QG Model implementing collinear pv behavior."""
 
     _supported_layers_nb: int = 2
-    _coefficient = 0.01
 
     def __init__(
         self,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
-        coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT002, FBT001
     ) -> None:
         """Collinear Sublayer Potential Vorticity.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Collinearity coefficient.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        super().__init__(space_3d, g_prime, beta_plane, coefficient, optimize)
+        super().__init__(space_2d, H, g_prime, optimize)
         # Two layers stretching operator for QoG inversion
         A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
         decomposition = compute_layers_to_mode_decomposition(A_2l)
         self.Cm2l, lambd, self.Cl2m = decomposition
-        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
+        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
         # Two layers helmholtz solver
         self.set_helmholtz_solver(self.lambd)
         # One layer stretching operator for G
@@ -288,33 +261,30 @@ class QGCollinearPV(_QGCollinearSublayer):
 class QGSmoothCollinearSF(_QGCollinearSublayer):
     """QGSmoothCollinearSF."""
 
-    _coefficient = 0
     _supported_layers_nb = 2
 
     def __init__(
         self,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
-        coefficient: float | Coefficient = _coefficient,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         """Smoothed Collinear Sublayer Stream Function.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            coefficient (float): Collinearity coefficient.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        super().__init__(space_3d, g_prime, beta_plane, coefficient, optimize)
+        super().__init__(space_2d, H, g_prime, optimize)
         # Two layers stretching operator for QoG inversion
         A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
         decomposition = compute_layers_to_mode_decomposition(A_2l)
         self.Cm2l, lambd, self.Cl2m = decomposition
-        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
+        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
         # Two layers helmholtz solver
         self.set_helmholtz_solver(self.lambd)
         # One layer stretching operator for G
