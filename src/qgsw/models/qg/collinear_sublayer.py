@@ -163,7 +163,7 @@ class _QGCollinearSublayer(QG):
         Args:
             coefficient (float): Collinearity Coefficient.
         """
-        if isinstance(coefficient, int | float):
+        if isinstance(coefficient, (int, float)):
             self._coefficient = ConstantCoefficient(coefficient)
         else:
             self._coefficient = coefficient
