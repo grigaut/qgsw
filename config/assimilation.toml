@@ -5,7 +5,7 @@ save = true
 type = "interval"           # "interval"
 # quantity = 100
 interval_duration = 86_400  # seconds
-directory = "assimilation"
+directory = "assimilation_qg_alpha_0_5"
 
 [physics]
 rho = 1000
@@ -19,7 +19,7 @@ kind = "assimilation"
 duration = 31_536_000       # seconds
 dt = 3600                   # seconds
 fork_interval = 1_728_000   # seconds
-startup_file = "output/g5k/double_gyre_qg/results_step_87600.npz"
+startup_file = "output/g5k/double_gyre_qg_long/results_step_876000.npz"
 [simulation.reference]
 type = "QG"
 prefix = "reference_step_"
@@ -35,14 +35,19 @@ reduced_gravity = [
 ]
 
 [model]
-type = "QG"
+type = "QGCollinearSF"
 prefix = "results_step_"
 layers = [
-    4100
+    400,
+    1100,
 ]
 reduced_gravity = [
-    9.81
+    9.81,
+    0.025
 ]
+[model.collinearity_coef]
+type="constant"
+value=0.5
 
 [space]
 nx = 128
