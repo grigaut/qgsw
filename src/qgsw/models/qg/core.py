@@ -101,12 +101,17 @@ class QG(Model):
         )
         decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, lambd, self.Cl2m = decomposition
-        self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
+        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
 
     @property
     def sw(self) -> SW:
         """Core Shallow Water Model."""
         return self._core
+
+    @property
+    def lambd(self) -> torch.Tensor:
+        """Eigenvalues of A."""
+        return self._lambd
 
     @Model.beta_plane.setter
     def beta_plane(self, beta_plane: BetaPlane) -> None:
