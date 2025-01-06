@@ -25,7 +25,7 @@ from qgsw.specs import DEVICE
 if TYPE_CHECKING:
     from qgsw.fields.variables.uvh import UVH
     from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.specs._utils import Device
 
 
@@ -70,18 +70,17 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
     def __init__(
         self,
         *,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
         optimize: bool = True,
     ) -> None:
         """Model Instantiation.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -91,11 +90,10 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         )
         ModelParamChecker.__init__(
             self,
-            space_3d=space_3d,
+            space_2d=space_2d,
+            H=H,
             g_prime=g_prime,
-            beta_plane=beta_plane,
         )
-        self._compute_coriolis()
         ##Topography and Ref values
         self._set_ref_variables()
 
@@ -170,9 +168,15 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
 
     @ModelParamChecker.slip_coef.setter
     def slip_coef(self, slip_coef: float) -> None:
-        """Timestep setter."""
+        """Slip coefficient setter."""
         ModelParamChecker.slip_coef.fset(self, slip_coef)
         self._create_diagnostic_vars(self._state)
+
+    @ModelParamChecker.beta_plane.setter
+    def beta_plane(self, beta_plane: BetaPlane) -> None:
+        """Beta plane setter."""
+        ModelParamChecker.beta_plane.fset(self, beta_plane)
+        self._compute_coriolis()
 
     def _compute_coriolis(
         self,

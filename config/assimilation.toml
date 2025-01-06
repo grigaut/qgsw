@@ -4,15 +4,15 @@ name = "Assimilation."
 save = true
 type = "interval"           # "interval"
 # quantity = 100
-interval_duration = 86_400  # seconds
+interval_duration = 86_4000  # seconds
 directory = "assimilation"
 
 [physics]
 rho = 1000
 slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
-beta = 0                # coriolis gradient (m^-1 s^-1)
-bottom_drag_coefficient = 0
+beta = 1.754e-11                # coriolis gradient (m^-1 s^-1)
+bottom_drag_coefficient = 3.60577e-8
 
 [simulation]
 kind = "assimilation"
@@ -54,7 +54,9 @@ y_min = 0
 y_max = 5_120_000
 
 [windstress]
-type = "none"
+type = "cosine"
+magnitude = 0.08
+drag_coefficient = 0.0013
 
 [perturbation]
 type = "none"

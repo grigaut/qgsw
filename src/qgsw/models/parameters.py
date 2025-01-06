@@ -9,10 +9,15 @@ import torch
 from qgsw import verbose
 from qgsw.masks import Masks
 from qgsw.models.exceptions import InvalidModelParameterError
+from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.spatial.units._units import Unit
 
 if TYPE_CHECKING:
-    from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.spatial.core.discretization import (
+        SpaceDiscretization2D,
+        SpaceDiscretization3D,
+    )
     from qgsw.specs._utils import Device
 
 
@@ -32,16 +37,16 @@ class ModelParamChecker:
     def __init__(
         self,
         *,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
     ) -> None:
         """Model Instantiation.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.tensor): reference layer depth
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
         """
         # Set up
         verbose.display(
@@ -53,12 +58,11 @@ class ModelParamChecker:
             trigger_level=2,
         )
         ## Space
-        self._space = space_3d
-        self._beta_plane = beta_plane
+        self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
         # h
-        self._set_H(space_3d.h.xyh.h)
+        self._set_H(self._space.h.xyh.h)
         ## gravity
-        self._set_g_prime(g_prime)
+        self._set_g_prime(g_prime.unsqueeze(1).unsqueeze(1))
 
     @property
     def space(self) -> SpaceDiscretization3D:
@@ -123,6 +127,17 @@ class ModelParamChecker:
         """Beta Plane parmaters."""
         return self._beta_plane
 
+    @beta_plane.setter
+    def beta_plane(self, beta_plane: BetaPlane) -> None:
+        if not isinstance(beta_plane, BetaPlane):
+            msg = "beta_plane should be of type `BetaPlane`."
+            raise TypeError(msg)
+        verbose.display(
+            f"{self.__class__.__name__}: Beta-plane set to {beta_plane}",
+            trigger_level=2,
+        )
+        self._beta_plane = beta_plane
+
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
         """Layers thickness."""
@@ -161,7 +176,10 @@ class ModelParamChecker:
             msg = "Timestep must be greater than 0."
             raise InvalidModelParameterError(msg)
         self._dt = dt
-        verbose.display(f"dt set to {self.dt}", trigger_level=1)
+        verbose.display(
+            f"{self.__class__.__name__}: dt set to {self.dt}",
+            trigger_level=1,
+        )
 
     def _set_slip_coef(self, slip_coefficient: float) -> None:
         """Set the slip coefficient.
@@ -177,6 +195,11 @@ class ModelParamChecker:
             msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
             raise InvalidModelParameterError(msg)
         self._slip_coef = slip_coefficient
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: Slip coefficient set to {slip_coefficient}",
+            trigger_level=2,
+        )
 
     def _set_bottom_drag(self, bottom_drag: float) -> None:
         """Set th ebottom drag coefficient.
@@ -185,6 +208,11 @@ class ModelParamChecker:
             bottom_drag (float): Bottom drag coefficient.
         """
         self._bottom_drag = bottom_drag
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: Bottom drag set to {bottom_drag}",
+            trigger_level=2,
+        )
 
     def _set_n_ens(self, n_ens: int) -> None:
         """Set the number of ensembles.
@@ -203,6 +231,11 @@ class ModelParamChecker:
             msg = "n_ens must be greater than 1."
             raise InvalidModelParameterError(msg)
         self._n_ens = n_ens
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: Number of ensembles set to {n_ens}",
+            trigger_level=2,
+        )
 
     def _set_masks(self, mask: torch.Tensor) -> None:
         """Set the masks.
@@ -253,6 +286,11 @@ class ModelParamChecker:
             )
             raise InvalidModelParameterError(msg)
         self._H = h
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: H set to {h}",
+            trigger_level=2,
+        )
 
     def _set_g_prime(self, g_prime: torch.Tensor) -> None:
         """Set g_prime values.
@@ -267,6 +305,11 @@ class ModelParamChecker:
             )
             raise InvalidModelParameterError(msg)
         self._g_prime = g_prime
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: g' set to {g_prime}",
+            trigger_level=2,
+        )
 
     def _set_taux(self, taux: torch.Tensor | float) -> None:
         """Set taux value.

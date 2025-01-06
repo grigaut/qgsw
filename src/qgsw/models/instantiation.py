@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 import torch
 
 from qgsw.models.qg.alpha import coefficient_from_config
@@ -22,21 +21,21 @@ from qgsw.models.sw.filtering import (
     SWFilterBarotropicExact,
     SWFilterBarotropicSpectral,
 )
-from qgsw.spatial.core.discretization import (
-    SpaceDiscretization3D,
-    keep_top_layer,
-)
 from qgsw.specs import DEVICE
-from qgsw.utils import time_params
 
 if TYPE_CHECKING:
-    from qgsw.configs.core import Configuration
+    from qgsw.configs.models import ModelConfig
     from qgsw.perturbations.core import Perturbation
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import (
+        SpaceDiscretization2D,
+    )
 
 
 def instantiate_model(
-    config: Configuration,
-    space_3d: SpaceDiscretization3D,
+    model_config: ModelConfig,
+    beta_plane: BetaPlane,
+    space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
     Ro: float,  # noqa: N803
 ) -> (
@@ -50,9 +49,10 @@ def instantiate_model(
     """Instantiate the model, given the configuration and the perturbation.
 
     Args:
-        config (Configuration): Configuration.
-        space_3d (SpaceDiscretization3D): Space Discretization.
+        model_config (ModelConfig): Model configuration.
+        space_2d (SpaceDiscretization2D): Space Discretization.
         perturbation (Perturbation): Perturbation.
+        beta_plane (BetaPlane): Beta Plane.
         Ro (float): Rossby Number.
 
     Raises:
@@ -61,81 +61,86 @@ def instantiate_model(
     Returns:
         Model: Model.
     """
-    if config.model.type in [
+    if model_config.type in [
         "SW",
         "SWFilterBarotropicSpectral",
         "SWFilterBarotropicExact",
     ]:
         model = _instantiate_sw(
-            config=config,
-            space_3d=space_3d,
+            model_config=model_config,
+            space_2d=space_2d,
             perturbation=perturbation,
+            beta_plane=beta_plane,
             Ro=Ro,
         )
-    elif config.model.type == "QG":
+    elif model_config.type == "QG":
         model = _instantiate_qg(
-            config=config,
-            space_3d=space_3d,
+            model_config=model_config,
+            space_2d=space_2d,
             perturbation=perturbation,
+            beta_plane=beta_plane,
             Ro=Ro,
         )
-    elif config.model.type in [
+    elif model_config.type in [
         "QGCollinearSF",
         "QGCollinearPV",
         "QGSmoothCollinearSF",
     ]:
         model = _instantiate_collinear_qg(
-            config=config,
-            space_3d=space_3d,
+            model_config=model_config,
+            space_2d=space_2d,
             perturbation=perturbation,
+            beta_plane=beta_plane,
             Ro=Ro,
         )
     else:
-        msg = f"Unsupported model type: {config.model.type}"
+        msg = f"Unsupported model type: {model_config.type}"
         raise UnrecognizedQGModelError(msg)
-    model.slip_coef = config.physics.slip_coef
-    model.bottom_drag_coef = config.physics.bottom_drag_coefficient
-    if np.isnan(config.simulation.dt):
-        model.dt = time_params.compute_dt(
-            model.uvh,
-            model.space,
-            model.g_prime,
-            model.H,
-        )
-    else:
-        model.dt = config.simulation.dt
-    model.compute_time_derivatives(model.uvh)
     return model
 
 
 def _instantiate_sw(
-    config: Configuration,
-    space_3d: SpaceDiscretization3D,
+    model_config: ModelConfig,
+    space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
+    beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
 ) -> SW:
-    if config.model.type == "SW":
+    """Instantiate SW model from Configuration.
+
+    Args:
+        model_config (ModelConfig): Model configuration.
+        space_2d (SpaceDiscretization2D): Space Discretization.
+        perturbation (Perturbation): Perturbation.
+        beta_plane (BetaPlane): Physics configuration.
+        Ro (float): Rossby Number.
+
+    Returns:
+        SW: SW Model.
+    """
+    if model_config.type == "SW":
         model_class = SW
-    elif config.model.type == "SWFilterBarotropicSpectral":
+    elif model_config.type == "SWFilterBarotropicSpectral":
         model_class = SWFilterBarotropicSpectral
-    elif config.model.type == "SWFilterBarotropicExact":
+    elif model_config.type == "SWFilterBarotropicExact":
         model_class = SWFilterBarotropicExact
     else:
-        msg = f"Unrecognized model type: {config.model.type}"
+        msg = f"Unrecognized model type: {model_config.type}"
         raise ValueError(msg)
     model = model_class(
-        space_3d=space_3d,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
+        space_2d=space_2d,
+        H=model_config.h,
+        g_prime=model_config.g_prime,
     )
+    model.beta_plane = beta_plane
     p0 = perturbation.compute_initial_pressure(
-        space_3d.omega,
-        config.physics.beta_plane.f0,
+        model.space.omega,
+        beta_plane.f0,
         Ro,
     )
     A = compute_A(  # noqa: N806
-        space_3d.h.xyh.h[:, 0, 0],
-        config.model.g_prime.unsqueeze(1).unsqueeze(1)[:, 0, 0],
+        model_config.h,
+        model_config.g_prime,
         torch.float64,
         device=DEVICE.get(),
     )
@@ -144,7 +149,7 @@ def _instantiate_sw(
         model.space,
         model.H,
         A,
-        model.beta_plane.f0,
+        beta_plane.f0,
     )
     model.set_uvh(
         u=torch.clone(uvh0.u),
@@ -155,30 +160,33 @@ def _instantiate_sw(
 
 
 def _instantiate_qg(
-    config: Configuration,
-    space_3d: SpaceDiscretization3D,
+    model_config: ModelConfig,
+    space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
+    beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
 ) -> QG:
     """Instantiate QG model from Configuration.
 
     Args:
-        config (Configuration): Configuration.
-        space_3d (SpaceDiscretization3D): Space Discretization.
+        model_config (ModelConfig): Model configuration.
+        space_2d (SpaceDiscretization2D): Space Discretization.
         perturbation (Perturbation): Perturbation.
+        beta_plane (BetaPlane): Physics configuration.
         Ro (float): Rossby Number.
 
     Returns:
         QG: QG Model.
     """
     model = QG(
-        space_3d=space_3d,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
+        space_2d=space_2d,
+        H=model_config.h,
+        g_prime=model_config.g_prime,
     )
+    model.beta_plane = beta_plane
     p0 = perturbation.compute_initial_pressure(
-        space_3d.omega,
-        config.physics.beta_plane.f0,
+        model.space.omega,
+        model.beta_plane.f0,
         Ro,
     )
     uvh0 = model.G(p0)
@@ -191,51 +199,52 @@ def _instantiate_qg(
 
 
 def _instantiate_collinear_qg(
-    config: Configuration,
-    space_3d: SpaceDiscretization3D,
+    model_config: ModelConfig,
+    space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
+    beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
 ) -> _QGCollinearSublayer:
     """Instantiate Modified QG Models.
 
     Args:
-        config (Configuration): Configuration.
-        space_3d (SpaceDiscretization3D): Space Discretization.
+        model_config (ModelConfig): Model configuration.
+        space_2d (SpaceDiscretization2D): Space Discretization.
         perturbation (Perturbation): Perturbation.
+        beta_plane (BetaPlane): Physics configuration.
         Ro (float): Rossby Number.
 
     Returns:
         _QGCollinearSublayer: Modified QG Model.
     """
-    p0 = perturbation.compute_initial_pressure(
-        keep_top_layer(space_3d).omega,
-        config.physics.beta_plane.f0,
-        Ro,
-    )
-    if config.model.type == "QG":
-        model_class = QG
-    elif config.model.type == "QGCollinearSF":
+    if model_config.type == "QGCollinearSF":
         model_class = QGCollinearSF
-    elif config.model.type == "QGCollinearPV":
+    elif model_config.type == "QGCollinearPV":
         model_class = QGCollinearPV
-    elif config.model.type == "QGSmoothCollinearSF":
+    elif model_config.type == "QGSmoothCollinearSF":
         model_class = QGSmoothCollinearSF
     else:
-        msg = f"Unrecognized model type: {config.model.type}"
+        msg = f"Unrecognized model type: {model_config.type}"
         raise ValueError(msg)
     model = model_class(
-        space_3d=space_3d,
-        g_prime=config.model.g_prime.unsqueeze(1).unsqueeze(1),
-        beta_plane=config.physics.beta_plane,
-        coefficient=_determine_coef0(perturbation.type),
+        space_2d=space_2d,
+        H=model_config.h,
+        g_prime=model_config.g_prime,
     )
+    model.beta_plane = beta_plane
+    p0 = perturbation.compute_initial_pressure(
+        model.space.omega,
+        model.beta_plane.f0,
+        Ro,
+    )
+    model.coefficient = _determine_coef0(perturbation.type)
     uvh0 = model.G(p0)
     model.set_uvh(
         u=torch.clone(uvh0.u),
         v=torch.clone(uvh0.v),
         h=torch.clone(uvh0.h),
     )
-    model.coefficient = coefficient_from_config(config.model.collinearity_coef)
+    model.coefficient = coefficient_from_config(model_config.collinearity_coef)
     return model
 
 

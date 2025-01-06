@@ -119,8 +119,14 @@ def test_energy_equality(
 @pytest.mark.parametrize(
     ("H"),
     [
-        (torch.tensor([100], dtype=torch.float64, device=DEVICE.get())),
-        (torch.tensor([200, 800], dtype=torch.float64, device=DEVICE.get())),
+        pytest.param(
+            torch.tensor([100], dtype=torch.float64, device=DEVICE.get()),
+            id="one-layer",
+        ),
+        pytest.param(
+            torch.tensor([200, 800], dtype=torch.float64, device=DEVICE.get()),
+            id="two-layers",
+        ),
     ],
 )
 def test_W_shape(H: torch.Tensor) -> None:  # noqa: N802, N803

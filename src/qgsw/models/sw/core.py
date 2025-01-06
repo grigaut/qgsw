@@ -22,14 +22,12 @@ from qgsw.fields.variables.energetics import KineticEnergy
 from qgsw.fields.variables.uvh import UVH
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
-from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import State
-    from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
 def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -81,25 +79,24 @@ class SW(Model):
     def __init__(
         self,
         *,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
         optimize: bool = True,
     ) -> None:
         """SW Model Instantiation.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         super().__init__(
-            space_3d=space_3d,
+            space_2d=space_2d,
+            H=H,
             g_prime=g_prime,
-            beta_plane=beta_plane,
             optimize=optimize,
         )
 
