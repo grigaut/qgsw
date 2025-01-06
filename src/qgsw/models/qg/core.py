@@ -20,18 +20,19 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.models.sw.core import SW
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
 def G(  # noqa: N802
     p: torch.Tensor,
-    space: SpaceDiscretization3D,
+    space: SpaceDiscretization2D,
     H: torch.Tensor,  # noqa: N803
     A: torch.Tensor,  # noqa: N803
     f0: float,
@@ -42,7 +43,7 @@ def G(  # noqa: N802
 
     Args:
         p (torch.Tensor): Pressure.
-        space (SpaceDiscretization3D): Space Discretization
+        space (SpaceDiscretization2D): Space Discretization
         H (torch.Tensor): H tensor, (nl,nx,ny) shaped.
         A (torch.Tensor): Stretching operator matrix, (nl,nl) shaped.
         f0 (float): Coriolis parameter.
@@ -71,82 +72,78 @@ class QG(Model):
 
     def __init__(
         self,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT002, FBT001
     ) -> None:
         """QG Model Instantiation.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        self.A = self.compute_A(space_3d.h.xyh.h[:, 0, 0], g_prime[:, 0, 0])
         super().__init__(
-            space_3d=space_3d,
+            space_2d=space_2d,
+            H=H,
             g_prime=g_prime,
-            beta_plane=beta_plane,
             optimize=optimize,
         )
-        self._core = self._init_core_model(optimize=optimize)
+        self.A = self.compute_A(H, g_prime)
+        self._core = self._init_core_model(
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            optimize=optimize,
+        )
         decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, lambd, self.Cl2m = decomposition
         self.lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
-        self.set_helmholtz_solver(self.lambd)
 
     @property
     def sw(self) -> SW:
         """Core Shallow Water Model."""
         return self._core
 
-    def _set_bottom_drag(self, bottom_drag: float) -> None:
-        """Set the bottom drag coefficient.
+    @Model.beta_plane.setter
+    def beta_plane(self, beta_plane: BetaPlane) -> None:
+        """Beta-plane setter."""
+        Model.beta_plane.fset(self, beta_plane)
+        self.sw.beta_plane = beta_plane
+        self.set_helmholtz_solver(self.lambd)
 
-        Args:
-            bottom_drag (float): Bottom drag coefficient.
-        """
-        self.sw.bottom_drag_coef = bottom_drag
-        return super()._set_bottom_drag(bottom_drag)
+    @Model.slip_coef.setter
+    def slip_coef(self, slip_coef: float) -> None:
+        """Slip coefficient setter."""
+        Model.slip_coef.fset(self, slip_coef)
+        self.sw.slip_coef = slip_coef
 
-    def _set_slip_coef(self, slip_coefficient: float) -> None:
-        """Set the slip coefficient.
+    @Model.bottom_drag_coef.setter
+    def bottom_drag_coef(self, bottom_drag_coef: float) -> None:
+        """Beta-plane setter."""
+        Model.bottom_drag_coef.fset(self, bottom_drag_coef)
+        self.sw.bottom_drag_coef = bottom_drag_coef
 
-        Args:
-            slip_coefficient (float): Slip coefficient.
-        """
-        self.sw.slip_coef = slip_coefficient
-        return super()._set_slip_coef(slip_coefficient)
-
-    def _set_dt(self, dt: float) -> None:
-        """TimeStep Setter.
-
-        Args:
-        dt (float): Timestep (s)
-        """
+    @Model.dt.setter
+    def dt(self, dt: float) -> None:
+        """Timesetp setter."""
+        Model.dt.fset(self, dt)
         self.sw.dt = dt
-        return super()._set_dt(dt)
 
-    def _set_masks(self, mask: torch.Tensor) -> None:
-        """Set the masks.
+    @Model.masks.setter
+    def masks(self, masks: torch.Tensor) -> None:
+        """Masks setter."""
+        Model.masks.fset(self, masks)
+        self.sw.masks = masks
 
-        Args:
-        mask (torch.Tensor): Mask tensor.
-        """
-        self.sw.masks = mask
-        return super()._set_masks(mask)
-
-    def _set_n_ens(self, n_ens: int) -> None:
-        """Set the number of ensembles.
-
-        Args:
-        n_ens (int): Number of ensembles.
-        """
+    @Model.n_ens.setter
+    def n_ens(self, n_ens: int) -> None:
+        """Ensemble number setter."""
+        Model.n_ens.fset(self, n_ens)
         self.sw.n_ens = n_ens
-        return super()._set_n_ens(n_ens)
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -382,19 +379,29 @@ class QG(Model):
         """
         return self.G(*self.QoG_inv(self.Q(uvh)))
 
-    def _init_core_model(self, optimize: bool) -> SW:  # noqa: FBT001
+    def _init_core_model(
+        self,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        optimize: bool,  # noqa: FBT001
+    ) -> SW:
         """Initialize the core Shallow Water model.
 
         Args:
-            optimize (bool): Wehether to optimize the model functions or not.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
 
         Returns:
             SW: Core model.
         """
         return SW(
-            space_3d=self._space,
-            g_prime=self._g_prime,
-            beta_plane=self._beta_plane,
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
             optimize=optimize,
         )
 
