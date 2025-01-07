@@ -24,7 +24,8 @@ if TYPE_CHECKING:
 
     from matplotlib.axes import Axes
 
-    from qgsw.configs.alpha import CollinearityCoefficientConfig
+    from qgsw.configs.models import CollinearityCoefficientConfig
+
 ABOVE_ZERO_THRESHOLD = 1e-5
 
 

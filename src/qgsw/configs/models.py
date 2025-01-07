@@ -61,3 +61,9 @@ class ChangingCollinearityCoefConfig(BaseModel):
 
     type: Literal["changing"]
     source_file: FilePath
+
+
+CollinearityCoefficientConfig = Union[
+    ConstantCollinearityCoefConfig,
+    ChangingCollinearityCoefConfig,
+]

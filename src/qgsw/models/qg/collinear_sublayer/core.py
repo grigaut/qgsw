@@ -12,7 +12,10 @@ from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
+from qgsw.models.qg.collinear_sublayer.alpha import (
+    Coefficient,
+    ConstantCoefficient,
+)
 from qgsw.models.qg.core import QG
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,

@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.qg.alpha import coefficient_from_config
-from qgsw.models.qg.collinear_sublayer import (
+from qgsw.models.qg.collinear_sublayer.alpha import coefficient_from_config
+from qgsw.models.qg.collinear_sublayer.core import (
     QGCollinearPV,
     QGCollinearSF,
     QGSmoothCollinearSF,

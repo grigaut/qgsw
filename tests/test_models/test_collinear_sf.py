@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from qgsw.models.qg.collinear_sublayer import QGCollinearSF
+from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
