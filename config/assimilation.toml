@@ -4,7 +4,7 @@ name = "Assimilation."
 save = true
 type = "interval"           # "interval"
 # quantity = 100
-interval_duration = 86_4000  # seconds
+interval_duration = 86_400  # seconds
 directory = "assimilation"
 
 [physics]
