@@ -1,6 +1,5 @@
 """Run a single model with a Vortex forcing."""
 
-import argparse
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +7,7 @@ import torch
 from rich.progress import Progress
 
 from qgsw import verbose
+from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
@@ -19,19 +19,13 @@ from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
-verbose.set_level(2)
 
-parser = argparse.ArgumentParser(description="Retrieve Configuration file.")
-parser.add_argument(
-    "--config",
-    default="config/run.toml",
-    help="Configuration File Path (from qgsw root level)",
-)
-args = parser.parse_args()
+args = ScriptArgs.from_cli()
+
+verbose.set_level(args.verbose)
 
 ROOT_PATH = Path(__file__).parent.parent
-CONFIG_PATH = ROOT_PATH.joinpath(args.config)
-config = Configuration.from_toml(CONFIG_PATH)
+config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 summary = RunSummary.from_configuration(config)
 
 if config.io.output.save:

@@ -7,7 +7,7 @@
 #OAR -O logs/OAR.%jobid%.stdout
 #OAR -E logs/OAR.%jobid%.stderr
 
-# To run with arguments use quotes: "oarsub -S "./run_model.py --config=config.toml"
+# To run with arguments use quotes: oarsub -S "./run.sh --config=config/run.toml -vv"
 
 lscpu | grep 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1'
 

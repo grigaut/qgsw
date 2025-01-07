@@ -1,6 +1,5 @@
 """Data assimilation pipeline."""
 
-import argparse
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +7,7 @@ import torch
 from rich.progress import Progress
 
 from qgsw import verbose
+from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.uvh import UVH
 from qgsw.forcing.wind import WindForcing
@@ -22,21 +22,13 @@ from qgsw.specs import DEVICE
 from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
-verbose.set_level(2)
 
+args = ScriptArgs.from_cli()
 
-parser = argparse.ArgumentParser(description="Retrieve Configuration file.")
-parser.add_argument(
-    "--config",
-    default="config/assimilation.toml",
-    help="Configuration File Path (from qgsw root level)",
-)
-args = parser.parse_args()
-
+verbose.set_level(args.verbose)
 
 ROOT_PATH = Path(__file__).parent.parent
-CONFIG_PATH = ROOT_PATH.joinpath(args.config)
-config = Configuration.from_toml(CONFIG_PATH)
+config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 summary = RunSummary.from_configuration(config)
 
 if config.io.output.save:
