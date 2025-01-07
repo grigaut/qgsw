@@ -12,7 +12,13 @@ from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.alpha import Coefficient, ConstantCoefficient
+from qgsw.models.qg.collinear_sublayer.alpha import (
+    Coefficient,
+    ConstantCoefficient,
+)
+from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
+    compute_A_collinear_sf,
+)
 from qgsw.models.qg.core import QG
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
@@ -222,15 +228,13 @@ class QGCollinearSF(_QGCollinearSublayer):
         Returns:
             torch.Tensor: Stretching Operator
         """  # noqa: RUF002
-        A = super().compute_A(H, g_prime)  # noqa: N806
-        # Create layers coefficients vector [1, α]  # noqa: RUF003
-        layers_coefs = torch.tensor(
-            [1, self.alpha],
+        return compute_A_collinear_sf(
+            H=H,
+            g_prime=g_prime,
+            alpha=self.alpha,
             dtype=self.dtype,
             device=self.device.get(),
         )
-        # Select top row from matrix product
-        return (A @ layers_coefs)[0, ...].unsqueeze(0).unsqueeze(0)
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""

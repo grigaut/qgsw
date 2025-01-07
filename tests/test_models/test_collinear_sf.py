@@ -3,7 +3,10 @@
 import pytest
 import torch
 
-from qgsw.models.qg.collinear_sublayer import QGCollinearSF
+from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
+    compute_A_collinear_sf,
+)
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
@@ -131,17 +134,17 @@ testdata = [
 
 @pytest.mark.parametrize(("coefficient", "reference"), testdata)
 def test_model_stretching_matrix(
-    space_2d: SpaceDiscretization2D,
     H: torch.Tensor,  # noqa: N803
     g_prime: torch.Tensor,
     coefficient: float,
     reference: torch.Tensor,
 ) -> None:
     """Test streching matrix computation from QG model."""
-    model = QGCollinearSF(
-        space_2d,
+    A = compute_A_collinear_sf(  # noqa: N806
         H,
         g_prime,
+        coefficient,
+        torch.float64,
+        DEVICE.get(),
     )
-    model.coefficient = coefficient
-    assert torch.isclose(reference, model.A).all()
+    assert torch.isclose(reference, A).all()
