@@ -31,6 +31,9 @@ from qgsw.fields.variables.energetics import (
     TotalKineticEnergy,
 )
 from qgsw.masks import Masks
+from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
+    compute_A_collinear_sf,
+)
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
@@ -43,14 +46,14 @@ if TYPE_CHECKING:
     from qgsw.fields.variables.base import DiagnosticVariable
 
 
-def create_qg_variable_set(
+def _qg_variable_set(
     physics_config: PhysicsConfig,
     space_config: SpaceConfig,
     model_config: ModelConfig,
     dtype: torch.dtype,
     device: torch.device,
 ) -> dict[str, DiagnosticVariable]:
-    """Add QG variables to run output.
+    """Prepare QG variable set.
 
     Args:
         run_output (RunOutput): Run output.
@@ -129,14 +132,14 @@ def create_qg_variable_set(
     }
 
 
-def create_collinear_qg_variable_set(
+def _collinear_qg_variable_set(
     physics_config: PhysicsConfig,
     space_config: SpaceConfig,
     model_config: ModelConfig,
     dtype: torch.dtype,
     device: torch.device,
 ) -> dict[str, DiagnosticVariable]:
-    """Add QG variables to run output.
+    """Prepare Collinear QG variable set.
 
     Args:
         run_output (RunOutput): Run output.
@@ -150,11 +153,12 @@ def create_collinear_qg_variable_set(
     dx = space.dx
     dy = space.dy
     ds = space.area
-    H = model_config.h  # noqa: N806
-    g_prime = model_config.g_prime
-    A = compute_A(  # noqa: N806
-        H,
-        g_prime,
+    H = model_config.h[:1]  # noqa: N806
+    g_prime = model_config.g_prime[:1]
+    A = compute_A_collinear_sf(  # noqa: N806
+        model_config.h,
+        model_config.g_prime,
+        model_config.collinearity_coef.value,
         dtype,
         device,
     )
