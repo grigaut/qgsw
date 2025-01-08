@@ -218,3 +218,43 @@ def _collinear_qg_variable_set(
         ape.name: ape,
         energy.name: energy,
     }
+
+
+def create_qg_variable_set(
+    physics_config: PhysicsConfig,
+    space_config: SpaceConfig,
+    model_config: ModelConfig,
+    dtype: torch.dtype,
+    device: torch.device,
+) -> dict[str, DiagnosticVariable]:
+    """Prepare QG variable set.
+
+    Args:
+        run_output (RunOutput): Run output.
+        physics_config (PhysicsConfig): Physics configuration
+        space_config (SpaceConfig): Space configuration
+        model_config (ModelConfig): Model configuration
+        dtype (torch.dtype): Data type
+        device (torch.device): Device
+    """
+    if model_config.type == "QG":
+        return _qg_variable_set(
+            physics_config=physics_config,
+            space_config=space_config,
+            model_config=model_config,
+            dtype=dtype,
+            device=device,
+        )
+    if model_config.type == "QGCollinearSF":
+        return _collinear_qg_variable_set(
+            physics_config=physics_config,
+            space_config=space_config,
+            model_config=model_config,
+            dtype=dtype,
+            device=device,
+        )
+    msg = (
+        "Supported model types are `QG` and `QGCollinearSF`"
+        f", received {model_config.type}"
+    )
+    raise ValueError(msg)
