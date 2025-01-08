@@ -313,6 +313,57 @@ class PhysicalVorticity(DiagnosticVariable):
         return super().bind(state)
 
 
+class PressureAnomaly(DiagnosticVariable):
+    """Pressure Anomaly."""
+
+    _unit = Unit.M2S_2
+    _name = "p_anomaly"
+    _description = "Pressure anomaly per unit of mass"
+    _scope = Scope.POINT_WISE
+
+    def __init__(
+        self,
+        g_prime: torch.Tensor,
+        h_phys: PhysicalLayerDepthAnomaly,
+    ) -> None:
+        """Instantiate the pressure variable.
+
+        Args:
+            g_prime (torch.Tensor): Reduced gravity
+            h_phys (PhysicalLayerDepthAnomaly): Physical layer depth anomaly
+            variable.
+        """
+        self._g_prime = g_prime
+        self._h_phys = h_phys
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Pressure
+        """
+        return self._g_prime * self._h_phys.compute(uvh)
+
+    def bind(
+        self,
+        state: State,
+    ) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the h_phys variable
+        self._h_phys = self._h_phys.bind(state)
+        return super().bind(state)
+
+
 class Pressure(DiagnosticVariable):
     """Pressure."""
 
@@ -418,6 +469,49 @@ class PotentialVorticity(DiagnosticVariable):
         """
         # Bind the vorticity_phys variable
         self._vorticity_phys = self._vorticity_phys.bind(state)
+        return super().bind(state)
+
+
+class StreamFunctionAnomaly(DiagnosticVariable):
+    """Stream function anomaly variable."""
+
+    _unit = Unit.M2S_1
+    _name = "psi_anomaly"
+    _description = "Stream function anomaly"
+    _scope = Scope.POINT_WISE
+
+    def __init__(self, pressure_anomaly: PressureAnomaly, f0: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            pressure_anomaly (PressureAnomaly): Pressure anomaly variable.
+            f0 (float): Coriolis parameter.
+        """
+        self._p_anomaly = pressure_anomaly
+        self._f0 = f0
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            uvh (UVH): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Stream function.
+        """
+        return self._p_anomaly.compute(uvh) / self._f0
+
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the pressure variable
+        self._p_anomaly = self._p_anomaly.bind(state)
         return super().bind(state)
 
 

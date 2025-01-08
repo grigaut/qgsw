@@ -15,7 +15,9 @@ from qgsw.fields.variables.dynamics import (
     PhysicalZonalVelocity,
     PotentialVorticity,
     Pressure,
+    PressureAnomaly,
     StreamFunction,
+    StreamFunctionAnomaly,
     SurfaceHeightAnomaly,
     TotalEnstrophy,
     Vorticity,
@@ -89,7 +91,12 @@ def _qg_variable_set(
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)
     eta = SurfaceHeightAnomaly(h_phys)
+    p_anomaly = PressureAnomaly(
+        g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
+        h_phys,
+    )
     p = Pressure(g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1), eta)
+    psi_anomaly = StreamFunctionAnomaly(p_anomaly, physics_config.f0)
     psi = StreamFunction(p, physics_config.f0)
     pv = PotentialVorticity(
         vorticity_phys,
@@ -120,7 +127,9 @@ def _qg_variable_set(
         enstrophy.name: enstrophy,
         enstrophy_tot.name: enstrophy_tot,
         eta.name: eta,
+        p_anomaly.name: p_anomaly,
         p.name: p,
+        psi_anomaly.name: psi_anomaly,
         psi.name: psi,
         pv.name: pv,
         ke_hat.name: ke_hat,
@@ -177,7 +186,12 @@ def _collinear_qg_variable_set(
     vorticity_phys = PhysicalVorticity(vorticity, ds)
     eta = SurfaceHeightAnomaly(h_phys)
 
+    p_anomaly = PressureAnomaly(
+        g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
+        h_phys,
+    )
     p = Pressure(g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1), eta)
+    psi_anomaly = StreamFunctionAnomaly(p_anomaly, physics_config.f0)
     psi = StreamFunction(p, physics_config.f0)
     pv = PotentialVorticity(
         vorticity_phys,
@@ -208,7 +222,9 @@ def _collinear_qg_variable_set(
         enstrophy.name: enstrophy,
         enstrophy_tot.name: enstrophy_tot,
         eta.name: eta,
+        p_anomaly.name: p_anomaly,
         p.name: p,
+        psi_anomaly.name: psi_anomaly,
         psi.name: psi,
         pv.name: pv,
         ke_hat.name: ke_hat,
