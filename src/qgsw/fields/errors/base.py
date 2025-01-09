@@ -1,6 +1,7 @@
 """Base class for errors."""
 
 from abc import ABC, abstractmethod
+from types import EllipsisType
 
 import torch
 
@@ -33,6 +34,13 @@ class Error(ABC, Field):
             raise ValueError(msg)
         self._var = variable
         self._var_ref = variable_ref
+
+    @Field.slice.setter
+    def slice(self, slice_list: list[slice, EllipsisType]) -> None:
+        """Slice setter."""
+        Field.slice.fset(self, slice_list)
+        self._var.slice = slice_list
+        self._var_ref.slice = slice_list
 
     def __repr__(self) -> str:
         """String representation of the error."""

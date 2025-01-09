@@ -69,7 +69,7 @@ class KineticEnergy(DiagnosticVariable):
         self._V = V
         self._comp_ke = OptimizableFunction(finite_diff.comp_ke)
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the kinetic energy.
 
         Args:
@@ -79,8 +79,8 @@ class KineticEnergy(DiagnosticVariable):
             torch.Tensor: Kinetic energy.
         """
         u, v, _ = uvh
-        U = self._U.compute(uvh)  # noqa: N806
-        V = self._V.compute(uvh)  # noqa: N806
+        U = self._U.compute_no_slice(uvh)  # noqa: N806
+        V = self._V.compute_no_slice(uvh)  # noqa: N806
         return self._comp_ke(u, U, v, V) * self._h_mask
 
     def bind(
@@ -140,7 +140,7 @@ class ModalKineticEnergy(DiagnosticVariable):
         # Since Cm2lT_W_Cm2l is diagonal
         self._Cm2lT_W_Cm2l = torch.diag(Cm2lT_W_Cm2l)  # Vector
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
@@ -149,7 +149,7 @@ class ModalKineticEnergy(DiagnosticVariable):
         Returns:
             torch.Tensor: Modal kinetic energy, shape: (n_ens, nl).
         """
-        psi = self._psi.compute(uvh)
+        psi = self._psi.compute_no_slice(uvh)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
         # Pad x with 0 on top
         psi_hat_pad_x = F.pad(psi_hat, (0, 0, 0, 1))
@@ -216,7 +216,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
         Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
         self._Cm2lT_W_Cm2l_lambda = Cm2l_T @ W @ Cm2l @ lambd  # Vector
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
@@ -226,7 +226,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
             torch.Tensor: Modal avalaible potential energy,
             shape: (n_ens,nl).
         """
-        psi = self._psi.compute(uvh)
+        psi = self._psi.compute_no_slice(uvh)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
         psiT_CT_W_C_lambda_psi = torch.einsum(  # noqa: N806
             "l,...lxy->...lxy",
@@ -276,7 +276,7 @@ class ModalEnergy(DiagnosticVariable):
         self._ke = ke_hat
         self._ape = ape_hat
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute total modal energy.
 
         Args:
@@ -285,7 +285,7 @@ class ModalEnergy(DiagnosticVariable):
         Returns:
             torch.Tensor: Modal total energy, shape: (n_ens)
         """
-        return self._ke.compute(uvh) + self._ape.compute(uvh)
+        return self._ke.compute_no_slice(uvh) + self._ape.compute_no_slice(uvh)
 
     def bind(
         self,
@@ -337,7 +337,7 @@ class TotalKineticEnergy(DiagnosticVariable):
         # Compute W = Diag(H) / h_{tot}
         self._W = torch.diag(compute_W(H))  # Vector
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
@@ -346,7 +346,7 @@ class TotalKineticEnergy(DiagnosticVariable):
         Returns:
             torch.Tensor: Total modal kinetic energy, shape: (n_ens).
         """
-        psi = self._psi.compute(uvh)
+        psi = self._psi.compute_no_slice(uvh)
         # Pad x with 0 on top
         psi_pad_x = F.pad(psi, (0, 0, 0, 1))
         # Pad y with 0 on the left
@@ -408,7 +408,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
         # Compute weight matrix
         self._W = compute_W(H)  # Matrix
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
@@ -418,7 +418,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
             torch.Tensor: Total modal avalaible potential energy,
             shape: (n_ens).
         """
-        psi = self._psi.compute(uvh)
+        psi = self._psi.compute_no_slice(uvh)
         W_A_psi = torch.einsum(  # noqa: N806
             "lm,...mxy->...lxy",
             self._W @ self._A,
@@ -472,7 +472,7 @@ class TotalEnergy(DiagnosticVariable):
         self._ke = ke
         self._ape = ape
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute total modal energy.
 
         Args:
@@ -481,7 +481,7 @@ class TotalEnergy(DiagnosticVariable):
         Returns:
             torch.Tensor: Total modal energy, shape: (n_ens)
         """
-        return self._ke.compute(uvh) + self._ape.compute(uvh)
+        return self._ke.compute_no_slice(uvh) + self._ape.compute_no_slice(uvh)
 
     def bind(
         self,

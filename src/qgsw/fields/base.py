@@ -1,6 +1,13 @@
 """Base class for fields."""
 
-from qgsw.fields.scope import Scope
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from types import EllipsisType
+
+    from qgsw.fields.scope import Scope
 
 
 class Field:
@@ -9,6 +16,7 @@ class Field:
     _name: str
     _description: str
     _scope: Scope
+    _slice: list[slice | EllipsisType] = None
 
     @property
     def name(self) -> str:
@@ -24,6 +32,17 @@ class Field:
     def scope(self) -> Scope:
         """Variable scope."""
         return self._scope
+
+    @property
+    def slice(self) -> list[slice | EllipsisType]:
+        """Slice to apply to data."""
+        if self._slice is None:
+            return [...]
+        return self._slice
+
+    @slice.setter
+    def slice(self, slice_list: list[slice | EllipsisType]) -> None:
+        self._slice = slice_list
 
     def __repr__(self) -> str:
         """Variable string representation."""

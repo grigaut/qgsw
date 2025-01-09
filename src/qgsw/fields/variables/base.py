@@ -15,6 +15,8 @@ except ImportError:
 
 
 if TYPE_CHECKING:
+    from types import EllipsisType
+
     import torch
 
     from qgsw.fields.variables.state import State
@@ -58,6 +60,12 @@ class PrognosticVariable(ABC, Variable):
     """Prognostic variable."""
 
     _scope = Scope.POINT_WISE
+
+    @Field.slice.setter
+    def slice(self, slice_list: list[slice | EllipsisType]) -> None:  # noqa: ARG002
+        """Slice setter."""
+        msg = "Impossible to define slice for PrognosticVariable."
+        raise PermissionError(msg)
 
     def __init__(self, initial: torch.Tensor) -> None:
         """Instantiate the variable.
@@ -112,19 +120,35 @@ class PrognosticVariable(ABC, Variable):
         Returns:
             torch.Tensor: Value of the variable.
         """
-        return self._data
+        return self._data[*self.slice]
 
 
 class DiagnosticVariable(Variable, ABC):
     """Diagnostic Variable Base Class."""
 
     @abstractmethod
+    def _compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostic variables
+        """
+
     def compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
             uvh (UVH): Prognostic variables
         """
+        return self._compute(uvh)[*self.slice]
+
+    def compute_no_slice(self, uvh: UVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            uvh (UVH): Prognostic variables
+        """
+        return self._compute(uvh)
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
@@ -167,7 +191,7 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         """Whether the variable must be updated or not."""
         return self._up_to_date
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def compute_no_slice(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value if outdated.
 
         Args:
@@ -181,6 +205,17 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._up_to_date = True
         self._value = self._var.compute(uvh)
         return self._value
+
+    def compute(self, uvh: UVH) -> torch.Tensor:
+        """Compute the variable value if outdated.
+
+        Args:
+            uvh (UVH): UVH.
+
+        Returns:
+            torch.Tensor: Variable value.
+        """
+        return self.compute_no_slice(uvh)[*self.slice]
 
     def get(self) -> torch.Tensor:
         """Get the variable value.
