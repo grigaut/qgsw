@@ -15,7 +15,10 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from types import EllipsisType
+    try:
+        from types import EllipsisType
+    except ImportError:
+        EllipsisType = type(...)
 
     import torch
 
@@ -62,7 +65,10 @@ class PrognosticVariable(ABC, Variable):
     _scope = Scope.POINT_WISE
 
     @Field.slices.setter
-    def slices(self, slice_list: list[slice | EllipsisType]) -> None:  # noqa: ARG002
+    def slices(
+        self,
+        slices: list[slice | EllipsisType],  # type: ignore  # noqa: ARG002, PGH003
+    ) -> None:
         """Slice setter."""
         msg = "Impossible to define slice for PrognosticVariable."
         raise PermissionError(msg)

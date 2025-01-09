@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from types import EllipsisType
+    try:
+        from types import EllipsisType
+    except ImportError:
+        EllipsisType = type(...)
 
     from qgsw.fields.scope import Scope
 
@@ -16,7 +19,7 @@ class Field:
     _name: str
     _description: str
     _scope: Scope
-    _slices: list[slice | EllipsisType] = None
+    _slices: list[slice | EllipsisType] = None  # type: ignore  # noqa: PGH003
 
     @property
     def name(self) -> str:
@@ -34,15 +37,15 @@ class Field:
         return self._scope
 
     @property
-    def slices(self) -> list[slice | EllipsisType]:
+    def slices(self) -> list[slice | EllipsisType]:  # type: ignore  # noqa: PGH003
         """Slice to apply to data."""
         if self._slices is None:
             return [...]
         return self._slices
 
     @slices.setter
-    def slices(self, slice_list: list[slice | EllipsisType]) -> None:
-        self._slices = slice_list
+    def slices(self, slices: list[slice | EllipsisType]) -> None:  # type: ignore  # noqa: PGH003
+        self._slices = slices
 
     def __repr__(self) -> str:
         """Variable string representation."""
