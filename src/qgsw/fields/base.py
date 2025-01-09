@@ -16,7 +16,7 @@ class Field:
     _name: str
     _description: str
     _scope: Scope
-    _slice: list[slice | EllipsisType] = None
+    _slices: list[slice | EllipsisType] = None
 
     @property
     def name(self) -> str:
@@ -34,15 +34,15 @@ class Field:
         return self._scope
 
     @property
-    def slice(self) -> list[slice | EllipsisType]:
+    def slices(self) -> list[slice | EllipsisType]:
         """Slice to apply to data."""
-        if self._slice is None:
+        if self._slices is None:
             return [...]
-        return self._slice
+        return self._slices
 
-    @slice.setter
-    def slice(self, slice_list: list[slice | EllipsisType]) -> None:
-        self._slice = slice_list
+    @slices.setter
+    def slices(self, slice_list: list[slice | EllipsisType]) -> None:
+        self._slices = slice_list
 
     def __repr__(self) -> str:
         """Variable string representation."""

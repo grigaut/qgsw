@@ -50,14 +50,14 @@ def test_slicing(state: State) -> None:
     # Variables
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
 
-    h_phys.slice = [slice(0, 1), slice(0, 1), ...]
+    h_phys.slices = [slice(0, 1), slice(0, 1), ...]
     h = h_phys.compute(state.uvh)
     assert h.shape == (1, 1, 10, 10)
 
     h_no_slice = h_phys.compute_no_slice(state.uvh)
     assert h_no_slice.shape == (1, 2, 10, 10)
 
-    assert (h_no_slice[*h_phys.slice] == h).shape
+    assert (h_no_slice.__getitem__(h_phys.slices) == h).shape
 
 
 def test_slicing_bound(state: State) -> None:
@@ -77,15 +77,15 @@ def test_slicing_bound(state: State) -> None:
     )
     p_bound = p.bind(state)
 
-    p_bound.slice = [slice(0, 1), slice(0, 1), ...]
+    p_bound.slices = [slice(0, 1), slice(0, 1), ...]
     p_value = p_bound.get()
     assert p_value.shape == (1, 1, 10, 10)
 
-    p_bound.slice = [...]
+    p_bound.slices = [...]
     p_no_slice = p_bound.get()
     assert p_no_slice.shape == (1, 2, 10, 10)
 
-    assert (p_no_slice[*h_phys.slice] == p_value).shape
+    assert (p_no_slice.__getitem__(p_bound.slices) == p_value).shape
 
 
 def test_physical_prognostic_variables(state: State) -> None:

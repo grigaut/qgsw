@@ -35,12 +35,12 @@ class Error(ABC, Field):
         self._var = variable
         self._var_ref = variable_ref
 
-    @Field.slice.setter
-    def slice(self, slice_list: list[slice, EllipsisType]) -> None:
+    @Field.slices.setter
+    def slices(self, slice_list: list[slice, EllipsisType]) -> None:
         """Slice setter."""
-        Field.slice.fset(self, slice_list)
-        self._var.slice = slice_list
-        self._var_ref.slice = slice_list
+        Field.slices.fset(self, slice_list)
+        self._var.slices = slice_list
+        self._var_ref.slices = slice_list
 
     def __repr__(self) -> str:
         """String representation of the error."""

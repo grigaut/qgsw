@@ -135,15 +135,17 @@ def test_error_slicing(pressure: Pressure) -> None:
 
     slices = [slice(0, 1), slice(0, 1), slice(0, 5), ...]
 
-    rmse.slice = slices
+    rmse.slices = slices
 
     assert rmse.compute_point_wise(uvh, uvh_ref).shape == (n_ens, 1, 5, ny)
     assert rmse.compute_level_wise(uvh, uvh_ref).shape == (n_ens, 1)
     assert rmse.compute_ensemble_wise(uvh, uvh_ref).shape == (n_ens,)
 
-    assert (rmse.compute_point_wise(uvh, uvh_ref) == point_wise[*slices]).all()
+    assert (
+        rmse.compute_point_wise(uvh, uvh_ref) == point_wise.__getitem__(slices)
+    ).all()
 
-    rmse.slice = [...]
+    rmse.slices = [...]
 
     assert rmse.compute_point_wise(uvh, uvh_ref).shape == (n_ens, nl, nx, ny)
     assert rmse.compute_level_wise(uvh, uvh_ref).shape == (n_ens, nl)

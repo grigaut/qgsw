@@ -82,7 +82,7 @@ selected_var_pts_ref = vars_dict_ref[selected_var_pts.name]
 
 if show_error_pts:
     error_pts = error_type_pts(selected_var_pts, selected_var_pts_ref)
-    error_pts.slice = [slice(None, None), slice(0, 1), ...]
+    error_pts.slices = [slice(None, None), slice(0, 1), ...]
 
 with st.form(key="var-form"):
     level = st.selectbox("Level", list(range(levels_nb)))
@@ -157,7 +157,7 @@ if show_error_lvl:
         for var, var_ref in zip(selected_vars_lvl, selected_vars_lvl_ref)
     ]
     for error in errors_lvl:
-        error.slice = [slice(None, None), slice(0, 1), ...]
+        error.slices = [slice(None, None), slice(0, 1), ...]
 
 with st.form(key="var-form-level-wise"):
     levels = list(range(levels_nb))

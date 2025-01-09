@@ -61,8 +61,8 @@ class PrognosticVariable(ABC, Variable):
 
     _scope = Scope.POINT_WISE
 
-    @Field.slice.setter
-    def slice(self, slice_list: list[slice | EllipsisType]) -> None:  # noqa: ARG002
+    @Field.slices.setter
+    def slices(self, slice_list: list[slice | EllipsisType]) -> None:  # noqa: ARG002
         """Slice setter."""
         msg = "Impossible to define slice for PrognosticVariable."
         raise PermissionError(msg)
@@ -120,7 +120,7 @@ class PrognosticVariable(ABC, Variable):
         Returns:
             torch.Tensor: Value of the variable.
         """
-        return self._data.__getitem__(self.slice)
+        return self._data.__getitem__(self.slices)
 
 
 class DiagnosticVariable(Variable, ABC):
@@ -140,7 +140,7 @@ class DiagnosticVariable(Variable, ABC):
         Args:
             uvh (UVH): Prognostic variables
         """
-        return self._compute(uvh).__getitem__(self.slice)
+        return self._compute(uvh).__getitem__(self.slices)
 
     def compute_no_slice(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
@@ -215,7 +215,7 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         Returns:
             torch.Tensor: Variable value.
         """
-        return self.compute_no_slice(uvh).__getitem__(self.slice)
+        return self.compute_no_slice(uvh).__getitem__(self.slices)
 
     def get(self) -> torch.Tensor:
         """Get the variable value.
