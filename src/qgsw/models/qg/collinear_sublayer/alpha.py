@@ -14,9 +14,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import interpolate
 
-from qgsw.run_summary import RunSummary
 from qgsw.utils.gaussian_filtering import GaussianFilter1D
-from qgsw.utils.sorting import sort_files
 from qgsw.utils.type_switch import TypeSwitch
 
 if TYPE_CHECKING:
@@ -25,161 +23,6 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
 
     from qgsw.configs.models import CollinearityCoefficientConfig
-
-ABOVE_ZERO_THRESHOLD = 1e-5
-
-
-def mean_threshold(array: np.ndarray, std_nb: int = 1) -> float:
-    """Compute Threshold Based on mean value.
-
-    Threshold is 'mean + std_nb * std', computed on absolute values.
-
-    Args:
-        array (np.ndarray): Array to base threshold on.
-        std_nb (int, optional): Number of standard deviation to add.
-        Defaults to 1.
-
-    Returns:
-        float: mean + std_nb * std
-    """
-    array_abs = np.abs(array)
-    mean = np.mean(array_abs[array_abs > ABOVE_ZERO_THRESHOLD])
-    std = np.std(array_abs[array_abs > ABOVE_ZERO_THRESHOLD])
-    return mean + std_nb * std
-
-
-def quantile_threshold(
-    array: np.ndarray,
-    quantile: float = 0.95,
-) -> float:
-    """Compute Threshold based on quantile.
-
-    Args:
-        array (np.ndarray): Array to base threshold on.
-        quantile (float, optional): Quantile value. Defaults to 0.95.
-
-    Returns:
-        float: Threshold: quantile value over basolute values.
-    """
-    array_abs = np.abs(array)
-    abs_top = array_abs[array_abs > ABOVE_ZERO_THRESHOLD]
-    return np.quantile(abs_top, quantile)
-
-
-def compute_coef_from_two_layers(
-    top: np.ndarray,
-    bottom: np.ndarray,
-    mask: np.ndarray,
-) -> float:
-    """Compute the coefficient using layers values.
-
-    Args:
-        top (np.ndarray): Top layer.
-        bottom (np.ndarray): Bottom layer.
-        mask (np.ndarray): Mask over which to compute the coefficient.
-
-    Returns:
-        float: Mean value of the coefficient over the mask.
-        0 if all the domain is masked.
-    """
-    if np.sum(mask) == 0:
-        return 0
-    return np.mean(bottom[mask] / top[mask])
-
-
-def compute_coef_std_from_two_layers(
-    top: np.ndarray,
-    bottom: np.ndarray,
-    mask: np.ndarray,
-) -> float:
-    """Compute the standard deviation of the coefficient.
-
-    Args:
-        top (np.ndarray): Top layer.
-        bottom (np.ndarray): Bottom layer.
-        mask (np.ndarray): Mask over which to compute the std.
-
-    Returns:
-        float: std value of the coefficient over the mask.
-        0 if all the domain is masked.
-    """
-    if np.sum(mask) == 0:
-        return 0
-    return np.std(bottom[mask] / top[mask])
-
-
-def compute_coef_from_file(file: Path, field: str = "omega") -> float:
-    """Compute the coefficient from a file.
-
-    Args:
-        file (Path): File to use.
-        field (str, optional): Field to consider for the coefficient
-        computation. Defaults to "omega".
-
-    Returns:
-        float: Coefficient value.
-    """
-    data = np.load(file)[field]
-    top = data[0, 0]
-    bottom = data[0, 1]
-    mask = np.abs(top) > mean_threshold(top)
-    return compute_coef_from_two_layers(top, bottom, mask)
-
-
-def compute_coefficients(
-    files: list[Path],
-    field: str = "omega",
-) -> np.ndarray:
-    """Compute the coefficient over a list of fileS.
-
-    Args:
-        files (list[Path]): Files.
-        field (str, optional): Field to consider for the coefficient
-        computation. Defaults to "omega".
-
-    Returns:
-        np.ndarray: Coeeficient values for every file.
-    """
-    coefs = [compute_coef_from_file(file, field=field) for file in files]
-    return np.array(coefs)
-
-
-def extract_coefficients_from_run(
-    folder: Path,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Extract the coeffcient values from a run folder.
-
-    Args:
-        folder (Path): Run folder.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]: Times, coefficient values.
-    """
-    run = RunSummary.from_file(folder.joinpath("_summary.toml"))
-    dt = run.configuration.simulation.dt
-    steps, files = sort_files(
-        folder.rglob("*.npz"),
-        prefix=run.configuration.model.prefix,
-        suffix=".npz",
-    )
-    coefficients = compute_coefficients(files, field="omega")
-    return np.array(steps) * dt, coefficients
-
-
-def save_coefficients(
-    file: Path,
-    times: np.ndarray,
-    coefficients: np.ndarray,
-) -> None:
-    """Save coeffciients in a .npz file.
-
-    Args:
-        file (Path): File to save in.
-        times (np.ndarray): Steps.
-        coefficients (np.ndarray): Coefficients.
-        dt (float): Dt.
-    """
-    np.savez(file, times=times, alpha=coefficients)
 
 
 class Coefficient(TypeSwitch, metaclass=ABCMeta):
@@ -211,7 +54,6 @@ class Coefficient(TypeSwitch, metaclass=ABCMeta):
         Returns:
             float: Coefficient value.
         """
-        return self.at_step(time / self._dt)
 
     def reset_time(self) -> None:
         """Reset time."""
@@ -388,30 +230,6 @@ class ChangingCoefficient(Coefficient):
         plt.show()
 
     @classmethod
-    def from_model_files(
-        cls,
-        files: list[Path],
-        steps: np.ndarray,
-        dt: float,
-        field: str = "omega",
-    ) -> Self:
-        """Instantiate the coefficient from a list of files.
-
-        Args:
-            files (list[Path]): Files to use.
-            steps (np.ndarray): Steps values.
-            dt (float): Timesetp value (in seconds).
-            field (str, optional): Field to consider. Defaults to "omega".
-
-        Returns:
-            Self: Coefficient.
-        """
-        return cls(
-            compute_coefficients(files, field=field),
-            times=steps * dt,
-        )
-
-    @classmethod
     def from_file(
         cls,
         file: Path,
@@ -433,25 +251,6 @@ class ChangingCoefficient(Coefficient):
         return cls(
             data[coefs_field],
             data[times_field],
-        )
-
-    @classmethod
-    def from_run(
-        cls,
-        folder: Path,
-    ) -> Self:
-        """Instantiate the coefficients from a run folder.
-
-        Args:
-            folder (Path): Folder of the run output.
-
-        Returns:
-            Self: Coefficient.
-        """
-        times, coefficients = extract_coefficients_from_run(folder)
-        return cls(
-            coefficients,
-            times,
         )
 
 
