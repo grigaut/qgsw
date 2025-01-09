@@ -8,6 +8,8 @@ from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
     PhysicalZonalVelocity,
+    Pressure,
+    SurfaceHeightAnomaly,
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.state import UVH, State
@@ -41,8 +43,53 @@ def state() -> State:
     return State(UVH(u, v, h))
 
 
+def test_slicing(state: State) -> None:
+    """Test slicing with variables."""
+    dx = 2
+    dy = 3
+    # Variables
+    h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
+
+    h_phys.slices = [slice(0, 1), slice(0, 1), ...]
+    h = h_phys.compute(state.uvh)
+    assert h.shape == (1, 1, 10, 10)
+
+    h_no_slice = h_phys.compute_no_slice(state.uvh)
+    assert h_no_slice.shape == (1, 2, 10, 10)
+
+    assert (h_no_slice.__getitem__(h_phys.slices) == h).shape
+
+
+def test_slicing_bound(state: State) -> None:
+    """Test slicing with bounded variables."""
+    dx = 2
+    dy = 3
+    # Variables
+    h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
+    eta = SurfaceHeightAnomaly(h_phys)
+    p = Pressure(
+        g_prime=torch.tensor(
+            [[[[10]], [[0.05]]]],
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        ),
+        eta=eta,
+    )
+    p_bound = p.bind(state)
+
+    p_bound.slices = [slice(0, 1), slice(0, 1), ...]
+    p_value = p_bound.get()
+    assert p_value.shape == (1, 1, 10, 10)
+
+    p_bound.slices = [...]
+    p_no_slice = p_bound.get()
+    assert p_no_slice.shape == (1, 2, 10, 10)
+
+    assert (p_no_slice.__getitem__(p_bound.slices) == p_value).shape
+
+
 def test_physical_prognostic_variables(state: State) -> None:
-    """Test the physical progonstic variables."""
+    """Test the physical prognostic variables."""
     dx = 2
     dy = 3
     # Variables

@@ -56,6 +56,8 @@ vars_dict_ref = create_qg_variable_set(
 )
 levels_nb = run.summary.configuration.model.h.shape[0]
 
+if run.summary.configuration.model.type == "QGCollinearSF":
+    levels_nb -= 1
 
 if not run.summary.is_finished:
     st.warning("The simulation did not reach its end.", icon="⚠️")
@@ -80,6 +82,7 @@ selected_var_pts_ref = vars_dict_ref[selected_var_pts.name]
 
 if show_error_pts:
     error_pts = error_type_pts(selected_var_pts, selected_var_pts_ref)
+    error_pts.slices = [slice(None, None), slice(0, 1), ...]
 
 with st.form(key="var-form"):
     level = st.selectbox("Level", list(range(levels_nb)))
@@ -153,9 +156,10 @@ if show_error_lvl:
         error_type_lvl(var, var_ref)
         for var, var_ref in zip(selected_vars_lvl, selected_vars_lvl_ref)
     ]
+    for error in errors_lvl:
+        error.slices = [slice(None, None), slice(0, 1), ...]
 
 with st.form(key="var-form-level-wise"):
-    levels_nb = run.summary.configuration.model.h.shape[0]
     levels = list(range(levels_nb))
     selected_lvl = st.multiselect("Level(s)", levels)
     submit_lvl = st.form_submit_button("Display")

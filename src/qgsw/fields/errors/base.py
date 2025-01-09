@@ -1,13 +1,22 @@
 """Base class for errors."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 import torch
 
 from qgsw.fields.base import Field
 from qgsw.fields.scope import Scope
-from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.uvh import UVH
+
+if TYPE_CHECKING:
+    try:
+        from types import EllipsisType
+    except ImportError:
+        EllipsisType = type(...)
+    from qgsw.fields.variables.base import DiagnosticVariable
+    from qgsw.fields.variables.uvh import UVH
 
 
 class Error(ABC, Field):
@@ -33,6 +42,13 @@ class Error(ABC, Field):
             raise ValueError(msg)
         self._var = variable
         self._var_ref = variable_ref
+
+    @Field.slices.setter
+    def slices(self, slices: list[slice, EllipsisType]) -> None:  # type: ignore  # noqa: PGH003
+        """Slice setter."""
+        Field.slices.fset(self, slices)
+        self._var.slices = slices
+        self._var_ref.slices = slices
 
     def __repr__(self) -> str:
         """String representation of the error."""

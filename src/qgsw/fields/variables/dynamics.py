@@ -50,7 +50,7 @@ class PhysicalZonalVelocity(DiagnosticVariable):
         """
         self._dx = dx
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -78,7 +78,7 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
         """
         self._dy = dy
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -106,7 +106,7 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
         """
         self._ds = ds
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable.
 
         Args:
@@ -134,7 +134,7 @@ class ZonalVelocityFlux(DiagnosticVariable):
         """
         self._dx = dx
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -162,7 +162,7 @@ class MeridionalVelocityFlux(DiagnosticVariable):
         """
         self._dy = dy
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -190,7 +190,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
         """
         self._h_phys = h_phys
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -199,7 +199,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
         Returns:
             torch.Tensor: Surface height anomaly
         """
-        return reverse_cumsum(self._h_phys.compute(uvh), dim=-3)
+        return reverse_cumsum(self._h_phys.compute_no_slice(uvh), dim=-3)
 
     def bind(
         self,
@@ -243,7 +243,7 @@ class Vorticity(DiagnosticVariable):
         self._w_vertical_bound = masks.w_vertical_bound
         self._w_horizontal_bound = masks.w_horizontal_bound
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -285,7 +285,7 @@ class PhysicalVorticity(DiagnosticVariable):
         self._vorticity = vorticity
         self._ds = ds
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable.
 
         Args:
@@ -294,7 +294,7 @@ class PhysicalVorticity(DiagnosticVariable):
         Returns:
             torch.Tensor: Physical vorticity.
         """
-        return self._vorticity.compute(uvh) / self._ds
+        return self._vorticity.compute_no_slice(uvh) / self._ds
 
     def bind(
         self,
@@ -336,7 +336,7 @@ class PressureAnomaly(DiagnosticVariable):
         self._g_prime = g_prime
         self._h_phys = h_phys
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -345,7 +345,7 @@ class PressureAnomaly(DiagnosticVariable):
         Returns:
             torch.Tensor: Pressure
         """
-        return self._g_prime * self._h_phys.compute(uvh)
+        return self._g_prime * self._h_phys.compute_no_slice(uvh)
 
     def bind(
         self,
@@ -386,7 +386,7 @@ class Pressure(DiagnosticVariable):
         self._g_prime = g_prime
         self._eta = eta
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -395,7 +395,10 @@ class Pressure(DiagnosticVariable):
         Returns:
             torch.Tensor: Pressure
         """
-        return torch.cumsum(self._g_prime * self._eta.compute(uvh), dim=-3)
+        return torch.cumsum(
+            self._g_prime * self._eta.compute_no_slice(uvh),
+            dim=-3,
+        )
 
     def bind(
         self,
@@ -443,7 +446,7 @@ class PotentialVorticity(DiagnosticVariable):
         self._vorticity_phys = vorticity_phys
         self._interp = OptimizableFunction(points_to_surfaces)
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
@@ -452,7 +455,9 @@ class PotentialVorticity(DiagnosticVariable):
         Returns:
             torch.Tensor: Value
         """
-        vorticity_phys = self._interp(self._vorticity_phys.compute(uvh))
+        vorticity_phys = self._interp(
+            self._vorticity_phys.compute_no_slice(uvh),
+        )
         return vorticity_phys - self._f0 * uvh.h / self._h_ref
 
     def bind(
@@ -490,7 +495,7 @@ class StreamFunctionAnomaly(DiagnosticVariable):
         self._p_anomaly = pressure_anomaly
         self._f0 = f0
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -499,7 +504,7 @@ class StreamFunctionAnomaly(DiagnosticVariable):
         Returns:
             torch.Tensor: Stream function.
         """
-        return self._p_anomaly.compute(uvh) / self._f0
+        return self._p_anomaly.compute_no_slice(uvh) / self._f0
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
@@ -533,7 +538,7 @@ class StreamFunction(DiagnosticVariable):
         self._p = pressure
         self._f0 = f0
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -542,7 +547,7 @@ class StreamFunction(DiagnosticVariable):
         Returns:
             torch.Tensor: Stream function.
         """
-        return self._p.compute(uvh) / self._f0
+        return self._p.compute_no_slice(uvh) / self._f0
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
@@ -574,7 +579,7 @@ class Enstrophy(DiagnosticVariable):
         """
         self._pv = pv
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -583,7 +588,10 @@ class Enstrophy(DiagnosticVariable):
         Returns:
             torch.Tensor: Enstrophy.
         """
-        return 0.5 * torch.sum(self._pv.compute(uvh) ** 2, dim=(-1, -2))
+        return 0.5 * torch.sum(
+            self._pv.compute_no_slice(uvh) ** 2,
+            dim=(-1, -2),
+        )
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a state.
@@ -606,7 +614,7 @@ class TotalEnstrophy(Enstrophy):
     _description = "Total enstrophy"
     _scope = Scope.ENSEMBLE_WISE
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -615,7 +623,10 @@ class TotalEnstrophy(Enstrophy):
         Returns:
             torch.Tensor: Enstrophy.
         """
-        return 0.5 * torch.sum(self._pv.compute(uvh) ** 2, dim=(-1, -2, -3))
+        return 0.5 * torch.sum(
+            self._pv.compute_no_slice(uvh) ** 2,
+            dim=(-1, -2, -3),
+        )
 
 
 class ZonalVelocityDiag(DiagnosticVariable):
@@ -626,7 +637,7 @@ class ZonalVelocityDiag(DiagnosticVariable):
     _description = ZonalVelocity.get_description()
     _scope = ZonalVelocity.get_scope()
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
@@ -646,7 +657,7 @@ class MeridionalVelocityDiag(DiagnosticVariable):
     _description = MeridionalVelocity.get_description()
     _scope = MeridionalVelocity.get_scope()
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
@@ -666,7 +677,7 @@ class LayerDepthAnomalyDiag(DiagnosticVariable):
     _description = LayerDepthAnomaly.get_description()
     _scope = LayerDepthAnomaly.get_scope()
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, uvh: UVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
