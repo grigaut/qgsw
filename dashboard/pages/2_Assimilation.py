@@ -153,6 +153,8 @@ if show_error_lvl:
         error_type_lvl(var, var_ref)
         for var, var_ref in zip(selected_vars_lvl, selected_vars_lvl_ref)
     ]
+    for error in errors_lvl:
+        error.slice = [slice(None, None), slice(0, 1), ...]
 
 with st.form(key="var-form-level-wise"):
     levels_nb = run.summary.configuration.model.h.shape[0]
