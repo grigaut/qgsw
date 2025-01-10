@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from qgsw import verbose
+from qgsw.fields.variables.prognostic import Time
 from qgsw.models.exceptions import InvalidSavingFileError
 
 if TYPE_CHECKING:
@@ -84,10 +85,16 @@ class IO:
         """
         snippets = []
         for var in self._prog:
+            if var.name == Time.get_name():
+                snippets.append(
+                    f"{var.name} [{var.unit.value}]: {var.get().cpu().item()}",
+                )
+                continue
             data = var.get()
             data_mean = data.mean().cpu().item()
             data_max = data.abs().max().cpu().item()
             snippets.append(
-                f"{var.name}: mean: {data_mean:+.3E}, max: {data_max:+.3E}",
+                f"{var.name} [{var.unit.value}]: mean: {data_mean:+.3E},"
+                f" max: {data_max:+.3E}",
             )
         return " - ".join(snippets)
