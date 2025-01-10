@@ -152,6 +152,7 @@ class UVHalpha(NamedTuple):
     @classmethod
     def steady(
         cls,
+        alpha: torch.Tensor,
         n_ens: int,
         nl: int,
         nx: int,
@@ -162,6 +163,7 @@ class UVHalpha(NamedTuple):
         """Instantiate a steady UVHalpha with zero-filled prognostic variables.
 
         Args:
+            alpha (torch.Tensor): Collinearity coefficient.
             n_ens (int): Number of ensembles.
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
@@ -187,7 +189,7 @@ class UVHalpha(NamedTuple):
             dtype=dtype,
             device=device,
         )
-        return cls(u=u, v=v, h=h)
+        return cls(u=u, v=v, h=h, alpha=alpha)
 
     @classmethod
     def from_file(
