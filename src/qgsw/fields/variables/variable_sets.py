@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from qgsw.fields.variables.coefficients import LSRSFInferredAlpha
 from qgsw.fields.variables.dynamics import (
+    CollinearityCoefficientDiag,
     Enstrophy,
     LayerDepthAnomalyDiag,
     MeridionalVelocityDiag,
@@ -172,14 +173,19 @@ def _collinear_qg_variable_set(
     ds = space.area
     H = model_config.h[:1]  # noqa: N806
     g_prime = model_config.g_prime[:1]
+    if model_config.collinearity_coef.type == "constant":
+        alpha = model_config.collinearity_coef.value
+    elif model_config.collinearity_coef.type == "inferred":
+        alpha = model_config.collinearity_coef.initial
     A = compute_A_collinear_sf(  # noqa: N806
         model_config.h,
         model_config.g_prime,
-        model_config.collinearity_coef.value,
+        alpha,
         dtype,
         device,
     )
     t = TimeDiag()
+    alpha = CollinearityCoefficientDiag()
     u = ZonalVelocityDiag()
     v = MeridionalVelocityDiag()
     h = LayerDepthAnomalyDiag()
@@ -219,6 +225,7 @@ def _collinear_qg_variable_set(
     energy = TotalEnergy(ke, ape)
     return {
         t.name: t,
+        alpha.name: alpha,
         u.name: u,
         v.name: v,
         h.name: h,

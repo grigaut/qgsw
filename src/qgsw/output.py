@@ -26,6 +26,8 @@ from qgsw.utils.sorting import sort_files
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from qgsw.configs.models import ModelConfig
+
 T = TypeVar("T", bound=PrognosticTuple)
 
 
@@ -79,7 +81,7 @@ class OutputFile(_OutputReader[UVHT], _OutputFile):
 class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
     """Output file wrapper."""
 
-    def read_collinear(self) -> UVHTAlpha:
+    def read(self) -> UVHTAlpha:
         """Read the file data.
 
         Returns:
@@ -103,24 +105,32 @@ class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
 class RunOutput:
     """Run output."""
 
-    def __init__(self, folder: Path, prefix: str | None = None) -> None:
+    def __init__(
+        self,
+        folder: Path,
+        model_config: ModelConfig | None = None,
+    ) -> None:
         """Instantiate run output.
 
         Args:
             folder (Path): Run output folder.
-            prefix (str | None): Prefix to use to select files.
+            model_config (ModelConfig | None): Model configuration.
         """
         self._folder = Path(folder)
         self._summary = RunSummary.from_folder(self.folder)
-        if prefix is None:
+        if model_config is None:
             prefix = self.summary.configuration.model.prefix
+            model_type = self.summary.configuration.model.type
+        else:
+            prefix = model_config.prefix
+            model_type = model_config.type
         files = list(self.folder.glob(f"{prefix}*.npz"))
         steps, files = sort_files(files, prefix, ".npz")
         dt = self._summary.configuration.simulation.dt
         seconds = [step * dt for step in steps]
         timesteps = [timedelta(seconds=sec) for sec in seconds]
 
-        if self._summary.configuration.model.type == QGCollinearSF.get_type():
+        if model_type == QGCollinearSF.get_type():
             self._outputs = [
                 OutputFileAlpha(
                     step=steps[i],
@@ -194,7 +204,7 @@ class RunOutput:
         """
         return (output.second for output in iter(self._outputs))
 
-    def outputs(self) -> Iterator[_OutputFile]:
+    def outputs(self) -> Iterator[_OutputReader]:
         """Sorted outputs.
 
         Returns:

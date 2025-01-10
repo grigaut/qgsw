@@ -10,7 +10,6 @@ import torch
 from pydantic import (
     BaseModel,
     Field,
-    FilePath,
     PositiveFloat,
 )
 
@@ -26,7 +25,7 @@ class ModelConfig(BaseModel):
     reduced_gravity: list[PositiveFloat]
     collinearity_coef: Union[
         ConstantCollinearityCoefConfig,
-        ChangingCollinearityCoefConfig,
+        InferredCollinearityCoefConfig,
         None,
     ] = Field(None, discriminator="type")
 
@@ -56,14 +55,14 @@ class ConstantCollinearityCoefConfig(BaseModel):
     value: float
 
 
-class ChangingCollinearityCoefConfig(BaseModel):
-    """Changing collinearity coefficient configuration."""
+class InferredCollinearityCoefConfig(BaseModel):
+    """Inferred collinearity coeffciient."""
 
-    type: Literal["changing"]
-    source_file: FilePath
+    type: Literal["inferred"]
+    initial: float
 
 
 CollinearityCoefficientConfig = Union[
     ConstantCollinearityCoefConfig,
-    ChangingCollinearityCoefConfig,
+    InferredCollinearityCoefConfig,
 ]
