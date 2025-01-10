@@ -61,9 +61,9 @@ def instantiate_model(
         Model: Model.
     """
     if model_config.type in [
-        "SW",
-        "SWFilterBarotropicSpectral",
-        "SWFilterBarotropicExact",
+        SW.get_type(),
+        SWFilterBarotropicSpectral.get_type(),
+        SWFilterBarotropicExact.get_type(),
     ]:
         model = _instantiate_sw(
             model_config=model_config,
@@ -72,7 +72,7 @@ def instantiate_model(
             beta_plane=beta_plane,
             Ro=Ro,
         )
-    elif model_config.type == "QG":
+    elif model_config.type == QG.get_type():
         model = _instantiate_qg(
             model_config=model_config,
             space_2d=space_2d,
@@ -81,9 +81,8 @@ def instantiate_model(
             Ro=Ro,
         )
     elif model_config.type in [
-        "QGCollinearSF",
-        "QGCollinearPV",
-        "QGSmoothCollinearSF",
+        QGCollinearSF.get_type(),
+        QGCollinearPV.get_type(),
     ]:
         model = _instantiate_collinear_qg(
             model_config=model_config,
@@ -117,11 +116,11 @@ def _instantiate_sw(
     Returns:
         SW: SW Model.
     """
-    if model_config.type == "SW":
+    if model_config.type == SW.get_type():
         model_class = SW
-    elif model_config.type == "SWFilterBarotropicSpectral":
+    elif model_config.type == SWFilterBarotropicSpectral.get_type():
         model_class = SWFilterBarotropicSpectral
-    elif model_config.type == "SWFilterBarotropicExact":
+    elif model_config.type == SWFilterBarotropicExact.get_type():
         model_class = SWFilterBarotropicExact
     else:
         msg = f"Unrecognized model type: {model_config.type}"
@@ -216,9 +215,9 @@ def _instantiate_collinear_qg(
     Returns:
         _QGCollinearSublayer: Modified QG Model.
     """
-    if model_config.type == "QGCollinearSF":
+    if model_config.type == QGCollinearSF.get_type():
         model_class = QGCollinearSF
-    elif model_config.type == "QGCollinearPV":
+    elif model_config.type == QGCollinearPV.get_type():
         model_class = QGCollinearPV
     else:
         msg = f"Unrecognized model type: {model_config.type}"
@@ -241,7 +240,7 @@ def _instantiate_collinear_qg(
         v=torch.clone(uvh0.v),
         h=torch.clone(uvh0.h),
     )
-    model.coefficient = coefficient_from_config(model_config.collinearity_coef)
+    model.alpha = coefficient_from_config(model_config.collinearity_coef)
     return model
 
 

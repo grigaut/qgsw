@@ -76,6 +76,8 @@ class SW(Model):
 
     """
 
+    _type = "SW"
+
     def __init__(
         self,
         *,

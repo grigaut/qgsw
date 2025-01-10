@@ -5,6 +5,10 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
+import torch
+
+from qgsw.specs import DEVICE
+
 try:
     from typing import Self
 except ImportError:
@@ -280,7 +284,12 @@ def coefficient_from_config(
         raise KeyError(msg)
 
     if coef_config.type == ConstantCoefficient.get_type():
-        coef = ConstantCoefficient(value=coef_config.value)
+        coef = torch.tensor(
+            [coef_config.value],
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
     if coef_config.type == ChangingCoefficient.get_type():
-        coef = ChangingCoefficient.from_file(coef_config.source_file)
+        msg = "To Implement."
+        raise NotImplementedError(msg)
     return coef

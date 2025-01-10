@@ -70,6 +70,8 @@ def G(  # noqa: N802
 class QG(Model):
     """Quasi Geostrophic Model."""
 
+    _type = "QG"
+
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,

@@ -169,6 +169,8 @@ class _QGCollinearSublayer(QG):
 class QGCollinearSF(_QGCollinearSublayer):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
+    _type = "QGCollinearSF"
+
     _supported_layers_nb: int = 2
     _beta_plane_set = False
     _coefficient_set = False
@@ -230,6 +232,8 @@ class QGCollinearSF(_QGCollinearSublayer):
 
 class QGCollinearPV(_QGCollinearSublayer):
     """Modified QG Model implementing collinear pv behavior."""
+
+    _type = "QGCollinearPV"
 
     _supported_layers_nb: int = 2
 

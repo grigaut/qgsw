@@ -33,9 +33,11 @@ from qgsw.fields.variables.energetics import (
     TotalKineticEnergy,
 )
 from qgsw.masks import Masks
+from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
+from qgsw.models.qg.core import QG
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
@@ -253,7 +255,7 @@ def create_qg_variable_set(
         dtype (torch.dtype): Data type
         device (torch.device): Device
     """
-    if model_config.type == "QG":
+    if model_config.type == QG.get_type():
         return _qg_variable_set(
             physics_config=physics_config,
             space_config=space_config,
@@ -261,7 +263,7 @@ def create_qg_variable_set(
             dtype=dtype,
             device=device,
         )
-    if model_config.type == "QGCollinearSF":
+    if model_config.type == QGCollinearSF.get_type():
         return _collinear_qg_variable_set(
             physics_config=physics_config,
             space_config=space_config,

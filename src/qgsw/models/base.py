@@ -62,6 +62,8 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         - dy_p_ref
     """
 
+    _type: str
+
     dtype = torch.float64
     device: Device = DEVICE
     _taux: torch.Tensor | float = 0.0
@@ -368,3 +370,12 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.update_uvh(self.update(self._state.prognostic.uvh))
+
+    @classmethod
+    def get_type(cls) -> str:
+        """Get the model type.
+
+        Returns:
+            str: Model type.
+        """
+        return cls._type
