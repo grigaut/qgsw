@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qgsw.fields.variables.coefficients import LSRSFInferredAlpha
 from qgsw.fields.variables.dynamics import (
     Enstrophy,
     LayerDepthAnomalyDiag,
@@ -114,6 +115,7 @@ def _qg_variable_set(
     ke = TotalKineticEnergy(psi, H, dx, dy)
     ape = TotalAvailablePotentialEnergy(A, psi, H, physics_config.f0)
     energy = TotalEnergy(ke, ape)
+    lsr_sf_alpha = LSRSFInferredAlpha(psi)
 
     return {
         u.name: u,
@@ -140,6 +142,7 @@ def _qg_variable_set(
         ke.name: ke,
         ape.name: ape,
         energy.name: energy,
+        lsr_sf_alpha.name: lsr_sf_alpha,
     }
 
 
