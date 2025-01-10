@@ -12,18 +12,22 @@ testdata = [
     pytest.param(
         torch.rand((3, 1, 50), device=DEVICE.get()),
         torch.rand((1,), device=DEVICE.get()),
+        id="(3,1,50)-shaped",
     ),
     pytest.param(
         torch.rand((1, 50), device=DEVICE.get()),
         torch.rand((1,), device=DEVICE.get()),
+        id="(1,50)-shaped",
     ),
     pytest.param(
         torch.rand((3, 2, 50), device=DEVICE.get()),
         torch.rand((2,), device=DEVICE.get()),
+        id="(3,2,50)-shaped",
     ),
     pytest.param(
         torch.rand((2, 50), device=DEVICE.get()),
         torch.rand((2,), device=DEVICE.get()),
+        id="(2,50)-shaped",
     ),
 ]
 
