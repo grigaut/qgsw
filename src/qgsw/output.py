@@ -29,7 +29,18 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound=PrognosticTuple)
 
 
-class _OutputFile(ABC, Generic[T], NamedTuple):
+class _OutputFile(NamedTuple):
+    """Output file tuple."""
+
+    step: int
+    second: float
+    timestep: timedelta
+    path: Path
+    dtype = torch.float64
+    device = DEVICE.get()
+
+
+class _OutputReader(ABC, Generic[T]):
     """Output file wrapper."""
 
     step: int
@@ -43,7 +54,7 @@ class _OutputFile(ABC, Generic[T], NamedTuple):
     def read(self) -> T: ...
 
 
-class OutputFile(_OutputFile):
+class OutputFile(_OutputReader[UVHT], _OutputFile):
     """Output file wrapper."""
 
     def read(self) -> UVHT:
@@ -65,7 +76,7 @@ class OutputFile(_OutputFile):
         )
 
 
-class OutputFileAlpha(_OutputFile):
+class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
     """Output file wrapper."""
 
     def read_collinear(self) -> UVHTAlpha:
