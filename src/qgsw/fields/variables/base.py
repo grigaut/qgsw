@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from qgsw.fields.base import Field
-from qgsw.fields.scope import Scope
 
 try:
     from typing import Self
@@ -61,8 +60,6 @@ class Variable(Field):
 
 class PrognosticVariable(ABC, Variable):
     """Prognostic variable."""
-
-    _scope = Scope.POINT_WISE
 
     @Field.slices.setter
     def slices(
