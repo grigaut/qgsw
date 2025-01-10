@@ -8,7 +8,7 @@ from qgsw.utils.units._units import Unit
 class Time(PrognosticVariable):
     """Time."""
 
-    _scope = Scope.POINT_WISE
+    _scope = Scope.ENSEMBLE_WISE
     _unit = Unit.S
     _name = "t"
     _description = "Time"

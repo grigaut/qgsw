@@ -20,6 +20,7 @@ from qgsw.fields.variables.dynamics import (
     StreamFunction,
     StreamFunctionAnomaly,
     SurfaceHeightAnomaly,
+    TimeDiag,
     TotalEnstrophy,
     Vorticity,
     ZonalVelocityDiag,
@@ -80,6 +81,7 @@ def _qg_variable_set(
         dtype,
         device,
     )
+    t = TimeDiag()
     u = ZonalVelocityDiag()
     v = MeridionalVelocityDiag()
     h = LayerDepthAnomalyDiag()
@@ -118,6 +120,7 @@ def _qg_variable_set(
     lsr_sf_alpha = LSRSFInferredAlpha(psi)
 
     return {
+        t.name: t,
         u.name: u,
         v.name: v,
         h.name: h,
@@ -176,6 +179,7 @@ def _collinear_qg_variable_set(
         dtype,
         device,
     )
+    t = TimeDiag()
     u = ZonalVelocityDiag()
     v = MeridionalVelocityDiag()
     h = LayerDepthAnomalyDiag()
@@ -214,6 +218,7 @@ def _collinear_qg_variable_set(
     energy_hat = ModalEnergy(ke_hat, ape_hat)
     energy = TotalEnergy(ke, ape)
     return {
+        t.name: t,
         u.name: u,
         v.name: v,
         h.name: h,
