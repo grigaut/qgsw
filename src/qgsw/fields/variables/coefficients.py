@@ -5,6 +5,7 @@ try:
 except ImportError:
     from typing_extensions import Self
 
+import torch
 from torch._tensor import Tensor
 
 from qgsw.fields.scope import Scope
@@ -15,6 +16,7 @@ from qgsw.fields.variables.base import (
 from qgsw.fields.variables.dynamics import StreamFunction
 from qgsw.fields.variables.state import State
 from qgsw.fields.variables.uvh import PrognosticTuple
+from qgsw.specs import DEVICE
 from qgsw.utils.least_squares_regression import (
     perform_linear_least_squares_regression,
 )
@@ -57,7 +59,14 @@ class LSRSFInferredAlpha(DiagnosticVariable):
         x = x.transpose(-2, -1)  # (n_ens,nx*ny,1) -shaped
         y = psi_2.flatten(-2, -1)  # (n_ens,nx*ny) -shaped
 
-        return perform_linear_least_squares_regression(x, y)[:, 0]
+        try:
+            return perform_linear_least_squares_regression(x, y)[:, 0]
+        except torch.linalg.LinAlgError:
+            return torch.zeros(
+                (y.shape[0],),
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
