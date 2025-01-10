@@ -284,7 +284,7 @@ def coefficient_from_config(
     Returns:
         Coefficient: Coefficient.
     """
-    possible_coefs = ["constant"]
+    possible_coefs = ["constant", "inferred"]
     if coef_config.type not in possible_coefs:
         msg = (
             "Unrecognized perturbation type. "
@@ -295,6 +295,12 @@ def coefficient_from_config(
     if coef_config.type == "constant":
         coef = torch.tensor(
             [coef_config.value],
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+    elif coef_config.type == "inferred":
+        coef = torch.tensor(
+            [coef_config.initial],
             dtype=torch.float64,
             device=DEVICE.get(),
         )

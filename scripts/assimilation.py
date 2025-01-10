@@ -9,9 +9,17 @@ from rich.progress import Progress
 from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
+from qgsw.fields.variables.coefficients import LSRSFInferredAlpha
+from qgsw.fields.variables.dynamics import (
+    PhysicalLayerDepthAnomaly,
+    Pressure,
+    StreamFunction,
+    SurfaceHeightAnomaly,
+)
 from qgsw.fields.variables.uvh import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
+from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
@@ -68,7 +76,7 @@ if np.isnan(config.simulation.dt):
     )
 else:
     model_ref.dt = config.simulation.dt
-model_ref.compute_time_derivatives(model_ref.uvh)
+model_ref.compute_time_derivatives(model_ref.prognostic.uvh)
 model_ref.set_wind_forcing(taux, tauy)
 
 model = instantiate_model(
@@ -90,7 +98,7 @@ if np.isnan(config.simulation.dt):
     )
 else:
     model.dt = config.simulation.dt
-model.compute_time_derivatives(model.uvh)
+model.compute_time_derivatives(model.prognostic.uvh)
 model.set_wind_forcing(taux, tauy)
 
 
@@ -155,6 +163,22 @@ summary.register_start()
 prefix_ref = config.simulation.reference.prefix
 prefix = config.model.prefix
 output_dir = config.io.output.directory
+
+# Collinearity Coefficient
+
+if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
+    if config.model.collinearity_coef.type == "inferred":
+        h_phys = PhysicalLayerDepthAnomaly(model_ref.space.area)
+        eta = SurfaceHeightAnomaly(h_phys)
+        p = Pressure(
+            g_prime=config.simulation.reference.g_prime.unsqueeze(0)
+            .unsqueeze(-1)
+            .unsqueeze(-1),
+            eta=eta,
+        )
+        psi = StreamFunction(p, config.physics.f0)
+        alpha = LSRSFInferredAlpha(psi)
+
 with Progress() as progress:
     simulation = progress.add_task(
         rf"\[n=00000/{steps.n_tot:05d}]",
@@ -187,12 +211,15 @@ with Progress() as progress:
             model.io.save(output_dir.joinpath(f"{prefix}{n}.npz"))
             summary.register_step(n)
         if fork:
-            uvh = model_ref.uvh
+            prognostic = model_ref.prognostic
             model.set_uvh(
-                torch.clone(uvh.u)[:, :nl, ...],
-                torch.clone(uvh.v)[:, :nl, ...],
-                torch.clone(uvh.h)[:, :nl, ...],
+                torch.clone(prognostic.u)[:, :nl, ...],
+                torch.clone(prognostic.v)[:, :nl, ...],
+                torch.clone(prognostic.h)[:, :nl, ...],
             )
+            if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
+                if config.model.collinearity_coef.type == "inferred":
+                    model.alpha = alpha.compute_no_slice(prognostic)
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
                 trigger_level=1,

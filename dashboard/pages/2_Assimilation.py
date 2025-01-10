@@ -44,8 +44,8 @@ vars_dict = create_qg_variable_set(
 )
 st.write(run)
 
-prefix_ref = run.summary.configuration.simulation.reference.prefix
-run_ref = RunOutput(folder, prefix=prefix_ref)
+model_config_ref = run.summary.configuration.simulation.reference
+run_ref = RunOutput(folder, model_config=model_config_ref)
 
 vars_dict_ref = create_qg_variable_set(
     config.physics,

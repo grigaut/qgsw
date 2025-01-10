@@ -141,7 +141,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         return self._io
 
     @property
-    def uvh(self) -> PrognosticTuple:
+    def prognostic(self) -> PrognosticTuple:
         """Prognostic tuple."""
         return self._state.prognostic
 
