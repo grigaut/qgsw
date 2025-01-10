@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.prognostic import (
+    CollinearityCoefficient,
     LayerDepthAnomaly,
     MeridionalVelocity,
+    Time,
     ZonalVelocity,
 )
 from qgsw.utils.units._units import Unit
@@ -30,7 +32,7 @@ from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import State
-    from qgsw.fields.variables.uvh import PrognosticTuple
+    from qgsw.fields.variables.uvh import PrognosticTuple, UVHTAlpha
     from qgsw.masks import Masks
 
 
@@ -691,3 +693,43 @@ class LayerDepthAnomalyDiag(DiagnosticVariable):
             torch.Tensor: Value.
         """
         return prognostic.h
+
+
+class TimeDiag(DiagnosticVariable):
+    """Diagnostic Layer Depth Anomaly."""
+
+    _unit = Time.get_unit()
+    _name = Time.get_name()
+    _description = Time.get_description()
+    _scope = Time.get_scope()
+
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            prognostic (PrognosticTuple): Prognostic varibales values.
+
+        Returns:
+            torch.Tensor: Value.
+        """
+        return prognostic.t
+
+
+class CollinearityCoefficientDiag(DiagnosticVariable):
+    """Diagnostic Layer Depth Anomaly."""
+
+    _unit = CollinearityCoefficient.get_unit()
+    _name = CollinearityCoefficient.get_name()
+    _description = CollinearityCoefficient.get_description()
+    _scope = CollinearityCoefficient.get_scope()
+
+    def _compute(self, prognostic: UVHTAlpha) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            prognostic (UVHTAlpha): Prognostic varibales values.
+
+        Returns:
+            torch.Tensor: Value.
+        """
+        return prognostic.alpha

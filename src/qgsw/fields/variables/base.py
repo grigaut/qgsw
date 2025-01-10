@@ -129,6 +129,19 @@ class PrognosticVariable(ABC, Variable):
 class DiagnosticVariable(Variable, ABC):
     """Diagnostic Variable Base Class."""
 
+    _require_time: False
+    _require_alpha: False
+
+    @property
+    def require_time(self) -> bool:
+        """Whether the variable require time to be computed."""
+        return self._require_time
+
+    @property
+    def require_alpha(self) -> bool:
+        """Whether the variable require alpha to be computed."""
+        return self._require_alpha
+
     @abstractmethod
     def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
@@ -188,6 +201,16 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._name = self._var.name
         self._description = self._var.description
         self._scope = self._var.scope
+
+    @property
+    def require_time(self) -> bool:
+        """Whether the variable require time to be computed."""
+        return self._var.require_time
+
+    @property
+    def require_alpha(self) -> bool:
+        """Whether the variable require alpha to be computed."""
+        return self._var.require_alpha
 
     @property
     def up_to_date(self) -> bool:

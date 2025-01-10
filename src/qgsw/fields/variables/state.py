@@ -154,6 +154,11 @@ class BaseState(ABC, Generic[T]):
         for var in self.diag_vars.values():
             var.outdated()
 
+    def _time_updated(self) -> None:
+        """Update diagnostic variables."""
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
+
     def add_bound_diagnostic_variable(
         self,
         variable: BoundDiagnosticVariable,
@@ -187,7 +192,7 @@ class BaseState(ABC, Generic[T]):
 
     def increment_time(self, dt: float) -> None:
         """Increment time."""
-        self._updated()
+        self._time_updated()
         prognostic = self._prog.increment_time(dt)
         self._prog = prognostic
         self._update_prognostic_vars(prognostic)
@@ -305,13 +310,18 @@ class StateAlpha(BaseState[UVHTAlpha]):
         self._h.update(prognostic.h)
         self._alpha.update(prognostic.alpha)
 
+    def _alpha_updated(self) -> None:
+        """Update diagnostic variables."""
+        for var in filter(lambda v: v.require_alpha, self.diag_vars.values()):
+            var.outdated()
+
     def update_alpha(self, alpha: torch.Tensor) -> None:
         """Update only the value of alpha.
 
         Args:
             alpha (torch.Tensor): Collinearity coefficient.
         """
-        self._updated()
+        self._alpha_updated()
         prognostic = UVHTAlpha.from_uvh(
             self.t.get(),
             alpha,
