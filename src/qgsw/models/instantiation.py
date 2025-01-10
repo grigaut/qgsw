@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.qg.collinear_sublayer.alpha import coefficient_from_config
 from qgsw.models.qg.collinear_sublayer.core import (
     QGCollinearPV,
     QGCollinearSF,
@@ -23,7 +22,10 @@ from qgsw.models.sw.filtering import (
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.models import (
+        CollinearityCoefficientConfig,
+        ModelConfig,
+    )
     from qgsw.perturbations.core import Perturbation
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import (
@@ -266,3 +268,37 @@ def _determine_coef0(perturbation_type: str) -> float:
         return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     msg = f"Unknown perturbation type: {perturbation_type}"
     raise ValueError(msg)
+
+
+def coefficient_from_config(
+    coef_config: CollinearityCoefficientConfig,
+) -> torch.Tensor:
+    """Create Coefficient from configuration.
+
+    Args:
+        coef_config (CollinearityCoefficientConfig): Coefficient Configuration.
+
+    Raises:
+        KeyError: If the coeffciient type is not recognized/
+
+    Returns:
+        Coefficient: Coefficient.
+    """
+    possible_coefs = ["constant"]
+    if coef_config.type not in possible_coefs:
+        msg = (
+            "Unrecognized perturbation type. "
+            f"Possible values are {possible_coefs}"
+        )
+        raise KeyError(msg)
+
+    if coef_config.type == "constant":
+        coef = torch.tensor(
+            [coef_config.value],
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+    else:
+        msg = "To Implement."
+        raise NotImplementedError(msg)
+    return coef

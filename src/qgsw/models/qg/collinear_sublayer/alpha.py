@@ -5,10 +5,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
-import torch
-
-from qgsw.specs import DEVICE
-
 try:
     from typing import Self
 except ImportError:
@@ -26,7 +22,7 @@ if TYPE_CHECKING:
 
     from matplotlib.axes import Axes
 
-    from qgsw.configs.models import CollinearityCoefficientConfig
+raise NotImplementedError
 
 
 class Coefficient(TypeSwitch, metaclass=ABCMeta):
@@ -230,40 +226,3 @@ class ChangingCoefficient(Coefficient):
             data[coefs_field],
             data[times_field],
         )
-
-
-def coefficient_from_config(
-    coef_config: CollinearityCoefficientConfig,
-) -> Coefficient:
-    """Create Coefficient from configuration.
-
-    Args:
-        coef_config (CollinearityCoefficientConfig): Coefficient Configuration.
-
-    Raises:
-        KeyError: If the coeffciient type is not recognized/
-
-    Returns:
-        Coefficient: Coefficient.
-    """
-    possible_coefs = [
-        "constant",
-        ChangingCoefficient.get_type(),
-    ]
-    if coef_config.type not in possible_coefs:
-        msg = (
-            "Unrecognized perturbation type. "
-            f"Possible values are {possible_coefs}"
-        )
-        raise KeyError(msg)
-
-    if coef_config.type == "constant":
-        coef = torch.tensor(
-            [coef_config.value],
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-    if coef_config.type == ChangingCoefficient.get_type():
-        msg = "To Implement."
-        raise NotImplementedError(msg)
-    return coef
