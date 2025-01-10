@@ -6,7 +6,7 @@ from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     SurfaceHeightAnomaly,
 )
-from qgsw.fields.variables.state import State
+from qgsw.fields.variables.state import State, Statealpha
 from qgsw.fields.variables.uvh import UVH
 from qgsw.specs import DEVICE
 
@@ -86,3 +86,22 @@ def test_nested_bound_variables() -> None:
     eta2 = eta_bound.get()
     # Assert eta has changed
     assert not (eta1 == eta2).all()
+
+
+def test_state_alpha_updates() -> None:
+    """Test updates on Statealpha."""
+    state = Statealpha.steady(
+        torch.tensor([0.2], dtype=torch.float64, device=DEVICE.get()),
+        1,
+        2,
+        10,
+        10,
+        torch.float64,
+        DEVICE.get(),
+    )
+    alpha0 = state.alpha
+    state.update_uvh(UVH(state.u.get() + 2, state.v.get(), state.h.get()))
+    assert (state.alpha.get() == alpha0.get()).all()
+    uvh0 = state.prognostic.uvh
+    state.alpha = torch.tensor([0.4], dtype=torch.float64, device=DEVICE.get())
+    assert state.prognostic.uvh == uvh0

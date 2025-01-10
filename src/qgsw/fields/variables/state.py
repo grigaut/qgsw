@@ -291,7 +291,7 @@ class Statealpha(BaseState[UVHalpha]):
         Args:
             uvh (UVH): Prognostic u,v and h.
         """
-        self.prognostic = UVHalpha.from_uvh(self.alpha, uvh)
+        self.prognostic = UVHalpha.from_uvh(self.alpha.get(), uvh)
 
     @classmethod
     def steady(
