@@ -1,11 +1,11 @@
-"""Test UVH and UVHalpha."""
+"""Test UVH and UVHAlpha."""
 
 from __future__ import annotations
 
 import pytest
 import torch
 
-from qgsw.fields.variables.uvh import UVH, UVHalpha
+from qgsw.fields.variables.uvh import UVH, UVHAlpha
 from qgsw.specs import DEVICE
 
 
@@ -35,7 +35,7 @@ def uvh() -> UVH:
 
 
 @pytest.fixture
-def uvh_alpha() -> UVHalpha:
+def uvh_alpha() -> UVHAlpha:
     """UVH alpha."""
     n_ens = 3
     nl = 2
@@ -61,7 +61,7 @@ def uvh_alpha() -> UVHalpha:
         dtype=torch.float64,
         device=DEVICE.get(),
     )
-    return UVHalpha(u=u, v=v, h=h, alpha=alpha)
+    return UVHAlpha(u=u, v=v, h=h, alpha=alpha)
 
 
 def test_operations_uvh(
@@ -86,9 +86,9 @@ def test_operations_uvh(
 
 
 def test_operations_uvh_alpha(
-    uvh_alpha: UVHalpha,
+    uvh_alpha: UVHAlpha,
 ) -> None:
-    """Test operations on UVHalpha."""
+    """Test operations on UVHAlpha."""
     u0 = uvh_alpha.u
     v0 = uvh_alpha.v
     h0 = uvh_alpha.h

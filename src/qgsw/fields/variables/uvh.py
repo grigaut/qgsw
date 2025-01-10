@@ -115,7 +115,7 @@ class UVH(NamedTuple):
         return cls(u=u, v=v, h=h)
 
 
-class UVHalpha(NamedTuple):
+class UVHAlpha(NamedTuple):
     """Zonal velocity, meridional velocity and layer thickness."""
 
     u: torch.Tensor
@@ -128,19 +128,19 @@ class UVHalpha(NamedTuple):
         """UVH."""
         return UVH(self.u, self.v, self.h)
 
-    def __mul__(self, other: float) -> UVHalpha:
+    def __mul__(self, other: float) -> UVHAlpha:
         """Left multiplication."""
-        return UVHalpha.from_uvh(self.alpha, self.uvh.__mul__(other))
+        return UVHAlpha.from_uvh(self.alpha, self.uvh.__mul__(other))
 
-    def __rmul__(self, other: float) -> UVHalpha:
+    def __rmul__(self, other: float) -> UVHAlpha:
         """Right multiplication."""
         return self.__mul__(other)
 
-    def __add__(self, other: UVHalpha) -> UVHalpha:
+    def __add__(self, other: UVHAlpha) -> UVHAlpha:
         """Addition."""
-        return UVHalpha.from_uvh(self.alpha, self.uvh.__add__(other))
+        return UVHAlpha.from_uvh(self.alpha, self.uvh.__add__(other))
 
-    def __sub__(self, other: UVHalpha) -> UVHalpha:
+    def __sub__(self, other: UVHAlpha) -> UVHAlpha:
         """Substraction."""
         return self.__add__(-1 * other)
 
@@ -153,7 +153,7 @@ class UVHalpha(NamedTuple):
             uvh (UVH): UVH.
 
         Returns:
-            Self: UVHalpha
+            Self: UVHAlpha
         """
         return cls(uvh.u, uvh.v, uvh.h, alpha)
 
@@ -168,7 +168,7 @@ class UVHalpha(NamedTuple):
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
-        """Instantiate a steady UVHalpha with zero-filled prognostic variables.
+        """Instantiate a steady UVHAlpha with zero-filled prognostic variables.
 
         Args:
             alpha (torch.Tensor): Collinearity coefficient.
@@ -180,7 +180,7 @@ class UVHalpha(NamedTuple):
             device (torch.device): Device to use.
 
         Returns:
-            Self: UVHalpha.
+            Self: UVHAlpha.
         """
         return cls.from_uvh(
             alpha,
@@ -194,7 +194,7 @@ class UVHalpha(NamedTuple):
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
-        """Instantiate UVHalpha from a file.
+        """Instantiate UVHAlpha from a file.
 
         Args:
             file (Path): File to read.
@@ -202,7 +202,7 @@ class UVHalpha(NamedTuple):
             device (torch.device): Device to use.
 
         Returns:
-            Self: UVHalpha.
+            Self: UVHAlpha.
         """
         data = np.load(file)
         alpha_name = CollinearityCoefficient.get_name()
