@@ -34,18 +34,18 @@ T = TypeVar("T", bound=UVH | UVHalpha)
 class BaseState(ABC, Generic[T]):
     """Base State class."""
 
-    def __init__(self, uvh: T) -> None:
+    def __init__(self, prognostic: T) -> None:
         """Instantiate State.
 
         Args:
-            uvh (T): Core UVH or UVHalpha.
+            prognostic (T): Prognostic variables.
         """
         self.unbind()
-        self._uvh = uvh
-        self._u = ZonalVelocity(uvh.u)
-        self._v = MeridionalVelocity(uvh.v)
-        self._h = LayerDepthAnomaly(uvh.h)
-        self._prog = {
+        self._prog = prognostic
+        self._u = ZonalVelocity(prognostic.u)
+        self._v = MeridionalVelocity(prognostic.v)
+        self._h = LayerDepthAnomaly(prognostic.h)
+        self._prog_vars = {
             ZonalVelocity.get_name(): self._u,
             MeridionalVelocity.get_name(): self._v,
             LayerDepthAnomaly.get_name(): self._h,
@@ -67,20 +67,20 @@ class BaseState(ABC, Generic[T]):
         return self._h
 
     @property
-    def uvh(self) -> T:
+    def prognostic(self) -> T:
         """Prognostic variables."""
-        return self._uvh
+        return self._prog
 
-    @uvh.setter
-    def uvh(self, uvh: T) -> None:
+    @prognostic.setter
+    def prognostic(self, prognostic: T) -> None:
         self._updated()
-        self._uvh = uvh
-        self._update_prognostic_vars(uvh)
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
 
     @property
     def vars(self) -> dict[str, PrognosticVariable | BoundDiagnosticVariable]:
         """List of diagnostic variables."""
-        return self._prog | self._diag
+        return self.prog_vars | self.diag_vars
 
     @property
     def diag_vars(self) -> dict[str, BoundDiagnosticVariable]:
@@ -90,7 +90,7 @@ class BaseState(ABC, Generic[T]):
     @property
     def prog_vars(self) -> dict[str, BoundDiagnosticVariable]:
         """Prognostic variables."""
-        return self._prog
+        return self._prog_vars
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -164,7 +164,15 @@ class BaseState(ABC, Generic[T]):
         self._diag: dict[str, BoundDiagnosticVariable] = {}
 
     @abstractmethod
-    def _update_prognostic_vars(self, uvh: T) -> None: ...
+    def _update_prognostic_vars(self, prognostic: T) -> None: ...
+
+    @abstractmethod
+    def update_uvh(self, uvh: UVH) -> None:
+        """Update u,v and h.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+        """
 
 
 class State(BaseState[UVH]):
@@ -175,10 +183,18 @@ class State(BaseState[UVH]):
     only when the state has changed.
     """
 
-    def _update_prognostic_vars(self, uvh: UVH) -> None:
-        self._u.update(uvh.u)
-        self._v.update(uvh.v)
-        self._h.update(uvh.h)
+    def _update_prognostic_vars(self, prognostic: UVH) -> None:
+        self._u.update(prognostic.u)
+        self._v.update(prognostic.v)
+        self._h.update(prognostic.h)
+
+    def update_uvh(self, uvh: UVH) -> None:
+        """Update u,v and h.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+        """
+        self.prognostic = uvh
 
     @classmethod
     def steady(
@@ -233,26 +249,49 @@ class Statealpha(BaseState[UVHalpha]):
     only when the state has changed.
     """
 
-    def __init__(self, uvh: UVHalpha) -> None:
+    def __init__(self, prognostic: UVHalpha) -> None:
         """Instantiate Statealpha.
 
         Args:
-            uvh (UVHalpha): Core prognostic variables.
+            prognostic (UVHalpha): Core prognostic variables.
         """
-        super().__init__(uvh)
-        self._alpha = CollinearityCoefficient(uvh.alpha)
-        self._prog[CollinearityCoefficient.get_name()] = self._alpha
+        super().__init__(prognostic.uvh)
+        self._alpha = CollinearityCoefficient(prognostic.alpha)
+        self._prog_vars[CollinearityCoefficient.get_name()] = self._alpha
 
     @property
     def alpha(self) -> CollinearityCoefficient:
         """Collinearity coefficient."""
         return self._alpha
 
-    def _update_prognostic_vars(self, uvh: UVHalpha) -> None:
-        self._u.update(uvh.u)
-        self._v.update(uvh.v)
-        self._h.update(uvh.h)
-        self._alpha.update(uvh.alpha)
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self.update_alpha(alpha)
+
+    def _update_prognostic_vars(self, prognostic: UVHalpha) -> None:
+        self._u.update(prognostic.u)
+        self._v.update(prognostic.v)
+        self._h.update(prognostic.h)
+        self._alpha.update(prognostic.alpha)
+
+    def update_alpha(self, alpha: torch.Tensor) -> None:
+        """Update only the value of alpha.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+        """
+        self._updated()
+        prognostic = UVHalpha.from_uvh(alpha, self.prognostic.uvh)
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    def update_uvh(self, uvh: UVH) -> None:
+        """Update u,v and h only.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+        """
+        self.prognostic = UVHalpha.from_uvh(self.alpha, uvh)
 
     @classmethod
     def steady(

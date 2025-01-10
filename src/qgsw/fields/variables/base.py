@@ -226,7 +226,7 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         Returns:
             torch.Tensor: Variable value.
         """
-        return self.compute(self._state.uvh)
+        return self.compute(self._state.prognostic)
 
     def outdated(self) -> None:
         """Set the variable as outdated.

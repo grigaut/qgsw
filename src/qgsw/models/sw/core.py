@@ -274,7 +274,7 @@ class SW(Model):
         Returns:
             UVH: dt_u, dt_v, dt_h
         """
-        self._state.uvh = uvh
+        self._state.prognostic = uvh
         dt_h = self.advection_h(uvh.h)
         dt_u, dt_v = self.advection_momentum(uvh)
         return UVH(

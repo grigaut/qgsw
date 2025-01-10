@@ -51,10 +51,10 @@ def test_slicing(state: State) -> None:
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
 
     h_phys.slices = [slice(0, 1), slice(0, 1), ...]
-    h = h_phys.compute(state.uvh)
+    h = h_phys.compute(state.prognostic)
     assert h.shape == (1, 1, 10, 10)
 
-    h_no_slice = h_phys.compute_no_slice(state.uvh)
+    h_no_slice = h_phys.compute_no_slice(state.prognostic)
     assert h_no_slice.shape == (1, 2, 10, 10)
 
     assert (h_no_slice.__getitem__(h_phys.slices) == h).shape
@@ -97,13 +97,13 @@ def test_physical_prognostic_variables(state: State) -> None:
     v_phys = PhysicalMeridionalVelocity(dy=dy)
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
     # Compute physical variables
-    u_phys = u_phys.compute(state.uvh)
-    v_phys = v_phys.compute(state.uvh)
-    h_phys = h_phys.compute(state.uvh)
+    u_phys = u_phys.compute(state.prognostic)
+    v_phys = v_phys.compute(state.prognostic)
+    h_phys = h_phys.compute(state.prognostic)
     # Assert values equality
-    assert (u_phys == state.uvh.u / dx).all()
-    assert (v_phys == state.uvh.v / dy).all()
-    assert (h_phys == state.uvh.h / (dx * dy)).all()
+    assert (u_phys == state.prognostic.u / dx).all()
+    assert (v_phys == state.prognostic.v / dy).all()
+    assert (h_phys == state.prognostic.h / (dx * dy)).all()
 
 
 def test_velocity_flux(state: State) -> None:
@@ -114,8 +114,8 @@ def test_velocity_flux(state: State) -> None:
     u_flux = ZonalVelocityFlux(dx=dx)
     v_flux = MeridionalVelocityFlux(dy=dy)
     # Compute momentum
-    U = u_flux.compute(state.uvh)  # noqa: N806
-    V = v_flux.compute(state.uvh)  # noqa: N806
+    U = u_flux.compute(state.prognostic)  # noqa: N806
+    V = v_flux.compute(state.prognostic)  # noqa: N806
     # Assert values equality
-    assert (state.uvh.u / dx**2 == U).all()
-    assert (state.uvh.v / dy**2 == V).all()
+    assert (state.prognostic.u / dx**2 == U).all()
+    assert (state.prognostic.v / dy**2 == V).all()

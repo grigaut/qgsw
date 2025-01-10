@@ -149,7 +149,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
     @property
     def uvh(self) -> UVH:
         """UVH."""
-        return self._state.uvh
+        return self._state.prognostic
 
     @property
     def u(self) -> torch.Tensor:
@@ -335,7 +335,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         u = u.type(self.dtype) * self.masks.u
         v = v.type(self.dtype) * self.masks.v
         h = h.type(self.dtype) * self.masks.h
-        self._state.uvh = UVH(u, v, h)
+        self._state.prognostic = UVH(u, v, h)
 
     @abstractmethod
     def compute_time_derivatives(
@@ -364,4 +364,4 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        self._state.uvh = self.update(self._state.uvh)
+        self._state.prognostic = self.update(self._state.prognostic)

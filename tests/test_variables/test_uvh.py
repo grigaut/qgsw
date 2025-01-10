@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
 import torch
 
 from qgsw.fields.variables.uvh import UVH, UVHalpha
 from qgsw.specs import DEVICE
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 
 @pytest.fixture
@@ -40,7 +35,7 @@ def uvh() -> UVH:
 
 
 @pytest.fixture
-def uvhalpha() -> UVHalpha:
+def uvh_alpha() -> UVHalpha:
     """UVH alpha."""
     n_ens = 3
     nl = 2
@@ -69,58 +64,48 @@ def uvhalpha() -> UVHalpha:
     return UVHalpha(u=u, v=v, h=h, alpha=alpha)
 
 
-testdata = [
-    pytest.param(
-        "uvh",
-        lambda uvh: uvh.u,
-        id="UVH-u",
-    ),
-    pytest.param(
-        "uvh",
-        lambda uvh: uvh.v,
-        id="UVH-v",
-    ),
-    pytest.param(
-        "uvh",
-        lambda uvh: uvh.h,
-        id="UVH-h",
-    ),
-    pytest.param(
-        "uvhalpha",
-        lambda uvhalpha: uvhalpha.u,
-        id="UVHalpha-u",
-    ),
-    pytest.param(
-        "uvhalpha",
-        lambda uvhalpha: uvhalpha.v,
-        id="UVHalpha-v",
-    ),
-    pytest.param(
-        "uvhalpha",
-        lambda uvhalpha: uvhalpha.h,
-        id="UVHalpha-h",
-    ),
-    pytest.param(
-        "uvhalpha",
-        lambda uvhalpha: uvhalpha.alpha,
-        id="UVHalpha-alpha",
-    ),
-]
-
-
-@pytest.mark.parametrize(
-    ("var_fixture", "var_get_method"),
-    testdata,
-)
-def test_operations(
-    var_fixture: str,
-    var_get_method: Callable[[UVH | UVHalpha], torch.Tensor],
-    request: pytest.FixtureRequest,
+def test_operations_uvh(
+    uvh: UVH,
 ) -> None:
-    """Test operations on UVH and UVHalpha."""
-    var = request.getfixturevalue(var_fixture)
-    value0 = var_get_method(var)
-    assert (var_get_method(var * 2) == 2 * value0).all()
-    assert (var_get_method(3 * var) == 3 * value0).all()
-    assert (var_get_method(var + var) == value0 + value0).all()
-    assert (var_get_method(var - var) == value0 - value0).all()
+    """Test operations on UVH."""
+    u0 = uvh.u
+    v0 = uvh.v
+    h0 = uvh.h
+    assert ((uvh * 2).u == 2 * u0).all()
+    assert ((uvh * 2).v == 2 * v0).all()
+    assert ((uvh * 2).h == 2 * h0).all()
+    assert ((2 * uvh).u == 2 * u0).all()
+    assert ((2 * uvh).v == 2 * v0).all()
+    assert ((2 * uvh).h == 2 * h0).all()
+    assert ((uvh + 1.2 * uvh).u == u0 + 1.2 * u0).all()
+    assert ((uvh + 1.2 * uvh).v == v0 + 1.2 * v0).all()
+    assert ((uvh + 1.2 * uvh).h == h0 + 1.2 * h0).all()
+    assert ((uvh - 3 * uvh).u == u0 - 3 * u0).all()
+    assert ((uvh - 3 * uvh).v == v0 - 3 * v0).all()
+    assert ((uvh - 3 * uvh).h == h0 - 3 * h0).all()
+
+
+def test_operations_uvh_alpha(
+    uvh_alpha: UVHalpha,
+) -> None:
+    """Test operations on UVHalpha."""
+    u0 = uvh_alpha.u
+    v0 = uvh_alpha.v
+    h0 = uvh_alpha.h
+    alpha0 = uvh_alpha.alpha
+    assert ((uvh_alpha * 2).u == 2 * u0).all()
+    assert ((uvh_alpha * 2).v == 2 * v0).all()
+    assert ((uvh_alpha * 2).h == 2 * h0).all()
+    assert ((uvh_alpha * 2).alpha == alpha0).all()
+    assert ((2 * uvh_alpha).u == 2 * u0).all()
+    assert ((2 * uvh_alpha).v == 2 * v0).all()
+    assert ((2 * uvh_alpha).h == 2 * h0).all()
+    assert ((2 * uvh_alpha).alpha == alpha0).all()
+    assert ((uvh_alpha + 1.2 * uvh_alpha).u == u0 + 1.2 * u0).all()
+    assert ((uvh_alpha + 1.2 * uvh_alpha).v == v0 + 1.2 * v0).all()
+    assert ((uvh_alpha + 1.2 * uvh_alpha).h == h0 + 1.2 * h0).all()
+    assert ((uvh_alpha + 1.2 * uvh_alpha).alpha == alpha0).all()
+    assert ((uvh_alpha - 3 * uvh_alpha).u == u0 - 3 * u0).all()
+    assert ((uvh_alpha - 3 * uvh_alpha).v == v0 - 3 * v0).all()
+    assert ((uvh_alpha - 3 * uvh_alpha).h == h0 - 3 * h0).all()
+    assert ((uvh_alpha - 3 * uvh_alpha).alpha == alpha0).all()

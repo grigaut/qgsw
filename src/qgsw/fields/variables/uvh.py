@@ -33,7 +33,7 @@ class UVH(NamedTuple):
     h: torch.Tensor
 
     def __mul__(self, other: float) -> UVH:
-        """Left mutlitplication."""
+        """Left multiplication."""
         return UVH(self.u * other, self.v * other, self.h * other)
 
     def __rmul__(self, other: float) -> UVH:
@@ -123,14 +123,14 @@ class UVHalpha(NamedTuple):
     h: torch.Tensor
     alpha: torch.Tensor
 
+    @property
+    def uvh(self) -> UVH:
+        """UVH."""
+        return UVH(self.u, self.v, self.h)
+
     def __mul__(self, other: float) -> UVHalpha:
-        """Left mutlitplication."""
-        return UVHalpha(
-            self.u * other,
-            self.v * other,
-            self.h * other,
-            self.alpha * other,
-        )
+        """Left multiplication."""
+        return UVHalpha.from_uvh(self.alpha, self.uvh.__mul__(other))
 
     def __rmul__(self, other: float) -> UVHalpha:
         """Right multiplication."""
@@ -138,16 +138,24 @@ class UVHalpha(NamedTuple):
 
     def __add__(self, other: UVHalpha) -> UVHalpha:
         """Addition."""
-        return UVHalpha(
-            self.u + other.u,
-            self.v + other.v,
-            self.h + other.h,
-            self.alpha + other.alpha,
-        )
+        return UVHalpha.from_uvh(self.alpha, self.uvh.__add__(other))
 
     def __sub__(self, other: UVHalpha) -> UVHalpha:
         """Substraction."""
         return self.__add__(-1 * other)
+
+    @classmethod
+    def from_uvh(cls, alpha: torch.Tensor, uvh: UVH) -> Self:
+        """Instantiate from UVH.
+
+        Args:
+            alpha (torch.Tensor): Alpha.
+            uvh (UVH): UVH.
+
+        Returns:
+            Self: UVHalpha
+        """
+        return cls(uvh.u, uvh.v, uvh.h, alpha)
 
     @classmethod
     def steady(
@@ -174,22 +182,10 @@ class UVHalpha(NamedTuple):
         Returns:
             Self: UVHalpha.
         """
-        h = torch.zeros(
-            (n_ens, nl, nx, ny),
-            dtype=dtype,
-            device=device,
+        return cls.from_uvh(
+            alpha,
+            UVH.steady(n_ens, nl, nx, ny, dtype, device),
         )
-        u = torch.zeros(
-            (n_ens, nl, nx + 1, ny),
-            dtype=dtype,
-            device=device,
-        )
-        v = torch.zeros(
-            (n_ens, nl, nx, ny + 1),
-            dtype=dtype,
-            device=device,
-        )
-        return cls(u=u, v=v, h=h, alpha=alpha)
 
     @classmethod
     def from_file(
@@ -209,12 +205,6 @@ class UVHalpha(NamedTuple):
             Self: UVHalpha.
         """
         data = np.load(file)
-        u_name = ZonalVelocity.get_name()
-        u = torch.tensor(data[u_name]).to(dtype=dtype, device=device)
-        v_name = MeridionalVelocity.get_name()
-        v = torch.tensor(data[v_name]).to(dtype=dtype, device=device)
-        h_name = LayerDepthAnomaly.get_name()
-        h = torch.tensor(data[h_name]).to(dtype=dtype, device=device)
         alpha_name = CollinearityCoefficient.get_name()
         alpha = torch.tensor(data[alpha_name]).to(dtype=dtype, device=device)
-        return cls(u=u, v=v, h=h, alpha=alpha)
+        return cls.from_uvh(alpha, UVH.from_file(file, dtype, device))
