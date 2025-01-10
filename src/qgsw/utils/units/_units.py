@@ -7,6 +7,7 @@ class Unit(Enum):
     """Unit."""
 
     _ = " "
+    S = "s"
     M = "m"
     KM = "km"
     RAD = "rad"

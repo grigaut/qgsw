@@ -18,7 +18,7 @@ from qgsw.spatial.core.coordinates import (
 )
 
 if TYPE_CHECKING:
-    from qgsw.spatial.units._units import Unit
+    from qgsw.utils.units._units import Unit
 
 
 class XY(NamedTuple):

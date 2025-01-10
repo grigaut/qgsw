@@ -99,8 +99,8 @@ except ImportError:
 import torch
 
 from qgsw.spatial.core.grid import Grid2D, Grid3D
-from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
+from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.core import SpaceConfig

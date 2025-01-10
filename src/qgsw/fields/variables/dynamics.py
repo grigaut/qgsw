@@ -8,7 +8,7 @@ from qgsw.fields.variables.prognostic import (
     MeridionalVelocity,
     ZonalVelocity,
 )
-from qgsw.spatial.units._units import Unit
+from qgsw.utils.units._units import Unit
 
 try:
     from typing import Self

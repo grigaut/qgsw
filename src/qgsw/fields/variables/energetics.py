@@ -26,7 +26,7 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.spatial.units._units import Unit
+from qgsw.utils.units._units import Unit
 
 
 def compute_W(H: torch.Tensor) -> torch.Tensor:  # noqa: N802, N803

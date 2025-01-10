@@ -4,8 +4,8 @@ import torch
 
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION
 from qgsw.spatial.core.grid import Grid2D
-from qgsw.spatial.units._units import Unit
-from qgsw.spatial.units.exceptions import UnitError
+from qgsw.utils.units._units import Unit
+from qgsw.utils.units.exceptions import UnitError
 
 
 def compute_coriolis_parameter(

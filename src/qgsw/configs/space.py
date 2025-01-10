@@ -10,7 +10,7 @@ from pydantic import (
     PositiveInt,
 )
 
-from qgsw.spatial.units._units import Unit
+from qgsw.utils.units._units import Unit
 
 
 class SpaceConfig(BaseModel):

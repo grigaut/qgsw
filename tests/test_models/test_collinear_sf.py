@@ -8,8 +8,8 @@ from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
-from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
+from qgsw.utils.units._units import Unit
 
 
 @pytest.fixture

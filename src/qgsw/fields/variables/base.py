@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from qgsw.fields.variables.state import State
     from qgsw.fields.variables.uvh import PrognosticTuple
-    from qgsw.spatial.units._units import Unit
+    from qgsw.utils.units._units import Unit
 
 
 class Variable(Field):

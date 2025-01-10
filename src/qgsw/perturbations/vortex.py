@@ -21,9 +21,9 @@ from qgsw.perturbations.base import (
     _Perturbation,
 )
 from qgsw.spatial.core.grid import Grid2D, Grid3D
-from qgsw.spatial.units._units import Unit
-from qgsw.spatial.units.exceptions import UnitError
 from qgsw.specs import DEVICE
+from qgsw.utils.units._units import Unit
+from qgsw.utils.units.exceptions import UnitError
 
 if TYPE_CHECKING:
     from qgsw.configs.perturbation import PerturbationConfig

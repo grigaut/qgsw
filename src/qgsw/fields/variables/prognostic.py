@@ -2,7 +2,16 @@
 
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.base import PrognosticVariable
-from qgsw.spatial.units._units import Unit
+from qgsw.utils.units._units import Unit
+
+
+class Time(PrognosticVariable):
+    """Time."""
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.S
+    _name = "t"
+    _description = "Time"
 
 
 class ZonalVelocity(PrognosticVariable):

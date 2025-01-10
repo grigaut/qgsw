@@ -4,8 +4,8 @@ import torch
 
 from qgsw.forcing.wind import CosineZonalWindForcing
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
-from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
+from qgsw.utils.units._units import Unit
 
 
 def test_cosine_wind_forcing() -> None:
