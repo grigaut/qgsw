@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.uvh import UVH, PrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -410,20 +410,23 @@ class QG(Model):
             optimize=optimize,
         )
 
-    def compute_time_derivatives(self, uvh: UVH) -> UVH:
+    def compute_time_derivatives(
+        self,
+        prognostic: PrognosticTuple,
+    ) -> UVH:
         """Compute the prognostic variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            uvh (UVH): u,v and h.
+            prognostic (PrognosticTuple): u,v and h.
 
         Returns:
             UVH: dt_u, dt_v, dt_h
         """
-        dt_uvh_sw = self.sw.compute_time_derivatives(uvh)
-        return self.project(dt_uvh_sw)
+        dt_prognostic_sw = self.sw.compute_time_derivatives(prognostic)
+        return self.project(dt_prognostic_sw)
 
     def update(self, uvh: UVH) -> UVH:
-        """Update prognostic variables.
+        """Update uvh.
 
         Args:
             uvh (UVH): u,v and h.
@@ -431,7 +434,11 @@ class QG(Model):
         Returns:
             UVH: update prognostic variables.
         """
-        return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
+        return schemes.rk3_ssp(
+            uvh,
+            self.dt,
+            self.compute_time_derivatives,
+        )
 
     def set_wind_forcing(
         self,

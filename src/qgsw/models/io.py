@@ -15,11 +15,6 @@ if TYPE_CHECKING:
     from qgsw.fields.variables.base import (
         PrognosticVariable,
     )
-    from qgsw.fields.variables.prognostic import (
-        LayerDepthAnomaly,
-        MeridionalVelocity,
-        ZonalVelocity,
-    )
 
 
 class IO:
@@ -27,19 +22,18 @@ class IO:
 
     def __init__(
         self,
-        u: ZonalVelocity,
-        v: MeridionalVelocity,
-        h: LayerDepthAnomaly,
+        *args: PrognosticVariable,
+        **kwargs: PrognosticVariable,
     ) -> None:
         """Instantiate the object.
 
         Args:
-            u (ZonalVelocity): Zonal velocity.
-            v (MeridionalVelocity): Meriodional velocity.
-            h (LayerDepthAnomaly): Layer depth anomaly.
-            *args (BoundDiagnosticVariable): Diagnostic variableS.
+            *args (BoundDiagnosticVariable): Prognostic variables.
+            **kwargs (BoundDiagnosticVariable): Prognostic variables.
         """
-        self._prog: list[PrognosticVariable] = [u, v, h]
+        self._prog: list[PrognosticVariable] = list(args) + list(
+            kwargs.values(),
+        )
 
     @property
     def prognostic_vars(self) -> list[PrognosticVariable]:

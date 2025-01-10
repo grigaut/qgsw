@@ -97,7 +97,7 @@ def test_stretching_matrix_shape(
         H,
         g_prime,
     )
-    model.coefficient = 0
+    model.alpha = torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
     assert model.A.shape == (1, 1)
 
 

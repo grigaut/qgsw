@@ -19,7 +19,7 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.energetics import KineticEnergy
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.uvh import UVH, PrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
 from qgsw.spatial.core import grid_conversion as convert
@@ -145,22 +145,23 @@ class SW(Model):
 
     def _add_bottom_drag(
         self,
-        uvh: UVH,
+        prognostic: PrognosticTuple,
         du: torch.Tensor,
         dv: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Add bottom drag to the derivatives du, dv.
 
         Args:
-            uvh (UVH): u,v and h.
+            prognostic (PrognosticTuple): u,v and h.
             du (torch.Tensor): du
             dv (torch.Tensor): dv
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with botoom drag forcing.
         """
-        du[..., -1, :, :] += -self.bottom_drag_coef * uvh.u[..., -1, 1:-1, :]
-        dv[..., -1, :, :] += -self.bottom_drag_coef * uvh.v[..., -1, :, 1:-1]
+        coef = self.bottom_drag_coef
+        du[..., -1, :, :] += -coef * prognostic.u[..., -1, 1:-1, :]
+        dv[..., -1, :, :] += -coef * prognostic.v[..., -1, :, 1:-1]
         return du, dv
 
     def _create_diagnostic_vars(self, state: State) -> None:
@@ -180,17 +181,21 @@ class SW(Model):
         p.bind(state)
         k_energy.bind(state)
 
-    def update(self, uvh: UVH) -> UVH:
+    def update(self, prognostic: PrognosticTuple) -> PrognosticTuple:
         """Performs one step time-integration with RK3-SSP scheme.
 
         Agrs:
-            uvh (UVH): u,v and h.
+            prognostic (PrognosticTuple): u,v and h.
         """
-        return schemes.rk3_ssp(uvh, self.dt, self.compute_time_derivatives)
+        return schemes.rk3_ssp(
+            prognostic,
+            self.dt,
+            self.compute_time_derivatives,
+        )
 
     def advection_momentum(
         self,
-        uvh: UVH,
+        prognostic: PrognosticTuple,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
@@ -229,7 +234,7 @@ class SW(Model):
 
         # wind forcing and bottom drag
         dt_u, dt_v = self._add_wind_forcing(dt_u, dt_v)
-        dt_u, dt_v = self._add_bottom_drag(uvh, dt_u, dt_v)
+        dt_u, dt_v = self._add_bottom_drag(prognostic, dt_u, dt_v)
 
         return (
             F.pad(dt_u, (0, 0, 1, 1)) * self.masks.u,
@@ -274,7 +279,7 @@ class SW(Model):
         Returns:
             UVH: dt_u, dt_v, dt_h
         """
-        self._state.prognostic = uvh
+        self._state.update_uvh(uvh)
         dt_h = self.advection_h(uvh.h)
         dt_u, dt_v = self.advection_momentum(uvh)
         return UVH(

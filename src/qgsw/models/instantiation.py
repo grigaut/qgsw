@@ -10,7 +10,6 @@ from qgsw.models.qg.collinear_sublayer.alpha import coefficient_from_config
 from qgsw.models.qg.collinear_sublayer.core import (
     QGCollinearPV,
     QGCollinearSF,
-    QGSmoothCollinearSF,
     _QGCollinearSublayer,
 )
 from qgsw.models.qg.core import QG, G
@@ -221,8 +220,6 @@ def _instantiate_collinear_qg(
         model_class = QGCollinearSF
     elif model_config.type == "QGCollinearPV":
         model_class = QGCollinearPV
-    elif model_config.type == "QGSmoothCollinearSF":
-        model_class = QGSmoothCollinearSF
     else:
         msg = f"Unrecognized model type: {model_config.type}"
         raise ValueError(msg)
@@ -237,7 +234,7 @@ def _instantiate_collinear_qg(
         model.beta_plane.f0,
         Ro,
     )
-    model.coefficient = _determine_coef0(perturbation.type)
+    model.alpha = _determine_coef0(perturbation.type)
     uvh0 = model.G(p0)
     model.set_uvh(
         u=torch.clone(uvh0.u),
@@ -261,12 +258,12 @@ def _determine_coef0(perturbation_type: str) -> float:
         float: Initial coefficient value.
     """
     if perturbation_type == "vortex-baroclinic":
-        return 0
+        return torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
     if perturbation_type == "vortex-half-barotropic":
-        return 0.5
+        return torch.tensor([0.5], dtype=torch.float64, device=DEVICE.get())
     if perturbation_type == "vortex-barotropic":
-        return 1
+        return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     if perturbation_type == "none":
-        return 1
+        return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     msg = f"Unknown perturbation type: {perturbation_type}"
     raise ValueError(msg)

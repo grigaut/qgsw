@@ -255,7 +255,7 @@ class StateAlpha(BaseState[UVHAlpha]):
         Args:
             prognostic (UVHAlpha): Core prognostic variables.
         """
-        super().__init__(prognostic.uvh)
+        super().__init__(prognostic)
         self._alpha = CollinearityCoefficient(prognostic.alpha)
         self._prog_vars[CollinearityCoefficient.get_name()] = self._alpha
 

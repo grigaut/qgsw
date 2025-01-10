@@ -17,7 +17,7 @@ except ImportError:
     from typing_extensions import Self
 
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, TypeVar
 
 import torch
 
@@ -25,28 +25,50 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class UVH(NamedTuple):
+class BasePrognosticTuple:
+    """Prognostic tuple base class."""
+
+    def __mul__(self, other: float) -> Self:
+        """Left multiplication."""
+        return self.__class__(*[v * other for v in self])
+
+    def __rmul__(self, other: float) -> Self:
+        """Right multiplication."""
+        return self.__mul__(other)
+
+    def __add__(self, other: Self) -> Self:
+        """Addition."""
+        return self.__class__(*[s + o for s, o in zip(self, other)])
+
+    def __sub__(self, other: Self) -> Self:
+        """Substraction."""
+        return self.__add__(-1 * other)
+
+
+class _UVH(NamedTuple):
     """Zonal velocity, meridional velocity and layer thickness."""
 
     u: torch.Tensor
     v: torch.Tensor
     h: torch.Tensor
 
-    def __mul__(self, other: float) -> UVH:
-        """Left multiplication."""
-        return UVH(self.u * other, self.v * other, self.h * other)
 
-    def __rmul__(self, other: float) -> UVH:
-        """Right multiplication."""
-        return self.__mul__(other)
+class _UVHAlpha(NamedTuple):
+    """Zonal velocity, meridional velocity and layer thickness."""
 
-    def __add__(self, other: UVH) -> UVH:
-        """Addition."""
-        return UVH(self.u + other.u, self.v + other.v, self.h + other.h)
+    u: torch.Tensor
+    v: torch.Tensor
+    h: torch.Tensor
+    alpha: torch.Tensor
 
-    def __sub__(self, other: UVH) -> UVH:
-        """Substraction."""
-        return self.__add__(-1 * other)
+
+class UVH(BasePrognosticTuple, _UVH):
+    """Zonal velocity, meridional velocity and layer thickness."""
+
+    @property
+    def uvh(self) -> UVH:
+        """UVH."""
+        return self
 
     @classmethod
     def steady(
@@ -115,13 +137,8 @@ class UVH(NamedTuple):
         return cls(u=u, v=v, h=h)
 
 
-class UVHAlpha(NamedTuple):
+class UVHAlpha(BasePrognosticTuple, _UVHAlpha):
     """Zonal velocity, meridional velocity and layer thickness."""
-
-    u: torch.Tensor
-    v: torch.Tensor
-    h: torch.Tensor
-    alpha: torch.Tensor
 
     @property
     def uvh(self) -> UVH:
@@ -132,17 +149,9 @@ class UVHAlpha(NamedTuple):
         """Left multiplication."""
         return UVHAlpha.from_uvh(self.alpha, self.uvh.__mul__(other))
 
-    def __rmul__(self, other: float) -> UVHAlpha:
-        """Right multiplication."""
-        return self.__mul__(other)
-
     def __add__(self, other: UVHAlpha) -> UVHAlpha:
         """Addition."""
         return UVHAlpha.from_uvh(self.alpha, self.uvh.__add__(other))
-
-    def __sub__(self, other: UVHAlpha) -> UVHAlpha:
-        """Substraction."""
-        return self.__add__(-1 * other)
 
     @classmethod
     def from_uvh(cls, alpha: torch.Tensor, uvh: UVH) -> Self:
@@ -208,3 +217,6 @@ class UVHAlpha(NamedTuple):
         alpha_name = CollinearityCoefficient.get_name()
         alpha = torch.tensor(data[alpha_name]).to(dtype=dtype, device=device)
         return cls.from_uvh(alpha, UVH.from_file(file, dtype, device))
+
+
+PrognosticTuple = TypeVar("PrognosticTuple", bound=UVH | UVHAlpha)

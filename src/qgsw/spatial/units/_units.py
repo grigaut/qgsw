@@ -6,7 +6,7 @@ from enum import Enum
 class Unit(Enum):
     """Unit."""
 
-    _ = ""
+    _ = " "
     M = "m"
     KM = "km"
     RAD = "rad"
