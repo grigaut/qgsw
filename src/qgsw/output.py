@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 import numpy as np
 import torch
@@ -15,7 +16,9 @@ from qgsw.fields.variables.dynamics import (
     MeridionalVelocityDiag,
     ZonalVelocityDiag,
 )
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic import CollinearityCoefficient
+from qgsw.fields.variables.uvh import UVH, PrognosticTuple, UVHAlpha
+from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
 from qgsw.utils.sorting import sort_files
@@ -23,8 +26,10 @@ from qgsw.utils.sorting import sort_files
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+T = TypeVar("T", bound=PrognosticTuple)
 
-class OutputFile(NamedTuple):
+
+class _OutputFile(ABC, Generic[T], NamedTuple):
     """Output file wrapper."""
 
     step: int
@@ -33,6 +38,13 @@ class OutputFile(NamedTuple):
     path: Path
     dtype = torch.float64
     device = DEVICE.get()
+
+    @abstractmethod
+    def read(self) -> T: ...
+
+
+class OutputFile(_OutputFile):
+    """Output file wrapper."""
 
     def read(self) -> UVH:
         """Read the file data.
@@ -48,6 +60,28 @@ class OutputFile(NamedTuple):
             u.to(dtype=self.dtype, device=self.device),
             v.to(dtype=self.dtype, device=self.device),
             h.to(dtype=self.dtype, device=self.device),
+        )
+
+
+class OutputFileAlpha(_OutputFile):
+    """Output file wrapper."""
+
+    def read_collinear(self) -> UVH:
+        """Read the file data.
+
+        Returns:
+            UVh: Data.
+        """
+        data = np.load(file=self.path)
+        u = torch.tensor(data[ZonalVelocityDiag.get_name()])
+        v = torch.tensor(data[MeridionalVelocityDiag.get_name()])
+        h = torch.tensor(data[LayerDepthAnomalyDiag.get_name()])
+        alpha = torch.tensor(data[CollinearityCoefficient.get_name()])
+        return UVHAlpha(
+            u.to(dtype=self.dtype, device=self.device),
+            v.to(dtype=self.dtype, device=self.device),
+            h.to(dtype=self.dtype, device=self.device),
+            alpha.to(dtype=self.dtype, device=self.device),
         )
 
 
@@ -71,15 +105,27 @@ class RunOutput:
         seconds = [step * dt for step in steps]
         timesteps = [timedelta(seconds=sec) for sec in seconds]
 
-        self._outputs = [
-            OutputFile(
-                step=steps[i],
-                timestep=timesteps[i],
-                path=files[i],
-                second=seconds[i],
-            )
-            for i in range(len(files))
-        ]
+        if self._summary.configuration.model.type == QGCollinearSF.get_type():
+            self._outputs = [
+                OutputFileAlpha(
+                    step=steps[i],
+                    timestep=timesteps[i],
+                    path=files[i],
+                    second=seconds[i],
+                )
+                for i in range(len(files))
+            ]
+
+        else:
+            self._outputs = [
+                OutputFile(
+                    step=steps[i],
+                    timestep=timesteps[i],
+                    path=files[i],
+                    second=seconds[i],
+                )
+                for i in range(len(files))
+            ]
 
     @cached_property
     def folder(self) -> Path:
@@ -133,11 +179,11 @@ class RunOutput:
         """
         return (output.second for output in iter(self._outputs))
 
-    def outputs(self) -> Iterator[OutputFile]:
+    def outputs(self) -> Iterator[_OutputFile]:
         """Sorted outputs.
 
         Returns:
-            Iterator[OutputFile]: Outputs iterator.
+            Iterator[_OutputFile]: Outputs iterator.
         """
         return iter(self._outputs)
 
