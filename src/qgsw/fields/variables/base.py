@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from qgsw.fields.base import Field
-from qgsw.fields.scope import Scope
 
 try:
     from typing import Self
@@ -23,8 +22,8 @@ if TYPE_CHECKING:
     import torch
 
     from qgsw.fields.variables.state import State
-    from qgsw.fields.variables.uvh import UVH
-    from qgsw.spatial.units._units import Unit
+    from qgsw.fields.variables.uvh import PrognosticTuple
+    from qgsw.utils.units._units import Unit
 
 
 class Variable(Field):
@@ -61,8 +60,6 @@ class Variable(Field):
 
 class PrognosticVariable(ABC, Variable):
     """Prognostic variable."""
-
-    _scope = Scope.POINT_WISE
 
     @Field.slices.setter
     def slices(
@@ -132,29 +129,42 @@ class PrognosticVariable(ABC, Variable):
 class DiagnosticVariable(Variable, ABC):
     """Diagnostic Variable Base Class."""
 
+    _require_time: False
+    _require_alpha: False
+
+    @property
+    def require_time(self) -> bool:
+        """Whether the variable require time to be computed."""
+        return self._require_time
+
+    @property
+    def require_alpha(self) -> bool:
+        """Whether the variable require alpha to be computed."""
+        return self._require_alpha
+
     @abstractmethod
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            uvh (UVH): Prognostic variables
+            prognostic (PrognosticTuple): Prognostic variables
         """
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            uvh (UVH): Prognostic variables
+            prognostic (PrognosticTuple): Prognostic variables
         """
-        return self._compute(uvh).__getitem__(self.slices)
+        return self._compute(prognostic).__getitem__(self.slices)
 
-    def compute_no_slice(self, uvh: UVH) -> torch.Tensor:
+    def compute_no_slice(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            uvh (UVH): Prognostic variables
+            prognostic (PrognosticTuple): Prognostic variables
         """
-        return self._compute(uvh)
+        return self._compute(prognostic)
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
@@ -193,15 +203,25 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._scope = self._var.scope
 
     @property
+    def require_time(self) -> bool:
+        """Whether the variable require time to be computed."""
+        return self._var.require_time
+
+    @property
+    def require_alpha(self) -> bool:
+        """Whether the variable require alpha to be computed."""
+        return self._var.require_alpha
+
+    @property
     def up_to_date(self) -> bool:
         """Whether the variable must be updated or not."""
         return self._up_to_date
 
-    def compute_no_slice(self, uvh: UVH) -> torch.Tensor:
+    def compute_no_slice(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the variable value if outdated.
 
         Args:
-            uvh (UVH): UVH.
+            prognostic (PrognosticTuple): PrognosticTuple.
 
         Returns:
             torch.Tensor: Variable value.
@@ -209,19 +229,19 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         if self._up_to_date:
             return self._value
         self._up_to_date = True
-        self._value = self._var.compute(uvh)
+        self._value = self._var.compute(prognostic)
         return self._value
 
-    def compute(self, uvh: UVH) -> torch.Tensor:
+    def compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the variable value if outdated.
 
         Args:
-            uvh (UVH): UVH.
+            prognostic (PrognosticTuple): PrognosticTuple.
 
         Returns:
             torch.Tensor: Variable value.
         """
-        return self.compute_no_slice(uvh).__getitem__(self.slices)
+        return self.compute_no_slice(prognostic).__getitem__(self.slices)
 
     def get(self) -> torch.Tensor:
         """Get the variable value.
@@ -229,7 +249,7 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         Returns:
             torch.Tensor: Variable value.
         """
-        return self.compute(self._state.uvh)
+        return self.compute(self._state.prognostic)
 
     def outdated(self) -> None:
         """Set the variable as outdated.

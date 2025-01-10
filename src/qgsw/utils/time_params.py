@@ -2,7 +2,7 @@
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.uvh import PrognosticTuple
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 
@@ -11,7 +11,7 @@ CFL_GRAVITY = 0.5
 
 
 def compute_dt(
-    uvh: UVH,
+    prognostic: PrognosticTuple,
     space: SpaceDiscretization3D,
     g_prime: torch.Tensor,
     h: torch.Tensor,
@@ -19,7 +19,7 @@ def compute_dt(
     """Compute optimal dt.
 
     Args:
-        uvh (UVH): Prognostic Values.
+        prognostic (PrognosticTuple): Prognostic Values.
         space (SpaceDiscretization3D): 3D Space Discretization.
         g_prime (torch.Tensor): Reduced Gravity.
         h (torch.Tensor): Layers Thickness.
@@ -27,7 +27,8 @@ def compute_dt(
     Returns:
         float: Timestep in s.
     """
-    u, v, _ = uvh
+    u = prognostic.u
+    v = prognostic.v
     u_max, v_max, c = (
         torch.abs(u).max().item() / space.dx,
         torch.abs(v).max().item() / space.dy,

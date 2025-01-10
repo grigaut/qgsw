@@ -6,16 +6,11 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.state import State
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.state import StateAlpha
 from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.collinear_sublayer.alpha import (
-    Coefficient,
-    ConstantCoefficient,
-)
 from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
@@ -29,7 +24,6 @@ from qgsw.spatial.core.discretization import (
     keep_top_layer,
 )
 from qgsw.specs import DEVICE
-from qgsw.utils.gaussian_filtering import GaussianFilter2D
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -72,15 +66,7 @@ class _QGCollinearSublayer(QG):
         self._set_ref_variables()
 
         # initialize state
-        self._state = State.steady(
-            n_ens=self.n_ens,
-            nl=self.space.nl,
-            nx=self.space.nx,
-            ny=self.space.ny,
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
-        self._io = IO(u=self._state.u, v=self._state.v, h=self._state.h)
+        self._set_state()
         # initialize variables
         self._create_diagnostic_vars(self._state)
 
@@ -94,18 +80,13 @@ class _QGCollinearSublayer(QG):
         )
 
     @property
-    def coefficient(self) -> Coefficient:
+    def alpha(self) -> torch.Tensor:
         """Collinearity coefficient."""
-        return self._coefficient
+        return self._state.alpha.get()
 
-    @coefficient.setter
-    def coefficient(self, coefficient: float | Coefficient) -> None:
-        return self._set_coefficient(coefficient)
-
-    @property
-    def alpha(self) -> float:
-        """Alpha value."""
-        return self.coefficient.at_current_time()
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self._state.update_alpha(alpha)
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
@@ -143,6 +124,28 @@ class _QGCollinearSublayer(QG):
             optimize=optimize,
         )
 
+    def _set_state(self) -> None:
+        self._state = StateAlpha.steady(
+            alpha=torch.tensor(
+                [0.5],
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            ),
+            n_ens=self.n_ens,
+            nl=self.space.nl,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
+        self._io = IO(
+            t=self._state.t,
+            u=self._state.u,
+            v=self._state.v,
+            h=self._state.h,
+            alpha=self._state.alpha,
+        )
+
     def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
         """Perform additional validation over H.
 
@@ -163,20 +166,11 @@ class _QGCollinearSublayer(QG):
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
 
-    def _set_coefficient(self, coefficient: float | Coefficient) -> None:
-        """Set collinearity coefficient value.
-
-        Args:
-            coefficient (float): Collinearity Coefficient.
-        """
-        if isinstance(coefficient, (int, float)):
-            self._coefficient = ConstantCoefficient(coefficient)
-        else:
-            self._coefficient = coefficient
-
 
 class QGCollinearSF(_QGCollinearSublayer):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
+
+    _type = "QGCollinearSF"
 
     _supported_layers_nb: int = 2
     _beta_plane_set = False
@@ -192,14 +186,10 @@ class QGCollinearSF(_QGCollinearSublayer):
             self.set_helmholtz_solver(self.lambd)
             self._create_diagnostic_vars(self._state)
 
-    @_QGCollinearSublayer.coefficient.setter
-    def coefficient(self, coefficient: BetaPlane) -> None:
+    @_QGCollinearSublayer.alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
         """Beta-plane setter."""
-        _QGCollinearSublayer.coefficient.fset(self, coefficient)
-
-    def _set_coefficient(self, coefficient: float | Coefficient) -> None:
-        super()._set_coefficient(coefficient)
-        self._coefficient_set = True
+        _QGCollinearSublayer.alpha.fset(self, alpha)
         self._update_A()
 
     def _update_A(self) -> None:  # noqa: N802
@@ -238,14 +228,13 @@ class QGCollinearSF(_QGCollinearSublayer):
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        if not self.coefficient.isconstant:
-            self.coefficient.next_time(self.dt)
-            self._update_A()
         return super().step()
 
 
 class QGCollinearPV(_QGCollinearSublayer):
     """Modified QG Model implementing collinear pv behavior."""
+
+    _type = "QGCollinearPV"
 
     _supported_layers_nb: int = 2
 
@@ -254,7 +243,7 @@ class QGCollinearPV(_QGCollinearSublayer):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
-        optimize: bool = True,  # noqa: FBT002, FBT001
+        optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         """Collinear Sublayer Potential Vorticity.
 
@@ -306,85 +295,3 @@ class QGCollinearPV(_QGCollinearSublayer):
         p_qg_2l, p_qg_i_2l = super().QoG_inv(elliptic_rhs_2l)
         # Shrink to 1 layer
         return p_qg_2l[:, 0, ...], p_qg_i_2l[:, 0, ...]
-
-    def step(self) -> None:
-        """Performs one step time-integration with RK3-SSP scheme."""
-        if not self.coefficient.isconstant:
-            self.coefficient.next_time(self.dt)
-        return super().step()
-
-
-class QGSmoothCollinearSF(_QGCollinearSublayer):
-    """QGSmoothCollinearSF."""
-
-    _supported_layers_nb = 2
-
-    def __init__(
-        self,
-        space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
-        g_prime: torch.Tensor,
-        optimize: bool = True,  # noqa: FBT001, FBT002
-    ) -> None:
-        """Smoothed Collinear Sublayer Stream Function.
-
-        Args:
-            space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
-            optimize (bool, optional): Whether to precompile functions or
-            not. Defaults to True.
-        """
-        super().__init__(space_2d, H, g_prime, optimize)
-        # Two layers stretching operator for QoG inversion
-        A_2l = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
-        decomposition = compute_layers_to_mode_decomposition(A_2l)
-        self.Cm2l, lambd, self.Cl2m = decomposition
-        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
-        # Two layers helmholtz solver
-        self.set_helmholtz_solver(self.lambd)
-        # One layer stretching operator for G
-        self.A = self.compute_A(self.H[:, 0, 0], self.g_prime[:, 0, 0])
-        self._gaussian_filter = GaussianFilter2D(3, 10)
-
-    def G(self, p: torch.Tensor, p_i: torch.Tensor | None = None) -> UVH:  # noqa: N802
-        """G operator.
-
-        Args:
-            p (torch.Tensor): Pressure.
-            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
-             ("middle of grid cell"). Defaults to None.
-
-        Returns:
-            UVH: u, v and h
-        """
-        uvh = super().G(p=p, p_i=p_i)
-        return UVH(uvh.u[:, [0], ...], uvh.v[:, [0], ...], uvh.h[:, [0], ...])
-
-    def Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
-        """Q operator: compute elliptic equation r.h.s.
-
-        Args:
-            uvh (UVH): u,v and h.
-
-        Returns:
-            torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
-        """
-        alpha = self.alpha
-        smooth_u = self._gaussian_filter.smooth(uvh.u[0, 0, ...])
-        u_2l = torch.cat(
-            [uvh.u[0, [0], ...], alpha * smooth_u.unsqueeze(0)],
-            dim=0,
-        ).unsqueeze(0)
-        smooth_v = self._gaussian_filter.smooth(uvh.v[0, 0, ...])
-        v_2l = torch.cat(
-            [uvh.v[0, [0], ...], alpha * smooth_v.unsqueeze(0)],
-            dim=0,
-        ).unsqueeze(0)
-        smooth_h = self._gaussian_filter.smooth(uvh.h[0, 0, ...])
-        h_2l = torch.cat(
-            [uvh.h[0, [0], ...], alpha * smooth_h.unsqueeze(0)],
-            dim=0,
-        ).unsqueeze(0)
-
-        return super().Q(UVH(u_2l, v_2l, h_2l))

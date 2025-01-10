@@ -11,7 +11,7 @@ from qgsw.masks import Masks
 from qgsw.models.exceptions import InvalidModelParameterError
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
-from qgsw.spatial.units._units import Unit
+from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import (

@@ -6,11 +6,9 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.qg.collinear_sublayer.alpha import coefficient_from_config
 from qgsw.models.qg.collinear_sublayer.core import (
     QGCollinearPV,
     QGCollinearSF,
-    QGSmoothCollinearSF,
     _QGCollinearSublayer,
 )
 from qgsw.models.qg.core import QG, G
@@ -24,7 +22,10 @@ from qgsw.models.sw.filtering import (
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.models import (
+        CollinearityCoefficientConfig,
+        ModelConfig,
+    )
     from qgsw.perturbations.core import Perturbation
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import (
@@ -62,9 +63,9 @@ def instantiate_model(
         Model: Model.
     """
     if model_config.type in [
-        "SW",
-        "SWFilterBarotropicSpectral",
-        "SWFilterBarotropicExact",
+        SW.get_type(),
+        SWFilterBarotropicSpectral.get_type(),
+        SWFilterBarotropicExact.get_type(),
     ]:
         model = _instantiate_sw(
             model_config=model_config,
@@ -73,7 +74,7 @@ def instantiate_model(
             beta_plane=beta_plane,
             Ro=Ro,
         )
-    elif model_config.type == "QG":
+    elif model_config.type == QG.get_type():
         model = _instantiate_qg(
             model_config=model_config,
             space_2d=space_2d,
@@ -82,9 +83,8 @@ def instantiate_model(
             Ro=Ro,
         )
     elif model_config.type in [
-        "QGCollinearSF",
-        "QGCollinearPV",
-        "QGSmoothCollinearSF",
+        QGCollinearSF.get_type(),
+        QGCollinearPV.get_type(),
     ]:
         model = _instantiate_collinear_qg(
             model_config=model_config,
@@ -118,11 +118,11 @@ def _instantiate_sw(
     Returns:
         SW: SW Model.
     """
-    if model_config.type == "SW":
+    if model_config.type == SW.get_type():
         model_class = SW
-    elif model_config.type == "SWFilterBarotropicSpectral":
+    elif model_config.type == SWFilterBarotropicSpectral.get_type():
         model_class = SWFilterBarotropicSpectral
-    elif model_config.type == "SWFilterBarotropicExact":
+    elif model_config.type == SWFilterBarotropicExact.get_type():
         model_class = SWFilterBarotropicExact
     else:
         msg = f"Unrecognized model type: {model_config.type}"
@@ -217,12 +217,10 @@ def _instantiate_collinear_qg(
     Returns:
         _QGCollinearSublayer: Modified QG Model.
     """
-    if model_config.type == "QGCollinearSF":
+    if model_config.type == QGCollinearSF.get_type():
         model_class = QGCollinearSF
-    elif model_config.type == "QGCollinearPV":
+    elif model_config.type == QGCollinearPV.get_type():
         model_class = QGCollinearPV
-    elif model_config.type == "QGSmoothCollinearSF":
-        model_class = QGSmoothCollinearSF
     else:
         msg = f"Unrecognized model type: {model_config.type}"
         raise ValueError(msg)
@@ -237,14 +235,14 @@ def _instantiate_collinear_qg(
         model.beta_plane.f0,
         Ro,
     )
-    model.coefficient = _determine_coef0(perturbation.type)
+    model.alpha = _determine_coef0(perturbation.type)
     uvh0 = model.G(p0)
     model.set_uvh(
         u=torch.clone(uvh0.u),
         v=torch.clone(uvh0.v),
         h=torch.clone(uvh0.h),
     )
-    model.coefficient = coefficient_from_config(model_config.collinearity_coef)
+    model.alpha = coefficient_from_config(model_config.collinearity_coef)
     return model
 
 
@@ -261,12 +259,46 @@ def _determine_coef0(perturbation_type: str) -> float:
         float: Initial coefficient value.
     """
     if perturbation_type == "vortex-baroclinic":
-        return 0
+        return torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
     if perturbation_type == "vortex-half-barotropic":
-        return 0.5
+        return torch.tensor([0.5], dtype=torch.float64, device=DEVICE.get())
     if perturbation_type == "vortex-barotropic":
-        return 1
+        return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     if perturbation_type == "none":
-        return 1
+        return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     msg = f"Unknown perturbation type: {perturbation_type}"
     raise ValueError(msg)
+
+
+def coefficient_from_config(
+    coef_config: CollinearityCoefficientConfig,
+) -> torch.Tensor:
+    """Create Coefficient from configuration.
+
+    Args:
+        coef_config (CollinearityCoefficientConfig): Coefficient Configuration.
+
+    Raises:
+        KeyError: If the coeffciient type is not recognized/
+
+    Returns:
+        Coefficient: Coefficient.
+    """
+    possible_coefs = ["constant"]
+    if coef_config.type not in possible_coefs:
+        msg = (
+            "Unrecognized perturbation type. "
+            f"Possible values are {possible_coefs}"
+        )
+        raise KeyError(msg)
+
+    if coef_config.type == "constant":
+        coef = torch.tensor(
+            [coef_config.value],
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+    else:
+        msg = "To Implement."
+        raise NotImplementedError(msg)
+    return coef

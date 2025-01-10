@@ -8,8 +8,8 @@ from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     SpaceDiscretization3D,
 )
-from qgsw.spatial.units._units import Unit
 from qgsw.specs import DEVICE
+from qgsw.utils.units._units import Unit
 
 
 @pytest.fixture

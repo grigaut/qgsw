@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     except ImportError:
         EllipsisType = type(...)
     from qgsw.fields.variables.base import DiagnosticVariable
-    from qgsw.fields.variables.uvh import UVH
+    from qgsw.fields.variables.uvh import PrognosticTuple
 
 
 class Error(ABC, Field):
@@ -57,12 +57,17 @@ class Error(ABC, Field):
         return super().__repr__() + f" on {var_name} ([{var_unit}])"
 
     @abstractmethod
-    def _compute(self, uvh: UVH, uvh_ref: UVH) -> torch.Tensor:
+    def _compute(
+        self,
+        prognostic: PrognosticTuple,
+        prognostic_ref: PrognosticTuple,
+    ) -> torch.Tensor:
         """Compute error.
 
         Args:
-            uvh (UVH): Prognostic variables value.
-            uvh_ref (UVH): Reference prognostic variables value.
+            prognostic (PrognosticTuple): Prognostic variables value.
+            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            value.
 
         Returns:
             torch.Tensor: Error.
@@ -74,17 +79,22 @@ class EnsembleWiseError(Error):
 
     _scope = Scope.ENSEMBLE_WISE
 
-    def compute_ensemble_wise(self, uvh: UVH, uvh_ref: UVH) -> torch.Tensor:
+    def compute_ensemble_wise(
+        self,
+        prognostic: PrognosticTuple,
+        prognostic_ref: PrognosticTuple,
+    ) -> torch.Tensor:
         """Compute ensemble-wise error.
 
         Args:
-            uvh (UVH): Prognostic variables value.
-            uvh_ref (UVH): Reference prognostic variables value.
+            prognostic (PrognosticTuple): Prognostic variables value.
+            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            value.
 
         Returns:
             torch.Tensor: Error.
         """
-        return self._compute(uvh, uvh_ref)
+        return self._compute(prognostic, prognostic_ref)
 
 
 class LevelWiseError(Error):
@@ -92,29 +102,39 @@ class LevelWiseError(Error):
 
     _scope = Scope.LEVEL_WISE
 
-    def compute_level_wise(self, uvh: UVH, uvh_ref: UVH) -> torch.Tensor:
+    def compute_level_wise(
+        self,
+        prognostic: PrognosticTuple,
+        prognostic_ref: PrognosticTuple,
+    ) -> torch.Tensor:
         """Compute level-wise error.
 
         Args:
-            uvh (UVH): Prognostic variables value.
-            uvh_ref (UVH): Reference prognostic variables value.
+            prognostic (PrognosticTuple): Prognostic variables value.
+            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            value.
 
         Returns:
             torch.Tensor: Error.
         """
-        return self._compute(uvh, uvh_ref)
+        return self._compute(prognostic, prognostic_ref)
 
-    def compute_ensemble_wise(self, uvh: UVH, uvh_ref: UVH) -> torch.Tensor:
+    def compute_ensemble_wise(
+        self,
+        prognostic: PrognosticTuple,
+        prognostic_ref: PrognosticTuple,
+    ) -> torch.Tensor:
         """Compute ensemble-wise error.
 
         Args:
-            uvh (UVH): Prognostic variables value.
-            uvh_ref (UVH): Reference prognostic variables value.
+            prognostic (PrognosticTuple): Prognostic variables value.
+            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            value.
 
         Returns:
             torch.Tensor: Error.
         """
-        return torch.mean(self._compute(uvh, uvh_ref), dim=(-1))
+        return torch.mean(self._compute(prognostic, prognostic_ref), dim=(-1))
 
 
 class PointWiseError(Error):
@@ -122,38 +142,59 @@ class PointWiseError(Error):
 
     _scope = Scope.POINT_WISE
 
-    def compute_point_wise(self, uvh: UVH, uvh_ref: UVH) -> torch.Tensor:
+    def compute_point_wise(
+        self,
+        prognostic: PrognosticTuple,
+        prognostic_ref: PrognosticTuple,
+    ) -> torch.Tensor:
         """Compute point-wise error.
 
         Args:
-            uvh (UVH): Prognostic variables value.
-            uvh_ref (UVH): Reference prognostic variables value.
+            prognostic (PrognosticTuple): Prognostic variables value.
+            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            value.
 
         Returns:
             torch.Tensor: Error.
         """
-        return self._compute(uvh, uvh_ref)
+        return self._compute(prognostic, prognostic_ref)
 
-    def compute_level_wise(self, uvh: UVH, uvh_ref: UVH) -> torch.Tensor:
+    def compute_level_wise(
+        self,
+        prognostic: PrognosticTuple,
+        prognostic_ref: PrognosticTuple,
+    ) -> torch.Tensor:
         """Compute level-wise error.
 
         Args:
-            uvh (UVH): Prognostic variables value.
-            uvh_ref (UVH): Reference prognostic variables value.
+            prognostic (PrognosticTuple): Prognostic variables value.
+            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            value.
 
         Returns:
             torch.Tensor: Error.
         """
-        return torch.mean(self._compute(uvh, uvh_ref), dim=(-1, -2))
+        return torch.mean(
+            self._compute(prognostic, prognostic_ref),
+            dim=(-1, -2),
+        )
 
-    def compute_ensemble_wise(self, uvh: UVH, uvh_ref: UVH) -> torch.Tensor:
+    def compute_ensemble_wise(
+        self,
+        prognostic: PrognosticTuple,
+        prognostic_ref: PrognosticTuple,
+    ) -> torch.Tensor:
         """Compute ensemble-wise error.
 
         Args:
-            uvh (UVH): Prognostic variables value.
-            uvh_ref (UVH): Reference prognostic variables value.
+            prognostic (PrognosticTuple): Prognostic variables value.
+            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            value.
 
         Returns:
             torch.Tensor: Error.
         """
-        return torch.mean(self._compute(uvh, uvh_ref), dim=(-1, -2, -3))
+        return torch.mean(
+            self._compute(prognostic, prognostic_ref),
+            dim=(-1, -2, -3),
+        )

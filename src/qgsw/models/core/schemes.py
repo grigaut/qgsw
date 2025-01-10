@@ -18,7 +18,7 @@ def rk3_ssp(
         time_derivation_func (Callable): Time derivation.
 
     Returns:
-        UVH: Final prognostic variables.
+        UVH: Final uvh variables.
     """
     dt0_uvh = time_derivation_func(uvh)
     uvh += dt * dt0_uvh

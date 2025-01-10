@@ -11,6 +11,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.fields.variables.state import State
+from qgsw.fields.variables.uvh import UVH, PrognosticTuple
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -23,7 +24,6 @@ from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.uvh import UVH
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.specs._utils import Device
@@ -62,6 +62,8 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         - dy_p_ref
     """
 
+    _type: str
+
     dtype = torch.float64
     device: Device = DEVICE
     _taux: torch.Tensor | float = 0.0
@@ -98,15 +100,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         self._set_ref_variables()
 
         # initialize state
-        self._state = State.steady(
-            n_ens=self.n_ens,
-            nl=self.space.nl,
-            nx=self.space.nx,
-            ny=self.space.ny,
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
-        self._io = IO(u=self._state.u, v=self._state.v, h=self._state.h)
+        self._set_state()
         # initialize variables
         self._create_diagnostic_vars(self._state)
 
@@ -147,9 +141,9 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         return self._io
 
     @property
-    def uvh(self) -> UVH:
-        """UVH."""
-        return self._state.uvh
+    def uvh(self) -> PrognosticTuple:
+        """Prognostic tuple."""
+        return self._state.prognostic
 
     @property
     def u(self) -> torch.Tensor:
@@ -231,6 +225,22 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
             self.h_ref_vgrid = self.h_ref
             self.dx_p_ref = 0.0
             self.dy_p_ref = 0.0
+
+    def _set_state(self) -> None:
+        self._state = State.steady(
+            n_ens=self.n_ens,
+            nl=self.space.nl,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
+        self._io = IO(
+            t=self._state.t,
+            u=self._state.u,
+            v=self._state.v,
+            h=self._state.h,
+        )
 
     def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
         """Set utils functions.
@@ -335,17 +345,17 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         u = u.type(self.dtype) * self.masks.u
         v = v.type(self.dtype) * self.masks.v
         h = h.type(self.dtype) * self.masks.h
-        self._state.update(u, v, h)
+        self._state.update_uvh(UVH(u, v, h))
 
     @abstractmethod
     def compute_time_derivatives(
         self,
-        uvh: UVH,
+        prognostic: PrognosticTuple,
     ) -> UVH:
         """Compute the state variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            uvh (UVH): u,v and h.
+            prognostic (PrognosticTuple): u,v and h.
 
         Returns:
             UVH: dt_u, dt_v, dt_h
@@ -353,7 +363,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
 
     @abstractmethod
     def update(self, uvh: UVH) -> UVH:
-        """Update prognostic variables.
+        """Update u,v and h.
 
         Args:
             uvh (UVH): u,v and h.
@@ -364,4 +374,14 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        self._state.uvh = self.update(self._state.uvh)
+        self._state.increment_time(self.dt)
+        self._state.update_uvh(self.update(self._state.prognostic.uvh))
+
+    @classmethod
+    def get_type(cls) -> str:
+        """Get the model type.
+
+        Returns:
+            str: Model type.
+        """
+        return cls._type

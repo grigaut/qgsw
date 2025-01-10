@@ -6,7 +6,7 @@ from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     SurfaceHeightAnomaly,
 )
-from qgsw.fields.variables.state import State
+from qgsw.fields.variables.state import State, StateAlpha
 from qgsw.fields.variables.uvh import UVH
 from qgsw.specs import DEVICE
 
@@ -42,7 +42,7 @@ def test_init_update() -> None:
     v = torch.clone(v) + 2
     h = torch.clone(h) + 3
 
-    state.update(u, v, h)
+    state.update_uvh(UVH(u, v, h))
 
     assert (state.u.get() == u).all()
     assert (state.v.get() == v).all()
@@ -52,7 +52,7 @@ def test_init_update() -> None:
     v += 2
     h += 3
 
-    state.uvh = UVH(u, v, h)
+    state.update_uvh(UVH(u, v, h))
 
     assert (state.u.get() == u).all()
     assert (state.v.get() == v).all()
@@ -69,7 +69,7 @@ def test_nested_bound_variables() -> None:
     # Bind only eta
     eta_bound = eta.bind(state)
     # Compute eta and h
-    eta0 = eta.compute(state.uvh)
+    eta0 = eta.compute(state.prognostic)
     # Assert both variables are bound
     assert len(state.diag_vars) == 2  # noqa: PLR2004
     # Assert both variables are bound once
@@ -79,10 +79,29 @@ def test_nested_bound_variables() -> None:
     # Compare values of eta and h
     assert (eta0 == eta1).all()
     # Update state
-    state.update(state.u.get(), state.v.get(), state.h.get() + 2)
+    state.update_uvh(UVH(state.u.get(), state.v.get(), state.h.get() + 2))
     # Assert all variables must be updated
     assert all(not var.up_to_date for var in state.diag_vars.values())
     # Compute the value of eta
     eta2 = eta_bound.get()
     # Assert eta has changed
     assert not (eta1 == eta2).all()
+
+
+def test_state_alpha_updates() -> None:
+    """Test updates on StateAlpha."""
+    state = StateAlpha.steady(
+        torch.tensor([0.2], dtype=torch.float64, device=DEVICE.get()),
+        1,
+        2,
+        10,
+        10,
+        torch.float64,
+        DEVICE.get(),
+    )
+    alpha0 = state.alpha
+    state.update_uvh(UVH(state.u.get() + 2, state.v.get(), state.h.get()))
+    assert (state.alpha.get() == alpha0.get()).all()
+    uvh0 = state.prognostic.uvh
+    state.alpha = torch.tensor([0.4], dtype=torch.float64, device=DEVICE.get())
+    assert state.prognostic.uvh == uvh0

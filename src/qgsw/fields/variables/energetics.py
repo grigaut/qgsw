@@ -19,14 +19,14 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.state import State
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.uvh import PrognosticTuple
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.spatial.units._units import Unit
+from qgsw.utils.units._units import Unit
 
 
 def compute_W(H: torch.Tensor) -> torch.Tensor:  # noqa: N802, N803
@@ -69,18 +69,19 @@ class KineticEnergy(DiagnosticVariable):
         self._V = V
         self._comp_ke = OptimizableFunction(finite_diff.comp_ke)
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the kinetic energy.
 
         Args:
-            uvh (UVH): u,v,h
+            prognostic (PrognosticTuple): u,v,h
 
         Returns:
             torch.Tensor: Kinetic energy.
         """
-        u, v, _ = uvh
-        U = self._U.compute_no_slice(uvh)  # noqa: N806
-        V = self._V.compute_no_slice(uvh)  # noqa: N806
+        u = prognostic.u
+        v = prognostic.v
+        U = self._U.compute_no_slice(prognostic)  # noqa: N806
+        V = self._V.compute_no_slice(prognostic)  # noqa: N806
         return self._comp_ke(u, U, v, V) * self._h_mask
 
     def bind(
@@ -140,16 +141,16 @@ class ModalKineticEnergy(DiagnosticVariable):
         # Since Cm2lT_W_Cm2l is diagonal
         self._Cm2lT_W_Cm2l = torch.diag(Cm2lT_W_Cm2l)  # Vector
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            uvh (UVH): Prognostic variables.
+            prognostic (PrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Modal kinetic energy, shape: (n_ens, nl).
         """
-        psi = self._psi.compute_no_slice(uvh)
+        psi = self._psi.compute_no_slice(prognostic)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
         # Pad x with 0 on top
         psi_hat_pad_x = F.pad(psi_hat, (0, 0, 0, 1))
@@ -216,17 +217,17 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
         Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
         self._Cm2lT_W_Cm2l_lambda = Cm2l_T @ W @ Cm2l @ lambd  # Vector
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            uvh (UVH): Prognostic variables.
+            prognostic (PrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Modal avalaible potential energy,
             shape: (n_ens,nl).
         """
-        psi = self._psi.compute_no_slice(uvh)
+        psi = self._psi.compute_no_slice(prognostic)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
         psiT_CT_W_C_lambda_psi = torch.einsum(  # noqa: N806
             "l,...lxy->...lxy",
@@ -276,16 +277,18 @@ class ModalEnergy(DiagnosticVariable):
         self._ke = ke_hat
         self._ape = ape_hat
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute total modal energy.
 
         Args:
-            uvh (UVH): Prognostic variables.
+            prognostic (PrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Modal total energy, shape: (n_ens)
         """
-        return self._ke.compute_no_slice(uvh) + self._ape.compute_no_slice(uvh)
+        ke = self._ke.compute_no_slice(prognostic)
+        ape = self._ape.compute_no_slice(prognostic)
+        return ke + ape
 
     def bind(
         self,
@@ -337,16 +340,16 @@ class TotalKineticEnergy(DiagnosticVariable):
         # Compute W = Diag(H) / h_{tot}
         self._W = torch.diag(compute_W(H))  # Vector
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            uvh (UVH): Prognostic variables.
+            prognostic (PrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Total modal kinetic energy, shape: (n_ens).
         """
-        psi = self._psi.compute_no_slice(uvh)
+        psi = self._psi.compute_no_slice(prognostic)
         # Pad x with 0 on top
         psi_pad_x = F.pad(psi, (0, 0, 0, 1))
         # Pad y with 0 on the left
@@ -408,17 +411,17 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
         # Compute weight matrix
         self._W = compute_W(H)  # Matrix
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            uvh (UVH): Prognostic variables.
+            prognostic (PrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Total modal avalaible potential energy,
             shape: (n_ens).
         """
-        psi = self._psi.compute_no_slice(uvh)
+        psi = self._psi.compute_no_slice(prognostic)
         W_A_psi = torch.einsum(  # noqa: N806
             "lm,...mxy->...lxy",
             self._W @ self._A,
@@ -472,16 +475,18 @@ class TotalEnergy(DiagnosticVariable):
         self._ke = ke
         self._ape = ape
 
-    def _compute(self, uvh: UVH) -> torch.Tensor:
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute total modal energy.
 
         Args:
-            uvh (UVH): Prognostic variables.
+            prognostic (PrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Total modal energy, shape: (n_ens)
         """
-        return self._ke.compute_no_slice(uvh) + self._ape.compute_no_slice(uvh)
+        return self._ke.compute_no_slice(
+            prognostic,
+        ) + self._ape.compute_no_slice(prognostic)
 
     def bind(
         self,

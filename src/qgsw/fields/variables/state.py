@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Generic, TypeVar, Union
 
 try:
     from typing import Self
@@ -11,11 +12,13 @@ except ImportError:
 
 
 from qgsw.fields.variables.prognostic import (
+    CollinearityCoefficient,
     LayerDepthAnomaly,
     MeridionalVelocity,
+    Time,
     ZonalVelocity,
 )
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.uvh import UVH, UVHT, UVHTAlpha
 
 if TYPE_CHECKING:
     import torch
@@ -26,46 +29,35 @@ if TYPE_CHECKING:
     )
 
 
-class State:
-    """State: wrapper for UVH state variables.
+T = TypeVar("T", bound=Union[UVHT, UVHTAlpha])
 
-    This wrapper links uvh variables to diagnostic variables.
-    Diagnostic variables can be bound to the state so that they are updated
-    only when the state has changed.
-    """
 
-    def __init__(
-        self,
-        uvh: UVH,
-    ) -> None:
-        """Instantiate state.
+class BaseState(ABC, Generic[T]):
+    """Base State class."""
+
+    def __init__(self, prognostic: T) -> None:
+        """Instantiate State.
 
         Args:
-            uvh (UVH): Prognostic variables.
+            prognostic (T): Prognostic variables.
         """
         self.unbind()
-        self._uvh = uvh
-        self._u = ZonalVelocity(uvh.u)
-        self._v = MeridionalVelocity(uvh.v)
-        self._h = LayerDepthAnomaly(uvh.h)
-        self._prog = {
+        self._prog = prognostic
+        self._t = Time(prognostic.t)
+        self._u = ZonalVelocity(prognostic.u)
+        self._v = MeridionalVelocity(prognostic.v)
+        self._h = LayerDepthAnomaly(prognostic.h)
+        self._prog_vars = {
+            Time.get_name(): self._t,
             ZonalVelocity.get_name(): self._u,
             MeridionalVelocity.get_name(): self._v,
             LayerDepthAnomaly.get_name(): self._h,
         }
 
     @property
-    def uvh(self) -> UVH:
-        """Prognostic variables."""
-        return self._uvh
-
-    @uvh.setter
-    def uvh(self, uvh: UVH) -> None:
-        self._uvh = uvh
-        self._u.update(uvh.u)
-        self._v.update(uvh.v)
-        self._h.update(uvh.h)
-        self._updated()
+    def t(self) -> Time:
+        """Time."""
+        return self._t
 
     @property
     def u(self) -> ZonalVelocity:
@@ -83,9 +75,20 @@ class State:
         return self._h
 
     @property
+    def prognostic(self) -> T:
+        """Prognostic variables."""
+        return self._prog
+
+    @prognostic.setter
+    def prognostic(self, prognostic: T) -> None:
+        self._updated()
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    @property
     def vars(self) -> dict[str, PrognosticVariable | BoundDiagnosticVariable]:
         """List of diagnostic variables."""
-        return self._prog | self._diag
+        return self.prog_vars | self.diag_vars
 
     @property
     def diag_vars(self) -> dict[str, BoundDiagnosticVariable]:
@@ -95,7 +98,7 @@ class State:
     @property
     def prog_vars(self) -> dict[str, BoundDiagnosticVariable]:
         """Prognostic variables."""
-        return self._prog
+        return self._prog_vars
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -146,24 +149,14 @@ class State:
             raise KeyError(msg)
         return self.vars[name]
 
-    def update(
-        self,
-        u: torch.Tensor,
-        v: torch.Tensor,
-        h: torch.Tensor,
-    ) -> None:
-        """Update prognostic variables.
-
-        Args:
-            u (torch.Tensor): Zonal velocity.
-            v (torch.Tensor): Meriodional velocity.
-            h (torch.Tensor): Surface height anomaly.
-        """
-        self.uvh = UVH(u, v, h)
-
     def _updated(self) -> None:
         """Update diagnostic variables."""
         for var in self.diag_vars.values():
+            var.outdated()
+
+    def _time_updated(self) -> None:
+        """Update diagnostic variables."""
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
             var.outdated()
 
     def add_bound_diagnostic_variable(
@@ -182,6 +175,61 @@ class State:
     def unbind(self) -> None:
         """Unbind all variables from state."""
         self._diag: dict[str, BoundDiagnosticVariable] = {}
+
+    def update_time(self, time: torch.Tensor) -> None:
+        """Update only the value of time.
+
+        Args:
+            time (torch.Tensor): Time.
+        """
+        self._updated()
+        prognostic = UVHT.from_uvh(
+            time,
+            self.prognostic.uvh,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    def increment_time(self, dt: float) -> None:
+        """Increment time."""
+        self._time_updated()
+        prognostic = self._prog.increment_time(dt)
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    @abstractmethod
+    def _update_prognostic_vars(self, prognostic: T) -> None: ...
+
+    @abstractmethod
+    def update_uvh(self, uvh: UVH) -> None:
+        """Update u,v and h.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+        """
+
+
+class State(BaseState[UVHT]):
+    """State: wrapper for UVH state variables.
+
+    This wrapper links uvh variables to diagnostic variables.
+    Diagnostic variables can be bound to the state so that they are updated
+    only when the state has changed.
+    """
+
+    def _update_prognostic_vars(self, prognostic: UVHT) -> None:
+        self._t.update(prognostic.t)
+        self._u.update(prognostic.u)
+        self._v.update(prognostic.v)
+        self._h.update(prognostic.h)
+
+    def update_uvh(self, uvh: UVH) -> None:
+        """Update u,v and h.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+        """
+        self.prognostic = UVHT.from_uvh(self.t.get(), uvh)
 
     @classmethod
     def steady(
@@ -206,7 +254,7 @@ class State:
         Returns:
             Self: State.
         """
-        return cls(UVH.steady(n_ens, nl, nx, ny, dtype, device))
+        return cls(UVHT.steady(n_ens, nl, nx, ny, dtype, device))
 
     @classmethod
     def from_tensors(
@@ -226,3 +274,118 @@ class State:
             Self: State.
         """
         return cls(UVH(u, v, h))
+
+
+class StateAlpha(BaseState[UVHTAlpha]):
+    """StateAlpha: wrapper for UVHTAlpha state variables.
+
+    This wrapper links uvh variables to diagnostic variables.
+    Diagnostic variables can be bound to the state so that they are updated
+    only when the state has changed.
+    """
+
+    def __init__(self, prognostic: UVHTAlpha) -> None:
+        """Instantiate StateAlpha.
+
+        Args:
+            prognostic (UVHTAlpha): Core prognostic variables.
+        """
+        super().__init__(prognostic)
+        self._alpha = CollinearityCoefficient(prognostic.alpha)
+        self._prog_vars[CollinearityCoefficient.get_name()] = self._alpha
+
+    @property
+    def alpha(self) -> CollinearityCoefficient:
+        """Collinearity coefficient."""
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self.update_alpha(alpha)
+
+    def _update_prognostic_vars(self, prognostic: UVHTAlpha) -> None:
+        self._t.update(prognostic.t)
+        self._u.update(prognostic.u)
+        self._v.update(prognostic.v)
+        self._h.update(prognostic.h)
+        self._alpha.update(prognostic.alpha)
+
+    def _alpha_updated(self) -> None:
+        """Update diagnostic variables."""
+        for var in filter(lambda v: v.require_alpha, self.diag_vars.values()):
+            var.outdated()
+
+    def update_alpha(self, alpha: torch.Tensor) -> None:
+        """Update only the value of alpha.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+        """
+        self._alpha_updated()
+        prognostic = UVHTAlpha.from_uvh(
+            self.t.get(),
+            alpha,
+            self.prognostic.uvh,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    def update_uvh(self, uvh: UVH) -> None:
+        """Update u,v and h only.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+        """
+        self.prognostic = UVHTAlpha.from_uvh(
+            self.t.get(),
+            self.alpha.get(),
+            uvh,
+        )
+
+    @classmethod
+    def steady(
+        cls,
+        alpha: torch.Tensor,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> Self:
+        """Instantiate a steady state with zero-filled prognostic variables.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype): Data type.
+            device (torch.device): Device to use.
+
+        Returns:
+            Self: State.
+        """
+        return cls(UVHTAlpha.steady(alpha, n_ens, nl, nx, ny, dtype, device))
+
+    @classmethod
+    def from_tensors(
+        cls,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+        alpha: torch.Tensor,
+    ) -> Self:
+        """Instantiate the state from tensors.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meridional velocity.
+            h (torch.Tensor): Surface height anomaly.
+            alpha (torch.Tensor): Collinearity coefficient.
+
+        Returns:
+            Self: State.
+        """
+        return cls(UVHTAlpha(u, v, h, alpha))

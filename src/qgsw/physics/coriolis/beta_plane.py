@@ -8,8 +8,8 @@ import torch
 
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.spatial.conversion import deg_to_m_lat, deg_to_rad, km_to_m
-from qgsw.spatial.units._units import Unit
-from qgsw.spatial.units.exceptions import UnitError
+from qgsw.utils.units._units import Unit
+from qgsw.utils.units.exceptions import UnitError
 
 if TYPE_CHECKING:
     from qgsw.spatial.core.grid import Grid2D
