@@ -92,32 +92,6 @@ class Coefficient(TypeSwitch, metaclass=ABCMeta):
         self._time = time
 
 
-class ConstantCoefficient(Coefficient):
-    """Constant Coefficient."""
-
-    _type = "constant"
-    _constant = True
-
-    def __init__(self, value: float) -> None:
-        """Instantiate the coefficient.
-
-        Args:
-            value (float): Coefficient constant value.
-        """
-        self._value = value
-
-    def at_time(self, time: float) -> float:  # noqa: ARG002
-        """Compute the coefficient at a given time.
-
-        Args:
-            time (int): Time at which to compute the coefficient.
-
-        Returns:
-            float: Coefficient value.
-        """
-        return self._value
-
-
 class ChangingCoefficient(Coefficient):
     """Changing coefficient."""
 
@@ -273,7 +247,7 @@ def coefficient_from_config(
         Coefficient: Coefficient.
     """
     possible_coefs = [
-        ConstantCoefficient.get_type(),
+        "constant",
         ChangingCoefficient.get_type(),
     ]
     if coef_config.type not in possible_coefs:
@@ -283,7 +257,7 @@ def coefficient_from_config(
         )
         raise KeyError(msg)
 
-    if coef_config.type == ConstantCoefficient.get_type():
+    if coef_config.type == "constant":
         coef = torch.tensor(
             [coef_config.value],
             dtype=torch.float64,
