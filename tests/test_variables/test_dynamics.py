@@ -12,7 +12,8 @@ from qgsw.fields.variables.dynamics import (
     SurfaceHeightAnomaly,
     ZonalVelocityFlux,
 )
-from qgsw.fields.variables.state import UVH, State
+from qgsw.fields.variables.state import State
+from qgsw.fields.variables.uvh import UVHT
 from qgsw.specs import DEVICE
 
 
@@ -40,7 +41,12 @@ def state() -> State:
         dtype=torch.float64,
         device=DEVICE.get(),
     )
-    return State(UVH(u, v, h))
+    t = torch.rand(
+        (n_ens,),
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    return State(UVHT(u, v, h, t))
 
 
 def test_slicing(state: State) -> None:

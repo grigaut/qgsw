@@ -139,6 +139,7 @@ class _QGCollinearSublayer(QG):
             device=self.device.get(),
         )
         self._io = IO(
+            t=self._state.t,
             u=self._state.u,
             v=self._state.v,
             h=self._state.h,

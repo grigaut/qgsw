@@ -42,7 +42,7 @@ def test_init_update() -> None:
     v = torch.clone(v) + 2
     h = torch.clone(h) + 3
 
-    state.prognostic = UVH(u, v, h)
+    state.update_uvh(UVH(u, v, h))
 
     assert (state.u.get() == u).all()
     assert (state.v.get() == v).all()
@@ -52,7 +52,7 @@ def test_init_update() -> None:
     v += 2
     h += 3
 
-    state.prognostic = UVH(u, v, h)
+    state.update_uvh(UVH(u, v, h))
 
     assert (state.u.get() == u).all()
     assert (state.v.get() == v).all()
@@ -79,7 +79,7 @@ def test_nested_bound_variables() -> None:
     # Compare values of eta and h
     assert (eta0 == eta1).all()
     # Update state
-    state.prognostic = UVH(state.u.get(), state.v.get(), state.h.get() + 2)
+    state.update_uvh(UVH(state.u.get(), state.v.get(), state.h.get() + 2))
     # Assert all variables must be updated
     assert all(not var.up_to_date for var in state.diag_vars.values())
     # Compute the value of eta

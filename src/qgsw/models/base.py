@@ -235,7 +235,12 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
             dtype=self.dtype,
             device=self.device.get(),
         )
-        self._io = IO(u=self._state.u, v=self._state.v, h=self._state.h)
+        self._io = IO(
+            t=self._state.t,
+            u=self._state.u,
+            v=self._state.v,
+            h=self._state.h,
+        )
 
     def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
         """Set utils functions.
@@ -369,6 +374,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
+        self._state.increment_time(self.dt)
         self._state.update_uvh(self.update(self._state.prognostic.uvh))
 
     @classmethod

@@ -16,8 +16,8 @@ from qgsw.fields.variables.dynamics import (
     MeridionalVelocityDiag,
     ZonalVelocityDiag,
 )
-from qgsw.fields.variables.prognostic import CollinearityCoefficient
-from qgsw.fields.variables.uvh import UVH, PrognosticTuple, UVHAlpha
+from qgsw.fields.variables.prognostic import CollinearityCoefficient, Time
+from qgsw.fields.variables.uvh import UVHT, PrognosticTuple, UVHTAlpha
 from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
@@ -46,41 +46,45 @@ class _OutputFile(ABC, Generic[T], NamedTuple):
 class OutputFile(_OutputFile):
     """Output file wrapper."""
 
-    def read(self) -> UVH:
+    def read(self) -> UVHT:
         """Read the file data.
 
         Returns:
             UVh: Data.
         """
         data = np.load(file=self.path)
+        t = torch.tensor(data[Time.get_name()])
         u = torch.tensor(data[ZonalVelocityDiag.get_name()])
         v = torch.tensor(data[MeridionalVelocityDiag.get_name()])
         h = torch.tensor(data[LayerDepthAnomalyDiag.get_name()])
-        return UVH(
+        return UVHT(
             u.to(dtype=self.dtype, device=self.device),
             v.to(dtype=self.dtype, device=self.device),
             h.to(dtype=self.dtype, device=self.device),
+            t.to(dtype=self.dtype, device=self.device),
         )
 
 
 class OutputFileAlpha(_OutputFile):
     """Output file wrapper."""
 
-    def read_collinear(self) -> UVH:
+    def read_collinear(self) -> UVHTAlpha:
         """Read the file data.
 
         Returns:
             UVh: Data.
         """
         data = np.load(file=self.path)
+        t = torch.tensor(data[Time.get_name()])
         u = torch.tensor(data[ZonalVelocityDiag.get_name()])
         v = torch.tensor(data[MeridionalVelocityDiag.get_name()])
         h = torch.tensor(data[LayerDepthAnomalyDiag.get_name()])
         alpha = torch.tensor(data[CollinearityCoefficient.get_name()])
-        return UVHAlpha(
+        return UVHTAlpha(
             u.to(dtype=self.dtype, device=self.device),
             v.to(dtype=self.dtype, device=self.device),
             h.to(dtype=self.dtype, device=self.device),
+            t.to(dtype=self.dtype, device=self.device),
             alpha.to(dtype=self.dtype, device=self.device),
         )
 
