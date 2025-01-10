@@ -11,6 +11,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.fields.variables.state import State
+from qgsw.fields.variables.uvh import UVH
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -23,7 +24,6 @@ from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.uvh import UVH
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.specs._utils import Device
@@ -335,7 +335,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         u = u.type(self.dtype) * self.masks.u
         v = v.type(self.dtype) * self.masks.v
         h = h.type(self.dtype) * self.masks.h
-        self._state.update(u, v, h)
+        self._state.uvh = UVH(u, v, h)
 
     @abstractmethod
     def compute_time_derivatives(
