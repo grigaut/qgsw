@@ -1,6 +1,7 @@
 """Space Configuration tests."""
 
 import pytest
+import torch
 
 from qgsw.configs.space import SpaceConfig
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
@@ -25,6 +26,6 @@ def test_dx_dy_ds(
 ) -> None:
     """Test that dx,dy and ds are consistent."""
     space_2d = SpaceDiscretization2D.from_config(space_config)
-    assert space_config.dx == space_2d.dx
-    assert space_config.dy == space_2d.dy
-    assert space_config.ds == space_2d.ds
+    assert torch.isclose(space_config.dx, space_2d.dx).all()
+    assert torch.isclose(space_config.dy, space_2d.dy).all()
+    assert torch.isclose(space_config.ds, space_2d.ds).all()
