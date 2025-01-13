@@ -176,7 +176,7 @@ class MeridionalVelocityFlux(DiagnosticVariable):
         return prognostic.v / self._dy**2
 
 
-class SurfaceHeightAnomaly(DiagnosticVariable):
+class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
     """Surface height anomaly."""
 
     _unit = Unit.M
@@ -381,13 +381,14 @@ class Pressure(DiagnosticVariable):
     def __init__(
         self,
         g_prime: torch.Tensor,
-        eta: SurfaceHeightAnomaly,
+        eta: PhysicalSurfaceHeightAnomaly,
     ) -> None:
         """Instantiate the pressure variable.
 
         Args:
             g_prime (torch.Tensor): Reduced gravity
-            eta (SurfaceHeightAnomaly): Surface height anomaly variable.
+            eta (PhysicalSurfaceHeightAnomaly): Surface height anomaly
+            variable.
         """
         self._g_prime = g_prime
         self._eta = eta

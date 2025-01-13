@@ -13,6 +13,7 @@ from qgsw.fields.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
+    PhysicalSurfaceHeightAnomaly,
     PhysicalVorticity,
     PhysicalZonalVelocity,
     PotentialVorticity,
@@ -20,7 +21,6 @@ from qgsw.fields.variables.dynamics import (
     PressureAnomaly,
     StreamFunction,
     StreamFunctionAnomaly,
-    SurfaceHeightAnomaly,
     TimeDiag,
     TotalEnstrophy,
     Vorticity,
@@ -94,7 +94,7 @@ def _qg_variable_set(
         slip_coef=physics_config.slip_coef,
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)
-    eta = SurfaceHeightAnomaly(h_phys)
+    eta = PhysicalSurfaceHeightAnomaly(h_phys)
     p_anomaly = PressureAnomaly(
         g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
         h_phys,
@@ -196,7 +196,7 @@ def _collinear_qg_variable_set(
         slip_coef=physics_config.slip_coef,
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)
-    eta = SurfaceHeightAnomaly(h_phys)
+    eta = PhysicalSurfaceHeightAnomaly(h_phys)
 
     p_anomaly = PressureAnomaly(
         g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),

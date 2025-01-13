@@ -6,8 +6,8 @@ import torch
 from qgsw.fields.errors.point_wise import RMSE
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
+    PhysicalSurfaceHeightAnomaly,
     Pressure,
-    SurfaceHeightAnomaly,
 )
 from qgsw.fields.variables.uvh import UVH
 from qgsw.specs import DEVICE
@@ -23,7 +23,7 @@ def pressure() -> Pressure:
         .unsqueeze(-1)
     )
     h_phys = PhysicalLayerDepthAnomaly(ds=1)
-    eta = SurfaceHeightAnomaly(h_phys)
+    eta = PhysicalSurfaceHeightAnomaly(h_phys)
     return Pressure(g_prime, eta)
 
 

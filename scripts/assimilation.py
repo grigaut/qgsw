@@ -12,9 +12,9 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients import LSRSFInferredAlpha
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
+    PhysicalSurfaceHeightAnomaly,
     Pressure,
     StreamFunction,
-    SurfaceHeightAnomaly,
 )
 from qgsw.fields.variables.uvh import UVH
 from qgsw.forcing.wind import WindForcing
@@ -169,7 +169,7 @@ output_dir = config.io.output.directory
 if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
     if config.model.collinearity_coef.type == "inferred":
         h_phys = PhysicalLayerDepthAnomaly(config.space.ds)
-        eta = SurfaceHeightAnomaly(h_phys)
+        eta = PhysicalSurfaceHeightAnomaly(h_phys)
         p = Pressure(
             g_prime=config.simulation.reference.g_prime.unsqueeze(0)
             .unsqueeze(-1)

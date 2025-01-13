@@ -13,8 +13,8 @@ import torch.nn.functional as F  # noqa: N812
 from qgsw.fields.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
+    PhysicalSurfaceHeightAnomaly,
     Pressure,
-    SurfaceHeightAnomaly,
     Vorticity,
     ZonalVelocityFlux,
 )
@@ -173,7 +173,7 @@ class SW(Model[UVHT]):
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
-        eta = SurfaceHeightAnomaly(h_phys=h_phys)
+        eta = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta=eta)
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 

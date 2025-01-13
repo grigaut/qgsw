@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
+    PhysicalSurfaceHeightAnomaly,
     Pressure,
-    SurfaceHeightAnomaly,
 )
 from qgsw.models.qg.core import QG
 from qgsw.models.sw.core import SW
@@ -153,7 +153,7 @@ class LSRSFInferredAlpha(Coefficient):
             Self: Coefficient.
         """
         h_phys = PhysicalLayerDepthAnomaly(space_config.ds)
-        eta = SurfaceHeightAnomaly(h_phys)
+        eta = PhysicalSurfaceHeightAnomaly(h_phys)
         p = Pressure(
             g_prime=model_config.g_prime.unsqueeze(0)
             .unsqueeze(-1)

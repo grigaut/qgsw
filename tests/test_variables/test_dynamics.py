@@ -7,9 +7,9 @@ from qgsw.fields.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
+    PhysicalSurfaceHeightAnomaly,
     PhysicalZonalVelocity,
     Pressure,
-    SurfaceHeightAnomaly,
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.state import State
@@ -72,7 +72,7 @@ def test_slicing_bound(state: State) -> None:
     dy = 3
     # Variables
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
-    eta = SurfaceHeightAnomaly(h_phys)
+    eta = PhysicalSurfaceHeightAnomaly(h_phys)
     p = Pressure(
         g_prime=torch.tensor(
             [[[[10]], [[0.05]]]],

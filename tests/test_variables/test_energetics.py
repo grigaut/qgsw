@@ -5,9 +5,9 @@ import torch
 
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
+    PhysicalSurfaceHeightAnomaly,
     Pressure,
     StreamFunction,
-    SurfaceHeightAnomaly,
 )
 from qgsw.fields.variables.energetics import (
     ModalAvailablePotentialEnergy,
@@ -71,7 +71,7 @@ def psi(
 ) -> StreamFunction:
     """Stream function."""
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
-    eta = SurfaceHeightAnomaly(h_phys)
+    eta = PhysicalSurfaceHeightAnomaly(h_phys)
     p = Pressure(g_prime.unsqueeze(1).unsqueeze(1), eta)
     return StreamFunction(p, f0)
 

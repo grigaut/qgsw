@@ -4,7 +4,7 @@ import torch
 
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
-    SurfaceHeightAnomaly,
+    PhysicalSurfaceHeightAnomaly,
 )
 from qgsw.fields.variables.state import State, StateAlpha
 from qgsw.fields.variables.uvh import UVH
@@ -65,7 +65,7 @@ def test_nested_bound_variables() -> None:
     state = State.steady(1, 2, 10, 10, torch.float64, DEVICE.get())
     # Define variables
     h = PhysicalLayerDepthAnomaly(ds=1)
-    eta = SurfaceHeightAnomaly(h_phys=h)
+    eta = PhysicalSurfaceHeightAnomaly(h_phys=h)
     # Bind only eta
     eta_bound = eta.bind(state)
     # Compute eta and h
