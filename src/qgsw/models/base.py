@@ -206,7 +206,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         - self.dx_p_ref
         - self.dy_p_ref
         """
-        self.h_ref = self.H * self.space.area
+        self.h_ref = self.H * self.space.ds
         self.eta_ref = -self.H.sum(dim=-3) + reverse_cumsum(self.H, dim=-3)
         self.p_ref = torch.cumsum(self.g_prime * self.eta_ref, dim=-3)
         if self.h_ref.shape[-2] != 1 and self.h_ref.shape[-1] != 1:
@@ -305,7 +305,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         self.set_uvh(
             u_ * self.space.dx,
             v_ * self.space.dy,
-            h_ * self.space.area,
+            h_ * self.space.ds,
         )
 
     def set_uvh(

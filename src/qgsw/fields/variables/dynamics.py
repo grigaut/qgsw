@@ -435,7 +435,7 @@ class PotentialVorticity(DiagnosticVariable):
         self,
         vorticity_phys: PhysicalVorticity,
         h_ref: torch.Tensor,
-        area: float,
+        ds: float,
         f0: float,
     ) -> None:
         """Instantiate variable.
@@ -443,11 +443,11 @@ class PotentialVorticity(DiagnosticVariable):
         Args:
             vorticity_phys (PhysicalVorticity): Physical vorticity.
             h_ref (torch.Tensor): Reference heights.
-            area (float): Elementary area.
+            ds (float): Elementary area.
             f0 (float): Coriolis parameter.
         """
         self._h_ref = h_ref
-        self._area = area
+        self._ds = ds
         self._f0 = f0
         self._vorticity_phys = vorticity_phys
         self._interp = OptimizableFunction(points_to_surfaces)

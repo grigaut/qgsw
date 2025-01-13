@@ -62,7 +62,7 @@ def G(  # noqa: N802
     u = -torch.diff(p, dim=-1) / dy / f0 * dx
     v = torch.diff(p, dim=-2) / dx / f0 * dy
     # h = diag(H)Ap
-    h = H * torch.einsum("lm,...mxy->...lxy", A, p_i) * space.area
+    h = H * torch.einsum("lm,...mxy->...lxy", A, p_i) * space.ds
 
     return UVH(u, v, h)
 
@@ -363,14 +363,14 @@ class QG(Model):
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
-        f0, H, area = self.beta_plane.f0, self.H, self.space.area  # noqa: N806
+        f0, H, ds = self.beta_plane.f0, self.H, self.space.ds  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
             uvh.u[..., 1:-1, :],
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.points_to_surfaces(uvh.h) / H) * (f0 / area)
+        return (omega - f0 * self.points_to_surfaces(uvh.h) / H) * (f0 / ds)
 
     def project(
         self,

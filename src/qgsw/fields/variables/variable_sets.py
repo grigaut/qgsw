@@ -73,7 +73,7 @@ def _qg_variable_set(
     space = SpaceDiscretization3D.from_config(space_config, model_config)
     dx = space.dx
     dy = space.dy
-    ds = space.area
+    ds = space.ds
     H = model_config.h  # noqa: N806
     g_prime = model_config.g_prime
     A = compute_A(  # noqa: N806
@@ -170,7 +170,7 @@ def _collinear_qg_variable_set(
     space = SpaceDiscretization3D.from_config(space_config, model_config)
     dx = space.dx
     dy = space.dy
-    ds = space.area
+    ds = space.ds
     H = model_config.h[:1]  # noqa: N806
     g_prime = model_config.g_prime[:1]
     if model_config.collinearity_coef.type == "constant":

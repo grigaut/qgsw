@@ -168,7 +168,7 @@ output_dir = config.io.output.directory
 
 if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
     if config.model.collinearity_coef.type == "inferred":
-        h_phys = PhysicalLayerDepthAnomaly(model_ref.space.area)
+        h_phys = PhysicalLayerDepthAnomaly(model_ref.space.ds)
         eta = SurfaceHeightAnomaly(h_phys)
         p = Pressure(
             g_prime=config.simulation.reference.g_prime.unsqueeze(0)
