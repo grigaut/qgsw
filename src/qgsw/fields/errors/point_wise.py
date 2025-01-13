@@ -27,10 +27,9 @@ class RMSE(PointWiseError):  # noqa: N818
         Returns:
             torch.Tensor: Error.
         """
-        return torch.square(
-            self._var.compute(prognostic).__getitem__(self.slices)
-            - self._var_ref.compute(prognostic_ref).__getitem__(self.slices),
-        )
+        value = self._var.compute_no_slice(prognostic)
+        value_ref = self._var_ref.compute_no_slice(prognostic_ref)
+        return torch.square(value - value_ref).__getitem__(self.slices)
 
     def compute_point_wise(
         self,
@@ -64,9 +63,10 @@ class RMSE(PointWiseError):  # noqa: N818
         Returns:
             torch.Tensor: Error.
         """
-        return torch.sqrt(
-            torch.sum(self._compute(prognostic, prognostic_ref), dim=(-1, -2)),
-        )
+        point_wise = self._compute(prognostic, prognostic_ref)
+        sum_errs = torch.sum(point_wise, dim=(-1, -2))
+        _, _, nx, ny = point_wise.shape
+        return torch.sqrt(sum_errs / (nx * ny))
 
     def compute_ensemble_wise(
         self,
@@ -83,9 +83,7 @@ class RMSE(PointWiseError):  # noqa: N818
         Returns:
             torch.Tensor: Error.
         """
-        return torch.sqrt(
-            torch.sum(
-                self._compute(prognostic, prognostic_ref),
-                dim=(-1, -2, -3),
-            ),
-        )
+        point_wise = self._compute(prognostic, prognostic_ref)
+        sum_errs = torch.sum(point_wise, dim=(-1, -2, -3))
+        _, nl, nx, ny = point_wise.shape
+        return torch.sqrt(sum_errs / (nl * nx * ny))
