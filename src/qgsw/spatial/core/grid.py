@@ -105,22 +105,22 @@ class Grid2D:
         return self._coords.y.n
 
     @property
-    def lx(self) -> int:
+    def lx(self) -> torch.Tensor:
         """Total length in the x direction (in meters)."""
         return self._coords.x.l
 
     @property
-    def ly(self) -> int:
+    def ly(self) -> torch.Tensor:
         """Total length in the y direction (in meters)."""
         return self._coords.y.l
 
     @property
-    def dx(self) -> float:
+    def dx(self) -> torch.Tensor:
         """Dx."""
         return self.lx / (self.nx - 1)
 
     @property
-    def dy(self) -> float:
+    def dy(self) -> torch.Tensor:
         """Dy."""
         return self.ly / (self.ny - 1)
 

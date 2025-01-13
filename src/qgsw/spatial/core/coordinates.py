@@ -48,7 +48,7 @@ class Coordinates1D:
         return self._points.shape[0]
 
     @property
-    def l(self) -> int:  # noqa: E743
+    def l(self) -> torch.Tensor:  # noqa: E743
         """Total length."""
         return self._points[-1] - self._points[0]
 

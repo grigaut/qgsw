@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH, PrognosticTuple
+from qgsw.fields.variables.uvh import UVH, UVHT
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -62,12 +62,15 @@ def G(  # noqa: N802
     u = -torch.diff(p, dim=-1) / dy / f0 * dx
     v = torch.diff(p, dim=-2) / dx / f0 * dy
     # h = diag(H)Ap
-    h = H * torch.einsum("lm,...mxy->...lxy", A, p_i) * space.area
+    h = H * torch.einsum("lm,...mxy->...lxy", A, p_i) * space.ds
 
     return UVH(u, v, h)
 
 
-class QG(Model):
+T = TypeVar("T")
+
+
+class QGCore(Model[T], Generic[T]):
     """Quasi Geostrophic Model."""
 
     _type = "QG"
@@ -363,14 +366,14 @@ class QG(Model):
         Returns:
             torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
         """
-        f0, H, area = self.beta_plane.f0, self.H, self.space.area  # noqa: N806
+        f0, H, ds = self.beta_plane.f0, self.H, self.space.ds  # noqa: N806
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
             uvh.u[..., 1:-1, :],
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * self.points_to_surfaces(uvh.h) / H) * (f0 / area)
+        return (omega - f0 * self.points_to_surfaces(uvh.h) / H) * (f0 / ds)
 
     def project(
         self,
@@ -414,12 +417,12 @@ class QG(Model):
 
     def compute_time_derivatives(
         self,
-        prognostic: PrognosticTuple,
+        prognostic: UVH,
     ) -> UVH:
         """Compute the prognostic variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            prognostic (PrognosticTuple): u,v and h.
+            prognostic (UVH): u,v and h.
 
         Returns:
             UVH: dt_u, dt_v, dt_h
@@ -455,3 +458,7 @@ class QG(Model):
         """
         super().set_wind_forcing(taux, tauy)
         self.sw.set_wind_forcing(taux, tauy)
+
+
+class QG(QGCore[UVHT]):
+    """Quasi Geostrophic Model."""

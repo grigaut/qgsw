@@ -97,13 +97,13 @@ class Bathymetry:
         """
         land = self.interpolate(grid_2d=grid_2d) > 0
         # remove small ocean inclusions in land
-        land_without_lakes: np.ndarray = skimage.morphology.area_closing(
+        land_without_lakes: np.ndarray = skimage.morphology.ds_closing(
             land,
             area_threshold=self._lake_min,
         )
         # remove small land inclusion in ocean
         land: np.ndarray = np.logical_not(
-            skimage.morphology.area_closing(
+            skimage.morphology.ds_closing(
                 np.logical_not(land_without_lakes),
                 area_threshold=self._island_min,
             ),
@@ -127,13 +127,13 @@ class Bathymetry:
         interp_bathy = self.interpolate(grid_2d=grid_2d)
         ocean = interp_bathy < self._htop
         # Remove small land inclusions in ocean
-        ocean_without_islands: np.ndarray = skimage.morphology.area_closing(
+        ocean_without_islands: np.ndarray = skimage.morphology.ds_closing(
             ocean,
             area_threshold=self._island_min,
         )
         # Remove small ocean inclusions in land
         ocean_without_lakes: np.ndarray = np.logical_not(
-            skimage.morphology.area_closing(
+            skimage.morphology.ds_closing(
                 np.logical_not(ocean_without_islands),
                 area_threshold=self._lake_min,
             ),

@@ -234,7 +234,7 @@ class SpaceDiscretization2D:
         return self.h.dy
 
     @property
-    def area(self) -> float:
+    def ds(self) -> float:
         """Elementary area surface."""
         return self.dx * self.dy
 
@@ -718,7 +718,7 @@ class SpaceDiscretization3D:
                 f"\t├── Y: {self.ny} points "
                 f"- dy = {self.dy} {self.omega.xy_unit.value}"
             ),
-            f"\t└── H: {self.nl} layer{'s' if self.nl>1 else ''}",
+            f"\t└── H: {self.nl} layer{'s' if self.nl > 1 else ''}",
         ]
 
     def __repr__(self) -> str:
@@ -766,7 +766,7 @@ class SpaceDiscretization3D:
         return self.h.dy
 
     @property
-    def area(self) -> float:
+    def ds(self) -> float:
         """Elementary area surface."""
         return self.dx * self.dy
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
 import torch
@@ -11,7 +11,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.fields.variables.state import State
-from qgsw.fields.variables.uvh import UVH, PrognosticTuple
+from qgsw.fields.variables.uvh import UVH, BasePrognosticTuple
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -28,8 +28,10 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.specs._utils import Device
 
+Prognostic = TypeVar("Prognostic", bound=BasePrognosticTuple)
 
-class Model(ModelParamChecker, metaclass=ABCMeta):
+
+class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
     """Base class for models.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -141,7 +143,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         return self._io
 
     @property
-    def prognostic(self) -> PrognosticTuple:
+    def prognostic(self) -> Prognostic:
         """Prognostic tuple."""
         return self._state.prognostic
 
@@ -206,7 +208,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         - self.dx_p_ref
         - self.dy_p_ref
         """
-        self.h_ref = self.H * self.space.area
+        self.h_ref = self.H * self.space.ds
         self.eta_ref = -self.H.sum(dim=-3) + reverse_cumsum(self.H, dim=-3)
         self.p_ref = torch.cumsum(self.g_prime * self.eta_ref, dim=-3)
         if self.h_ref.shape[-2] != 1 and self.h_ref.shape[-1] != 1:
@@ -305,7 +307,7 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
         self.set_uvh(
             u_ * self.space.dx,
             v_ * self.space.dy,
-            h_ * self.space.area,
+            h_ * self.space.ds,
         )
 
     def set_uvh(
@@ -350,12 +352,12 @@ class Model(ModelParamChecker, metaclass=ABCMeta):
     @abstractmethod
     def compute_time_derivatives(
         self,
-        prognostic: PrognosticTuple,
+        prognostic: UVH,
     ) -> UVH:
         """Compute the state variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            prognostic (PrognosticTuple): u,v and h.
+            prognostic (UVH): u,v and h.
 
         Returns:
             UVH: dt_u, dt_v, dt_h

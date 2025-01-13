@@ -42,7 +42,6 @@ from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
 )
 from qgsw.models.qg.core import QG
 from qgsw.models.qg.stretching_matrix import compute_A
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 if TYPE_CHECKING:
     import torch
@@ -70,10 +69,9 @@ def _qg_variable_set(
         dtype (torch.dtype): Data type
         device (torch.device): Device
     """
-    space = SpaceDiscretization3D.from_config(space_config, model_config)
-    dx = space.dx
-    dy = space.dy
-    ds = space.area
+    dx = space_config.dx
+    dy = space_config.dy
+    ds = space_config.ds
     H = model_config.h  # noqa: N806
     g_prime = model_config.g_prime
     A = compute_A(  # noqa: N806
@@ -92,7 +90,7 @@ def _qg_variable_set(
     U = ZonalVelocityFlux(dx)  # noqa: N806
     V = MeridionalVelocityFlux(dy)  # noqa: N806
     vorticity = Vorticity(
-        Masks.empty(space.nx, space.ny, device),
+        Masks.empty(space_config.nx, space_config.ny, device),
         slip_coef=physics_config.slip_coef,
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)
@@ -167,10 +165,9 @@ def _collinear_qg_variable_set(
         dtype (torch.dtype): Data type
         device (torch.device): Device
     """
-    space = SpaceDiscretization3D.from_config(space_config, model_config)
-    dx = space.dx
-    dy = space.dy
-    ds = space.area
+    dx = space_config.dx
+    dy = space_config.dy
+    ds = space_config.ds
     H = model_config.h[:1]  # noqa: N806
     g_prime = model_config.g_prime[:1]
     if model_config.collinearity_coef.type == "constant":
@@ -195,7 +192,7 @@ def _collinear_qg_variable_set(
     U = ZonalVelocityFlux(dx)  # noqa: N806
     V = MeridionalVelocityFlux(dy)  # noqa: N806
     vorticity = Vorticity(
-        Masks.empty(space.nx, space.ny, device),
+        Masks.empty(space_config.nx, space_config.ny, device),
         slip_coef=physics_config.slip_coef,
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)

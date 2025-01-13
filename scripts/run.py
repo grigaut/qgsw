@@ -59,14 +59,14 @@ model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coefficient
 if np.isnan(config.simulation.dt):
     model.dt = time_params.compute_dt(
-        model.uvh,
+        model.prognostic,
         model.space,
         model.g_prime,
         model.H,
     )
 else:
     model.dt = config.simulation.dt
-model.compute_time_derivatives(model.uvh)
+model.compute_time_derivatives(model.prognostic)
 model.set_wind_forcing(taux, tauy)
 
 ## Compute Burger Number

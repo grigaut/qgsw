@@ -9,7 +9,7 @@ import torch
 from qgsw.models.qg.collinear_sublayer.core import (
     QGCollinearPV,
     QGCollinearSF,
-    _QGCollinearSublayer,
+    QGCollinearSublayer,
 )
 from qgsw.models.qg.core import QG, G
 from qgsw.models.qg.exceptions import UnrecognizedQGModelError
@@ -204,7 +204,7 @@ def _instantiate_collinear_qg(
     perturbation: Perturbation,
     beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
-) -> _QGCollinearSublayer:
+) -> QGCollinearSublayer:
     """Instantiate Modified QG Models.
 
     Args:

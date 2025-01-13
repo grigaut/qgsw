@@ -19,7 +19,7 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.energetics import KineticEnergy
-from qgsw.fields.variables.uvh import UVH, PrognosticTuple
+from qgsw.fields.variables.uvh import UVH, UVHT
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
 from qgsw.spatial.core import grid_conversion as convert
@@ -43,7 +43,7 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return torch.cat([-torch.diff(x, dim=dim), x.narrow(dim, -1, 1)], dim=dim)
 
 
-class SW(Model):
+class SW(Model[UVHT]):
     """# Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -115,9 +115,9 @@ class SW(Model):
         self.f_ugrid = convert.omega_to_u(self.f)
         self.f_vgrid = convert.omega_to_v(self.f)
         self.f_hgrid = convert.omega_to_h(self.f)
-        self.fstar_ugrid = self.f_ugrid * self.space.area
-        self.fstar_vgrid = self.f_vgrid * self.space.area
-        self.fstar_hgrid = self.f_hgrid * self.space.area
+        self.fstar_ugrid = self.f_ugrid * self.space.ds
+        self.fstar_vgrid = self.f_vgrid * self.space.ds
+        self.fstar_hgrid = self.f_hgrid * self.space.ds
 
     def _add_wind_forcing(
         self,
@@ -137,8 +137,8 @@ class SW(Model):
         h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
         # Sum h on v grid
         h_tot_vgrid = self.h_ref_vgrid + convert.h_to_v(self.h, self.masks.h)
-        h_ugrid = h_tot_ugrid / self.space.area
-        h_vgrid = h_tot_vgrid / self.space.area
+        h_ugrid = h_tot_ugrid / self.space.ds
+        h_vgrid = h_tot_vgrid / self.space.ds
         du_wind = self.taux / h_ugrid[..., 0, 1:-1, :] * self.space.dx
         dv_wind = self.tauy / h_vgrid[..., 0, :, 1:-1] * self.space.dy
         du[..., 0, :, :] += du_wind
@@ -147,14 +147,14 @@ class SW(Model):
 
     def _add_bottom_drag(
         self,
-        prognostic: PrognosticTuple,
+        prognostic: UVHT,
         du: torch.Tensor,
         dv: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Add bottom drag to the derivatives du, dv.
 
         Args:
-            prognostic (PrognosticTuple): u,v and h.
+            prognostic (UVHT): u,v and h.
             du (torch.Tensor): du
             dv (torch.Tensor): dv
 
@@ -169,7 +169,7 @@ class SW(Model):
     def _create_diagnostic_vars(self, state: State) -> None:
         super()._create_diagnostic_vars(state)
 
-        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.area)
+        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
@@ -183,11 +183,11 @@ class SW(Model):
         p.bind(state)
         k_energy.bind(state)
 
-    def update(self, prognostic: PrognosticTuple) -> PrognosticTuple:
+    def update(self, prognostic: UVHT) -> UVHT:
         """Performs one step time-integration with RK3-SSP scheme.
 
         Agrs:
-            prognostic (PrognosticTuple): u,v and h.
+            prognostic (UVHT): u,v and h.
         """
         return schemes.rk3_ssp(
             prognostic,
@@ -197,7 +197,7 @@ class SW(Model):
 
     def advection_momentum(
         self,
-        prognostic: PrognosticTuple,
+        prognostic: UVHT,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Advection RHS for momentum (u, v).
 
