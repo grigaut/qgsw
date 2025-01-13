@@ -38,7 +38,7 @@ class SpaceConfig(BaseModel):
         dx = (x_max - x_min)/nx
         """
         return torch.tensor(
-            [(self.x_max - self.x_min) / self.nx],
+            (self.x_max - self.x_min) / self.nx,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
@@ -50,7 +50,7 @@ class SpaceConfig(BaseModel):
         dy = (y_max - y_min)/ny
         """
         return torch.tensor(
-            [(self.y_max - self.y_min) / self.ny],
+            (self.y_max - self.y_min) / self.ny,
             dtype=torch.float64,
             device=DEVICE.get(),
         )

@@ -190,6 +190,20 @@ with Progress() as progress:
             description=rf"\[n={n:05d}/{steps.n_tot:05d}]",
         )
         progress.advance(simulation)
+        if fork:
+            prognostic = model_ref.prognostic
+            model.set_uvh(
+                torch.clone(prognostic.u)[:, :nl, ...],
+                torch.clone(prognostic.v)[:, :nl, ...],
+                torch.clone(prognostic.h)[:, :nl, ...],
+            )
+            if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
+                if config.model.collinearity_coef.type == "inferred":
+                    model.alpha = alpha.compute_no_slice(prognostic)
+            verbose.display(
+                msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
+                trigger_level=1,
+            )
         if save:
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}]",
@@ -210,20 +224,6 @@ with Progress() as progress:
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.npz"))
             summary.register_step(n)
-        if fork:
-            prognostic = model_ref.prognostic
-            model.set_uvh(
-                torch.clone(prognostic.u)[:, :nl, ...],
-                torch.clone(prognostic.v)[:, :nl, ...],
-                torch.clone(prognostic.h)[:, :nl, ...],
-            )
-            if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
-                if config.model.collinearity_coef.type == "inferred":
-                    model.alpha = alpha.compute_no_slice(prognostic)
-            verbose.display(
-                msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
-                trigger_level=1,
-            )
 
         model_ref.step()
         model.step()
