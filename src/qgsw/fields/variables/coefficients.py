@@ -23,16 +23,21 @@ from qgsw.utils.least_squares_regression import (
 from qgsw.utils.units._units import Unit
 
 
-class LSRSFInferredAlpha(DiagnosticVariable):
+class Coefficient(DiagnosticVariable):
+    """Coefficient."""
+
+    _unit = Unit._
+    _scope = Scope.ENSEMBLE_WISE
+
+
+class LSRSFInferredAlpha(Coefficient):
     """Inferred collinearity from the streamfunction.
 
     Performs linear least squares regression to infer alpha.
     """
 
-    _unit = Unit._
     _name = "alpha_lsr_sf"
     _description = "LSR-Stream function inferred coefficient"
-    _scope = Scope.ENSEMBLE_WISE
 
     def __init__(self, psi_ref: StreamFunction) -> None:
         """Instantiate the variable.
@@ -80,3 +85,29 @@ class LSRSFInferredAlpha(DiagnosticVariable):
         # Bind the psi variable
         self._psi = self._psi.bind(state)
         return super().bind(state)
+
+
+class ConstantCoefficient(Coefficient):
+    """COnstant collinearity coefficient."""
+
+    _name = "alpha_constant"
+    _description = "Constant coefficient"
+
+    def __init__(self, value: torch.Tensor) -> None:
+        """Instantiate the coefficient.
+
+        Args:
+            value (torch.Tensor): Coefficient value.
+        """
+        self._value = value
+
+    def _compute(self, prognostic: PrognosticTuple) -> Tensor:  # noqa: ARG002
+        """Compute the value of alpha.
+
+        Args:
+            prognostic (PrognosticTuple): Useless, for compatibility reasons.
+
+        Returns:
+            Tensor: Alpha.
+        """
+        return self._value
