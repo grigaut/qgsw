@@ -47,8 +47,6 @@ class Error(ABC, Field):
     def slices(self, slices: list[slice, EllipsisType]) -> None:  # type: ignore  # noqa: PGH003
         """Slice setter."""
         Field.slices.fset(self, slices)
-        self._var.slices = slices
-        self._var_ref.slices = slices
 
     def __repr__(self) -> str:
         """String representation of the error."""
