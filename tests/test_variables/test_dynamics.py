@@ -72,14 +72,14 @@ def test_slicing_bound(state: State) -> None:
     dy = 3
     # Variables
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
-    eta = PhysicalSurfaceHeightAnomaly(h_phys)
+    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
     p = Pressure(
         g_prime=torch.tensor(
             [[[[10]], [[0.05]]]],
             dtype=torch.float64,
             device=DEVICE.get(),
         ),
-        eta=eta,
+        eta_phys=eta_phys,
     )
     p_bound = p.bind(state)
 

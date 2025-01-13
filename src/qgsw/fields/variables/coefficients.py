@@ -153,12 +153,12 @@ class LSRSFInferredAlpha(Coefficient):
             Self: Coefficient.
         """
         h_phys = PhysicalLayerDepthAnomaly(space_config.ds)
-        eta = PhysicalSurfaceHeightAnomaly(h_phys)
+        eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
         p = Pressure(
             g_prime=model_config.g_prime.unsqueeze(0)
             .unsqueeze(-1)
             .unsqueeze(-1),
-            eta=eta,
+            eta_phys=eta_phys,
         )
         psi = StreamFunction(p, physics_config.f0)
         return cls(psi)

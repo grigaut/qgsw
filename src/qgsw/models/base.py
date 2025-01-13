@@ -50,7 +50,7 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
         - U = u_phys / dx
         - V = v_phys / dx
         - omega = omega_phys x dx x dy    (rel. vorticity)
-        - eta = eta_phys                  (interface height)
+        - eta_phys = eta_phys                  (interface height)
         - p = p_phys                      (hydrostratic pressure)
         - k_energy = k_energy_phys        (kinetic energy)
 

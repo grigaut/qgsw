@@ -176,12 +176,35 @@ class MeridionalVelocityFlux(DiagnosticVariable):
         return prognostic.v / self._dy**2
 
 
-class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
+class SurfaceHeightAnomaly(DiagnosticVariable):
     """Surface height anomaly."""
 
     _unit = Unit.M
     _name = "eta"
     _description = "Surface height anomaly"
+    _scope = Scope.POINT_WISE
+
+    def __init__(self) -> None:
+        """Instantiate variable."""
+
+    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            prognostic (PrognosticTuple): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Surface height anomaly
+        """
+        return reverse_cumsum(prognostic.h, dim=-3)
+
+
+class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
+    """Physical Surface height anomaly."""
+
+    _unit = Unit.M
+    _name = "eta_phys"
+    _description = "Physical Surface height anomaly"
     _scope = Scope.POINT_WISE
 
     def __init__(self, h_phys: PhysicalLayerDepthAnomaly) -> None:
@@ -381,17 +404,17 @@ class Pressure(DiagnosticVariable):
     def __init__(
         self,
         g_prime: torch.Tensor,
-        eta: PhysicalSurfaceHeightAnomaly,
+        eta_phys: PhysicalSurfaceHeightAnomaly,
     ) -> None:
         """Instantiate the pressure variable.
 
         Args:
             g_prime (torch.Tensor): Reduced gravity
-            eta (PhysicalSurfaceHeightAnomaly): Surface height anomaly
+            eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
             variable.
         """
         self._g_prime = g_prime
-        self._eta = eta
+        self._eta = eta_phys
 
     def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
@@ -419,7 +442,7 @@ class Pressure(DiagnosticVariable):
         Returns:
             BoundDiagnosticVariable: Bound variable.
         """
-        # Bind the eta variable
+        # Bind the eta_phys variable
         self._eta = self._eta.bind(state)
         return super().bind(state)
 

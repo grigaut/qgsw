@@ -21,6 +21,7 @@ from qgsw.fields.variables.dynamics import (
     PressureAnomaly,
     StreamFunction,
     StreamFunctionAnomaly,
+    SurfaceHeightAnomaly,
     TimeDiag,
     TotalEnstrophy,
     Vorticity,
@@ -94,12 +95,13 @@ def _qg_variable_set(
         slip_coef=physics_config.slip_coef,
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)
-    eta = PhysicalSurfaceHeightAnomaly(h_phys)
+    eta = SurfaceHeightAnomaly()
+    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
     p_anomaly = PressureAnomaly(
         g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
         h_phys,
     )
-    p = Pressure(g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1), eta)
+    p = Pressure(g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1), eta_phys)
     psi_anomaly = StreamFunctionAnomaly(p_anomaly, physics_config.f0)
     psi = StreamFunction(p, physics_config.f0)
     pv = PotentialVorticity(
@@ -132,7 +134,8 @@ def _qg_variable_set(
         vorticity_phys.name: vorticity_phys,
         enstrophy.name: enstrophy,
         enstrophy_tot.name: enstrophy_tot,
-        eta.name: eta,
+        eta: eta,
+        eta_phys.name: eta_phys,
         p_anomaly.name: p_anomaly,
         p.name: p,
         psi_anomaly.name: psi_anomaly,
@@ -196,13 +199,17 @@ def _collinear_qg_variable_set(
         slip_coef=physics_config.slip_coef,
     )
     vorticity_phys = PhysicalVorticity(vorticity, ds)
-    eta = PhysicalSurfaceHeightAnomaly(h_phys)
+    eta = SurfaceHeightAnomaly()
+    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
 
     p_anomaly = PressureAnomaly(
         g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
         h_phys,
     )
-    p = Pressure(g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1), eta)
+    p = Pressure(
+        g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
+        eta_phys,
+    )
     psi_anomaly = StreamFunctionAnomaly(p_anomaly, physics_config.f0)
     psi = StreamFunction(p, physics_config.f0)
     pv = PotentialVorticity(
@@ -235,7 +242,8 @@ def _collinear_qg_variable_set(
         vorticity_phys.name: vorticity_phys,
         enstrophy.name: enstrophy,
         enstrophy_tot.name: enstrophy_tot,
-        eta.name: eta,
+        eta: eta,
+        eta_phys.name: eta_phys,
         p_anomaly.name: p_anomaly,
         p.name: p,
         psi_anomaly.name: psi_anomaly,

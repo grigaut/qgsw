@@ -71,8 +71,8 @@ def psi(
 ) -> StreamFunction:
     """Stream function."""
     h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
-    eta = PhysicalSurfaceHeightAnomaly(h_phys)
-    p = Pressure(g_prime.unsqueeze(1).unsqueeze(1), eta)
+    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
+    p = Pressure(g_prime.unsqueeze(1).unsqueeze(1), eta_phys)
     return StreamFunction(p, f0)
 
 

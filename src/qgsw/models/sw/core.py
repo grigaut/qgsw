@@ -66,7 +66,7 @@ class SW(Model[UVHT]):
       - U = u_phys / dx
       - V = v_phys / dx
       - omega = omega_phys x dx x dy    (rel. vorticity)
-      - eta = eta_phys                  (interface height)
+      - eta_phys = eta_phys                  (interface height)
       - p = p_phys                      (hydrostratic pressure)
       - k_energy = k_energy_phys        (kinetic energy)
       - pv = pv_phys                    (potential vorticity)
@@ -173,8 +173,8 @@ class SW(Model[UVHT]):
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
-        eta = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
-        p = Pressure(g_prime=self.g_prime, eta=eta)
+        eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
+        p = Pressure(g_prime=self.g_prime, eta_phys=eta_phys)
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
         U.bind(state)

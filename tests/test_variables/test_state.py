@@ -65,26 +65,26 @@ def test_nested_bound_variables() -> None:
     state = State.steady(1, 2, 10, 10, torch.float64, DEVICE.get())
     # Define variables
     h = PhysicalLayerDepthAnomaly(ds=1)
-    eta = PhysicalSurfaceHeightAnomaly(h_phys=h)
-    # Bind only eta
-    eta_bound = eta.bind(state)
-    # Compute eta and h
-    eta0 = eta.compute(state.prognostic)
+    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h)
+    # Bind only eta_phys
+    eta_bound = eta_phys.bind(state)
+    # Compute eta_phys and h
+    eta0 = eta_phys.compute(state.prognostic)
     # Assert both variables are bound
     assert len(state.diag_vars) == 2  # noqa: PLR2004
     # Assert both variables are bound once
     assert len(state.diag_vars) == 2  # noqa: PLR2004
-    # Compute eta
+    # Compute eta_phys
     eta1 = eta_bound.get()
-    # Compare values of eta and h
+    # Compare values of eta_phys and h
     assert (eta0 == eta1).all()
     # Update state
     state.update_uvh(UVH(state.u.get(), state.v.get(), state.h.get() + 2))
     # Assert all variables must be updated
     assert all(not var.up_to_date for var in state.diag_vars.values())
-    # Compute the value of eta
+    # Compute the value of eta_phys
     eta2 = eta_bound.get()
-    # Assert eta has changed
+    # Assert eta_phys has changed
     assert not (eta1 == eta2).all()
 
 

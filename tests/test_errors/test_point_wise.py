@@ -23,8 +23,8 @@ def pressure() -> Pressure:
         .unsqueeze(-1)
     )
     h_phys = PhysicalLayerDepthAnomaly(ds=1)
-    eta = PhysicalSurfaceHeightAnomaly(h_phys)
-    return Pressure(g_prime, eta)
+    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
+    return Pressure(g_prime, eta_phys)
 
 
 def test_RMSE(pressure: Pressure) -> None:  # noqa: N802
