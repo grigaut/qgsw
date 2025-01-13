@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw.fields.variables.state import StateAlpha
+from qgsw.fields.variables.uvh import UVHTAlpha
 from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
@@ -14,7 +15,7 @@ from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
-from qgsw.models.qg.core import QG
+from qgsw.models.qg.core import QGCore
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     )
 
 
-class _QGCollinearSublayer(QG):
+class QGCollinearSublayer(QGCore[UVHTAlpha]):
     """Collinear QG Model."""
 
     _supported_layers_nb: int
@@ -160,14 +161,14 @@ class _QGCollinearSublayer(QG):
         """
         if self.space.nl != self._supported_layers_nb:
             msg = (
-                "_QGCollinearSublayer can only support"
+                "QGCollinearSublayer can only support"
                 f"{self._supported_layers_nb} layers."
             )
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
 
 
-class QGCollinearSF(_QGCollinearSublayer):
+class QGCollinearSF(QGCollinearSublayer):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _type = "QGCollinearSF"
@@ -186,10 +187,10 @@ class QGCollinearSF(_QGCollinearSublayer):
             self.set_helmholtz_solver(self.lambd)
             self._create_diagnostic_vars(self._state)
 
-    @_QGCollinearSublayer.alpha.setter
+    @QGCollinearSublayer.alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         """Beta-plane setter."""
-        _QGCollinearSublayer.alpha.fset(self, alpha)
+        QGCollinearSublayer.alpha.fset(self, alpha)
         self._update_A()
 
     def _update_A(self) -> None:  # noqa: N802
@@ -231,7 +232,7 @@ class QGCollinearSF(_QGCollinearSublayer):
         return super().step()
 
 
-class QGCollinearPV(_QGCollinearSublayer):
+class QGCollinearPV(QGCollinearSublayer):
     """Modified QG Model implementing collinear pv behavior."""
 
     _type = "QGCollinearPV"

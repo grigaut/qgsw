@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH, PrognosticTuple
+from qgsw.fields.variables.uvh import UVH, UVHT
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -67,7 +67,10 @@ def G(  # noqa: N802
     return UVH(u, v, h)
 
 
-class QG(Model):
+T = TypeVar("T")
+
+
+class QGCore(Model[T], Generic[T]):
     """Quasi Geostrophic Model."""
 
     _type = "QG"
@@ -414,12 +417,12 @@ class QG(Model):
 
     def compute_time_derivatives(
         self,
-        prognostic: PrognosticTuple,
+        prognostic: UVH,
     ) -> UVH:
         """Compute the prognostic variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            prognostic (PrognosticTuple): u,v and h.
+            prognostic (UVH): u,v and h.
 
         Returns:
             UVH: dt_u, dt_v, dt_h
@@ -455,3 +458,7 @@ class QG(Model):
         """
         super().set_wind_forcing(taux, tauy)
         self.sw.set_wind_forcing(taux, tauy)
+
+
+class QG(QGCore[UVHT]):
+    """Quasi Geostrophic Model."""
