@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
@@ -133,13 +131,10 @@ class UVH(BasePrognosticTuple, _UVH):
         Returns:
             Self: UVH.
         """
-        data = np.load(file)
-        u_name = ZonalVelocity.get_name()
-        u = torch.tensor(data[u_name]).to(dtype=dtype, device=device)
-        v_name = MeridionalVelocity.get_name()
-        v = torch.tensor(data[v_name]).to(dtype=dtype, device=device)
-        h_name = LayerDepthAnomaly.get_name()
-        h = torch.tensor(data[h_name]).to(dtype=dtype, device=device)
+        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        u = data[ZonalVelocity.get_name()].to(dtype=dtype, device=device)
+        v = data[MeridionalVelocity.get_name()].to(dtype=dtype, device=device)
+        h = data[LayerDepthAnomaly.get_name()].to(dtype=dtype, device=device)
         return cls(u=u, v=v, h=h)
 
 
@@ -228,9 +223,8 @@ class UVHT(BasePrognosticTuple, _UVHT):
         Returns:
             Self: UVHT.
         """
-        data = np.load(file)
-        t_name = Time.get_name()
-        t = torch.tensor(data[t_name]).to(dtype=dtype, device=device)
+        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        t = data[Time.get_name()].to(dtype=dtype, device=device)
         return cls.from_uvh(t, UVH.from_file(file, dtype, device))
 
 
@@ -348,9 +342,11 @@ class UVHTAlpha(BasePrognosticTuple, _UVHTAlpha):
         Returns:
             Self: UVHTAlpha.
         """
-        data = np.load(file)
-        alpha_name = CollinearityCoefficient.get_name()
-        alpha = torch.tensor(data[alpha_name]).to(dtype=dtype, device=device)
+        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        alpha = data[CollinearityCoefficient.get_name()].to(
+            dtype=dtype,
+            device=device,
+        )
         return cls.from_uvht(alpha, UVHT.from_file(file, dtype, device))
 
 

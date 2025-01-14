@@ -8,7 +8,6 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
-import numpy as np
 import torch
 
 from qgsw.fields.variables.dynamics import (
@@ -65,11 +64,14 @@ class OutputFile(_OutputReader[UVHT], _OutputFile):
         Returns:
             UVh: Data.
         """
-        data = np.load(file=self.path)
-        t = torch.tensor(data[Time.get_name()])
-        u = torch.tensor(data[ZonalVelocityDiag.get_name()])
-        v = torch.tensor(data[MeridionalVelocityDiag.get_name()])
-        h = torch.tensor(data[LayerDepthAnomalyDiag.get_name()])
+        data: dict[str, torch.Tensor] = torch.load(
+            self.path,
+            weights_only=True,
+        )
+        t = data[Time.get_name()]
+        u = data[ZonalVelocityDiag.get_name()]
+        v = data[MeridionalVelocityDiag.get_name()]
+        h = data[LayerDepthAnomalyDiag.get_name()]
         return UVHT(
             u.to(dtype=self.dtype, device=self.device),
             v.to(dtype=self.dtype, device=self.device),
@@ -87,12 +89,15 @@ class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
         Returns:
             UVh: Data.
         """
-        data = np.load(file=self.path)
-        t = torch.tensor(data[Time.get_name()])
-        u = torch.tensor(data[ZonalVelocityDiag.get_name()])
-        v = torch.tensor(data[MeridionalVelocityDiag.get_name()])
-        h = torch.tensor(data[LayerDepthAnomalyDiag.get_name()])
-        alpha = torch.tensor(data[CollinearityCoefficient.get_name()])
+        data: dict[str, torch.Tensor] = torch.load(
+            self.path,
+            weights_only=True,
+        )
+        t = data[Time.get_name()]
+        u = data[ZonalVelocityDiag.get_name()]
+        v = data[MeridionalVelocityDiag.get_name()]
+        h = data[LayerDepthAnomalyDiag.get_name()]
+        alpha = data[CollinearityCoefficient.get_name()]
         return UVHTAlpha(
             u.to(dtype=self.dtype, device=self.device),
             v.to(dtype=self.dtype, device=self.device),

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
+import torch
 
 from qgsw import verbose
 from qgsw.fields.variables.prognostic import Time
@@ -50,27 +50,21 @@ class IO:
             output_file (Path): Output file.
 
         Raises:
-            InvalidSavingFileError: if the saving file extension is not .npz.
+            InvalidSavingFileError: if the saving file extension is not .pt.
         """
-        if output_file.suffix != ".npz":
-            msg = "Variables are expected to be saved in an .npz file."
+        if output_file.suffix != ".pt":
+            msg = "Variables are expected to be saved in an .pt file."
             raise InvalidSavingFileError(msg)
 
     def save(self, output_file: Path) -> None:
         """Save given variables.
 
         Args:
-            output_file (Path): File to save value in (.npz).
+            output_file (Path): File to save value in (.pt).
         """
         self._raise_if_invalid_savefile(output_file=output_file)
-        to_save = {
-            var.name: var.get().cpu().numpy().astype("float32")
-            for var in self._prog
-        }
-        np.savez(
-            file=output_file,
-            **to_save,
-        )
+        to_save = {var.name: var.get() for var in self._prog}
+        torch.save(to_save, f=output_file)
 
         verbose.display(
             msg=f"Saved {', '.join(list(to_save.keys()))} to {output_file}.",

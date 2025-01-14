@@ -5,11 +5,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
-
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import interpolate
@@ -18,8 +13,6 @@ from qgsw.utils.gaussian_filtering import GaussianFilter1D
 from qgsw.utils.type_switch import TypeSwitch
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from matplotlib.axes import Axes
 
 raise NotImplementedError
@@ -202,27 +195,3 @@ class ChangingCoefficient(Coefficient):
             )
         plt.legend()
         plt.show()
-
-    @classmethod
-    def from_file(
-        cls,
-        file: Path,
-        coefs_field: str = "alpha",
-        times_field: str = "times",
-    ) -> Self:
-        """Instantiate the coefficient a file of values and times.
-
-        Args:
-            file (Path): File to laod.
-            coefs_field (str, optional): Field for coefs. Defaults to "alpha".
-            times_field (str, optional): Field for times. Defaults to "times".
-            dt_field (str, optional): Field for dt. Defaults to "dt".
-
-        Returns:
-            Self: Coefficient.
-        """
-        data = np.load(file)
-        return cls(
-            data[coefs_field],
-            data[times_field],
-        )
