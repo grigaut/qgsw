@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -40,13 +41,15 @@ class Error(ABC, Field):
         if variable.scope != self.scope or variable_ref.scope != self.scope:
             msg = "Only point wise variable are supported for such error."
             raise ValueError(msg)
-        self._var = variable
-        self._var_ref = variable_ref
+        self._var = copy.deepcopy(variable)
+        self._var_ref = copy.deepcopy(variable_ref)
 
     @Field.slices.setter
     def slices(self, slices: list[slice, EllipsisType]) -> None:  # type: ignore  # noqa: PGH003
         """Slice setter."""
         Field.slices.fset(self, slices)
+        self._var.slices = slices
+        self._var_ref.slices = slices
 
     def __repr__(self) -> str:
         """String representation of the error."""

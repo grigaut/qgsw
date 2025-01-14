@@ -27,9 +27,9 @@ class RMSE(PointWiseError):  # noqa: N818
         Returns:
             torch.Tensor: Error.
         """
-        value = self._var.compute_no_slice(prognostic)
-        value_ref = self._var_ref.compute_no_slice(prognostic_ref)
-        return torch.square(value - value_ref).__getitem__(self.slices)
+        value = self._var.compute(prognostic)
+        value_ref = self._var_ref.compute(prognostic_ref)
+        return torch.square(value - value_ref)
 
     def compute_point_wise(
         self,
@@ -63,8 +63,15 @@ class RMSE(PointWiseError):  # noqa: N818
         Returns:
             torch.Tensor: Error.
         """
-        point_wise = self._compute(prognostic, prognostic_ref)
-        sum_errs = torch.sum(point_wise, dim=(-1, -2))
+        value = self._var.compute(prognostic)
+        value_ref = self._var_ref.compute(prognostic_ref)
+        norm = torch.max(
+            torch.square(value_ref).flatten(-2, -1),
+            dim=-1,
+            keepdim=True,
+        ).values.unsqueeze(-1)
+        point_wise = torch.square(value - value_ref)
+        sum_errs = torch.sum(point_wise / norm, dim=(-1, -2))
         _, _, nx, ny = point_wise.shape
         return torch.sqrt(sum_errs / (nx * ny))
 
@@ -83,7 +90,13 @@ class RMSE(PointWiseError):  # noqa: N818
         Returns:
             torch.Tensor: Error.
         """
-        point_wise = self._compute(prognostic, prognostic_ref)
-        sum_errs = torch.sum(point_wise, dim=(-1, -2, -3))
+        value = self._var.compute(prognostic)
+        value_ref = self._var_ref.compute(prognostic_ref)
+        norm = torch.mean(
+            torch.square(value_ref).flatten(-3, -1),
+            dim=-1,
+        )
+        point_wise = torch.square(value - value_ref)
+        sum_errs = torch.sum(point_wise / norm, dim=(-1, -2, -3))
         _, nl, nx, ny = point_wise.shape
         return torch.sqrt(sum_errs / (nl * nx * ny))
