@@ -122,7 +122,7 @@ with Progress() as progress:
                 trigger_level=1,
             )
             directory = config.io.output.directory
-            model.io.save(directory.joinpath(f"{prefix}{n}.npz"))
+            model.io.save(directory.joinpath(f"{prefix}{n}.pt"))
 
         model.step()
         t += dt

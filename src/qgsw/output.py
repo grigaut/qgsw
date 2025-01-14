@@ -129,8 +129,8 @@ class RunOutput:
         else:
             prefix = model_config.prefix
             model_type = model_config.type
-        files = list(self.folder.glob(f"{prefix}*.npz"))
-        steps, files = sort_files(files, prefix, ".npz")
+        files = list(self.folder.glob(f"{prefix}*.pt"))
+        steps, files = sort_files(files, prefix, ".pt")
         dt = self._summary.configuration.simulation.dt
         seconds = [step * dt for step in steps]
         timesteps = [timedelta(seconds=sec) for sec in seconds]
