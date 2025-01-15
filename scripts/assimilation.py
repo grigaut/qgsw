@@ -173,6 +173,7 @@ output_dir = config.io.output.directory
 is_collinear = config.model.type == QGCollinearSF.get_type()
 if is_collinear:
     alpha = create_coefficient(config)
+    model.alpha = alpha.compute(model_ref.prognostic)
 
 with Progress() as progress:
     simulation = progress.add_task(

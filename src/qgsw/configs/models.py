@@ -51,14 +51,14 @@ class ModelConfig(BaseModel):
 class ConstantCollinearityCoefConfig(BaseModel):
     """Constant collinearity model configuration."""
 
-    type: Literal["constant"]
+    type: Literal["alpha_constant"]
     value: float
 
 
 class InferredCollinearityCoefConfig(BaseModel):
     """Inferred collinearity coeffciient."""
 
-    type: Literal["inferred"]
+    type: Literal["alpha_lsr_sf"]
     initial: float
 
 
