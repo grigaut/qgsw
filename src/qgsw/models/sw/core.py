@@ -31,7 +31,6 @@ from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     keep_top_layer,
 )
-from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import State
@@ -407,11 +406,6 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
 
     def _set_state(self) -> None:
         self._state = StateAlpha.steady(
-            alpha=torch.tensor(
-                [0.5],
-                dtype=torch.float64,
-                device=DEVICE.get(),
-            ),
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,

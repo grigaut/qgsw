@@ -128,11 +128,6 @@ class QGCollinearSublayer(QGCore[UVHTAlpha]):
 
     def _set_state(self) -> None:
         self._state = StateAlpha.steady(
-            alpha=torch.tensor(
-                [0.5],
-                dtype=torch.float64,
-                device=DEVICE.get(),
-            ),
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,

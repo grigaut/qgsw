@@ -314,7 +314,6 @@ class UVHTAlpha(BasePrognosticTuple, _UVHTAlpha):
     @classmethod
     def steady(
         cls,
-        alpha: torch.Tensor,
         n_ens: int,
         nl: int,
         nx: int,
@@ -337,7 +336,7 @@ class UVHTAlpha(BasePrognosticTuple, _UVHTAlpha):
             Self: UVHTAlpha.
         """
         return cls.from_uvht(
-            alpha,
+            torch.zeros((n_ens,), dtype=dtype, device=device),
             UVHT.steady(n_ens, nl, nx, ny, dtype, device),
         )
 

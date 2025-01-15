@@ -345,7 +345,6 @@ class StateAlpha(BaseState[UVHTAlpha]):
     @classmethod
     def steady(
         cls,
-        alpha: torch.Tensor,
         n_ens: int,
         nl: int,
         nx: int,
@@ -367,7 +366,7 @@ class StateAlpha(BaseState[UVHTAlpha]):
         Returns:
             Self: State.
         """
-        return cls(UVHTAlpha.steady(alpha, n_ens, nl, nx, ny, dtype, device))
+        return cls(UVHTAlpha.steady(n_ens, nl, nx, ny, dtype, device))
 
     @classmethod
     def from_tensors(
