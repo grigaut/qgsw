@@ -34,6 +34,7 @@ from qgsw.utils.least_squares_regression import (
 from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
+    from qgsw.configs.core import Configuration
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
@@ -218,16 +219,12 @@ class ConstantCoefficient(Coefficient):
 
 
 def create_coefficient(
-    model_config: ModelConfig,
-    physics_config: PhysicsConfig,
-    space_config: SpaceConfig,
+    config: Configuration,
 ) -> ConstantCoefficient | LSRSFInferredAlpha:
     """Create the coefficient.
 
     Args:
-        model_config (ModelConfig): Model configuration.
-        physics_config (PhysicsConfig): Physics configuration.
-        space_config (SpaceConfig): Space configuration.
+        config (Configuration): Model Configuration.
 
     Raises:
         ValueError: If the coefficient is not valid.
@@ -235,17 +232,18 @@ def create_coefficient(
     Returns:
         ConstantCoefficient | LSRSFInferredAlpha: Coefficient
     """
-    if model_config.type == ConstantCoefficient.get_name():
+    coef_type = config.model.collinearity_coef.type
+    if coef_type == ConstantCoefficient.get_name():
         return ConstantCoefficient.from_config(
-            model_config=model_config,
-            physics_config=physics_config,
-            space_config=space_config,
+            model_config=config.model,
+            physics_config=config.physics,
+            space_config=config.space,
         )
-    if model_config.type == LSRSFInferredAlpha.get_name():
+    if coef_type == LSRSFInferredAlpha.get_name():
         return LSRSFInferredAlpha.from_config(
-            model_config=model_config,
-            physics_config=physics_config,
-            space_config=space_config,
+            model_config=config.simulation.reference,
+            physics_config=config.physics,
+            space_config=config.space,
         )
     msg = "Possible coeffciient types are: "
     coef_types = [

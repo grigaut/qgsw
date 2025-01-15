@@ -9,15 +9,12 @@ from rich.progress import Progress
 from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
-from qgsw.fields.variables.coefficients import LSRSFInferredAlpha
-from qgsw.fields.variables.dynamics import (
-    PhysicalLayerDepthAnomaly,
-    PhysicalSurfaceHeightAnomaly,
-    Pressure,
-    StreamFunction,
+from qgsw.fields.variables.coefficients import (
+    create_coefficient,
 )
 from qgsw.fields.variables.uvh import UVH
 from qgsw.forcing.wind import WindForcing
+from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model
 from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.perturbations.core import Perturbation
@@ -69,7 +66,7 @@ model_ref.slip_coef = config.physics.slip_coef
 model_ref.bottom_drag_coef = config.physics.bottom_drag_coefficient
 if np.isnan(config.simulation.dt):
     model_ref.dt = time_params.compute_dt(
-        model_ref.uvh,
+        model_ref.prognostic.uvh,
         model_ref.space,
         model_ref.g_prime,
         model_ref.H,
@@ -91,7 +88,7 @@ model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coefficient
 if np.isnan(config.simulation.dt):
     model.dt = time_params.compute_dt(
-        model.uvh,
+        model.prognostic.uvh,
         model.space,
         model.g_prime,
         model.H,
@@ -109,6 +106,14 @@ verbose.display(msg=model.__repr__(), trigger_level=1)
 
 nl_ref = model_ref.space.nl
 nl = model.space.nl
+
+if nl not in [1, nl_ref]:
+    msg = (
+        "This script only runs for model with 1 layer or as many layers as "
+        f"the reference model, hence {nl_ref}"
+    )
+    raise ValueError(msg)
+
 nx = model.space.nx
 ny = model.space.ny
 
@@ -165,19 +170,9 @@ prefix = config.model.prefix
 output_dir = config.io.output.directory
 
 # Collinearity Coefficient
-
-if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
-    if config.model.collinearity_coef.type == "inferred":
-        h_phys = PhysicalLayerDepthAnomaly(config.space.ds)
-        eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
-        p = Pressure(
-            g_prime=config.simulation.reference.g_prime.unsqueeze(0)
-            .unsqueeze(-1)
-            .unsqueeze(-1),
-            eta_phys=eta_phys,
-        )
-        psi = StreamFunction(p, config.physics.f0)
-        alpha = LSRSFInferredAlpha(psi)
+is_collinear = config.model.type == QGCollinearSF.get_type()
+if is_collinear:
+    alpha = create_coefficient(config)
 
 with Progress() as progress:
     simulation = progress.add_task(
@@ -192,14 +187,27 @@ with Progress() as progress:
         progress.advance(simulation)
         if fork:
             prognostic = model_ref.prognostic
+            if is_collinear:
+                model.alpha = alpha.compute_no_slice(prognostic)
+                uvh = matching.n_layers_to_collinear_1_layer(
+                    prognostic.uvh,
+                    config.simulation.reference.g_prime,
+                    model.alpha,
+                    config.model.g_prime,
+                )
+            elif nl == 1:
+                uvh = matching.n_layers_to_1_layer(
+                    prognostic.uvh,
+                    config.simulation.reference.g_prime,
+                    config.model.g_prime,
+                )
+            else:
+                uvh = prognostic.uvh
             model.set_uvh(
-                torch.clone(prognostic.u)[:, :nl, ...],
-                torch.clone(prognostic.v)[:, :nl, ...],
-                torch.clone(prognostic.h)[:, :nl, ...],
+                torch.clone(uvh.u),
+                torch.clone(uvh.v),
+                torch.clone(uvh.h),
             )
-            if config.model.type == QGCollinearSF.get_type():  # noqa: SIM102
-                if config.model.collinearity_coef.type == "inferred":
-                    model.alpha = alpha.compute_no_slice(prognostic)
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
                 trigger_level=1,
