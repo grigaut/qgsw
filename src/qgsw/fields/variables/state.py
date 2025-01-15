@@ -59,6 +59,10 @@ class BaseState(ABC, Generic[T]):
         """Time."""
         return self._t
 
+    @t.setter
+    def t(self, time: torch.Tensor) -> None:
+        self.update_time(time)
+
     @property
     def u(self) -> ZonalVelocity:
         """Prognostic zonal velocity."""
@@ -81,7 +85,8 @@ class BaseState(ABC, Generic[T]):
 
     @prognostic.setter
     def prognostic(self, prognostic: T) -> None:
-        self._updated()
+        for var in self.diag_vars.values():
+            var.outdated()
         self._prog = prognostic
         self._update_prognostic_vars(prognostic)
 
@@ -149,16 +154,6 @@ class BaseState(ABC, Generic[T]):
             raise KeyError(msg)
         return self.vars[name]
 
-    def _updated(self) -> None:
-        """Update diagnostic variables."""
-        for var in self.diag_vars.values():
-            var.outdated()
-
-    def _time_updated(self) -> None:
-        """Update diagnostic variables."""
-        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
-            var.outdated()
-
     def add_bound_diagnostic_variable(
         self,
         variable: BoundDiagnosticVariable,
@@ -182,7 +177,8 @@ class BaseState(ABC, Generic[T]):
         Args:
             time (torch.Tensor): Time.
         """
-        self._updated()
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
         prognostic = UVHT.from_uvh(
             time,
             self.prognostic.uvh,
@@ -192,7 +188,8 @@ class BaseState(ABC, Generic[T]):
 
     def increment_time(self, dt: float) -> None:
         """Increment time."""
-        self._time_updated()
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
         prognostic = self._prog.increment_time(dt)
         self._prog = prognostic
         self._update_prognostic_vars(prognostic)
@@ -310,18 +307,14 @@ class StateAlpha(BaseState[UVHTAlpha]):
         self._h.update(prognostic.h)
         self._alpha.update(prognostic.alpha)
 
-    def _alpha_updated(self) -> None:
-        """Update diagnostic variables."""
-        for var in filter(lambda v: v.require_alpha, self.diag_vars.values()):
-            var.outdated()
-
     def update_alpha(self, alpha: torch.Tensor) -> None:
         """Update only the value of alpha.
 
         Args:
             alpha (torch.Tensor): Collinearity coefficient.
         """
-        self._alpha_updated()
+        for var in filter(lambda v: v.require_alpha, self.diag_vars.values()):
+            var.outdated()
         prognostic = UVHTAlpha.from_uvh(
             self.t.get(),
             alpha,
