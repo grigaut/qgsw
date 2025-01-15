@@ -215,6 +215,9 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
         """
         self._h_phys = h_phys
 
+        self._require_alpha |= h_phys.require_alpha
+        self._require_time |= h_phys.require_time
+
     def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
 
@@ -314,6 +317,9 @@ class PhysicalVorticity(DiagnosticVariable):
         self._vorticity = vorticity
         self._ds = ds
 
+        self._require_alpha |= vorticity.require_alpha
+        self._require_time |= vorticity.require_time
+
     def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the variable.
 
@@ -364,6 +370,9 @@ class Pressure(DiagnosticVariable):
         """
         self._g_prime = g_prime
         self._eta = eta_phys
+
+        self._require_alpha |= eta_phys.require_alpha
+        self._require_time |= eta_phys.require_time
 
     def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
@@ -425,6 +434,9 @@ class PotentialVorticity(DiagnosticVariable):
         self._vorticity_phys = vorticity_phys
         self._interp = OptimizableFunction(points_to_surfaces)
 
+        self._require_alpha |= vorticity_phys.require_alpha
+        self._require_time |= vorticity_phys.require_time
+
     def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
 
@@ -474,6 +486,9 @@ class StreamFunction(DiagnosticVariable):
         self._p = pressure
         self._f0 = f0
 
+        self._require_alpha |= pressure.require_alpha
+        self._require_time |= pressure.require_time
+
     def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the variable value.
 
@@ -522,6 +537,9 @@ class PressureTilde(Pressure):
         self._g2 = g_prime.squeeze()[1]
         self._eta = eta_phys
 
+        self._require_alpha |= eta_phys.require_alpha
+        self._require_time |= eta_phys.require_time
+
     def _compute_g_tilde(self, alpha: torch.Tensor) -> torch.Tensor:
         """Compute g_tilde.
 
@@ -561,6 +579,8 @@ class Enstrophy(DiagnosticVariable):
             pv (PotentialVorticity): Physical vorticity.
         """
         self._pv = pv
+        self._require_alpha |= pv.require_alpha
+        self._require_time |= pv.require_time
 
     def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the variable value.
