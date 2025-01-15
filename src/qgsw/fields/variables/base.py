@@ -129,8 +129,8 @@ class PrognosticVariable(ABC, Variable):
 class DiagnosticVariable(Variable, ABC):
     """Diagnostic Variable Base Class."""
 
-    _require_time: False
-    _require_alpha: False
+    _require_time = False
+    _require_alpha = False
 
     @property
     def require_time(self) -> bool:

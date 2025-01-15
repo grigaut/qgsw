@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
@@ -24,8 +26,17 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class BasePrognosticTuple:
+class BasePrognosticTuple(ABC):
     """Prognostic tuple base class."""
+
+    u: torch.Tensor
+    v: torch.Tensor
+    h: torch.Tensor
+
+    @property
+    @abstractmethod
+    def uvh(self) -> UVH:
+        """UVH."""
 
     def __mul__(self, other: float) -> Self:
         """Left multiplication."""
@@ -73,6 +84,11 @@ class _UVHTAlpha(NamedTuple):
 
 class UVH(BasePrognosticTuple, _UVH):
     """Zonal velocity, meridional velocity and layer thickness."""
+
+    @property
+    def uvh(self) -> UVH:
+        """UVH."""
+        return self
 
     @classmethod
     def steady(

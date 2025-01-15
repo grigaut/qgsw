@@ -5,7 +5,7 @@ Louis Thiry, Nov 2023 for IFREMER.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 import torch.nn.functional as F  # noqa: N812
@@ -15,15 +15,23 @@ from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
     Pressure,
+    PressureTilde,
     Vorticity,
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.energetics import KineticEnergy
-from qgsw.fields.variables.uvh import UVH, UVHT
+from qgsw.fields.variables.state import StateAlpha
+from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple, UVHTAlpha
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
+from qgsw.models.io import IO
+from qgsw.models.parameters import ModelParamChecker
 from qgsw.spatial.core import grid_conversion as convert
-from qgsw.spatial.core.discretization import SpaceDiscretization2D
+from qgsw.spatial.core.discretization import (
+    SpaceDiscretization2D,
+    keep_top_layer,
+)
+from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import State
@@ -43,8 +51,11 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return torch.cat([-torch.diff(x, dim=dim), x.narrow(dim, -1, 1)], dim=dim)
 
 
-class SW(Model[UVHT]):
-    """# Implementation of multilayer rotating shallow-water model.
+T = TypeVar("T", bound=BasePrognosticTuple)
+
+
+class SWCore(Model[T], Generic[T]):
+    """Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .
 
@@ -288,4 +299,129 @@ class SW(Model[UVHT]):
             dt_u,
             dt_v,
             dt_h,
+        )
+
+
+class SW(SWCore[UVHT]):
+    """Implementation of multilayer rotating shallow-water model.
+
+    Following https://doi.org/10.1029/2021MS002663 .
+
+    ## Main ingredients
+        - vector invariant formulation
+        - velocity RHS using vortex force upwinding with wenoz-5 reconstruction
+        - mass continuity RHS with finite volume using wenoz-5 recontruction
+
+    ## Variables
+    Prognostic variables u, v, h differ from physical variables
+    u_phys, v_phys (velocity components) and
+    h_phys (layer thickness perturbation) as they include
+    metric terms dx and dy :
+      - u = u_phys x dx
+      - v = v_phys x dy
+      - h = g_phys x dx x dy
+
+    Diagnostic variables are :
+      - U = u_phys / dx
+      - V = v_phys / dx
+      - omega = omega_phys x dx x dy    (rel. vorticity)
+      - eta_phys = eta_phys                  (interface height)
+      - p = p_phys                      (hydrostratic pressure)
+      - k_energy = k_energy_phys        (kinetic energy)
+      - pv = pv_phys                    (potential vorticity)
+
+    ## Time integration
+    Explicit time integration with RK3-SSP scheme.
+
+    """
+
+
+class SWCollinearSublayer(SWCore[UVHTAlpha]):
+    """Shallow water for collinear sublayer models."""
+
+    def __init__(
+        self,
+        *,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        optimize: bool = True,
+    ) -> None:
+        """SW Model Instantiation.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        ModelParamChecker.__init__(
+            self,
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+        )
+        self._space = keep_top_layer(self._space)
+        ##Topography and Ref values
+        self._set_ref_variables()
+
+        # initialize state
+        self._set_state()
+        # initialize variables
+        self._create_diagnostic_vars(self._state)
+
+        self._set_utils(optimize)
+        self._set_fluxes(optimize)
+
+    @property
+    def H(self) -> torch.Tensor:  # noqa: N802
+        """Layers thickness."""
+        return self._H[:1, ...]
+
+    @property
+    def alpha(self) -> torch.Tensor:
+        """Collinearity coefficient."""
+        return self._state.alpha.get()
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self._state.update_alpha(alpha)
+
+    def _create_diagnostic_vars(self, state: StateAlpha) -> None:
+        self._state.unbind()
+
+        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
+        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
+        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
+        omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
+        eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
+        p = PressureTilde(g_prime=self.g_prime, eta_phys=eta_phys)
+        k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
+
+        U.bind(state)
+        V.bind(state)
+        omega.bind(state)
+        p.bind(state)
+        k_energy.bind(state)
+
+    def _set_state(self) -> None:
+        self._state = StateAlpha.steady(
+            alpha=torch.tensor(
+                [0.5],
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            ),
+            n_ens=self.n_ens,
+            nl=self.space.nl,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
+        self._io = IO(
+            t=self._state.t,
+            u=self._state.u,
+            v=self._state.v,
+            h=self._state.h,
         )

@@ -19,7 +19,7 @@ from qgsw.models.qg.core import QGCore
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.models.sw.core import SW
+from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     keep_top_layer,
@@ -88,6 +88,7 @@ class QGCollinearSublayer(QGCore[UVHTAlpha]):
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
+        self._core.alpha = alpha
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
@@ -105,7 +106,7 @@ class QGCollinearSublayer(QGCore[UVHTAlpha]):
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
         optimize: bool,  # noqa: FBT001
-    ) -> SW:
+    ) -> SWCollinearSublayer:
         """Initialize the core Shallow Water model.
 
         Args:
@@ -118,10 +119,10 @@ class QGCollinearSublayer(QGCore[UVHTAlpha]):
         Returns:
             SW: Core model (One layer).
         """
-        return SW(
+        return SWCollinearSublayer(
             space_2d=space_2d,
-            H=H[:1],  # Only consider top layer
-            g_prime=g_prime[:1],  # Only consider top layer
+            H=H,  # Only consider top layer
+            g_prime=g_prime,  # Only consider top layer
             optimize=optimize,
         )
 
