@@ -164,9 +164,9 @@ def _collinear_qg_variable_set(
     dy = space_config.dy
     ds = space_config.ds
     H = model_config.h[:1]  # noqa: N806
-    if model_config.collinearity_coef.type == "constant":
+    if model_config.collinearity_coef.type == "alpha_constant":
         alpha = model_config.collinearity_coef.value
-    elif model_config.collinearity_coef.type == "inferred":
+    elif model_config.collinearity_coef.type == "alpha_lsr_sf":
         alpha = model_config.collinearity_coef.initial
     A = compute_A_collinear_sf(  # noqa: N806
         model_config.h,
