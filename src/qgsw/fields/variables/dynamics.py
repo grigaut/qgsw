@@ -647,7 +647,9 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
             torch.Tensor: Stream function.
         """
         vorticity = self._vorticity.compute_no_slice(prognostic)
-        return solve_helmholtz_dstI(vorticity, self._laplacian)[..., 1:, 1:]
+        return points_to_surfaces(
+            solve_helmholtz_dstI(vorticity, self._laplacian),
+        )
 
     def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
