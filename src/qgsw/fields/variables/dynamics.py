@@ -10,7 +10,13 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
+from qgsw.fields.variables.state import State
 from qgsw.fields.variables.uvh import BasePrognosticTuple
+from qgsw.models.core.helmholtz import (
+    compute_laplace_dstI,
+    solve_helmholtz_dstI,
+)
+from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
 
 try:
@@ -585,6 +591,75 @@ class StreamFunction(DiagnosticVariable):
         """
         # Bind the pressure variable
         self._p = self._p.bind(state)
+        return super().bind(state)
+
+
+class StreamFunctionFromVorticity(DiagnosticVariable):
+    """Stream function variable from vorticity inversion."""
+
+    _unit = Unit.M2S_1
+    _name = "psi_from_omega"
+    _description = "Stream function from vorticity inversion"
+    _scope = Scope.POINT_WISE
+
+    def __init__(
+        self,
+        vorticity: PhysicalVorticity,
+        nx: int,
+        ny: int,
+        dx: float,
+        dy: float,
+    ) -> None:
+        """Instantiate the variable.
+
+        Args:
+            vorticity (PhysicalVorticity): Physical vorticity.
+            nx (int): Number of poitn in the x direction.
+            ny (int): Number of points in the y direction.
+            dx (float): Infinitesimal x step.
+            dy (float): Infinitesimal y step.
+        """
+        self._vorticity = vorticity
+
+        self._require_alpha |= vorticity.require_alpha
+        self._require_time |= vorticity.require_time
+
+        self._laplacian = (
+            compute_laplace_dstI(
+                nx,
+                ny,
+                dx,
+                dy,
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            .unsqueeze(0)
+            .unsqueeze(0)
+        )
+
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            prognostic (BasePrognosticTuple): Prognostic variables.
+
+        Returns:
+            torch.Tensor: Stream function.
+        """
+        vorticity = self._vorticity.compute_no_slice(prognostic)
+        return solve_helmholtz_dstI(vorticity, self._laplacian)[..., 1:, 1:]
+
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (State): State to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the vorticity variable
+        self._vorticity = self._vorticity.bind(state)
         return super().bind(state)
 
 
