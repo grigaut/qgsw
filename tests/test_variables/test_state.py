@@ -91,7 +91,6 @@ def test_nested_bound_variables() -> None:
 def test_state_alpha_updates() -> None:
     """Test updates on StateAlpha."""
     state = StateAlpha.steady(
-        torch.tensor([0.2], dtype=torch.float64, device=DEVICE.get()),
         1,
         2,
         10,

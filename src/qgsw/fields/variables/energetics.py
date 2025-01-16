@@ -19,7 +19,9 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.state import State
-from qgsw.fields.variables.uvh import PrognosticTuple
+from qgsw.fields.variables.uvh import (
+    BasePrognosticTuple,
+)
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff
 from qgsw.models.core.utils import OptimizableFunction
@@ -68,12 +70,14 @@ class KineticEnergy(DiagnosticVariable):
         self._U = U
         self._V = V
         self._comp_ke = OptimizableFunction(finite_diff.comp_ke)
+        self._require_alpha |= U.require_alpha | V.require_alpha
+        self._require_time |= U.require_time | V.require_time
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the kinetic energy.
 
         Args:
-            prognostic (PrognosticTuple): u,v,h
+            prognostic (BasePrognosticTuple): u,v,h
 
         Returns:
             torch.Tensor: Kinetic energy.
@@ -129,6 +133,9 @@ class ModalKineticEnergy(DiagnosticVariable):
             dy (float): Elementary distance in the Y direction.
         """
         self._psi = stream_function
+        self._require_alpha |= stream_function.require_alpha
+        self._require_time |= stream_function.require_time
+
         self._dx = dx
         self._dy = dy
         # Decomposition of A
@@ -141,11 +148,11 @@ class ModalKineticEnergy(DiagnosticVariable):
         # Since Cm2lT_W_Cm2l is diagonal
         self._Cm2lT_W_Cm2l = torch.diag(Cm2lT_W_Cm2l)  # Vector
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Modal kinetic energy, shape: (n_ens, nl).
@@ -208,6 +215,9 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
             f0 (float): Coriolis parameter.
         """
         self._psi = stream_function
+        self._require_alpha |= stream_function.require_alpha
+        self._require_time |= stream_function.require_time
+
         self._f0 = f0
         # Decomposition of A
         Cm2l, lambd, self._Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
@@ -217,11 +227,11 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
         Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
         self._Cm2lT_W_Cm2l_lambda = Cm2l_T @ W @ Cm2l @ lambd  # Vector
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Modal avalaible potential energy,
@@ -276,12 +286,14 @@ class ModalEnergy(DiagnosticVariable):
         """
         self._ke = ke_hat
         self._ape = ape_hat
+        self._require_alpha |= ke_hat.require_alpha | ape_hat.require_alpha
+        self._require_time |= ke_hat.require_time | ape_hat.require_time
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute total modal energy.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Modal total energy, shape: (n_ens)
@@ -335,16 +347,19 @@ class TotalKineticEnergy(DiagnosticVariable):
             dy (float): Elementary distance in the Y direction.
         """
         self._psi = stream_function
+        self._require_alpha |= stream_function.require_alpha
+        self._require_time |= stream_function.require_time
+
         self._dx = dx
         self._dy = dy
         # Compute W = Diag(H) / h_{tot}
         self._W = torch.diag(compute_W(H))  # Vector
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Total modal kinetic energy, shape: (n_ens).
@@ -406,16 +421,19 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
             f0 (float): Coriolis parameter.
         """
         self._psi = stream_function
+        self._require_alpha |= stream_function.require_alpha
+        self._require_time |= stream_function.require_time
+
         self._f0 = f0
         self._A = A
         # Compute weight matrix
         self._W = compute_W(H)  # Matrix
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Total modal avalaible potential energy,
@@ -475,11 +493,14 @@ class TotalEnergy(DiagnosticVariable):
         self._ke = ke
         self._ape = ape
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+        self._require_alpha |= ke.require_alpha | ke.require_alpha
+        self._require_time |= ke.require_time | ke.require_time
+
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute total modal energy.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
             torch.Tensor: Total modal energy, shape: (n_ens)

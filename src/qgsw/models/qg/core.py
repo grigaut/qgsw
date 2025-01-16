@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH, UVHT
+from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.core.helmholtz import (
@@ -67,7 +67,7 @@ def G(  # noqa: N802
     return UVH(u, v, h)
 
 
-T = TypeVar("T")
+T = TypeVar("T", bound=BasePrognosticTuple)
 
 
 class QGCore(Model[T], Generic[T]):

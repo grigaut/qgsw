@@ -18,9 +18,8 @@ from qgsw.fields.variables.dynamics import (
     PhysicalZonalVelocity,
     PotentialVorticity,
     Pressure,
-    PressureAnomaly,
+    PressureTilde,
     StreamFunction,
-    StreamFunctionAnomaly,
     SurfaceHeightAnomaly,
     TimeDiag,
     TotalEnstrophy,
@@ -97,12 +96,7 @@ def _qg_variable_set(
     vorticity_phys = PhysicalVorticity(vorticity, ds)
     eta = SurfaceHeightAnomaly()
     eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
-    p_anomaly = PressureAnomaly(
-        g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
-        h_phys,
-    )
     p = Pressure(g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1), eta_phys)
-    psi_anomaly = StreamFunctionAnomaly(p_anomaly, physics_config.f0)
     psi = StreamFunction(p, physics_config.f0)
     pv = PotentialVorticity(
         vorticity_phys,
@@ -136,9 +130,7 @@ def _qg_variable_set(
         enstrophy_tot.name: enstrophy_tot,
         eta: eta,
         eta_phys.name: eta_phys,
-        p_anomaly.name: p_anomaly,
         p.name: p,
-        psi_anomaly.name: psi_anomaly,
         psi.name: psi,
         pv.name: pv,
         ke_hat.name: ke_hat,
@@ -172,10 +164,9 @@ def _collinear_qg_variable_set(
     dy = space_config.dy
     ds = space_config.ds
     H = model_config.h[:1]  # noqa: N806
-    g_prime = model_config.g_prime[:1]
-    if model_config.collinearity_coef.type == "constant":
+    if model_config.collinearity_coef.type == "alpha_constant":
         alpha = model_config.collinearity_coef.value
-    elif model_config.collinearity_coef.type == "inferred":
+    elif model_config.collinearity_coef.type == "alpha_lsr_sf":
         alpha = model_config.collinearity_coef.initial
     A = compute_A_collinear_sf(  # noqa: N806
         model_config.h,
@@ -201,16 +192,10 @@ def _collinear_qg_variable_set(
     vorticity_phys = PhysicalVorticity(vorticity, ds)
     eta = SurfaceHeightAnomaly()
     eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
-
-    p_anomaly = PressureAnomaly(
-        g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
-        h_phys,
-    )
-    p = Pressure(
-        g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
+    p = PressureTilde(
+        model_config.g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
         eta_phys,
     )
-    psi_anomaly = StreamFunctionAnomaly(p_anomaly, physics_config.f0)
     psi = StreamFunction(p, physics_config.f0)
     pv = PotentialVorticity(
         vorticity_phys,
@@ -244,9 +229,7 @@ def _collinear_qg_variable_set(
         enstrophy_tot.name: enstrophy_tot,
         eta: eta,
         eta_phys.name: eta_phys,
-        p_anomaly.name: p_anomaly,
         p.name: p,
-        psi_anomaly.name: psi_anomaly,
         psi.name: psi,
         pv.name: pv,
         ke_hat.name: ke_hat,

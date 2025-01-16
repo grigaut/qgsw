@@ -23,7 +23,6 @@ from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.models import (
-        CollinearityCoefficientConfig,
         ModelConfig,
     )
     from qgsw.perturbations.core import Perturbation
@@ -242,7 +241,6 @@ def _instantiate_collinear_qg(
         v=torch.clone(uvh0.v),
         h=torch.clone(uvh0.h),
     )
-    model.alpha = coefficient_from_config(model_config.collinearity_coef)
     return model
 
 
@@ -268,43 +266,3 @@ def _determine_coef0(perturbation_type: str) -> float:
         return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     msg = f"Unknown perturbation type: {perturbation_type}"
     raise ValueError(msg)
-
-
-def coefficient_from_config(
-    coef_config: CollinearityCoefficientConfig,
-) -> torch.Tensor:
-    """Create Coefficient from configuration.
-
-    Args:
-        coef_config (CollinearityCoefficientConfig): Coefficient Configuration.
-
-    Raises:
-        KeyError: If the coeffciient type is not recognized/
-
-    Returns:
-        Coefficient: Coefficient.
-    """
-    possible_coefs = ["constant", "inferred"]
-    if coef_config.type not in possible_coefs:
-        msg = (
-            "Unrecognized perturbation type. "
-            f"Possible values are {possible_coefs}"
-        )
-        raise KeyError(msg)
-
-    if coef_config.type == "constant":
-        coef = torch.tensor(
-            [coef_config.value],
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-    elif coef_config.type == "inferred":
-        coef = torch.tensor(
-            [coef_config.initial],
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-    else:
-        msg = "To Implement."
-        raise NotImplementedError(msg)
-    return coef
