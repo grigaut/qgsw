@@ -18,7 +18,7 @@ except ImportError:
     from typing_extensions import Self
 
 
-from typing import TYPE_CHECKING, NamedTuple, TypeVar, Union
+from typing import TYPE_CHECKING, NamedTuple
 
 import torch
 
@@ -363,6 +363,3 @@ class UVHTAlpha(BasePrognosticTuple, _UVHTAlpha):
             device=device,
         )
         return cls.from_uvht(alpha, UVHT.from_file(file, dtype, device))
-
-
-PrognosticTuple = TypeVar("PrognosticTuple", bound=Union[UVHT, UVHTAlpha])

@@ -3,7 +3,7 @@
 import torch
 
 from qgsw.fields.errors.base import PointWiseError
-from qgsw.fields.variables.uvh import PrognosticTuple
+from qgsw.fields.variables.uvh import BasePrognosticTuple
 
 
 class RMSE(PointWiseError):  # noqa: N818
@@ -14,14 +14,15 @@ class RMSE(PointWiseError):  # noqa: N818
 
     def _compute(
         self,
-        prognostic: PrognosticTuple,
-        prognostic_ref: PrognosticTuple,
+        prognostic: BasePrognosticTuple,
+        prognostic_ref: BasePrognosticTuple,
     ) -> torch.Tensor:
         """Compute error.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables value.
-            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            prognostic (BasePrognosticTuple): Prognostic variables value.
+            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            variables.
             value.
 
         Returns:
@@ -33,14 +34,15 @@ class RMSE(PointWiseError):  # noqa: N818
 
     def compute_point_wise(
         self,
-        prognostic: PrognosticTuple,
-        prognostic_ref: PrognosticTuple,
+        prognostic: BasePrognosticTuple,
+        prognostic_ref: BasePrognosticTuple,
     ) -> torch.Tensor:
         """Compute point-wise error.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables value.
-            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            prognostic (BasePrognosticTuple): Prognostic variables value.
+            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            variables.
             value.
 
         Returns:
@@ -50,14 +52,15 @@ class RMSE(PointWiseError):  # noqa: N818
 
     def compute_level_wise(
         self,
-        prognostic: PrognosticTuple,
-        prognostic_ref: PrognosticTuple,
+        prognostic: BasePrognosticTuple,
+        prognostic_ref: BasePrognosticTuple,
     ) -> torch.Tensor:
         """Compute level-wise error.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables value.
-            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            prognostic (BasePrognosticTuple): Prognostic variables value.
+            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            variables.
             value.
 
         Returns:
@@ -77,14 +80,15 @@ class RMSE(PointWiseError):  # noqa: N818
 
     def compute_ensemble_wise(
         self,
-        prognostic: PrognosticTuple,
-        prognostic_ref: PrognosticTuple,
+        prognostic: BasePrognosticTuple,
+        prognostic_ref: BasePrognosticTuple,
     ) -> torch.Tensor:
         """Compute ensemble-wise error.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables value.
-            prognostic_ref (PrognosticTuple): Reference prognostic variables
+            prognostic (BasePrognosticTuple): Prognostic variables value.
+            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            variables.
             value.
 
         Returns:

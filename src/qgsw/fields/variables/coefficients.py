@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.state import State
-    from qgsw.fields.variables.uvh import PrognosticTuple
+    from qgsw.fields.variables.uvh import BasePrognosticTuple
     from qgsw.models.qg.collinear_sublayer.core import QGCollinearSublayer
 
 
@@ -98,11 +98,11 @@ class LSRSFInferredAlpha(Coefficient):
         """
         self._psi = psi_ref
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the value of alpha.
 
         Args:
-            prognostic (PrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
             Tensor: Alpha
@@ -179,11 +179,12 @@ class ConstantCoefficient(Coefficient):
         """
         self._value = value
 
-    def _compute(self, prognostic: PrognosticTuple) -> torch.Tensor:  # noqa: ARG002
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:  # noqa: ARG002
         """Compute the value of alpha.
 
         Args:
-            prognostic (PrognosticTuple): Useless, for compatibility reasons.
+            prognostic (BasePrognosticTuple): Useless, for compatibility
+            reasons.
 
         Returns:
             Tensor: Alpha.

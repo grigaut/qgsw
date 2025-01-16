@@ -16,7 +16,7 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityDiag,
 )
 from qgsw.fields.variables.prognostic import CollinearityCoefficient, Time
-from qgsw.fields.variables.uvh import UVHT, PrognosticTuple, UVHTAlpha
+from qgsw.fields.variables.uvh import UVHT, BasePrognosticTuple, UVHTAlpha
 from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
     from qgsw.configs.models import ModelConfig
 
-T = TypeVar("T", bound=PrognosticTuple)
+T = TypeVar("T", bound=BasePrognosticTuple)
 
 
 class _OutputFile(NamedTuple):
