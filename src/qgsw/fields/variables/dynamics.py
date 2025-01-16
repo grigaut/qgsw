@@ -10,6 +10,13 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
+from qgsw.fields.variables.state import State
+from qgsw.fields.variables.uvh import BasePrognosticTuple
+from qgsw.models.core.helmholtz import (
+    compute_laplace_dstI,
+    solve_helmholtz_dstI,
+)
+from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
 
 try:
@@ -249,12 +256,12 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
         return super().bind(state)
 
 
-class Vorticity(DiagnosticVariable):
-    """Vorticity Diagnostic Variable."""
+class MaskedVorticity(DiagnosticVariable):
+    """Masked Vorticity Diagnostic Variable."""
 
     _unit = Unit.M2S_1
-    _name = "omega"
-    _description = "Vorticity"
+    _name = "omega_masked"
+    _description = "Vorticity matching mask"
     _scope = Scope.POINT_WISE
 
     def __init__(
@@ -296,6 +303,29 @@ class Vorticity(DiagnosticVariable):
             + self._w_cornerout_bound * (1 - self._slip_coef) * curl_uv
             + self._w_vertical_bound * alpha * dx_v
             - self._w_horizontal_bound * alpha * dy_u
+        )
+
+
+class Vorticity(DiagnosticVariable):
+    """Vorticity."""
+
+    _unit = Unit.M2S_1
+    _name = "omega"
+    _description = "Vorticity"
+    _scope = Scope.POINT_WISE
+
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            prognostic (BasePrognosticTuple): Prognostic tuple.
+
+        Returns:
+            torch.Tensor: Vorticity, (n_ens,nl,nx-1,ny-1)-shaped
+        """
+        return torch.diff(prognostic.v[..., 1:-1], dim=-2) - torch.diff(
+            prognostic.u[..., 1:-1, :],
+            dim=-1,
         )
 
 
@@ -403,6 +433,56 @@ class Pressure(DiagnosticVariable):
         # Bind the eta_phys variable
         self._eta = self._eta.bind(state)
         return super().bind(state)
+
+
+class PressureTilde(Pressure):
+    """Pressure tilde."""
+
+    _description = "Pressure per unit of mass for collinear model"
+
+    def __init__(
+        self,
+        g_prime: torch.Tensor,
+        eta_phys: PhysicalSurfaceHeightAnomaly,
+    ) -> None:
+        """Instantiate the pressure variable.
+
+        Args:
+            g_prime (torch.Tensor): Reduced gravity
+            eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
+            variable.
+        """
+        if not g_prime.squeeze().shape[0] == 2:  # noqa: PLR2004
+            raise ValueError
+        self._g1 = g_prime.squeeze()[0]
+        self._g2 = g_prime.squeeze()[1]
+        self._eta = eta_phys
+
+        self._require_alpha |= eta_phys.require_alpha
+        self._require_time |= eta_phys.require_time
+
+    def _compute_g_tilde(self, alpha: torch.Tensor) -> torch.Tensor:
+        """Compute g_tilde.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+
+        Returns:
+            torch.Tensor: g_tilde
+        """
+        return self._g1 * self._g2 / (self._g2 + (1 - alpha) * self._g1)
+
+    def _compute(self, prognostic: UVHTAlpha) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            prognostic (UVHTAlpha): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Pressure
+        """
+        g_tilde = self._compute_g_tilde(prognostic.alpha)
+        return g_tilde * self._eta.compute_no_slice(prognostic)
 
 
 class PotentialVorticity(DiagnosticVariable):
@@ -514,54 +594,75 @@ class StreamFunction(DiagnosticVariable):
         return super().bind(state)
 
 
-class PressureTilde(Pressure):
-    """Pressure tilde."""
+class StreamFunctionFromVorticity(DiagnosticVariable):
+    """Stream function variable from vorticity inversion."""
 
-    _description = "Pressure per unit of mass for collinear model"
+    _unit = Unit.M2S_1
+    _name = "psi_from_omega"
+    _description = "Stream function from vorticity inversion"
+    _scope = Scope.POINT_WISE
 
     def __init__(
         self,
-        g_prime: torch.Tensor,
-        eta_phys: PhysicalSurfaceHeightAnomaly,
+        vorticity: PhysicalVorticity,
+        nx: int,
+        ny: int,
+        dx: float,
+        dy: float,
     ) -> None:
-        """Instantiate the pressure variable.
+        """Instantiate the variable.
 
         Args:
-            g_prime (torch.Tensor): Reduced gravity
-            eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
-            variable.
+            vorticity (PhysicalVorticity): Physical vorticity.
+            nx (int): Number of poitn in the x direction.
+            ny (int): Number of points in the y direction.
+            dx (float): Infinitesimal x step.
+            dy (float): Infinitesimal y step.
         """
-        if not g_prime.squeeze().shape[0] == 2:  # noqa: PLR2004
-            raise ValueError
-        self._g1 = g_prime.squeeze()[0]
-        self._g2 = g_prime.squeeze()[1]
-        self._eta = eta_phys
+        self._vorticity = vorticity
 
-        self._require_alpha |= eta_phys.require_alpha
-        self._require_time |= eta_phys.require_time
+        self._require_alpha |= vorticity.require_alpha
+        self._require_time |= vorticity.require_time
 
-    def _compute_g_tilde(self, alpha: torch.Tensor) -> torch.Tensor:
-        """Compute g_tilde.
+        self._laplacian = (
+            compute_laplace_dstI(
+                nx,
+                ny,
+                dx,
+                dy,
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            .unsqueeze(0)
+            .unsqueeze(0)
+        )
+
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+        """Compute the variable value.
 
         Args:
-            alpha (torch.Tensor): Collinearity coefficient.
+            prognostic (BasePrognosticTuple): Prognostic variables.
 
         Returns:
-            torch.Tensor: g_tilde
+            torch.Tensor: Stream function.
         """
-        return self._g1 * self._g2 / (self._g2 + (1 - alpha) * self._g1)
+        vorticity = self._vorticity.compute_no_slice(prognostic)
+        return points_to_surfaces(
+            solve_helmholtz_dstI(vorticity, self._laplacian),
+        )
 
-    def _compute(self, prognostic: UVHTAlpha) -> torch.Tensor:
-        """Compute the value of the variable.
+    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
 
         Args:
-            prognostic (UVHTAlpha): Prognostioc variables
+            state (State): State to bind the variable to.
 
         Returns:
-            torch.Tensor: Pressure
+            BoundDiagnosticVariable: Bound variable.
         """
-        g_tilde = self._compute_g_tilde(prognostic.alpha)
-        return g_tilde * self._eta.compute_no_slice(prognostic)
+        # Bind the vorticity variable
+        self._vorticity = self._vorticity.bind(state)
+        return super().bind(state)
 
 
 class Enstrophy(DiagnosticVariable):
