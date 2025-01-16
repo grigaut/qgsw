@@ -10,6 +10,7 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
+from qgsw.fields.variables.uvh import BasePrognosticTuple
 from qgsw.utils.units._units import Unit
 
 try:
@@ -249,12 +250,12 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
         return super().bind(state)
 
 
-class Vorticity(DiagnosticVariable):
-    """Vorticity Diagnostic Variable."""
+class MaskedVorticity(DiagnosticVariable):
+    """Masked Vorticity Diagnostic Variable."""
 
     _unit = Unit.M2S_1
-    _name = "omega"
-    _description = "Vorticity"
+    _name = "omega_masked"
+    _description = "Vorticity matching mask"
     _scope = Scope.POINT_WISE
 
     def __init__(
@@ -296,6 +297,29 @@ class Vorticity(DiagnosticVariable):
             + self._w_cornerout_bound * (1 - self._slip_coef) * curl_uv
             + self._w_vertical_bound * alpha * dx_v
             - self._w_horizontal_bound * alpha * dy_u
+        )
+
+
+class Vorticity(DiagnosticVariable):
+    """Vorticity."""
+
+    _unit = Unit.M2S_1
+    _name = "omega"
+    _description = "Vorticity"
+    _scope = Scope.POINT_WISE
+
+    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            prognostic (BasePrognosticTuple): Prognostic tuple.
+
+        Returns:
+            torch.Tensor: Vorticity, (n_ens,nl,nx-1,ny-1)-shaped
+        """
+        return torch.diff(prognostic.v[..., 1:-1], dim=-2) - torch.diff(
+            prognostic.u[..., 1:-1, :],
+            dim=-1,
         )
 
 

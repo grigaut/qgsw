@@ -35,7 +35,6 @@ from qgsw.fields.variables.energetics import (
     TotalEnergy,
     TotalKineticEnergy,
 )
-from qgsw.masks import Masks
 from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
@@ -89,10 +88,7 @@ def _qg_variable_set(
     h_phys = PhysicalLayerDepthAnomaly(ds)
     U = ZonalVelocityFlux(dx)  # noqa: N806
     V = MeridionalVelocityFlux(dy)  # noqa: N806
-    vorticity = Vorticity(
-        Masks.empty(space_config.nx, space_config.ny, device),
-        slip_coef=physics_config.slip_coef,
-    )
+    vorticity = Vorticity()
     vorticity_phys = PhysicalVorticity(vorticity, ds)
     eta = SurfaceHeightAnomaly()
     eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
@@ -185,10 +181,7 @@ def _collinear_qg_variable_set(
     h_phys = PhysicalLayerDepthAnomaly(ds)
     U = ZonalVelocityFlux(dx)  # noqa: N806
     V = MeridionalVelocityFlux(dy)  # noqa: N806
-    vorticity = Vorticity(
-        Masks.empty(space_config.nx, space_config.ny, device),
-        slip_coef=physics_config.slip_coef,
-    )
+    vorticity = Vorticity()
     vorticity_phys = PhysicalVorticity(vorticity, ds)
     eta = SurfaceHeightAnomaly()
     eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)

@@ -11,12 +11,12 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.fields.variables.dynamics import (
+    MaskedVorticity,
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
     Pressure,
     PressureTilde,
-    Vorticity,
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.energetics import KineticEnergy
@@ -114,7 +114,7 @@ class SWCore(Model[T], Generic[T]):
 
     @property
     def pv(self) -> torch.Tensor:
-        """Potential Vorticity."""
+        """Potential MaskedVorticity."""
         msg = "Shallow Water Models don't have vorticity plots."
         raise AttributeError(msg)
 
@@ -182,7 +182,7 @@ class SWCore(Model[T], Generic[T]):
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
-        omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
+        omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta_phys=eta_phys)
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
@@ -230,7 +230,7 @@ class SWCore(Model[T], Generic[T]):
         V_m = self.points_to_surfaces(V)  # noqa: N806
 
         # Vortex-force + Coriolis
-        omega = self._state[Vorticity.get_name()].get()
+        omega = self._state[MaskedVorticity.get_name()].get()
         omega_v_m = self._fluxes.w_y(omega[..., 1:-1, :], V_m)
         omega_u_m = self._fluxes.w_x(omega[..., 1:-1], U_m)
 
@@ -393,7 +393,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
-        omega = Vorticity(masks=self.masks, slip_coef=self.slip_coef)
+        omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = PressureTilde(g_prime=self.g_prime, eta_phys=eta_phys)
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
