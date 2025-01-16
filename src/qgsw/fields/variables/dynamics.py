@@ -429,6 +429,56 @@ class Pressure(DiagnosticVariable):
         return super().bind(state)
 
 
+class PressureTilde(Pressure):
+    """Pressure tilde."""
+
+    _description = "Pressure per unit of mass for collinear model"
+
+    def __init__(
+        self,
+        g_prime: torch.Tensor,
+        eta_phys: PhysicalSurfaceHeightAnomaly,
+    ) -> None:
+        """Instantiate the pressure variable.
+
+        Args:
+            g_prime (torch.Tensor): Reduced gravity
+            eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
+            variable.
+        """
+        if not g_prime.squeeze().shape[0] == 2:  # noqa: PLR2004
+            raise ValueError
+        self._g1 = g_prime.squeeze()[0]
+        self._g2 = g_prime.squeeze()[1]
+        self._eta = eta_phys
+
+        self._require_alpha |= eta_phys.require_alpha
+        self._require_time |= eta_phys.require_time
+
+    def _compute_g_tilde(self, alpha: torch.Tensor) -> torch.Tensor:
+        """Compute g_tilde.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+
+        Returns:
+            torch.Tensor: g_tilde
+        """
+        return self._g1 * self._g2 / (self._g2 + (1 - alpha) * self._g1)
+
+    def _compute(self, prognostic: UVHTAlpha) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            prognostic (UVHTAlpha): Prognostioc variables
+
+        Returns:
+            torch.Tensor: Pressure
+        """
+        g_tilde = self._compute_g_tilde(prognostic.alpha)
+        return g_tilde * self._eta.compute_no_slice(prognostic)
+
+
 class PotentialVorticity(DiagnosticVariable):
     """Potential Vorticity."""
 
@@ -536,56 +586,6 @@ class StreamFunction(DiagnosticVariable):
         # Bind the pressure variable
         self._p = self._p.bind(state)
         return super().bind(state)
-
-
-class PressureTilde(Pressure):
-    """Pressure tilde."""
-
-    _description = "Pressure per unit of mass for collinear model"
-
-    def __init__(
-        self,
-        g_prime: torch.Tensor,
-        eta_phys: PhysicalSurfaceHeightAnomaly,
-    ) -> None:
-        """Instantiate the pressure variable.
-
-        Args:
-            g_prime (torch.Tensor): Reduced gravity
-            eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
-            variable.
-        """
-        if not g_prime.squeeze().shape[0] == 2:  # noqa: PLR2004
-            raise ValueError
-        self._g1 = g_prime.squeeze()[0]
-        self._g2 = g_prime.squeeze()[1]
-        self._eta = eta_phys
-
-        self._require_alpha |= eta_phys.require_alpha
-        self._require_time |= eta_phys.require_time
-
-    def _compute_g_tilde(self, alpha: torch.Tensor) -> torch.Tensor:
-        """Compute g_tilde.
-
-        Args:
-            alpha (torch.Tensor): Collinearity coefficient.
-
-        Returns:
-            torch.Tensor: g_tilde
-        """
-        return self._g1 * self._g2 / (self._g2 + (1 - alpha) * self._g1)
-
-    def _compute(self, prognostic: UVHTAlpha) -> torch.Tensor:
-        """Compute the value of the variable.
-
-        Args:
-            prognostic (UVHTAlpha): Prognostioc variables
-
-        Returns:
-            torch.Tensor: Pressure
-        """
-        g_tilde = self._compute_g_tilde(prognostic.alpha)
-        return g_tilde * self._eta.compute_no_slice(prognostic)
 
 
 class Enstrophy(DiagnosticVariable):
