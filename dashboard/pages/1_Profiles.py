@@ -8,6 +8,7 @@ import torch
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
 from qgsw.fields.variables.variable_sets import create_qg_variable_set
+from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,
@@ -36,6 +37,8 @@ vars_dict = create_qg_variable_set(
     DEVICE.get(),
 )
 levels_nb = run.summary.configuration.model.h.shape[0]
+if run.summary.configuration.model.type == QGCollinearSF.get_type():
+    levels_nb -= 1
 
 st.write(run)
 
@@ -49,22 +52,25 @@ vars_pts = [var for var in vars_dict.values() if var.scope == Scope.POINT_WISE]
 selected_var_pts = st.selectbox("Variable to display", vars_pts)
 
 with st.form(key="var-form"):
-    level = st.selectbox("Level", list(range(levels_nb)))
+    levels = st.multiselect("Level", list(range(levels_nb)))
     submit_pts = st.form_submit_button("Display")
 
 if submit_pts:
     uvhs = (output.read() for output in run.outputs())
-    values = (selected_var_pts.compute(uvh) for uvh in uvhs)
-    data = [d[0, level].T.cpu() for d in values]
+    values = [selected_var_pts.compute(uvh) for uvh in uvhs]
+    datas = [[d[0, lvl].T.cpu() for d in values] for lvl in levels]
 
     plot_pts = AnimatedHeatmaps(
-        [data],
+        datas,
     )
     plot_pts.set_slider_prefix("Time: ")
     txt = f"{selected_var_pts.description}[{selected_var_pts.unit.value}]"
     plot_pts.set_colorbar_text(txt)
     plot_pts.set_subplot_titles(
-        [f"{run.summary.configuration.io.name} - Level {level}"],
+        [
+            f"{run.summary.configuration.io.name} - Level {lvl}"
+            for lvl in levels
+        ],
     )
     plot_pts.set_frame_labels([f"{t.days} days" for t in run.timesteps()])
 
@@ -83,7 +89,6 @@ if not check_unit_compatibility(*selected_vars_lvl):
     st.stop()
 
 with st.form(key="var-form-level-wise"):
-    levels_nb = run.summary.configuration.model.h.shape[0]
     levels = list(range(levels_nb))
     selected_lvl = st.multiselect("Level(s)", levels)
     submit_lvl = st.form_submit_button("Display")
