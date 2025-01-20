@@ -438,6 +438,7 @@ class Pressure(DiagnosticVariable):
 class PressureTilde(Pressure):
     """Pressure tilde."""
 
+    _name = "p_tilde"
     _description = "Pressure per unit of mass for collinear model"
     _require_alpha = True
 
