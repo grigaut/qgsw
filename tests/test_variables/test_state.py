@@ -5,6 +5,7 @@ import torch
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
+    PressureTilde,
 )
 from qgsw.fields.variables.state import State, StateAlpha
 from qgsw.fields.variables.uvh import UVH
@@ -104,3 +105,48 @@ def test_state_alpha_updates() -> None:
     uvh0 = state.prognostic.uvh
     state.alpha = torch.tensor([0.4], dtype=torch.float64, device=DEVICE.get())
     assert state.prognostic.uvh == uvh0
+
+
+def test_sate_update_only_alpha() -> None:
+    """Test that updating only state does not reload all variables."""
+    state = StateAlpha.steady(
+        1,
+        1,
+        10,
+        10,
+        torch.float64,
+        DEVICE.get(),
+    )
+    state.update_uvh(
+        UVH(
+            state.u.get(),
+            state.v.get(),
+            torch.rand_like(state.h.get()),
+        ),
+    )
+    g_tilde = torch.tensor(
+        [[[[9.81]], [[0.05]]]],
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    h_phys = PhysicalLayerDepthAnomaly(ds=2).bind(state)
+    h_tilde = PhysicalLayerDepthAnomaly(ds=2)
+    eta_tilde = PhysicalSurfaceHeightAnomaly(h_tilde)
+    pressure_tilde = PressureTilde(g_tilde, eta_tilde).bind(state)
+    h_phys.get()
+    pressure_tilde.get()
+    assert h_phys.up_to_date
+    assert pressure_tilde.up_to_date
+    state.update_alpha(torch.rand_like(state.alpha.get()))
+    assert h_phys.up_to_date
+    assert not pressure_tilde.up_to_date
+    pressure_tilde.get()
+    state.update_uvh(
+        UVH(
+            torch.rand_like(state.u.get()),
+            torch.rand_like(state.v.get()),
+            torch.rand_like(state.h.get()),
+        ),
+    )
+    assert not h_phys.up_to_date
+    assert not pressure_tilde.up_to_date
