@@ -30,11 +30,6 @@ reduced_gravity = [
     10.0,
     5e-2
 ]
-[model.collinearity_coef]
-# Section relevant for modified QG models only
-type = "constant" # 'constant' or 'changing'
-value = 0.1 # Only relevant for constant coefficients.
-source_file = "data/coefficients.npz" # Only relevant for 'changing' coefficients.
 
 [space]
 nx = 192
