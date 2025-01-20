@@ -439,6 +439,7 @@ class PressureTilde(Pressure):
     """Pressure tilde."""
 
     _description = "Pressure per unit of mass for collinear model"
+    _require_alpha = True
 
     def __init__(
         self,
