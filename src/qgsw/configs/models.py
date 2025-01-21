@@ -13,6 +13,7 @@ from pydantic import (
     PositiveFloat,
 )
 
+from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
 from qgsw.specs import DEVICE
 
 
@@ -37,6 +38,12 @@ class ModelConfig(BaseModel):
             dtype=torch.float64,
             device=DEVICE.get(),
         )
+
+    @cached_property
+    def nl(self) -> torch.Tensor:
+        """Number of layers."""
+        n_tot = self.h.shape[0]
+        return n_tot - int(self.type == QGCollinearSF.get_type())
 
     @cached_property
     def g_prime(self) -> torch.Tensor:
