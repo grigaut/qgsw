@@ -19,6 +19,7 @@ from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
+from qgsw.models.sw.core import SW
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     keep_top_layer,
@@ -92,6 +93,32 @@ class QGCollinearFilteredSF(QGAlpha):
         decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, lambd, self.Cl2m = decomposition
         self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
+
+    def _init_core_model(
+        self,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        optimize: bool,  # noqa: FBT001
+    ) -> SW:
+        """Initialize the core Shallow Water model.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+
+        Returns:
+            SW: Core model (One layer).
+        """
+        return SW(
+            space_2d=space_2d,
+            H=H[:1],  # Only consider top layer
+            g_prime=g_prime[:1],  # Only consider top layer
+            optimize=optimize,
+        )
 
     def _create_diagnostic_vars(self, state: State) -> None:
         super()._create_diagnostic_vars(state)
