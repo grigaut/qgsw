@@ -16,6 +16,9 @@ from qgsw.fields.variables.uvh import UVH
 from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
+from qgsw.models.qg.stretching_matrix import (
+    compute_layers_to_mode_decomposition,
+)
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     keep_top_layer,
@@ -79,6 +82,16 @@ class QGCollinearFilteredSF(QGAlpha):
             optimize=optimize,
         )
         self._filt = GaussianHighPass2D(10)
+        self.A = self.compute_A(H, g_prime)
+        self._core = self._init_core_model(
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            optimize=optimize,
+        )
+        decomposition = compute_layers_to_mode_decomposition(self.A)
+        self.Cm2l, lambd, self.Cl2m = decomposition
+        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
 
     def _create_diagnostic_vars(self, state: State) -> None:
         super()._create_diagnostic_vars(state)
@@ -102,7 +115,7 @@ class QGCollinearFilteredSF(QGAlpha):
         p = self._state[Pressure.get_name()].compute_no_slice(uvh)
         p_toplayer = torch.nn.functional.pad(p[:, 0, ...], (1, 1, 1, 1))
         p_sublayer = self._filt(p_toplayer[0, 0]).unsqueeze(0)
-        p = torch.stack([p_toplayer, p_sublayer], dim=1)
+        p = torch.stack([p_toplayer, self.alpha * p_sublayer], dim=1)
         new_uvh = self.G(p)
         projected = super().project(new_uvh)
         return UVH(
