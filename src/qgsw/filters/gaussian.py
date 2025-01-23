@@ -13,17 +13,17 @@ from abc import ABC, abstractmethod
 
 import torch
 
+from qgsw.filters.base import _Filter
 from qgsw.specs import DEVICE
 
 T = TypeVar("T", bound=torch.nn.modules.conv._ConvNd)  # noqa: SLF001
 
 
-class GaussianFilter(ABC, Generic[T]):
+class GaussianFilter(_Filter, ABC, Generic[T]):
     """Gaussian Filter."""
 
     _windows_width_factor = 4  # nbs of sigma
     _span_threshold = 0.05
-    dtype = torch.float64
 
     def __init__(self, sigma: float) -> None:
         """Instantiate the filter.
@@ -69,11 +69,6 @@ class GaussianFilter(ABC, Generic[T]):
     def window_radius(self) -> int:
         """Window radius."""
         return int(self._windows_width_factor * self._sigma) + 1
-
-    @property
-    def window_width(self) -> int:
-        """Window radius."""
-        return self.compute_window_width(self.window_radius)
 
     @abstractmethod
     def _set_null_mu(self) -> torch.Tensor:
@@ -139,18 +134,6 @@ class GaussianFilter(ABC, Generic[T]):
             device=DEVICE.get(),
         )
         return (sigma * torch.sqrt(-8 * torch.log(thres))).item()
-
-    @staticmethod
-    def compute_window_width(window_radius: int) -> int:
-        """Compute the wisndow width.
-
-        Args:
-            window_radius (int): Window radius.
-
-        Returns:
-            int: Window width
-        """
-        return window_radius * 2 + 1
 
     @staticmethod
     @abstractmethod
