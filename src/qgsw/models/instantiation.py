@@ -10,9 +10,10 @@ from qgsw.models.qg.core import QG, G
 from qgsw.models.qg.exceptions import UnrecognizedQGModelError
 from qgsw.models.qg.modified.collinear_sublayer.core import (
     QGAlpha,
-    QGCollinearPV,
     QGCollinearSF,
 )
+from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
+from qgsw.models.qg.modified.utils import is_modified
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
 from qgsw.models.sw.filtering import (
@@ -43,8 +44,8 @@ def instantiate_model(
     | SWFilterBarotropicSpectral
     | SWFilterBarotropicExact
     | QG
-    | QGCollinearPV
     | QGCollinearSF
+    | QGCollinearFilteredSF
 ):
     """Instantiate the model, given the configuration and the perturbation.
 
@@ -81,10 +82,7 @@ def instantiate_model(
             beta_plane=beta_plane,
             Ro=Ro,
         )
-    elif model_config.type in [
-        QGCollinearSF.get_type(),
-        QGCollinearPV.get_type(),
-    ]:
+    elif is_modified(model_config.type):
         model = _instantiate_collinear_qg(
             model_config=model_config,
             space_2d=space_2d,
@@ -218,8 +216,8 @@ def _instantiate_collinear_qg(
     """
     if model_config.type == QGCollinearSF.get_type():
         model_class = QGCollinearSF
-    elif model_config.type == QGCollinearPV.get_type():
-        model_class = QGCollinearPV
+    if model_config.type == QGCollinearFilteredSF.get_type():
+        model_class = QGCollinearFilteredSF
     else:
         msg = f"Unrecognized model type: {model_config.type}"
         raise ValueError(msg)

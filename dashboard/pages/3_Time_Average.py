@@ -8,7 +8,7 @@ import torch
 from qgsw.fields.errors.error_sets import create_errors_set
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.variable_sets import create_qg_variable_set
-from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.utils import is_modified
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,
@@ -37,7 +37,7 @@ vars_dict = create_qg_variable_set(
     DEVICE.get(),
 )
 levels_nb = run.summary.configuration.model.h.shape[0]
-if config.model.type == QGCollinearSF.get_type():
+if is_modified(config.model.type):
     levels_nb -= 1
 
 st.write(run)

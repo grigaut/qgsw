@@ -16,7 +16,7 @@ from qgsw.fields.variables.uvh import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model
-from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.utils import is_modified
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
@@ -170,8 +170,7 @@ prefix = config.model.prefix
 output_dir = config.io.output.directory
 
 # Collinearity Coefficient
-is_collinear = config.model.type == QGCollinearSF.get_type()
-if is_collinear:
+if is_modified(config.model.type):
     alpha = create_coefficient(config)
     model.alpha = alpha.compute(model_ref.prognostic)
 
@@ -188,7 +187,7 @@ with Progress() as progress:
         progress.advance(simulation)
         if fork:
             prognostic = model_ref.prognostic
-            if is_collinear:
+            if is_modified(config.model.type):
                 model.alpha = alpha.compute_no_slice(prognostic)
                 uvh = matching.n_layers_to_collinear_1_layer(
                     prognostic.uvh,
