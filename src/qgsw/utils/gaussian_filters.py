@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Generic, TypeVar
+
 try:
     from typing import Self
 except ImportError:
@@ -13,8 +15,10 @@ import torch
 
 from qgsw.specs import DEVICE
 
+T = TypeVar("T", bound=torch.nn.modules.conv._ConvNd)  # noqa: SLF001
 
-class GaussianFilter(ABC):
+
+class GaussianFilter(ABC, Generic[T]):
     """Gaussian Filter."""
 
     _windows_width_factor = 4  # nbs of sigma
@@ -58,6 +62,8 @@ class GaussianFilter(ABC):
             mu=self._mu,
             window_radius=self.window_radius,
         )
+        self._conv = self._build_convolution()
+        self._conv.weight.data = self.kernel.unsqueeze(0).unsqueeze(0)
 
     @property
     def window_radius(self) -> int:
@@ -76,6 +82,27 @@ class GaussianFilter(ABC):
         Returns:
             torch.Tensor: mu
         """
+
+    @abstractmethod
+    def _build_convolution(self) -> T:
+        """Build the convolution.
+
+        Returns:
+            T: Convolution.
+        """
+
+    def __call__(self, to_filter: torch.Tensor) -> torch.Tensor:
+        """Perform filtering.
+
+        Args:
+            to_filter (torch.Tensor): Tensor to filter, (p,q)-shaped.
+
+        Returns:
+            torch.Tensor: Filtered tensor.
+        """
+        to_filter_expanded = to_filter.unsqueeze(0).unsqueeze(0)
+        filtered: torch.Tensor = self._conv(to_filter_expanded).detach()
+        return filtered.squeeze((0, 1))
 
     @staticmethod
     def compute_sigma_from_span(span: float, threshold: float) -> float:
@@ -161,12 +188,23 @@ class GaussianFilter(ABC):
         )
 
 
-class GaussianFilter1D(GaussianFilter):
+class GaussianFilter1D(GaussianFilter[torch.nn.Conv1d]):
     """1D Gaussian Filter."""
 
     def _set_null_mu(self) -> torch.Tensor:
         return torch.zeros(
             (1,),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+
+    def _build_convolution(self) -> torch.nn.Conv1d:
+        return torch.nn.Conv1d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=(self.window_width,),
+            padding=self.window_width // 2,
+            bias=False,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
@@ -199,12 +237,23 @@ class GaussianFilter1D(GaussianFilter):
         return kernel
 
 
-class GaussianFilter2D(GaussianFilter):
+class GaussianFilter2D(GaussianFilter[torch.nn.Conv2d]):
     """2D Gaussian Filter."""
 
     def _set_null_mu(self) -> torch.Tensor:
         return torch.zeros(
             (2,),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+
+    def _build_convolution(self) -> torch.nn.Conv2d:
+        return torch.nn.Conv2d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=(self.window_width, self.window_width),
+            padding=self.window_width // 2,
+            bias=False,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
@@ -232,7 +281,7 @@ class GaussianFilter2D(GaussianFilter):
             device=DEVICE.get(),
             dtype=torch.float64,
         )
-        xy = torch.stack(torch.meshgrid(x, x))
+        xy = torch.stack(torch.meshgrid(x, x, indexing="xy"))
         mu_reshaped = mu.reshape((-1, 1, 1))
 
         r = torch.norm(xy - mu_reshaped, dim=0)
