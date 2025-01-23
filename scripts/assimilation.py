@@ -16,7 +16,7 @@ from qgsw.fields.variables.uvh import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model
-from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps

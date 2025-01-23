@@ -43,7 +43,7 @@ verbose.display(
     trigger_level=1,
 )
 verbose.display(
-    msg=f"dx={config.space.dx/1e3:.1f}km, dy={config.space.dy/1e3:.1f}km .",
+    msg=f"dx={config.space.dx / 1e3:.1f}km, dy={config.space.dy / 1e3:.1f}km .",
     trigger_level=1,
 )
 verbose.display(
@@ -144,8 +144,8 @@ if config.io.log_performance:
 
 if config.io.plots.save:
     output_dir = (
-        f'{config.io.results.directory}/{name}_{config.space.nx}x{config.space.ny}_dt{config.space.dt}_'
-        f'slip{param["slip_coef"]}/'
+        f"{config.io.results.directory}/{name}_{config.space.nx}x{config.space.ny}_dt{config.space.dt}_"
+        f"slip{param['slip_coef']}/"
     )
     os.makedirs(output_dir, exist_ok=True)
     verbose.display(
@@ -207,7 +207,7 @@ for n in range(1, n_steps + 1):
         perf = (walltime - walltime0) / (ngridpoints)
         mperf += perf
         verbose.display(
-            msg=f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf/n:.2e}) s",
+            msg=f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf / n:.2e}) s",
             trigger_level=1,
         )
 

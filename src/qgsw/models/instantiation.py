@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.qg.collinear_sublayer.core import (
-    QGCollinearPV,
-    QGCollinearSF,
-    QGCollinearSublayer,
-)
 from qgsw.models.qg.core import QG, G
 from qgsw.models.qg.exceptions import UnrecognizedQGModelError
+from qgsw.models.qg.modified.collinear_sublayer.core import (
+    QGAlpha,
+    QGCollinearPV,
+    QGCollinearSF,
+)
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
 from qgsw.models.sw.filtering import (
@@ -203,7 +203,7 @@ def _instantiate_collinear_qg(
     perturbation: Perturbation,
     beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
-) -> QGCollinearSublayer:
+) -> QGAlpha:
     """Instantiate Modified QG Models.
 
     Args:
@@ -214,7 +214,7 @@ def _instantiate_collinear_qg(
         Ro (float): Rossby Number.
 
     Returns:
-        _QGCollinearSublayer: Modified QG Model.
+        QGAlpha: Modified QG Model.
     """
     if model_config.type == QGCollinearSF.get_type():
         model_class = QGCollinearSF

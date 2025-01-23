@@ -17,7 +17,7 @@ from qgsw.fields.variables.dynamics import (
 )
 from qgsw.fields.variables.prognostic import CollinearityCoefficient, Time
 from qgsw.fields.variables.uvh import UVHT, BasePrognosticTuple, UVHTAlpha
-from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
 from qgsw.utils.sorting import sort_files

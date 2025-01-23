@@ -13,7 +13,7 @@ from pydantic import (
     PositiveFloat,
 )
 
-from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
 from qgsw.specs import DEVICE
 
 

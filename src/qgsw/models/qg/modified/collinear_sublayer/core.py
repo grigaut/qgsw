@@ -6,16 +6,17 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from qgsw import verbose
 from qgsw.fields.variables.state import StateAlpha
 from qgsw.fields.variables.uvh import UVHTAlpha
 from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
+from qgsw.models.qg.core import QGCore
+from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
-from qgsw.models.qg.core import QGCore
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
@@ -33,52 +34,11 @@ if TYPE_CHECKING:
     )
 
 
-class QGCollinearSublayer(QGCore[UVHTAlpha]):
+class QGAlpha(QGCore[UVHTAlpha]):
     """Collinear QG Model."""
 
     _supported_layers_nb: int
-    _coefficient: float
     _A: torch.Tensor
-
-    def __init__(
-        self,
-        space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
-        g_prime: torch.Tensor,
-        optimize: bool = True,  # noqa: FBT001, FBT002
-    ) -> None:
-        """Collinear Sublayer Stream Function.
-
-        Args:
-            space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
-            optimize (bool, optional): Whether to precompile functions or
-            not. Defaults to True.
-        """
-        ModelParamChecker.__init__(
-            self,
-            space_2d=space_2d,
-            H=H,
-            g_prime=g_prime,
-        )
-        self._space = keep_top_layer(self._space)
-        ##Topography and Ref values
-        self._set_ref_variables()
-
-        # initialize state
-        self._set_state()
-        # initialize variables
-        self._create_diagnostic_vars(self._state)
-
-        self._set_utils(optimize)
-        self._set_fluxes(optimize)
-        self._core = self._init_core_model(
-            space_2d=space_2d,
-            H=H,
-            g_prime=g_prime,
-            optimize=optimize,
-        )
 
     @property
     def alpha(self) -> torch.Tensor:
@@ -88,43 +48,6 @@ class QGCollinearSublayer(QGCore[UVHTAlpha]):
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
-        self._core.alpha = alpha
-
-    @property
-    def H(self) -> torch.Tensor:  # noqa: N802
-        """Layers thickness."""
-        return self._H[:1, ...]
-
-    @property
-    def g_prime(self) -> torch.Tensor:
-        """Reduced Gravity."""
-        return self._g_prime[:1, ...]
-
-    def _init_core_model(
-        self,
-        space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
-        g_prime: torch.Tensor,
-        optimize: bool,  # noqa: FBT001
-    ) -> SWCollinearSublayer:
-        """Initialize the core Shallow Water model.
-
-        Args:
-            space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
-            optimize (bool, optional): Whether to precompile functions or
-            not. Defaults to True.
-
-        Returns:
-            SW: Core model (One layer).
-        """
-        return SWCollinearSublayer(
-            space_2d=space_2d,
-            H=H,  # Only consider top layer
-            g_prime=g_prime,  # Only consider top layer
-            optimize=optimize,
-        )
 
     def _set_state(self) -> None:
         self._state = StateAlpha.steady(
@@ -157,14 +80,13 @@ class QGCollinearSublayer(QGCore[UVHTAlpha]):
         """
         if self.space.nl != self._supported_layers_nb:
             msg = (
-                "QGCollinearSublayer can only support"
-                f"{self._supported_layers_nb} layers."
+                f"QGAlpha can only support{self._supported_layers_nb} layers."
             )
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
 
 
-class QGCollinearSF(QGCollinearSublayer):
+class QGCollinearSF(QGAlpha):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _type = "QGCollinearSF"
@@ -172,6 +94,61 @@ class QGCollinearSF(QGCollinearSublayer):
     _supported_layers_nb: int = 2
     _beta_plane_set = False
     _coefficient_set = False
+    _core: SWCollinearSublayer
+
+    def __init__(
+        self,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        optimize: bool = True,  # noqa: FBT001, FBT002
+    ) -> None:
+        """Collinear Sublayer Stream Function.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        verbose.display(
+            msg=f"Creating {self.__class__.__name__} model...",
+            trigger_level=1,
+        )
+        ModelParamChecker.__init__(
+            self,
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+        )
+        self._space = keep_top_layer(self._space)
+        ##Topography and Ref values
+        self._set_ref_variables()
+
+        # initialize state
+        self._set_state()
+        # initialize variables
+        self._create_diagnostic_vars(self._state)
+
+        self._set_utils(optimize)
+        self._set_fluxes(optimize)
+        self._core = self._init_core_model(
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            optimize=optimize,
+        )
+
+    @property
+    def H(self) -> torch.Tensor:  # noqa: N802
+        """Layers thickness."""
+        return self._H[:1, ...]
+
+    @property
+    def g_prime(self) -> torch.Tensor:
+        """Reduced Gravity."""
+        return self._g_prime[:1, ...]
 
     @Model.beta_plane.setter
     def beta_plane(self, beta_plane: BetaPlane) -> None:
@@ -183,11 +160,38 @@ class QGCollinearSF(QGCollinearSublayer):
             self.set_helmholtz_solver(self.lambd)
             self._create_diagnostic_vars(self._state)
 
-    @QGCollinearSublayer.alpha.setter
+    @QGAlpha.alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         """Beta-plane setter."""
-        QGCollinearSublayer.alpha.fset(self, alpha)
+        QGAlpha.alpha.fset(self, alpha)
+        self._core.alpha = alpha
         self._update_A()
+
+    def _init_core_model(
+        self,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        optimize: bool,  # noqa: FBT001
+    ) -> SWCollinearSublayer:
+        """Initialize the core Shallow Water model.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+
+        Returns:
+            SW: Core model (One layer).
+        """
+        return SWCollinearSublayer(
+            space_2d=space_2d,
+            H=H,  # Only consider top layer
+            g_prime=g_prime,  # Only consider top layer
+            optimize=optimize,
+        )
 
     def _update_A(self) -> None:  # noqa: N802
         """Update the stretching operator matrix."""
@@ -228,7 +232,7 @@ class QGCollinearSF(QGCollinearSublayer):
         return super().step()
 
 
-class QGCollinearPV(QGCollinearSublayer):
+class QGCollinearPV(QGAlpha):
     """Modified QG Model implementing collinear pv behavior."""
 
     _type = "QGCollinearPV"

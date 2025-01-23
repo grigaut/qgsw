@@ -8,7 +8,7 @@ import torch
 from qgsw.fields.errors.error_sets import create_errors_set
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.variable_sets import create_qg_variable_set
-from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,

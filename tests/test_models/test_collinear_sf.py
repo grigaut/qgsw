@@ -3,8 +3,8 @@
 import pytest
 import torch
 
-from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
-from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
+from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization2D

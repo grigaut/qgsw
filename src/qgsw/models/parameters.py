@@ -262,7 +262,7 @@ class ModelParamChecker:
             raise InvalidModelParameterError(msg)
         verbose.display(
             msg=(
-                f"{'Non-trivial' if len(vals)==2 else 'Trivial'}"  # noqa: PLR2004
+                f"{'Non-trivial' if len(vals) == 2 else 'Trivial'}"  # noqa: PLR2004
                 " mask provided"
             ),
             trigger_level=2,
@@ -328,7 +328,7 @@ class ModelParamChecker:
         if is_tensorx and (taux.shape != (self.space.nx - 1, self.space.ny)):
             msg = (
                 "Tau_x Tensor must be "
-                f"{(self.space.nx-1, self.space.ny)}-shaped."
+                f"{(self.space.nx - 1, self.space.ny)}-shaped."
             )
             raise InvalidModelParameterError(msg)
         self._taux = taux
@@ -350,7 +350,7 @@ class ModelParamChecker:
         if is_tensory and (tauy.shape != (self.space.nx, self.space.ny - 1)):
             msg = (
                 "Tau_y Tensor must be "
-                f"{(self.space.nx, self.space.ny-1)}-shaped."
+                f"{(self.space.nx, self.space.ny - 1)}-shaped."
             )
             raise InvalidModelParameterError(msg)
         self._tauy = tauy

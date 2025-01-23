@@ -130,8 +130,7 @@ for model, name, dt, start_file in [
 
     if freq_save > 0:
         output_dir = (
-            f'run_outputs/{name}_{nx}x{ny}_dt{dt}_'
-            f'slip{param["slip_coef"]}/'
+            f"run_outputs/{name}_{nx}x{ny}_dt{dt}_slip{param['slip_coef']}/"
         )
         os.makedirs(output_dir, exist_ok=True)
         print(f"Outputs will be saved to {output_dir}")

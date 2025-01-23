@@ -27,8 +27,7 @@ from qgsw.models import SW, QG
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "config",
-    help="Configuration: 'med' for Mediterranea "
-    " and 'na' for North-Atlantic.",
+    help="Configuration: 'med' for Mediterranea  and 'na' for North-Atlantic.",
 )
 parser.add_argument("--log_perf", action="store_true", help="Log performance")
 parser.add_argument(
@@ -71,7 +70,7 @@ dy = Ly / ny
 print(
     f"Grid lat: {lat_min:.1f}, {lat_max:.1f}, "
     f"lon: {lon_min:.1f}, {lon_max:.1f}, "
-    f"dx={dx/1e3:.1f}km, dy={dy/1e3:.1f}km ."
+    f"dx={dx / 1e3:.1f}km, dy={dy / 1e3:.1f}km ."
 )
 
 x_cor = np.linspace(lon_min, lon_max, nx + 1)
@@ -376,9 +375,7 @@ if args.log_perf:
 
 
 if freq_save > 0:
-    output_dir = (
-        f'{disk}/{name}_{nx}x{ny}_dt{dt}_' f'slip{param["slip_coef"]}/'
-    )
+    output_dir = f"{disk}/{name}_{nx}x{ny}_dt{dt}_slip{param['slip_coef']}/"
     os.makedirs(output_dir, exist_ok=True)
     print(f"Outputs will be saved to {output_dir}")
     np.save(os.path.join(output_dir, "mask_land_h.npz"), mask_land)
@@ -433,7 +430,7 @@ for n in range(1, n_steps + 1):
         perf = (walltime - walltime0) / (ngridpoints)
         mperf += perf
         print(
-            f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf/n:.2e}) s",
+            f"\rkt={n:4} time={t:.2f} perf={perf:.2e} ({mperf / n:.2e}) s",
             end="",
         )
 

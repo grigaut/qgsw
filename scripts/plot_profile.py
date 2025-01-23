@@ -46,7 +46,7 @@ txt = f"{variables[0].description}[{variables[0].unit.value}]"
 plot.set_colorbar_text(txt)
 plot.set_subplot_titles(
     [
-        f"{runs[k].summary.configuration.io.name} - Level {source["level"]}"
+        f"{runs[k].summary.configuration.io.name} - Level {source['level']}"
         for k, source in enumerate(config["source"])
     ],
 )
