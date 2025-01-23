@@ -5,12 +5,12 @@ import pytest
 import torch
 from scipy import signal
 
-from qgsw.specs import DEVICE
-from qgsw.utils.gaussian_filters import (
+from qgsw.filters.gaussian import (
     GaussianFilter,
     GaussianFilter1D,
     GaussianFilter2D,
 )
+from qgsw.specs import DEVICE
 
 testdata = [
     pytest.param((500,), GaussianFilter1D(10), id="1D"),
