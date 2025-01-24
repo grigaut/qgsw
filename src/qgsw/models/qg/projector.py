@@ -42,7 +42,9 @@ class QGProjector:
 
         Args:
             A (torch.Tensor): Stretching matrix.
+                └── (nl, nl)-shaped
             H (torch.Tensor): Layers reference thickness.
+                └── (n_ens, nl, 1, 1)-shaped
             space (SpaceDiscretization3D): 3D space discretization.
             f0 (float): f0.
             masks (Masks): Masks.
@@ -62,7 +64,7 @@ class QGProjector:
     def A(self) -> torch.Tensor:  # noqa: N802
         """Streching matrix.
 
-        (nl,nl)-shaped.
+        └── (nl,nl)-shaped.
         """
         return self._A
 
@@ -88,7 +90,7 @@ class QGProjector:
     def H(self) -> torch.Tensor:  # noqa: N802
         """Layers reference thickness.
 
-        (n_ens, nl, nx,ny)-shaped.
+        └── (n_ens, nl, 1, 1)-shaped.
         """
         return self._H
 
@@ -96,7 +98,7 @@ class QGProjector:
     def lambd(self) -> torch.Tensor:
         """Eigen values of A.
 
-        (1,nl,1,1)-shaped.
+        └── (1, nl, 1, 1)-shaped.
         """
         return self._lambd
 
@@ -104,7 +106,8 @@ class QGProjector:
         """Set the Helmholtz Solver.
 
         Args:
-            lambd (torch.Tensor): Matrix A's eigenvalues, (1,nl,1,1)-shaped.
+            lambd (torch.Tensor): Matrix A's eigenvalues.
+                └── (1, nl, 1, 1)-shaped.
             f0 (float): f0.
         """
         # For Helmholtz equations
@@ -184,24 +187,27 @@ class QGProjector:
         """Geostrophic operator.
 
         Args:
-            p (torch.float):Pressure, (n_ens, nl, nx+1, ny+1)-shaped.
-            A (torch.Tensor): Stretching matrix, (nl,nl)-shaped.
-            H (torch.Tensor): Layers reference thickness,
-            (n_ens, nl, 1, 1)-shaped.
+            p (torch.float):Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+            A (torch.Tensor): Stretching matrix.
+                └── (nl,nl)-shaped.
+            H (torch.Tensor): Layers reference thickness.
+                └── (n_ens, nl, 1, 1)-shaped.
             dx (float): dx.
             dy (float): dy.
             ds (float): ds.
             f0 (float): f0.
             points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface function.
-            p_i (torch.Tensor | None, optional): INterpolated pressure.
+            p_i (torch.Tensor | None, optional): Interpolated pressure.
             Defaults to None.
+                └── (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: Prognostic variables u,v and h.
-            u is (n_ens, nl, nx+1,ny)-shaped,
-            v is (n_ens, nl, nx,ny+1)-shaped and
-            h is (n_ens, nl, nx,ny)-shaped.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         p_i = points_to_surfaces(p) if p_i is None else p_i
 
@@ -218,13 +224,15 @@ class QGProjector:
 
         Args:
             p (torch.float):Pressure, (n_ens, nl, nx+1, ny+1)-shaped.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
             p_i (torch.Tensor | None): Interpolated pressure.
+                └── (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: Prognostic variables u,v and h.
-            u is (n_ens, nl, nx+1,ny)-shaped,
-            v is (n_ens, nl, nx,ny+1)-shaped and
-            h is (n_ens, nl, nx,ny)-shaped.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         return self.G(
             p=p,
@@ -250,18 +258,19 @@ class QGProjector:
 
         Args:
             uvh (UVH): Prognostic u,v and h.
-            u is (n_ens, nl, nx+1,ny)-shaped,
-            v is (n_ens, nl, nx,ny+1)-shaped and
-            h is (n_ens, nl, nx,ny)-shaped.
-            H (torch.Tensor): Layers reference thickness,
-            (n_ens,nl,1,1)-shaped.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+            H (torch.Tensor): Layers reference thickness.
+                └── (n_ens,nl,1,1)-shaped.
             f0 (float): f0.
             ds (float): ds.
             points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface interpolation function.
 
         Returns:
-            torch.Tensor: Pressure, (n_ens,nl,nx,ny)-shaped.
+            torch.Tensor: Pressure.
+                └── (n_ens,nl,nx,ny)-shaped.
         """
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
@@ -276,9 +285,13 @@ class QGProjector:
 
         Args:
             uvh (UVH): Prognostic u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Pressure, (n_ens,nl,nx,ny)-shaped.
+            torch.Tensor: Pressure.
+                └── (n_ens,nl,nx,ny)-shaped.
         """
         return self.Q(
             uvh=uvh,
@@ -296,12 +309,13 @@ class QGProjector:
 
         Args:
             elliptic_rhs (torch.Tensor): Right hand side,
-            (n_ens,nl,nx,ny)-shaped.
+                └── (n_ens, nl, nx, ny)-shaped.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Pressure,
-            (n_ens,nl, nx+1,ny+1)-shaped and interpolated pressure,
-            (n_ens, nl,nx,ny)-shaped.
+            tuple[torch.Tensor, torch.Tensor]: Pressure p and
+            interpolated pressure p_i.
+                ├── p: (n_ens, nl, nx+1, ny+1)-shaped
+                └── p_i: (n_ens, nl, nx, ny)-shaped
         """
         # transform to modes
         helmholtz_rhs: torch.Tensor = torch.einsum(
@@ -330,14 +344,14 @@ class QGProjector:
 
         Args:
             uvh (UVH): Prognostic u,v and h.
-            u is (n_ens, nl, nx+1,ny)-shaped,
-            v is (n_ens, nl, nx,ny+1)-shaped and
-            h is (n_ens, nl, nx,ny)-shaped.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: Projected prognostic u,v and h.
-            u is (n_ens, nl, nx+1,ny)-shaped,
-            v is (n_ens, nl, nx,ny+1)-shaped and
-            h is (n_ens, nl, nx,ny)-shaped.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         return self._G(*self.QoG_inv(self._Q(uvh)))

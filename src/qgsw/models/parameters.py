@@ -128,14 +128,14 @@ class ModelParamChecker:
 
     @property
     def beta_plane(self) -> BetaPlane:
-        """Beta Plane parmaters."""
+        """Beta Plane paramters."""
         return self._beta_plane
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
         """Layers thickness.
 
-        (n_ens, nl, nx, ny)-shaped.
+        └── (n_ens, nl, 1, 1)-shaped.
         """
         return self._H
 
@@ -143,14 +143,17 @@ class ModelParamChecker:
     def g_prime(self) -> torch.Tensor:
         """Reduced Gravity.
 
-        (n_ens, nl, nx, ny)-shaped.
+        └── (n_ens, nl, 1, 1)-shaped
         """
         return self._g_prime
 
     @property
     def g(self) -> float:
-        """Reduced gravity in top layer."""
-        return self.g_prime[0]
+        """Reduced gravity in top layer.
+
+        (n_ens,)-shaped.
+        """
+        return self.g_prime[:, 0, 0, 0]
 
     @property
     def taux(self) -> torch.Tensor | float:
@@ -286,6 +289,7 @@ class ModelParamChecker:
 
         Args:
             h (torch.Tensor): Layers Thickness.
+                └── (nl, 1, 1)-shaped
         """
         if len(h.shape) < 3:  # noqa: PLR2004
             msg = (

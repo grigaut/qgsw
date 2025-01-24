@@ -18,13 +18,16 @@ def compute_A_collinear_sf(  # noqa: N802
 
     Args:
         H (torch.Tensor): Layers reference height.
+                └── (2,) shaped
         g_prime (torch.Tensor): Reduced gravity values.
+                └── (2,) shaped
         alpha (float): Collinearity coefficient.
         dtype (torch.dtype): Data type.
         device: (torch.device): Data device.
 
     Returns:
-        torch.Tensor: Stretching Operator
+        torch.Tensor: Stretching Operator.
+                └── (2, 2) shaped
     """  # noqa: RUF002
     A = compute_A(H=H, g_prime=g_prime, dtype=dtype, device=device)  # noqa: N806
     # Create layers coefficients vector [1, α]  # noqa: RUF003

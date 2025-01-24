@@ -104,8 +104,10 @@ class SWCore(Model[T], Generic[T]):
 
         Args:
             space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (nl,) shaped.
             beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
@@ -117,12 +119,6 @@ class SWCore(Model[T], Generic[T]):
             beta_plane=beta_plane,
             optimize=optimize,
         )
-
-    @property
-    def pv(self) -> torch.Tensor:
-        """Potential MaskedVorticity."""
-        msg = "Shallow Water Models don't have vorticity plots."
-        raise AttributeError(msg)
 
     def _compute_coriolis(self, omega_grid_2d: Grid2D) -> None:
         """Set Coriolis related grids.
@@ -147,11 +143,16 @@ class SWCore(Model[T], Generic[T]):
         """Add wind forcing to the derivatives du, dv.
 
         Args:
+            prognostic (UVHT): u,v and h.
             du (torch.Tensor): du
+                └── (n_ens, nl, nx+1, ny)-shaped
             dv (torch.Tensor): dv
+                └── (n_ens, nl, nx, ny+1)-shaped
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with wind forcing.
+                ├── du: (n_ens, nl, nx+1, ny)-shaped
+                └── dv: (n_ens, nl, nx, ny+1)-shaped
         """
         # Sum h on u grid
         h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
@@ -176,10 +177,14 @@ class SWCore(Model[T], Generic[T]):
         Args:
             prognostic (UVHT): u,v and h.
             du (torch.Tensor): du
+                └── (n_ens, nl, nx+1, ny)-shaped
             dv (torch.Tensor): dv
+                └── (n_ens, nl, nx, ny+1)-shaped
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: du, dv with botoom drag forcing.
+                ├── du: (n_ens, nl, nx+1, ny)-shaped
+                └── dv: (n_ens, nl, nx, ny+1)-shaped
         """
         coef = self.bottom_drag_coef
         du[..., -1, :, :] += -coef * prognostic.u[..., -1, 1:-1, :]
@@ -187,6 +192,11 @@ class SWCore(Model[T], Generic[T]):
         return du, dv
 
     def _create_diagnostic_vars(self, state: State) -> None:
+        """Create diagnostic variables and bind them to state.
+
+        Args:
+            state (State): state.
+        """
         super()._create_diagnostic_vars(state)
 
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
@@ -209,6 +219,9 @@ class SWCore(Model[T], Generic[T]):
 
         Agrs:
             prognostic (UVHT): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         return schemes.rk3_ssp(
             prognostic,
@@ -228,8 +241,16 @@ class SWCore(Model[T], Generic[T]):
         - ∂_t u = (ω + f)v - ∂_x(gη + 0.5(u² + v²))
         - ∂_t v = - (ω + f)u - ∂_y(gη + 0.5(u² + v²))
 
+        Agrs:
+            prognostic (UVHT): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
         Returns:
             tuple[torch.Tensor,torch.Tensor]: u, v advection (∂_t u, ∂_t v).
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                └── v: (n_ens, nl, nx, ny+1)-shaped
         """
         # Zonal velocity -> corresponds to the v grid
         # Has no value on the boundary of the v grid
@@ -274,9 +295,11 @@ class SWCore(Model[T], Generic[T]):
 
         Args:
             h (torch.Tensor): layer Thickness perturbation
+                └── (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: h advection (∂_t h).
+            torch.Tensor: h advection (∂_t h)
+                └── (n_ens, nl, nx, ny)-shaped
         """
         h_tot = self.h_ref + h
         # Compute (h_tot x V)
@@ -297,10 +320,16 @@ class SWCore(Model[T], Generic[T]):
         """Compute the state variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            uvh (UVH): u,v and h.
+            uvh (UVH): u,v and h
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            UVH: dt_u, dt_v, dt_h
+            UVH: dt_u, dt_v, dt_h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         self._state.update_uvh(uvh)
         dt_h = self.advection_h(uvh.h)

@@ -154,17 +154,26 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
 
     @property
     def u(self) -> torch.Tensor:
-        """State Variable u: Zonal Speed."""
+        """State Variable u: Zonal Speed.
+
+        └── (n_ens, nl, nx+1,ny)-shaped.
+        """
         return self._state.u.get()
 
     @property
     def v(self) -> torch.Tensor:
-        """State Variable v: Meridional Speed."""
+        """State Variable v: Meridional Speed.
+
+        └── (n_ens, nl, nx,ny+1)-shaped.
+        """
         return self._state.v.get()
 
     @property
     def h(self) -> torch.Tensor:
-        """State Variable h: Layers Thickness."""
+        """State Variable h: Layers Thickness.
+
+        └── (n_ens, nl, nx,ny)-shaped.
+        """
         return self._state.h.get()
 
     @ModelParamChecker.slip_coef.setter
@@ -233,6 +242,7 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
             self.dy_p_ref = 0.0
 
     def _set_state(self) -> None:
+        """Set the state."""
         self._state = State.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
@@ -290,8 +300,11 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
 
         Args:
             u_phys (torch.Tensor|np.ndarray): Physical U.
+                └── (n_ens, nl, nx+1, ny)-shaped.
             v_phys (torch.Tensor|np.ndarray): Physical V.
+                └── (n_ens, nl, nx, ny+1)-shaped.
             h_phys (torch.Tensor|np.ndarray): Physical H.
+                └── (n_ens, nl, nx, ny)-shaped.
         """
         u_ = (
             torch.from_numpy(u_phys)
@@ -328,8 +341,11 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
 
         Args:
             u (torch.Tensor): State variable u.
+                └── (n_ens, nl, nx+1, ny)-shaped.
             v (torch.Tensor): State variable v.
+                └── (n_ens, nl, nx, ny+1)-shaped.
             h (torch.Tensor): State variable h.
+                └── (n_ens, nl, nx, ny)-shaped.
         """
         u = u.to(self.device.get())
         v = v.to(self.device.get())
@@ -362,9 +378,15 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
 
         Args:
             prognostic (UVH): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: dt_u, dt_v, dt_h
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
         """
 
     @abstractmethod
@@ -373,9 +395,15 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
 
         Args:
             uvh (UVH): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: update prognostic variables.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
 
     def step(self) -> None:
