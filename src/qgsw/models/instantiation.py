@@ -128,6 +128,7 @@ def _instantiate_sw(
         space_2d=space_2d,
         H=model_config.h,
         g_prime=model_config.g_prime,
+        beta_plane=beta_plane,
     )
     model.beta_plane = beta_plane
     p0 = perturbation.compute_initial_pressure(
@@ -179,6 +180,7 @@ def _instantiate_qg(
         space_2d=space_2d,
         H=model_config.h,
         g_prime=model_config.g_prime,
+        beta_plane=beta_plane,
     )
     model.beta_plane = beta_plane
     p0 = perturbation.compute_initial_pressure(

@@ -34,7 +34,9 @@ from qgsw.spatial.core.discretization import (
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import State
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
+    from qgsw.spatial.core.grid import Grid2D
 
 
 def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -94,6 +96,7 @@ class SWCore(Model[T], Generic[T]):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
         optimize: bool = True,
     ) -> None:
         """SW Model Instantiation.
@@ -102,6 +105,7 @@ class SWCore(Model[T], Generic[T]):
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
             g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -109,6 +113,7 @@ class SWCore(Model[T], Generic[T]):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
             optimize=optimize,
         )
 
@@ -118,9 +123,13 @@ class SWCore(Model[T], Generic[T]):
         msg = "Shallow Water Models don't have vorticity plots."
         raise AttributeError(msg)
 
-    def _compute_coriolis(self) -> None:
-        """Set Coriolis Related Grids."""
-        super()._compute_coriolis()
+    def _compute_coriolis(self, omega_grid_2d: Grid2D) -> None:
+        """Set Coriolis related grids.
+
+        Args:
+            omega_grid_2d (Grid2D): Omega grid (2D).
+        """
+        super()._compute_coriolis(omega_grid_2d=omega_grid_2d)
         ## Coriolis grids
         self.f_ugrid = convert.omega_to_u(self.f)
         self.f_vgrid = convert.omega_to_v(self.f)
@@ -344,6 +353,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
         optimize: bool = True,
     ) -> None:
         """SW Model Instantiation.
@@ -352,6 +362,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
             g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -360,8 +371,10 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
         )
         self._space = keep_top_layer(self._space)
+        self._compute_coriolis(self._space.omega.remove_z_h())
         ##Topography and Ref values
         self._set_ref_variables()
 

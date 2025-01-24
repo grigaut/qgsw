@@ -26,6 +26,7 @@ from qgsw.specs import DEVICE
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
+    from qgsw.spatial.core.grid import Grid2D
     from qgsw.specs._utils import Device
 
 Prognostic = TypeVar("Prognostic", bound=BasePrognosticTuple)
@@ -77,6 +78,7 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
         optimize: bool = True,
     ) -> None:
         """Model Instantiation.
@@ -85,6 +87,7 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
             g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -97,7 +100,9 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
         )
+        self._compute_coriolis(self._space.omega.remove_z_h())
         ##Topography and Ref values
         self._set_ref_variables()
 
@@ -168,18 +173,17 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
         ModelParamChecker.slip_coef.fset(self, slip_coef)
         self._create_diagnostic_vars(self._state)
 
-    @ModelParamChecker.beta_plane.setter
-    def beta_plane(self, beta_plane: BetaPlane) -> None:
-        """Beta plane setter."""
-        ModelParamChecker.beta_plane.fset(self, beta_plane)
-        self._compute_coriolis()
-
     def _compute_coriolis(
         self,
+        omega_grid_2d: Grid2D,
     ) -> None:
-        """Set Coriolis Values."""
+        """Set Coriolis Values.
+
+        Args:
+            omega_grid_2d (Grid2D): Omega grid (2D).
+        """
         # Coriolis values
-        f = self.beta_plane.compute_over_grid(self.space.omega.remove_z_h())
+        f = self.beta_plane.compute_over_grid(omega_grid_2d)
         self.f = f.unsqueeze(0)
 
     def set_wind_forcing(

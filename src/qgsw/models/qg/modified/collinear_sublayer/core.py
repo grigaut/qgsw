@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from qgsw import verbose
 from qgsw.fields.variables.state import StateAlpha
 from qgsw.fields.variables.uvh import UVHTAlpha
-from qgsw.models.base import Model
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
@@ -91,7 +90,6 @@ class QGCollinearSF(QGAlpha):
     _type = "QGCollinearSF"
 
     _supported_layers_nb: int = 2
-    _beta_plane_set = False
     _coefficient_set = False
     _core: SWCollinearSublayer
 
@@ -100,6 +98,7 @@ class QGCollinearSF(QGAlpha):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         """Collinear Sublayer Stream Function.
@@ -108,6 +107,7 @@ class QGCollinearSF(QGAlpha):
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
             g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -120,8 +120,10 @@ class QGCollinearSF(QGAlpha):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
         )
         self._space = keep_top_layer(self._space)
+        self._compute_coriolis(self._space.omega.remove_z_h())
         ##Topography and Ref values
         self._set_ref_variables()
 
@@ -136,6 +138,7 @@ class QGCollinearSF(QGAlpha):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
             optimize=optimize,
         )
 
@@ -149,16 +152,6 @@ class QGCollinearSF(QGAlpha):
         """Reduced Gravity."""
         return self._g_prime[:1, ...]
 
-    @Model.beta_plane.setter
-    def beta_plane(self, beta_plane: BetaPlane) -> None:
-        """Beta-plane setter."""
-        Model.beta_plane.fset(self, beta_plane)
-        self.sw.beta_plane = beta_plane
-        self._beta_plane_set = True
-        if self._coefficient_set:
-            self.set_helmholtz_solver(self.lambd)
-            self._create_diagnostic_vars(self._state)
-
     @QGAlpha.alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         """Beta-plane setter."""
@@ -171,6 +164,7 @@ class QGCollinearSF(QGAlpha):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
         optimize: bool,  # noqa: FBT001
     ) -> SWCollinearSublayer:
         """Initialize the core Shallow Water model.
@@ -179,6 +173,7 @@ class QGCollinearSF(QGAlpha):
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
             g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
 
@@ -189,6 +184,7 @@ class QGCollinearSF(QGAlpha):
             space_2d=space_2d,
             H=H,  # Only consider top layer
             g_prime=g_prime,  # Only consider top layer
+            beta_plane=beta_plane,
             optimize=optimize,
         )
 
@@ -198,9 +194,8 @@ class QGCollinearSF(QGAlpha):
         decomposition = compute_layers_to_mode_decomposition(self.A)
         self.Cm2l, lambd, self.Cl2m = decomposition
         self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
-        if self._beta_plane_set:
-            self.set_helmholtz_solver(self.lambd)
-            self._create_diagnostic_vars(self._state)
+        self.set_helmholtz_solver(self.lambd)
+        self._create_diagnostic_vars(self._state)
 
     def compute_A(  # noqa: N802
         self,

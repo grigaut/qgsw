@@ -80,6 +80,7 @@ class QGCore(Model[T], Generic[T]):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT002, FBT001
     ) -> None:
         """QG Model Instantiation.
@@ -88,6 +89,7 @@ class QGCore(Model[T], Generic[T]):
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
             g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
@@ -95,6 +97,7 @@ class QGCore(Model[T], Generic[T]):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
             optimize=optimize,
         )
         self.A = self.compute_A(H, g_prime)
@@ -102,6 +105,7 @@ class QGCore(Model[T], Generic[T]):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
             optimize=optimize,
         )
         decomposition = compute_layers_to_mode_decomposition(self.A)
@@ -117,13 +121,6 @@ class QGCore(Model[T], Generic[T]):
     def lambd(self) -> torch.Tensor:
         """Eigenvalues of A."""
         return self._lambd
-
-    @Model.beta_plane.setter
-    def beta_plane(self, beta_plane: BetaPlane) -> None:
-        """Beta-plane setter."""
-        Model.beta_plane.fset(self, beta_plane)
-        self.sw.beta_plane = beta_plane
-        self.set_helmholtz_solver(self.lambd)
 
     @Model.slip_coef.setter
     def slip_coef(self, slip_coef: float) -> None:
@@ -394,6 +391,7 @@ class QGCore(Model[T], Generic[T]):
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
         optimize: bool,  # noqa: FBT001
     ) -> SW:
         """Initialize the core Shallow Water model.
@@ -402,6 +400,7 @@ class QGCore(Model[T], Generic[T]):
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
             g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
 
@@ -412,6 +411,7 @@ class QGCore(Model[T], Generic[T]):
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
+            beta_plane=beta_plane,
             optimize=optimize,
         )
 

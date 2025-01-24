@@ -7,6 +7,7 @@ from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
 from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
+from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
@@ -52,6 +53,7 @@ def test_H_shape(  # noqa: N802
         space_2d,
         H,
         g_prime,
+        beta_plane=BetaPlane(9.375e-5, 0),
     )
     assert model.H.shape == (1, 1, 1)
 
@@ -66,6 +68,7 @@ def test_g_prime_shape(
         space_2d,
         H,
         g_prime,
+        beta_plane=BetaPlane(9.375e-5, 0),
     )
     assert model.g_prime.shape == (1, 1, 1)
 
@@ -80,6 +83,7 @@ def test_UVH_shape(  # noqa: N802
         space_2d,
         H,
         g_prime,
+        beta_plane=BetaPlane(9.375e-5, 0),
     )
     assert model.u.shape[1] == 1
     assert model.v.shape[1] == 1
@@ -96,6 +100,7 @@ def test_stretching_matrix_shape(
         space_2d,
         H,
         g_prime,
+        beta_plane=BetaPlane(9.375e-5, 0),
     )
     model.alpha = torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
     assert model.A.shape == (1, 1)
