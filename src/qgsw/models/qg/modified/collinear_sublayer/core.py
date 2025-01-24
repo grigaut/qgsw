@@ -14,9 +14,6 @@ from qgsw.models.qg.core import QGCore
 from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
-from qgsw.models.qg.stretching_matrix import (
-    compute_layers_to_mode_decomposition,
-)
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -157,7 +154,9 @@ class QGCollinearSF(QGAlpha):
         """Beta-plane setter."""
         QGAlpha.alpha.fset(self, alpha)
         self._core.alpha = alpha
-        self._update_A()
+        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
+        self._set_projector()
+        self._create_diagnostic_vars(self._state)
 
     def _init_core_model(
         self,
@@ -187,15 +186,6 @@ class QGCollinearSF(QGAlpha):
             beta_plane=beta_plane,
             optimize=optimize,
         )
-
-    def _update_A(self) -> None:  # noqa: N802
-        """Update the stretching operator matrix."""
-        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
-        decomposition = compute_layers_to_mode_decomposition(self.A)
-        self.Cm2l, lambd, self.Cl2m = decomposition
-        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
-        self.set_helmholtz_solver(self.lambd)
-        self._create_diagnostic_vars(self._state)
 
     def compute_A(  # noqa: N802
         self,

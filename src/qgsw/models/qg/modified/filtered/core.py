@@ -125,7 +125,7 @@ class QGCollinearFilteredSF(QGAlpha):
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(
-            g_prime=self.g_prime[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
+            g_prime=self.g_prime[:, :1, ...],
             eta_phys=eta_phys,
         )
         p.bind(self._state)
@@ -140,8 +140,8 @@ class QGCollinearFilteredSF(QGAlpha):
             UVH: Quasi geostrophic u,v and h
         """
         p = self._state[Pressure.get_name()].compute_no_slice(uvh)
-        p_toplayer = torch.nn.functional.pad(p[:, 0, ...], (1, 1, 1, 1))
-        p_sublayer = self._filt(p_toplayer[0, 0]).unsqueeze(0)
+        p_toplayer = torch.nn.functional.pad(p[:, 0, ...], (1, 0, 1, 0))
+        p_sublayer = self._filt(p_toplayer[0]).unsqueeze(0)
         p = torch.stack([p_toplayer, self.alpha * p_sublayer], dim=1)
         new_uvh = self.G(p)
         projected = super().project(new_uvh)

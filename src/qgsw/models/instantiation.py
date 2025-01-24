@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.qg.core import QG, G
+from qgsw.models.qg.core import QG
 from qgsw.models.qg.exceptions import UnrecognizedQGModelError
 from qgsw.models.qg.modified.collinear_sublayer.core import (
     QGAlpha,
@@ -14,12 +14,14 @@ from qgsw.models.qg.modified.collinear_sublayer.core import (
 )
 from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
 from qgsw.models.qg.modified.utils import is_modified
+from qgsw.models.qg.projector import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
 from qgsw.models.sw.filtering import (
     SWFilterBarotropicExact,
     SWFilterBarotropicSpectral,
 )
+from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
@@ -130,7 +132,6 @@ def _instantiate_sw(
         g_prime=model_config.g_prime,
         beta_plane=beta_plane,
     )
-    model.beta_plane = beta_plane
     p0 = perturbation.compute_initial_pressure(
         model.space.omega,
         beta_plane.f0,
@@ -142,12 +143,15 @@ def _instantiate_sw(
         torch.float64,
         device=DEVICE.get(),
     )
-    uvh0 = G(
+    uvh0 = QGProjector.G(
         p0,
-        model.space,
-        model.H,
-        A,
-        beta_plane.f0,
+        A=A,
+        H=model.H,
+        dx=model.space.dx,
+        dy=model.space.dy,
+        ds=model.space.ds,
+        f0=model.beta_plane.f0,
+        points_to_surfaces=points_to_surfaces,
     )
     model.set_uvh(
         u=torch.clone(uvh0.u),
@@ -182,13 +186,21 @@ def _instantiate_qg(
         g_prime=model_config.g_prime,
         beta_plane=beta_plane,
     )
-    model.beta_plane = beta_plane
     p0 = perturbation.compute_initial_pressure(
         model.space.omega,
         model.beta_plane.f0,
         Ro,
     )
-    uvh0 = model.G(p0)
+    uvh0 = QGProjector.G(
+        p0,
+        A=model.A,
+        H=model.H,
+        dx=model.space.dx,
+        dy=model.space.dy,
+        ds=model.space.ds,
+        f0=model.beta_plane.f0,
+        points_to_surfaces=points_to_surfaces,
+    )
     model.set_uvh(
         u=torch.clone(uvh0.u),
         v=torch.clone(uvh0.v),
@@ -227,19 +239,28 @@ def _instantiate_collinear_qg(
         space_2d=space_2d,
         H=model_config.h,
         g_prime=model_config.g_prime,
+        beta_plane=beta_plane,
     )
-    model.beta_plane = beta_plane
     p0 = perturbation.compute_initial_pressure(
         model.space.omega,
         model.beta_plane.f0,
         Ro,
     )
     model.alpha = _determine_coef0(perturbation.type)
-    uvh0 = model.G(p0)
+    uvh0 = QGProjector.G(
+        p0,
+        A=model.A,
+        H=model.H,
+        dx=model.space.dx,
+        dy=model.space.dy,
+        ds=model.space.ds,
+        f0=model.beta_plane.f0,
+        points_to_surfaces=points_to_surfaces,
+    )
     model.set_uvh(
-        u=torch.clone(uvh0.u),
-        v=torch.clone(uvh0.v),
-        h=torch.clone(uvh0.h),
+        u=torch.clone(uvh0.u[:, :1, ...]),
+        v=torch.clone(uvh0.v[:, :1, ...]),
+        h=torch.clone(uvh0.h[:, :1, ...]),
     )
     return model
 

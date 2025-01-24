@@ -4,67 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic, TypeVar
 
-import torch
-
 from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
-from qgsw.models.core.helmholtz import (
-    compute_capacitance_matrices,
-    compute_laplace_dstI,
-    solve_helmholtz_dstI,
-    solve_helmholtz_dstI_cmm,
-)
+from qgsw.models.qg.projector import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
-    compute_layers_to_mode_decomposition,
 )
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    import torch
 
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
-
-
-def G(  # noqa: N802
-    p: torch.Tensor,
-    space: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
-    A: torch.Tensor,  # noqa: N803
-    f0: float,
-    p_i: torch.Tensor = None,
-    corner_to_center: Callable = points_to_surfaces,
-) -> UVH:
-    """G operator.
-
-    Args:
-        p (torch.Tensor): Pressure.
-        space (SpaceDiscretization2D): Space Discretization
-        H (torch.Tensor): H tensor, (nl,nx,ny) shaped.
-        A (torch.Tensor): Stretching operator matrix, (nl,nl) shaped.
-        f0 (float): Coriolis parameter.
-        p_i (torch.Tensor, optional): Interpolated pressure
-        ("middle of grid cell"). Defaults to None.
-        corner_to_center (Callable, optional): Corner to center interpolation
-        function. Defaults to points_to_surfaces.
-
-    Returns:
-        UVH: Resulting u v and h
-    """
-    p_i = corner_to_center(p) if p_i is None else p_i
-    dx, dy = space.dx, space.dy
-
-    # geostrophic balance
-    u = -torch.diff(p, dim=-1) / dy / f0 * dx
-    v = torch.diff(p, dim=-2) / dx / f0 * dy
-    # h = diag(H)Ap
-    h = H * torch.einsum("lm,...mxy->...lxy", A, p_i) * space.ds
-
-    return UVH(u, v, h)
 
 
 T = TypeVar("T", bound=BasePrognosticTuple)
@@ -101,6 +55,7 @@ class QGCore(Model[T], Generic[T]):
             optimize=optimize,
         )
         self.A = self.compute_A(H, g_prime)
+        self._set_projector()
         self._core = self._init_core_model(
             space_2d=space_2d,
             H=H,
@@ -108,19 +63,11 @@ class QGCore(Model[T], Generic[T]):
             beta_plane=beta_plane,
             optimize=optimize,
         )
-        decomposition = compute_layers_to_mode_decomposition(self.A)
-        self.Cm2l, lambd, self.Cl2m = decomposition
-        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
 
     @property
     def sw(self) -> SW:
         """Core Shallow Water Model."""
         return self._core
-
-    @property
-    def lambd(self) -> torch.Tensor:
-        """Eigenvalues of A."""
-        return self._lambd
 
     @Model.slip_coef.setter
     def slip_coef(self, slip_coef: float) -> None:
@@ -145,6 +92,7 @@ class QGCore(Model[T], Generic[T]):
         """Masks setter."""
         Model.masks.fset(self, masks)
         self.sw.masks = masks
+        self._P.masks = masks
 
     @Model.n_ens.setter
     def n_ens(self, n_ens: int) -> None:
@@ -201,65 +149,6 @@ class QGCore(Model[T], Generic[T]):
             device=self.device.get(),
         )
 
-    def set_helmholtz_solver(self, lambd: torch.Tensor) -> None:
-        """Set the Helmholtz Solver.
-
-        Args:
-            lambd (torch.Tensor): Matrix A's eigenvalues.
-        """
-        # For Helmholtz equations
-        nl, nx, ny = lambd.shape[1], self.space.nx, self.space.ny
-        laplace_dstI = (  # noqa: N806
-            compute_laplace_dstI(
-                nx,
-                ny,
-                self.space.dx,
-                self.space.dy,
-                dtype=self.dtype,
-                device=self.device.get(),
-            )
-            .unsqueeze(0)
-            .unsqueeze(0)
-        )
-        # Compute "(∆ - (f_0)² Λ)" in Fourier Space
-        self.helmholtz_dstI = laplace_dstI - self.beta_plane.f0**2 * lambd
-        # Constant Omega grid
-        cst_wgrid = torch.ones(
-            (1, nl, nx + 1, ny + 1),
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
-        if len(self.masks.psi_irrbound_xids) > 0:
-            # Handle Non rectangular geometry
-            self.cap_matrices = compute_capacitance_matrices(
-                self.helmholtz_dstI,
-                self.masks.psi_irrbound_xids,
-                self.masks.psi_irrbound_yids,
-            )
-            sol_wgrid = solve_helmholtz_dstI_cmm(
-                (cst_wgrid * self.masks.psi)[..., 1:-1, 1:-1],
-                self.helmholtz_dstI,
-                self.cap_matrices,
-                self.masks.psi_irrbound_xids,
-                self.masks.psi_irrbound_yids,
-                self.masks.psi,
-            )
-        else:
-            self.cap_matrices = None
-            sol_wgrid = solve_helmholtz_dstI(
-                cst_wgrid[..., 1:-1, 1:-1],
-                self.helmholtz_dstI,
-            )
-        # Compute homogenous solution
-        self.homsol_wgrid = (
-            cst_wgrid + sol_wgrid * self.beta_plane.f0**2 * lambd
-        )
-        self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
-        self.homsol_hgrid = self.points_to_surfaces(
-            self.homsol_wgrid,
-        )
-        self.homsol_hgrid_mean = self.homsol_hgrid.mean((-1, -2), keepdim=True)
-
     def set_uvh(
         self,
         u: torch.Tensor,
@@ -280,111 +169,14 @@ class QGCore(Model[T], Generic[T]):
         self.sw.set_uvh(u, v, h)
         super().set_uvh(u, v, h)
 
-    def G(  # noqa: N802
-        self,
-        p: torch.Tensor,
-        p_i: torch.Tensor | None = None,
-    ) -> UVH:
-        """G operator.
-
-        Args:
-            p (torch.Tensor): Pressure.
-            p_i (Union[None, torch.Tensor], optional): Interpolated pressure
-             ("middle of grid cell"). Defaults to None.
-
-        Returns:
-            UVH: u, v and h
-        """
-        return G(
-            p,
-            self.space,
-            self.H,
+    def _set_projector(self) -> None:
+        self._P = QGProjector(
             self.A,
-            self.beta_plane.f0,
-            p_i,
-            self.points_to_surfaces,
+            self.H,
+            space=self.space,
+            f0=self.beta_plane.f0,
+            masks=self.masks,
         )
-
-    def QoG_inv(  # noqa: N802
-        self,
-        elliptic_rhs: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """(Q o G)^{-1} operator: solve elliptic eq with mass conservation.
-
-        More informatiosn: https://gmd.copernicus.org/articles/17/1749/2024/.)
-
-        Args:
-            elliptic_rhs (torch.Tensor): Elliptic equation right hand side
-            value (ω-f_0*h/H).
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: Quasi-geostrophique pressure,
-            interpolated quasi-geostroophic pressure ("middle of grid cell").
-        """
-        # transform to modes
-        helmholtz_rhs: torch.Tensor = torch.einsum(
-            "lm,...mxy->...lxy",
-            self.Cl2m,
-            elliptic_rhs,
-        )
-        if self.cap_matrices is not None:
-            p_modes = solve_helmholtz_dstI_cmm(
-                helmholtz_rhs * self.masks.psi[..., 1:-1, 1:-1],
-                self.helmholtz_dstI,
-                self.cap_matrices,
-                self.masks.psi_irrbound_xids,
-                self.masks.psi_irrbound_yids,
-                self.masks.psi,
-            )
-        else:
-            p_modes = solve_helmholtz_dstI(helmholtz_rhs, self.helmholtz_dstI)
-
-        # Add homogeneous solutions to ensure mass conservation
-        alpha = -p_modes.mean((-1, -2), keepdim=True) / self.homsol_wgrid_mean
-        p_modes += alpha * self.homsol_wgrid
-        # transform back to layers
-        p_qg: torch.Tensor = torch.einsum(
-            "lm,...mxy->...lxy",
-            self.Cm2l,
-            p_modes,
-        )
-        p_qg_i = self.points_to_surfaces(p_qg)
-        return p_qg, p_qg_i
-
-    def Q(  # noqa: N802
-        self,
-        uvh: UVH,
-    ) -> torch.Tensor:
-        """Q operator: compute elliptic equation r.h.s.
-
-        Args:
-            uvh (UVH): u,v and h.
-
-        Returns:
-            torch.Tensor: Elliptic equation right hand side (ω-f_0*h/H).
-        """
-        f0, H, ds = self.beta_plane.f0, self.H, self.space.ds  # noqa: N806
-        # Compute ω = ∂_x v - ∂_y u
-        omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
-            uvh.u[..., 1:-1, :],
-            dim=-1,
-        )
-        # Compute ω-f_0*h/H
-        return (omega - f0 * self.points_to_surfaces(uvh.h) / H) * (f0 / ds)
-
-    def project(
-        self,
-        uvh: UVH,
-    ) -> UVH:
-        """QG projector P = G o (Q o G)^{-1} o Q.
-
-        Args:
-            uvh (UVH): u,v and h.
-
-        Returns:
-            UVH: Quasi geostrophic u,v and h
-        """
-        return self.G(*self.QoG_inv(self.Q(uvh)))
 
     def _init_core_model(
         self,
@@ -428,7 +220,7 @@ class QGCore(Model[T], Generic[T]):
             UVH: dt_u, dt_v, dt_h
         """
         dt_prognostic_sw = self.sw.compute_time_derivatives(prognostic)
-        return self.project(dt_prognostic_sw)
+        return self._P.project(dt_prognostic_sw)
 
     def update(self, uvh: UVH) -> UVH:
         """Update uvh.
