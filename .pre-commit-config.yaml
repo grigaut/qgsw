@@ -10,6 +10,13 @@ repos:
       - id: detect-private-key
   - repo: local
     hooks:
+      - id: nbstripout
+        name: nbstripout
+        description: 'nbstripout: strip output from Jupyter and IPython notebooks'
+        entry: nbstripout
+        language: python
+        types: [jupyter]
+
       - id: ruff
         name: ruff
         description: "Run 'ruff' for extremely fast Python linting"

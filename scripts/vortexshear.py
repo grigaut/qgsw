@@ -169,7 +169,7 @@ for Ro in [
     w_0 = qg_ml.omega.squeeze() / qg_ml.dx / qg_ml.dy
     tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).to(device=DEVICE.get()).item()
     verbose.display(
-        msg=f"tau = {tau *f0:.2f} f0-1",
+        msg=f"tau = {tau * f0:.2f} f0-1",
         trigger_level=1,
     )
 

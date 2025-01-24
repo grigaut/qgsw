@@ -12,7 +12,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients import create_coefficient
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
-from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.utils import is_modified
 from qgsw.perturbations import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary
@@ -57,8 +57,7 @@ model = instantiate_model(
     Ro=Ro,
 )
 # Collinearity Coefficient
-is_collinear = config.model.type == QGCollinearSF.get_type()
-if is_collinear:
+if is_modified(config.model.type):
     alpha = create_coefficient(config)
     model.alpha = alpha.compute(model.prognostic)
 

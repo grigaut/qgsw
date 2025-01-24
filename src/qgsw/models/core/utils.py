@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
-from typing_extensions import ParamSpec
 
 from qgsw import verbose
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-P = ParamSpec("P")
+Input = TypeVar("Input", bound=list)
+Output = TypeVar("Output")
 
 
-class OptimizableFunction:
+class OptimizableFunction(Generic[Input, Output]):
     """Optimize functions."""
 
-    def __init__(self, func: Callable) -> None:
+    def __init__(self, func: Callable[[Input], Output]) -> None:
         """Instantiate the OptimizableFunction.
 
         Args:
@@ -34,7 +34,7 @@ class OptimizableFunction:
             self._func = func
             self._core = self._trace
 
-    def _trace(self, *args: P.args) -> Any:  # noqa: ANN401
+    def _trace(self, *args: Input) -> Output:
         """Trace the core function.
 
         Returns:
@@ -47,7 +47,7 @@ class OptimizableFunction:
         self._core = torch.jit.trace(self._func, args)
         return self._core(*args)
 
-    def __call__(self, *args: P.args) -> Any:  # noqa: ANN401
+    def __call__(self, *args: Input) -> Output:
         """Function call.
 
         Returns:

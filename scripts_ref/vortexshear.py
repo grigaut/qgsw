@@ -192,7 +192,7 @@ for Bu, Ro in [
 
     w_0 = qg_multilayer.omega.squeeze() / qg_multilayer.dx / qg_multilayer.dy
     tau = 1.0 / torch.sqrt(w_0.pow(2).mean()).cpu().item()
-    print(f"tau = {tau *f0:.2f} f0-1")
+    print(f"tau = {tau * f0:.2f} f0-1")
 
     t_end = 8 * tau
     freq_plot = int(t_end / 100 / dt) + 1
@@ -241,8 +241,8 @@ for Bu, Ro in [
                 np.ma.masked_where(mask_w, (w_qg - w_sw)[0, 0]).T, **kwargs
             )
             f.suptitle(
-                f'Ro={Ro:.2f}, Bu={Bu:.2f}, t={t/tau:.2f}$\\tau$, '
-                f'{"neg." if flip_sign else "pos"} $f_0$'
+                f"Ro={Ro:.2f}, Bu={Bu:.2f}, t={t / tau:.2f}$\\tau$, "
+                f"{'neg.' if flip_sign else 'pos'} $f_0$"
             )
             plt.pause(0.05)
 

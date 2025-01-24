@@ -40,6 +40,7 @@ class ModelParamChecker:
         space_2d: SpaceDiscretization2D,
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
     ) -> None:
         """Model Instantiation.
 
@@ -47,6 +48,7 @@ class ModelParamChecker:
             space_2d (SpaceDiscretization2D): Space Discretization
             H (torch.tensor): reference layer depth
             g_prime (torch.Tensor): Reduced Gravity Values Tensor.
+            beta_plane (Beta_Plane): Beta plane.
         """
         # Set up
         verbose.display(
@@ -59,6 +61,8 @@ class ModelParamChecker:
         )
         ## Space
         self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
+        # Beta-plane
+        self._set_beta_plane(beta_plane)
         # h
         self._set_H(self._space.h.xyh.h)
         ## gravity
@@ -127,25 +131,20 @@ class ModelParamChecker:
         """Beta Plane parmaters."""
         return self._beta_plane
 
-    @beta_plane.setter
-    def beta_plane(self, beta_plane: BetaPlane) -> None:
-        if not isinstance(beta_plane, BetaPlane):
-            msg = "beta_plane should be of type `BetaPlane`."
-            raise TypeError(msg)
-        verbose.display(
-            f"{self.__class__.__name__}: Beta-plane set to {beta_plane}",
-            trigger_level=2,
-        )
-        self._beta_plane = beta_plane
-
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
-        """Layers thickness."""
+        """Layers thickness.
+
+        (n_ens, nl, nx, ny)-shaped.
+        """
         return self._H
 
     @property
     def g_prime(self) -> torch.Tensor:
-        """Reduced Gravity."""
+        """Reduced Gravity.
+
+        (n_ens, nl, nx, ny)-shaped.
+        """
         return self._g_prime
 
     @property
@@ -162,6 +161,16 @@ class ModelParamChecker:
     def tauy(self) -> torch.Tensor | float:
         """Tau y."""
         return self._tauy
+
+    def _set_beta_plane(self, beta_plane: BetaPlane) -> None:
+        if not isinstance(beta_plane, BetaPlane):
+            msg = "beta_plane should be of type `BetaPlane`."
+            raise TypeError(msg)
+        verbose.display(
+            f"{self.__class__.__name__}: Beta-plane set to {beta_plane}",
+            trigger_level=2,
+        )
+        self._beta_plane = beta_plane
 
     def _set_dt(self, dt: float) -> None:
         """TimeStep Setter.
@@ -262,7 +271,7 @@ class ModelParamChecker:
             raise InvalidModelParameterError(msg)
         verbose.display(
             msg=(
-                f"{'Non-trivial' if len(vals)==2 else 'Trivial'}"  # noqa: PLR2004
+                f"{'Non-trivial' if len(vals) == 2 else 'Trivial'}"  # noqa: PLR2004
                 " mask provided"
             ),
             trigger_level=2,
@@ -328,7 +337,7 @@ class ModelParamChecker:
         if is_tensorx and (taux.shape != (self.space.nx - 1, self.space.ny)):
             msg = (
                 "Tau_x Tensor must be "
-                f"{(self.space.nx-1, self.space.ny)}-shaped."
+                f"{(self.space.nx - 1, self.space.ny)}-shaped."
             )
             raise InvalidModelParameterError(msg)
         self._taux = taux
@@ -350,7 +359,7 @@ class ModelParamChecker:
         if is_tensory and (tauy.shape != (self.space.nx, self.space.ny - 1)):
             msg = (
                 "Tau_y Tensor must be "
-                f"{(self.space.nx, self.space.ny-1)}-shaped."
+                f"{(self.space.nx, self.space.ny - 1)}-shaped."
             )
             raise InvalidModelParameterError(msg)
         self._tauy = tauy

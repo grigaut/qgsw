@@ -339,9 +339,9 @@ class MG_Helmholtz:
             mask = torch.ones(
                 (self.nx, self.ny), dtype=self.dtype, device=self.device
             )
-        assert (
-            mask.shape[-2] == self.nx and mask.shape[-1] == self.ny
-        ), f"Invalid mask shape {mask.shape}!=({self.nx},{self.ny})"
+        assert mask.shape[-2] == self.nx and mask.shape[-1] == self.ny, (
+            f"Invalid mask shape {mask.shape}!=({self.nx},{self.ny})"
+        )
         mask = mask.unsqueeze(0)
         mask_ugrid, mask_vgrid = compute_mask_uvgrids(mask)
         self.masks = [mask]
@@ -371,12 +371,12 @@ class MG_Helmholtz:
 
     def compute_coefficient_hierarchy(self, coef_ugrid, coef_vgrid):
         nx, ny = self.nx, self.ny
-        assert (
-            coef_ugrid.shape[-2] == nx + 1 and coef_ugrid.shape[-1] == ny
-        ), f"Invalid coef shape {coef_ugrid.shape[-2:]}!=({nx+1}, {ny})"
-        assert (
-            coef_vgrid.shape[-2] == nx and coef_vgrid.shape[-1] == ny + 1
-        ), f"Invalid coef shape {coef_vgrid.shape[-2:]}!=({nx}, {ny+1})"
+        assert coef_ugrid.shape[-2] == nx + 1 and coef_ugrid.shape[-1] == ny, (
+            f"Invalid coef shape {coef_ugrid.shape[-2:]}!=({nx + 1}, {ny})"
+        )
+        assert coef_vgrid.shape[-2] == nx and coef_vgrid.shape[-1] == ny + 1, (
+            f"Invalid coef shape {coef_vgrid.shape[-2:]}!=({nx}, {ny + 1})"
+        )
         coef = 0.25 * (
             coef_ugrid[..., 1:, :]
             + coef_ugrid[..., :-1, :]

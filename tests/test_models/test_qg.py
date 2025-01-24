@@ -8,6 +8,7 @@ from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
 )
+from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
@@ -86,6 +87,7 @@ def test_model_stretching_matrix(
         space_2d,
         H,
         g_prime,
+        BetaPlane(9.375e-5, 0),
     )
     assert (reference == model.A).all()
 

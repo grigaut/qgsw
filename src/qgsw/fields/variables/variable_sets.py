@@ -35,11 +35,11 @@ from qgsw.fields.variables.energetics import (
     TotalEnergy,
     TotalKineticEnergy,
 )
-from qgsw.models.qg.collinear_sublayer.core import QGCollinearSF
-from qgsw.models.qg.collinear_sublayer.stretching_matrix import (
+from qgsw.models.qg.core import QG
+from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
-from qgsw.models.qg.core import QG
 from qgsw.models.qg.stretching_matrix import compute_A
 
 if TYPE_CHECKING:

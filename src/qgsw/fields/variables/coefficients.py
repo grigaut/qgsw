@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.state import State
     from qgsw.fields.variables.uvh import BasePrognosticTuple
-    from qgsw.models.qg.collinear_sublayer.core import QGCollinearSublayer
+    from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
 
 
 class Coefficient(DiagnosticVariable, ABC):
@@ -49,11 +49,11 @@ class Coefficient(DiagnosticVariable, ABC):
     _unit = Unit._
     _scope = Scope.ENSEMBLE_WISE
 
-    def update_model(self, model: QGCollinearSublayer) -> None:
+    def update_model(self, model: QGAlpha) -> None:
         """Update a model coefficient value.
 
         Args:
-            model (QGCollinearSublayer): Model to update.
+            model (QGAlpha): Model to update.
         """
         if model.get_type() == QG.get_type():
             return
