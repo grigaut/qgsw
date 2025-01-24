@@ -143,10 +143,12 @@ def omega_to_h(omega_grid: torch.Tensor) -> torch.Tensor:
     x                                         x
 
     Args:
-        omega_grid (torch.Tensor): omega grid
+        omega_grid (torch.Tensor): omega grid.
+            └── (nx+1, ny+1)-shaped
 
     Returns:
-        torch.Tensor: h grid
+        torch.Tensor: h grid.
+            └── (nx, ny)-shaped
     """
     return points_to_surfaces(omega_grid)
 
@@ -200,9 +202,11 @@ def omega_to_u(omega_grid: torch.Tensor) -> torch.Tensor:
 
     Args:
         omega_grid (torch.Tensor): omega grid
+            └── (nx+1, ny+1)-shaped
 
     Returns:
         torch.Tensor: u grid
+            └── (nx+1, ny)-shaped
     """
     return 0.5 * (omega_grid[..., :, :-1] + omega_grid[..., :, 1:])
 
@@ -256,9 +260,11 @@ def omega_to_v(omega_grid: torch.Tensor) -> torch.Tensor:
 
     Args:
         omega_grid (torch.Tensor): omega grid
+            └── (nx+1, ny+1)-shaped
 
     Returns:
         torch.Tensor: v grid
+            └── (nx, ny+1)-shaped
     """
     return 0.5 * (omega_grid[..., :-1, :] + omega_grid[..., 1:, :])
 
@@ -315,12 +321,14 @@ def h_to_u(
 
     Args:
         h_grid (torch.Tensor): h grid
+            └── (nx, ny)-shaped
         mask (torch.Tensor|None): Mask tensor, if None, the mask
         will be considerated as equal to 1 evry points of the domain.,
         Defaults to None.
 
     Returns:
         torch.Tensor: u grid
+            └── (nx+1, ny)-shaped
     """
     if mask is None:
         mask = torch.ones_like(h_grid)
@@ -380,12 +388,14 @@ def h_to_v(
 
     Args:
         h_grid (torch.Tensor): h grid
+            └── (nx, ny)-shaped
         mask (torch.Tensor|None): Mask tensor, if None, the mask
         will be considerated as equal to 1 evry points of the domain.,
         Defaults to None.
 
     Returns:
         torch.Tensor: v grid
+            └── (nx, ny+1)-shaped
     """
     if mask is None:
         mask = torch.ones_like(h_grid)

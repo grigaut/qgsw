@@ -39,7 +39,10 @@ class Coordinates1D:
 
     @property
     def points(self) -> torch.Tensor:
-        """Points values."""
+        """Points values.
+
+        └── (n, )-shaped
+        """
         return self._points
 
     @property
@@ -101,7 +104,9 @@ class Coordinates2D:
     def xy(self) -> tuple[torch.Tensor, torch.Tensor]:
         """X,Y coordinates values.
 
-        X and Y are vectors with (nx,) and (ny,) shapes.
+        X and Y are vectors.
+            ├── X: (nx, )-shaped
+            └── Y: (ny, )-shaped
         """
         return self.x.points, self.y.points
 
@@ -145,8 +150,10 @@ class Coordinates2D:
 
         Args:
             x (torch.Tensor): X points.
+                └── (nx, )-shaped
             x_unit (Unit): X units.
             y (torch.Tensor): Y points.
+                └── (ny, )-shaped
             y_unit (Unit): Y units.
 
         Returns:
@@ -224,12 +231,22 @@ class Coordinates3D:
 
     @property
     def xyz(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """X,Y,Z coordinates."""
+        """X,Y,Z coordinates.
+
+        ├── X: (nx, )-shaped
+        ├── y: (ny, )-shaped
+        └── Z: (nl+1, )-shaped
+        """
         return self.x.points, self.y.points, self.z.points
 
     @property
     def xyh(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """X,Y coordinates and layer thickness (H)."""
+        """X,Y coordinates and layer thickness (H).
+
+        ├── X: (nx, )-shaped
+        ├── y: (ny, )-shaped
+        └── H: (nl, )-shaped
+        """
         return self.x.points, self.y.points, self.h.points
 
     @property
@@ -297,11 +314,15 @@ class Coordinates3D:
             y_unit (Unit): Y unit.
             zh_unit (Unit): Z or H unit.
             x (torch.Tensor): X points.
+                └── (nx, )-shaped
             y (torch.Tensor): Y points.
+                └── (ny, )-shaped
             z (torch.Tensor | None, optional): Z points, set to None if h is
             given. Defaults to None.
+                └── (nl+1, )-shaped
             h (torch.Tensor | None, optional): H points, set to None if z is
             given. Defaults to None.
+                └── (nl, )-shaped
 
         Raises:
             CoordinatesInstanciationError: If both z and h are None.

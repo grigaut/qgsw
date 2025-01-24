@@ -95,7 +95,7 @@ class RankineVortex2D:
 
         Returns:
             torch.Tensor: Streamfunction values over the domain,
-            (1, 1, nx, ny)-shaped..
+                └── (1, 1, nx, ny)-shaped
         """
         vor = self._compute_vorticity(grid_2d)
         # Compute Laplacian operator in Fourier Space
@@ -124,6 +124,7 @@ class RankineVortex2D:
 
         Returns:
             torch.Tensor: Vorticity Value.
+                └── (nx, ny)-shaped
         """
         self._raise_if_invalid_unit(grid_2d)
         x, y = grid_2d.xy
@@ -174,6 +175,7 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
 
         Returns:
             torch.Tensor: Stream function values.
+                └── (1, 1, nx, ny)-shaped
         """
         return self._2d_vortex.compute_stream_function(grid_2d)
 

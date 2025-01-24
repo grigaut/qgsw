@@ -78,13 +78,6 @@ v   h   v   h   v   h   v
 
 v
 x
-
-Horizontal Grids Relative Sizes:
-- ω : (nx, ny)
-- h : (nx - 1, ny - 1)
-- u : (nx, ny - 1)
-- v : (nx - 1, ny)
-
 """
 
 from __future__ import annotations
@@ -116,10 +109,10 @@ class SpaceDiscretization2D:
     """SpaceDiscretization2D Object.
 
     Horizontal Grids Sizes:
-        - ω : (nx, ny)
-        - h : (nx - 1, ny - 1)
-        - u : (nx, ny - 1)
-        - v : (nx - 1, ny)
+        ├── ω: (nx+1, ny+1)-shaped
+        ├── u: (nx+1, ny)-shaped
+        ├── v: (nx, ny+1)-shaped
+        └── h: (nx, ny)-shaped
 
 
     Grid Patterns:
@@ -247,7 +240,7 @@ class SpaceDiscretization2D:
     def omega(self) -> Grid2D:
         """Omega Grid.
 
-        Size: (nx, ny)
+        └── (nx+1, ny+1)-shaped
 
         Pattern:
 
@@ -301,7 +294,7 @@ class SpaceDiscretization2D:
     def h(self) -> Grid2D:
         """H Grid.
 
-        Size: (nx - 1, ny - 1)
+        └── (nx, ny)-shaped
 
         Pattern:
 
@@ -355,7 +348,7 @@ class SpaceDiscretization2D:
     def u(self) -> Grid2D:
         """U Grid.
 
-        Size: (nx, ny - 1)
+        └── (nx+1, ny)-shaped
 
         Pattern:
 
@@ -409,7 +402,7 @@ class SpaceDiscretization2D:
     def v(self) -> Grid2D:
         """V Grid.
 
-        Size: (nx - 1, ny)
+        └── (nx, ny+1)-shaped
 
         Pattern:
 
@@ -511,6 +504,7 @@ class SpaceDiscretization2D:
 
         Args:
             z (torch.Tensor): Z coordinates.
+                └── (nl+1, )-shaped
 
         Returns:
             SpaceDiscretization3D: 3D Grid.
@@ -570,7 +564,9 @@ class SpaceDiscretization2D:
 
         Args:
             x (torch.Tensor): X Coordinates.
+                └── (nx, )-shaped
             y (torch.Tensor): Y Coordinates.
+                └── (ny, )-shaped
             x_unit (Unit): X unit.
             y_unit (Unit): Y unit.
 
@@ -616,11 +612,11 @@ class SpaceDiscretization2D:
 class SpaceDiscretization3D:
     """3D Space Discretization.
 
-    Horizontal Grids sizes:
-        - ω : (nx, ny)
-        - h : (nx - 1, ny - 1)
-        - u : (nx, ny - 1)
-        - v : (nx - 1, ny)
+    Horizontal Grids sizes
+        ├── ω: (nx+1, ny+1)-shaped
+        ├── u: (nx+1, ny)-shaped
+        ├── v: (nx, ny+1)-shaped
+        └── h: (nx, ny)-shaped
 
 
     Grids Pattern:
@@ -774,7 +770,7 @@ class SpaceDiscretization3D:
     def omega(self) -> Grid3D:
         """X,Y cordinates of the Omega grid ('classical' grid corners).
 
-        Size: (nx, ny)
+        └── (nx+1, ny+1)-shaped
 
         Pattern:
 
@@ -828,7 +824,7 @@ class SpaceDiscretization3D:
     def h(self) -> Grid3D:
         """X,Y coordinates of the H grid (center of 'classical' grid cells).
 
-        Size: (nx - 1, ny - 1)
+        └── (nx, ny)-shaped
 
         Pattern:
 
@@ -882,7 +878,7 @@ class SpaceDiscretization3D:
     def u(self) -> Grid3D:
         """X,Y coordinates of the u grid.
 
-        Size: (nx, ny - 1)
+        └── (nx+1, ny)-shaped
 
         Pattern:
 
@@ -936,7 +932,7 @@ class SpaceDiscretization3D:
     def v(self) -> Grid3D:
         """X,Y coordinates of the H grid (center of 'classical' grid cells).
 
-        Size: (nx - 1, ny)
+        └── (nx, ny+1)-shaped
 
         Pattern:
 
@@ -1110,11 +1106,15 @@ class SpaceDiscretization3D:
             y_unit (Unit): Y unit.
             zh_unit (Unit): Z and H unit.
             x (torch.Tensor): X points.
+                └── (nx, )-shaped
             y (torch.Tensor): Y points.
+                └── (ny, )-shaped
             z (torch.Tensor | None, optional): Z points, set to None if h
             is given. Defaults to None.
+                └── (nl+1, )-shaped
             h (torch.Tensor | None, optional): H points, set to None if z
             is given. Defaults to None.
+                └── (nl, )-shaped
 
         Returns:
             Self: 3D Grids.

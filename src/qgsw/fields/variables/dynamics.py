@@ -44,7 +44,10 @@ if TYPE_CHECKING:
 
 
 class PhysicalZonalVelocity(DiagnosticVariable):
-    """Physical zonal velocity."""
+    """Physical zonal velocity.
+
+    └── (n_ens, nl, nx+1, ny)-shaped
+    """
 
     _unit = Unit.M1S_1
     _name = "u_phys"
@@ -63,16 +66,26 @@ class PhysicalZonalVelocity(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Physical zonal velocity component.
+                └── (n_ens, nl, nx+1, ny)-shaped
         """
         return prognostic.u / self._dx
 
 
 class PhysicalMeridionalVelocity(DiagnosticVariable):
-    """Physical zonal velocity."""
+    """Physical zonal velocity.
+
+    └── (n_ens, nl, nx, ny+1)-shaped
+    """
 
     _unit = Unit.M1S_1
     _name = "v_phys"
@@ -91,16 +104,26 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Physical zonal velocity component.
+                └── (n_ens, nl, nx, ny+1)-shaped
         """
         return prognostic.v / self._dy
 
 
 class PhysicalLayerDepthAnomaly(DiagnosticVariable):
-    """Physical layer depth anomaly."""
+    """Physical layer depth anomaly.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M
     _name = "h_phys"
@@ -119,16 +142,26 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
         """Compute the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Physical layer depth anomaly.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return prognostic.h / self._ds
 
 
 class ZonalVelocityFlux(DiagnosticVariable):
-    """Velocity flux."""
+    """Velocity flux.
+
+    └── (n_ens, nl, nx+1, ny)-shaped
+    """
 
     _unit = Unit.S_1
     _name = "U"
@@ -147,16 +180,26 @@ class ZonalVelocityFlux(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostioc variables
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             BasePrognosticTuple: Value
+                └── (n_ens, nl, nx+1, ny)-shaped
         """
         return prognostic.u / self._dx**2
 
 
 class MeridionalVelocityFlux(DiagnosticVariable):
-    """Velocity flux."""
+    """Velocity flux.
+
+    └── (n_ens, nl, nx, ny+1)-shaped
+    """
 
     _unit = Unit.S_1
     _name = "V"
@@ -175,16 +218,26 @@ class MeridionalVelocityFlux(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostioc variables
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             BasePrognosticTuple: Value
+                └── (n_ens, nl, nx, ny+1)-shaped
         """
         return prognostic.v / self._dy**2
 
 
 class SurfaceHeightAnomaly(DiagnosticVariable):
-    """Surface height anomaly."""
+    """Surface height anomaly.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M
     _name = "eta"
@@ -198,16 +251,26 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostioc variables
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Surface height anomaly
+            torch.Tensor: Surface height anomaly.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return reverse_cumsum(prognostic.h, dim=-3)
 
 
 class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
-    """Physical Surface height anomaly."""
+    """Physical Surface height anomaly.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M
     _name = "eta_phys"
@@ -229,10 +292,17 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostioc variables
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Surface height anomaly
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return reverse_cumsum(
             self._h_phys.compute_no_slice(prognostic),
@@ -257,7 +327,10 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
 
 
 class MaskedVorticity(DiagnosticVariable):
-    """Masked Vorticity Diagnostic Variable."""
+    """Masked Vorticity Diagnostic Variable.
+
+    └── (n_ens, nl, nx+1, ny+1)-shaped
+    """
 
     _unit = Unit.M2S_1
     _name = "omega_masked"
@@ -289,6 +362,7 @@ class MaskedVorticity(DiagnosticVariable):
 
         Returns:
             torch.Tensor: Vorticity
+                └── (n_ens, nl, nx+1, ny+1)-shaped
         """
         u = prognostic.u
         v = prognostic.v
@@ -307,7 +381,10 @@ class MaskedVorticity(DiagnosticVariable):
 
 
 class Vorticity(DiagnosticVariable):
-    """Vorticity."""
+    """Vorticity.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M2S_1
     _name = "omega"
@@ -321,7 +398,8 @@ class Vorticity(DiagnosticVariable):
             prognostic (BasePrognosticTuple): Prognostic tuple.
 
         Returns:
-            torch.Tensor: Vorticity, (n_ens,nl,nx-1,ny-1)-shaped
+            torch.Tensor: Vorticity.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return torch.diff(prognostic.v[..., 1:-1], dim=-2) - torch.diff(
             prognostic.u[..., 1:-1, :],
@@ -330,7 +408,10 @@ class Vorticity(DiagnosticVariable):
 
 
 class PhysicalVorticity(DiagnosticVariable):
-    """Physical vorticity."""
+    """Physical vorticity.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.S_1
     _name = "omega_phys"
@@ -354,10 +435,17 @@ class PhysicalVorticity(DiagnosticVariable):
         """Compute the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Physical vorticity.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return self._vorticity.compute_no_slice(prognostic) / self._ds
 
@@ -379,7 +467,10 @@ class PhysicalVorticity(DiagnosticVariable):
 
 
 class Pressure(DiagnosticVariable):
-    """Pressure."""
+    """Pressure.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "p"
@@ -394,7 +485,8 @@ class Pressure(DiagnosticVariable):
         """Instantiate the pressure variable.
 
         Args:
-            g_prime (torch.Tensor): Reduced gravity
+            g_prime (torch.Tensor): Reduced gravity.
+                └── (1, nl, 1, 1)-shaped
             eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
             variable.
         """
@@ -408,10 +500,17 @@ class Pressure(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostioc variables
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Pressure
+            torch.Tensor: Pressure.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return torch.cumsum(
             self._g_prime * self._eta.compute_no_slice(prognostic),
@@ -436,7 +535,10 @@ class Pressure(DiagnosticVariable):
 
 
 class PressureTilde(Pressure):
-    """Pressure tilde."""
+    """Pressure tilde.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _name = "p_tilde"
     _description = "Pressure per unit of mass for collinear model"
@@ -450,7 +552,8 @@ class PressureTilde(Pressure):
         """Instantiate the pressure variable.
 
         Args:
-            g_prime (torch.Tensor): Reduced gravity
+            g_prime (torch.Tensor): Reduced gravity.
+                └── (1, 2, 1, 1)-shaped
             eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
             variable.
         """
@@ -478,17 +581,27 @@ class PressureTilde(Pressure):
         """Compute the value of the variable.
 
         Args:
-            prognostic (UVHTAlpha): Prognostioc variables
+            prognostic (UVHTAlpha): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Pressure
+                └── (n_ens, nl, nx, ny)-shaped
         """
         g_tilde = self._compute_g_tilde(prognostic.alpha)
         return g_tilde * self._eta.compute_no_slice(prognostic)
 
 
 class PotentialVorticity(DiagnosticVariable):
-    """Potential Vorticity."""
+    """Potential Vorticity.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.S_1
     _name = "pv"
@@ -507,6 +620,7 @@ class PotentialVorticity(DiagnosticVariable):
         Args:
             vorticity_phys (PhysicalVorticity): Physical vorticity.
             h_ref (torch.Tensor): Reference heights.
+                └── (1, nl, 1, 1)-shaped
             ds (float): Elementary area.
             f0 (float): Coriolis parameter.
         """
@@ -523,10 +637,17 @@ class PotentialVorticity(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostioc variables
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Value
+                └── (n_ens, nl, nx, ny)-shaped
         """
         vorticity_phys = self._interp(
             self._vorticity_phys.compute_no_slice(prognostic),
@@ -551,7 +672,10 @@ class PotentialVorticity(DiagnosticVariable):
 
 
 class StreamFunction(DiagnosticVariable):
-    """Stream function variable."""
+    """Stream function variable.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M2S_1
     _name = "psi"
@@ -575,10 +699,17 @@ class StreamFunction(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Stream function.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return self._p.compute_no_slice(prognostic) / self._f0
 
@@ -597,7 +728,10 @@ class StreamFunction(DiagnosticVariable):
 
 
 class StreamFunctionFromVorticity(DiagnosticVariable):
-    """Stream function variable from vorticity inversion."""
+    """Stream function variable from vorticity inversion.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M2S_1
     _name = "psi_from_omega"
@@ -643,10 +777,17 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Stream function.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         vorticity = self._vorticity.compute_no_slice(prognostic)
         return points_to_surfaces(
@@ -668,7 +809,10 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
 
 
 class Enstrophy(DiagnosticVariable):
-    """Layer-wise enstrophy."""
+    """Layer-wise enstrophy.
+
+    └── (n_ens, nl,)-shaped
+    """
 
     _unit = Unit.S_2
     _name = "enstrophy"
@@ -689,10 +833,17 @@ class Enstrophy(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Enstrophy.
+                └── (n_ens, nl,)-shaped
         """
         return 0.5 * torch.sum(
             self._pv.compute_no_slice(prognostic) ** 2,
@@ -713,7 +864,10 @@ class Enstrophy(DiagnosticVariable):
 
 
 class TotalEnstrophy(Enstrophy):
-    """Total enstrophy."""
+    """Total enstrophy.
+
+    └── (n_ens,)-shaped
+    """
 
     _unit = Unit.S_2
     _name = "enstrophy_tot"
@@ -724,10 +878,17 @@ class TotalEnstrophy(Enstrophy):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Enstrophy.
+                └── (n_ens,)-shaped
         """
         return 0.5 * torch.sum(
             self._pv.compute_no_slice(prognostic) ** 2,
@@ -736,7 +897,10 @@ class TotalEnstrophy(Enstrophy):
 
 
 class ZonalVelocityDiag(DiagnosticVariable):
-    """Diagnostic zonal velocity."""
+    """Diagnostic zonal velocity.
+
+    └── (n_ens, nl, nx+1, ny)-shaped
+    """
 
     _unit = ZonalVelocity.get_unit()
     _name = ZonalVelocity.get_name()
@@ -747,16 +911,26 @@ class ZonalVelocityDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic varibales values.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Value.
+                └── (n_ens, nl, nx+1, ny)-shaped
         """
         return prognostic.u
 
 
 class MeridionalVelocityDiag(DiagnosticVariable):
-    """Diagnostic Meridional Velocity."""
+    """Diagnostic Meridional Velocity.
+
+    └── (n_ens, nl, nx, ny+1)-shaped
+    """
 
     _unit = MeridionalVelocity.get_unit()
     _name = MeridionalVelocity.get_name()
@@ -767,16 +941,26 @@ class MeridionalVelocityDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic varibales values.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Value.
+                └── (n_ens, nl, nx, ny+1)-shaped
         """
         return prognostic.v
 
 
 class LayerDepthAnomalyDiag(DiagnosticVariable):
-    """Diagnostic Layer Depth Anomaly."""
+    """Diagnostic Layer Depth Anomaly.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = LayerDepthAnomaly.get_unit()
     _name = LayerDepthAnomaly.get_name()
@@ -787,16 +971,26 @@ class LayerDepthAnomalyDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic varibales values.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Value.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         return prognostic.h
 
 
 class TimeDiag(DiagnosticVariable):
-    """Diagnostic Layer Depth Anomaly."""
+    """Diagnostic Layer Depth Anomaly.
+
+    └── (n_ens,)-shaped
+    """
 
     _unit = Time.get_unit()
     _name = Time.get_name()
@@ -807,16 +1001,26 @@ class TimeDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic varibales values.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Value.
+                └── (n_ens, )-shaped
         """
         return prognostic.t
 
 
 class CollinearityCoefficientDiag(DiagnosticVariable):
-    """Diagnostic Layer Depth Anomaly."""
+    """Diagnostic Layer Depth Anomaly.
+
+    └── (n_ens, )-shaped
+    """
 
     _unit = CollinearityCoefficient.get_unit()
     _name = CollinearityCoefficient.get_name()
@@ -827,9 +1031,16 @@ class CollinearityCoefficientDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (UVHTAlpha): Prognostic varibales values.
+            prognostic (UVHTAlpha): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Value.
+                └── (n_ens, )-shaped
         """
         return prognostic.alpha

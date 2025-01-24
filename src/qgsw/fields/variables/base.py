@@ -148,6 +148,12 @@ class DiagnosticVariable(Variable, ABC):
 
         Args:
             prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
 
     def compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
@@ -155,6 +161,12 @@ class DiagnosticVariable(Variable, ABC):
 
         Args:
             prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         return self._compute(prognostic).__getitem__(self.slices)
 
@@ -166,6 +178,12 @@ class DiagnosticVariable(Variable, ABC):
 
         Args:
             prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         return self._compute(prognostic)
 
