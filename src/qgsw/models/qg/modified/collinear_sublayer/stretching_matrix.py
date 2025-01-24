@@ -28,7 +28,7 @@ def compute_A_collinear_sf(  # noqa: N802
     Returns:
         torch.Tensor: Stretching Operator.
                 └── (2, 2) shaped
-    """  # noqa: RUF002
+    """
     A = compute_A(H=H, g_prime=g_prime, dtype=dtype, device=device)  # noqa: N806
     # Create layers coefficients vector [1, α]  # noqa: RUF003
     layers_coefs = torch.tensor(

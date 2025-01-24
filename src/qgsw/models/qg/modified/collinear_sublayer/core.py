@@ -213,7 +213,7 @@ class QGCollinearSF(QGAlpha):
 
         Returns:
             torch.Tensor: Stretching Operator
-        """  # noqa: RUF002
+        """
         return compute_A_collinear_sf(
             H=H,
             g_prime=g_prime,
