@@ -97,7 +97,7 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
         """
         to_filter_expanded = to_filter.unsqueeze(0).unsqueeze(0)
         filtered: torch.Tensor = self._conv(to_filter_expanded).detach()
-        return filtered.squeeze((0, 1))
+        return filtered.squeeze(0).squeeze(0)
 
     @staticmethod
     def compute_sigma_from_span(span: float, threshold: float) -> float:
