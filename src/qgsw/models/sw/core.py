@@ -89,6 +89,7 @@ class SWCore(Model[T], Generic[T]):
     """
 
     _type = "SW"
+    _pressure_name: str
 
     def __init__(
         self,
@@ -194,6 +195,7 @@ class SWCore(Model[T], Generic[T]):
         omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta_phys=eta_phys)
+        self._pressure_name = p.get_name()
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
         U.bind(state)
@@ -248,7 +250,7 @@ class SWCore(Model[T], Generic[T]):
 
         # grad pressure + k_energy
         k_energy = self._state[KineticEnergy.get_name()].get()
-        pressure = self._state[Pressure.get_name()].get()
+        pressure = self._state[self._pressure_name].get()
         ke_pressure = k_energy + pressure
         dt_u -= torch.diff(ke_pressure, dim=-2) + self.dx_p_ref
         dt_v -= torch.diff(ke_pressure, dim=-1) + self.dy_p_ref
@@ -409,6 +411,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
         omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = PressureTilde(g_prime=self.g_prime, eta_phys=eta_phys)
+        self._pressure_name = p.get_name()
         k_energy = KineticEnergy(masks=self.masks, U=U, V=V)
 
         U.bind(state)
