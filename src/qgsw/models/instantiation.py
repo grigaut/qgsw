@@ -230,7 +230,7 @@ def _instantiate_collinear_qg(
     """
     if model_config.type == QGCollinearSF.get_type():
         model_class = QGCollinearSF
-    if model_config.type == QGCollinearFilteredSF.get_type():
+    elif model_config.type == QGCollinearFilteredSF.get_type():
         model_class = QGCollinearFilteredSF
     else:
         msg = f"Unrecognized model type: {model_config.type}"
