@@ -17,6 +17,7 @@ from qgsw.spatial.core.discretization import SpaceDiscretization2D
 if TYPE_CHECKING:
     import torch
 
+    from qgsw.masks import Masks
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
@@ -41,8 +42,10 @@ class QGCore(Model[T], Generic[T]):
 
         Args:
             space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (nl,) shaped.
             beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
@@ -88,7 +91,7 @@ class QGCore(Model[T], Generic[T]):
         self.sw.dt = dt
 
     @Model.masks.setter
-    def masks(self, masks: torch.Tensor) -> None:
+    def masks(self, masks: Masks) -> None:
         """Masks setter."""
         Model.masks.fset(self, masks)
         self.sw.masks = masks
@@ -137,10 +140,13 @@ class QGCore(Model[T], Generic[T]):
 
         Args:
             H (torch.Tensor): Layers reference height.
+                └── (nl,)-shaped
             g_prime (torch.Tensor): Reduced gravity values.
+                └── (nl,)-shaped
 
         Returns:
-            torch.Tensor: Stretching Operator
+            torch.Tensor: Stretching Operator.
+                └── (nl, nl)-shaped
         """
         return compute_A(
             H=H,
@@ -163,13 +169,17 @@ class QGCore(Model[T], Generic[T]):
 
         Args:
             u (torch.Tensor): State variable u.
+                └── (n_ens, nl, nx+1, ny)-shaped
             v (torch.Tensor): State variable v.
+                └── (n_ens, nl, nx, ny+1)-shaped
             h (torch.Tensor): State variable h.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         self.sw.set_uvh(u, v, h)
         super().set_uvh(u, v, h)
 
     def _set_projector(self) -> None:
+        """Set the projector."""
         self._P = QGProjector(
             self.A,
             self.H,
@@ -215,9 +225,15 @@ class QGCore(Model[T], Generic[T]):
 
         Args:
             prognostic (UVH): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: dt_u, dt_v, dt_h
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         dt_prognostic_sw = self.sw.compute_time_derivatives(prognostic)
         return self._P.project(dt_prognostic_sw)
@@ -227,9 +243,15 @@ class QGCore(Model[T], Generic[T]):
 
         Args:
             uvh (UVH): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: update prognostic variables.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         return schemes.rk3_ssp(
             uvh,

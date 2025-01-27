@@ -15,12 +15,15 @@ def compute_A(  # noqa: N802
 
     Args:
         H (torch.Tensor): Layers reference height.
+            └── (nl, )-shaped
         g_prime (torch.Tensor): Reduced gravity values.
+            └── (nl, )-shaped
         dtype (torch.dtype): Data type
         device (str, optional): Device type. Defaults to DEVICE.
 
     Returns:
         torch.Tensor: Streching operator matrix
+            └── (nl, nl)-shaped
     """
     nl = H.shape[0]
     if nl == 1:
@@ -53,10 +56,14 @@ def compute_layers_to_mode_decomposition(
     A = Cm2l @ Λ @ Cl2m
 
     Args:
-        A (torch.Tensor): Stretching Operator
+        A (torch.Tensor): Stretching Operator.
+            └── (nl, nl)-shaped
 
     Returns:
-        tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Cm2l, Λ, Cl2m
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Cm2l, Λ, Cl2m.
+            ├── Cm2l: (nl, nl)-shaped
+            ├── Λ: (nl,)-shaped
+            └── Cl2m: (nl, nl)-shaped
     """
     # layer-to-mode and mode-to-layer matrices
     lambd_r, R = torch.linalg.eig(A)  # noqa: N806

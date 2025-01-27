@@ -36,15 +36,20 @@ def compute_W(H: torch.Tensor) -> torch.Tensor:  # noqa: N802, N803
 
     Args:
         H (torch.Tensor): Layers reference depths.
+            └── (nl,)-shaped
 
     Returns:
         torch.Tensor: Weight Matrix
+            └── (nl, nl)-shaped
     """
     return torch.diag(H) / torch.sum(H)
 
 
 class KineticEnergy(DiagnosticVariable):
-    """Kinetic Energy Variable."""
+    """Kinetic Energy Variable.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "kinetic_energy"
@@ -77,10 +82,17 @@ class KineticEnergy(DiagnosticVariable):
         """Compute the kinetic energy.
 
         Args:
-            prognostic (BasePrognosticTuple): u,v,h
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Kinetic energy.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         u = prognostic.u
         v = prognostic.v
@@ -107,7 +119,10 @@ class KineticEnergy(DiagnosticVariable):
 
 
 class ModalKineticEnergy(DiagnosticVariable):
-    """Compute modal kinetic energy."""
+    """Compute modal kinetic energy.
+
+    └── (n_ens, nl)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "ke_hat"
@@ -126,9 +141,11 @@ class ModalKineticEnergy(DiagnosticVariable):
 
         Args:
             A (torch.Tensor): Stetching matrix.
+                └── (nl, nl)-shaped
             stream_function (StreamFunction): Stream function diagnostic
             variable.
             H (torch.Tensor): Layers reference depth.
+                └── (nl,)-shaped
             dx (float): Elementary distance in the X direction.
             dy (float): Elementary distance in the Y direction.
         """
@@ -152,10 +169,17 @@ class ModalKineticEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Modal kinetic energy, shape: (n_ens, nl).
+            torch.Tensor: Modal kinetic energy.
+                └── (n_ens, nl)-shaped
         """
         psi = self._psi.compute_no_slice(prognostic)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
@@ -191,7 +215,10 @@ class ModalKineticEnergy(DiagnosticVariable):
 
 
 class ModalAvailablePotentialEnergy(DiagnosticVariable):
-    """Modal available potential energy."""
+    """Modal available potential energy.
+
+    └── (n_ens, nl)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "ape_hat"
@@ -209,9 +236,11 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
 
         Args:
             A (torch.Tensor): Stetching matrix.
+                └── (nl, nl)-shaped
             stream_function (StreamFunction): Stream function diagnostic
             variable.
             H (torch.Tensor): Layers reference depth.
+                └── (nl,)-shaped
             f0 (float): Coriolis parameter.
         """
         self._psi = stream_function
@@ -231,11 +260,17 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Modal avalaible potential energy,
-            shape: (n_ens,nl).
+            torch.Tensor: Modal avalaible potential energy.
+                └── (n_ens, nl)-shaped
         """
         psi = self._psi.compute_no_slice(prognostic)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
@@ -265,7 +300,10 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
 
 
 class ModalEnergy(DiagnosticVariable):
-    """Modal energy."""
+    """Modal energy.
+
+    └── (n_ens, nl)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "e_tot_hat"
@@ -293,10 +331,17 @@ class ModalEnergy(DiagnosticVariable):
         """Compute total modal energy.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Modal total energy, shape: (n_ens)
+            torch.Tensor: Modal total energy.
+                └── (n_ens, nl)-shaped
         """
         ke = self._ke.compute_no_slice(prognostic)
         ape = self._ape.compute_no_slice(prognostic)
@@ -322,7 +367,10 @@ class ModalEnergy(DiagnosticVariable):
 
 
 class TotalKineticEnergy(DiagnosticVariable):
-    """Compute total kinetic energy."""
+    """Compute total kinetic energy.
+
+    └── (n_ens,)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "ke"
@@ -340,9 +388,11 @@ class TotalKineticEnergy(DiagnosticVariable):
 
         Args:
             A (torch.Tensor): Stetching matrix.
+                └── (nl, nl)-shaped
             stream_function (StreamFunction): Stream function diagnostic
             variable.
             H (torch.Tensor): Layers reference depth.
+                └── (nl,)-shaped
             dx (float): Elementary distance in the X direction.
             dy (float): Elementary distance in the Y direction.
         """
@@ -359,10 +409,17 @@ class TotalKineticEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Total modal kinetic energy, shape: (n_ens).
+            torch.Tensor: Total modal kinetic energy.
+                └── (n_ens,)-shaped
         """
         psi = self._psi.compute_no_slice(prognostic)
         # Pad x with 0 on top
@@ -397,7 +454,10 @@ class TotalKineticEnergy(DiagnosticVariable):
 
 
 class TotalAvailablePotentialEnergy(DiagnosticVariable):
-    """Total modal available potential energy."""
+    """Total modal available potential energy.
+
+    └── (n_ens,)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "ape"
@@ -415,9 +475,11 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
 
         Args:
             A (torch.Tensor): Stetching matrix.
+                └── (nl, nl)-shaped
             stream_function (StreamFunction): Stream function diagnostic
             variable.
             H (torch.Tensor): Layers reference depth.
+                └── (nl,)-shaped
             f0 (float): Coriolis parameter.
         """
         self._psi = stream_function
@@ -433,11 +495,17 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Total modal avalaible potential energy,
-            shape: (n_ens).
+            torch.Tensor: Total modal avalaible potential energy.
+                └── (n_ens,)-shaped
         """
         psi = self._psi.compute_no_slice(prognostic)
         W_A_psi = torch.einsum(  # noqa: N806
@@ -471,7 +539,10 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
 
 
 class TotalEnergy(DiagnosticVariable):
-    """Total modal energy."""
+    """Total modal energy.
+
+    └── (n_ens,)-shaped
+    """
 
     _unit = Unit.M2S_2
     _name = "e_tot"
@@ -500,10 +571,17 @@ class TotalEnergy(DiagnosticVariable):
         """Compute total modal energy.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+            prognostic (BasePrognosticTuple): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Total modal energy, shape: (n_ens)
+            torch.Tensor: Total modal energy.
+                └── (n_ens,)-shaped
         """
         return self._ke.compute_no_slice(
             prognostic,

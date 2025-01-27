@@ -16,11 +16,11 @@ from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.sw.core import SW
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
 class BaseSWFilterBarotropic(ABC, SW):
@@ -29,7 +29,8 @@ class BaseSWFilterBarotropic(ABC, SW):
     def __init__(
         self,
         *,
-        space_3d: SpaceDiscretization3D,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,
@@ -37,15 +38,18 @@ class BaseSWFilterBarotropic(ABC, SW):
         """SWFilterBarotropic Model Instantiation.
 
         Args:
-            space_3d (SpaceDiscretization3D): Space Discretization
-            g_prime (torch.Tensor): Reduced Gravity Values Tensor.
-            beta_plane (BetaPlane): Beta Plane.
-            n_ens (int, optional): Number of ensembles. Defaults to 1.
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
         super().__init__(
-            space_3d=space_3d,
+            space_2d=space_2d,
+            H=H,
             g_prime=g_prime,
             beta_plane=beta_plane,
             optimize=optimize,
@@ -73,10 +77,17 @@ class BaseSWFilterBarotropic(ABC, SW):
         """Filter barotropic waves.
 
         Args:
-            dt_uvh (torch.Tensor): Derivative of prognostic variables u,v and h
+            dt_uvh (torch.Tensor): Derivative of prognostic variables
+            u,v and h.
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: filtered dt_uvh
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
         """
 
     def compute_time_derivatives(
@@ -87,9 +98,15 @@ class BaseSWFilterBarotropic(ABC, SW):
 
         Args:
             uvh (UVH): Prognostic variables u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: Derivatives of u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
         """
         dt_uvh = super().compute_time_derivatives(uvh)
         return self.filter_barotropic_waves(dt_uvh)
@@ -124,10 +141,17 @@ class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
         """Inspired from https://doi.org/10.1029/2000JC900089.
 
         Args:
-            dt_uvh (torch.Tensor): Derivative of prognostic variables u,v and h
+            dt_uvh (torch.Tensor): Derivative of prognostic variables
+            u,v and h.
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: filtered dt_uvh
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
         """
         # Sum h on u grid
         h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
@@ -204,10 +228,17 @@ class SWFilterBarotropicExact(BaseSWFilterBarotropic):
         """Inspired from https://doi.org/10.1029/2000JC900089.
 
         Args:
-            dt_uvh (torch.Tensor): Derivative of prognostic variables u,v and h
+            dt_uvh (torch.Tensor): Derivative of prognostic variables
+            u,v and h.
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             UVH: filtered dt_uvh
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
         """
         # Sum h on u grid
         h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)

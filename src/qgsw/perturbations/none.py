@@ -43,7 +43,8 @@ class NoPerturbation(BarotropicPerturbation):
             grid_2d (Grid2D): Grid to use for stream function computation.
 
         Returns:
-            torch.Tensor: Stream function, (nx, ny) shaped, full of zeros.
+            torch.Tensor: Stream function filled with 0s.
+                └── (nx, ny)-shaped
         """
         return torch.zeros(
             (grid_2d.nx, grid_2d.ny),
@@ -65,7 +66,8 @@ class NoPerturbation(BarotropicPerturbation):
             Ro (float): Rossby Number.
 
         Returns:
-            torch.Tensor: Pressure values, (1, nl, nx, ny) shaped, full of 0s.
+            torch.Tensor: Pressure values, filled of 0s.
+                └── (1, nl, nx, ny)-shaped
         """
         return self.compute_stream_function(grid_3d)
 

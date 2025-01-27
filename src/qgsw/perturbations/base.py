@@ -70,7 +70,8 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
             grid_2d (Grid2D): Grid to use for stream function computation.
 
         Returns:
-            torch.Tensor: Stream function values, (nx, ny) shaped.
+            torch.Tensor: Stream function values.
+                └── (nx, ny)-shaped
         """
 
     def compute_stream_function(self, grid_3d: Grid3D) -> torch.Tensor:
@@ -80,7 +81,8 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
             grid_3d (Grid3D): 3D Grid to generate Stream Function on.
 
         Returns:
-            torch.Tensor: Stream function values, (1, nl, nx, ny)-shaped..
+            torch.Tensor: Stream function values.
+                └── (1, nl, nx, ny)-shaped
         """
         psi = torch.ones(
             (1, grid_3d.nl, grid_3d.nx, grid_3d.ny),
@@ -105,12 +107,14 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
 
         Args:
             psi (torch.Tensor): Stream function.
+                └── (1, nl, nx, ny)-shaped
             grid_3d (Grid3D): 3D Grid.
             f0 (float): Coriolis Parameter.
             Ro (float): Rossby Number.
 
         Returns:
-            torch.Tensor: Pressure, (1, nl, nx, ny)-shaped.
+            torch.Tensor: Pressure.
+                └── (1, nl, nx, ny)-shaped
         """
         u, v = grad_perp(
             psi,
@@ -130,10 +134,12 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
 
         Args:
             psi (torch.Tensor): Stream function.
+                └── (1, nl, nx, ny)-shaped
             f0 (float): Coriolis Parameter.
 
         Returns:
-            torch.Tensor: Pressure, (1, nl, nx, ny)-shaped.
+            torch.Tensor: Pressure.
+                └── (1, nl, nx, ny)-shaped
         """
         return psi * f0
 
@@ -152,6 +158,7 @@ class _Perturbation(TypeSwitch, metaclass=ABCMeta):
 
         Returns:
             torch.Tensor: Pressure values.
+                └── (1, nl, nx, ny)-shaped
         """
         psi = self.compute_stream_function(grid_3d=grid_3d)
         psi_adjusted = self._adjust_stream_function(psi, grid_3d, f0, Ro)

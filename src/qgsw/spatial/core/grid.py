@@ -208,7 +208,9 @@ class Grid2D:
 
         Args:
             x (torch.Tensor): X coordinates Vector.
+                └── (nx, )-shaped
             y (torch.Tensor): Y coordinates Vector.
+                └── (ny, )-shaped
             x_unit (Unit): X unit.
             y_unit (Unit): Y unit.
 
@@ -448,12 +450,15 @@ class Grid3D:
             y_unit (Unit): Y unit.
             zh_unit (Unit): Z and H unit.
             x (torch.Tensor): X points.
+                └── (nx, )-shaped
             y (torch.Tensor): Y points.
+                └── (ny, )-shaped
             z (torch.Tensor | None, optional): Z points, set to None if h
             is given. Defaults to None.
+                └── (nl+1, )-shaped
             h (torch.Tensor | None, optional): H points, set to None if z
             is given. Defaults to None.
-
+                └── (nl, )-shaped
         Returns:
             Self: Grid3D.
         """

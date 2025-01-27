@@ -45,6 +45,7 @@ class QGAlpha(QGCore[UVHTAlpha]):
         self._state.update_alpha(alpha)
 
     def _set_state(self) -> None:
+        """Set the state."""
         self._state = StateAlpha.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
@@ -61,17 +62,15 @@ class QGAlpha(QGCore[UVHTAlpha]):
             alpha=self._state.alpha,
         )
 
-    def _set_H(self, h: torch.Tensor) -> torch.Tensor:  # noqa: N802
+    def _set_H(self, h: torch.Tensor) -> None:  # noqa: N802
         """Perform additional validation over H.
 
         Args:
             h (torch.Tensor): Layers thickness.
+                └── h: (nl, 1, 1)-shaped
 
         Raises:
             ValueError: if H is not constant in space
-
-        Returns:
-            torch.Tensor: H
         """
         if self.space.nl != self._supported_layers_nb:
             msg = (
@@ -102,8 +101,10 @@ class QGCollinearSF(QGAlpha):
 
         Args:
             space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (2,) shaped
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (2,) shaped
             beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
@@ -141,17 +142,23 @@ class QGCollinearSF(QGAlpha):
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
-        """Layers thickness."""
+        """Layers thickness.
+
+        └── (1, 1, 1) shaped
+        """
         return self._H[:1, ...]
 
     @property
     def g_prime(self) -> torch.Tensor:
-        """Reduced Gravity."""
+        """Reduced Gravity.
+
+        └── (1, 1, 1) shaped
+        """
         return self._g_prime[:1, ...]
 
     @QGAlpha.alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
-        """Beta-plane setter."""
+        """Alpha setter."""
         QGAlpha.alpha.fset(self, alpha)
         self._core.alpha = alpha
         self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
@@ -170,8 +177,10 @@ class QGCollinearSF(QGAlpha):
 
         Args:
             space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (2,) shaped
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (2,) shaped
             beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
@@ -198,11 +207,13 @@ class QGCollinearSF(QGAlpha):
 
         Args:
             H (torch.Tensor): Layers reference height.
+                └── (2,) shaped
             g_prime (torch.Tensor): Reduced gravity values.
+                └── (2,) shaped
 
         Returns:
             torch.Tensor: Stretching Operator
-        """  # noqa: RUF002
+        """
         return compute_A_collinear_sf(
             H=H,
             g_prime=g_prime,

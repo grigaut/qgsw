@@ -16,8 +16,10 @@ def n_layers_to_collinear_1_layer(
     Args:
         uvh_nl (UVH): n-layers uvh.
         g_prime_nl (torch.Tensor): g' for the n-layers model.
+            └── (nl,)-shaped.
         alpha (torch.Tensor): Collinearity coefficient.
         g_prime (torch.Tensor): g' for the 1-layer collinear model.
+            └── (2,)-shaped.
 
     Raises:
         ValueError: If g' shape is not (2,)
@@ -48,7 +50,9 @@ def n_layers_to_1_layer(
     Args:
         uvh_nl (UVH): n-layers uvh.
         g_prime_nl (torch.Tensor): g' for the n-layers model.
+            └── (nl,)-shaped
         g_prime (torch.Tensor): g' for the 1-layer collinear model.
+            └── (1,)-shaped
 
     Raises:
         ValueError: If g' shape is not (1,)
