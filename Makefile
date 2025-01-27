@@ -56,6 +56,8 @@ install: ${VENV} ${LOGS}
 install-dev:
 	@${MAKE} install
 	@${PIP} install -r ${DEV_REQUIREMENTS}
+	@${BIN}/pre-commit install --hook-type pre-commit
+	@${BIN}/pre-commit install --hook-type pre-push
 
 # GRID 5000 -----------------------------------------
 g5k-import-%:
