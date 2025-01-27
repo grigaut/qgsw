@@ -14,7 +14,7 @@ from qgsw.models.qg.modified.collinear_sublayer.core import (
 )
 from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
 from qgsw.models.qg.modified.utils import is_modified
-from qgsw.models.qg.projector import QGProjector
+from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
 from qgsw.models.sw.filtering import (

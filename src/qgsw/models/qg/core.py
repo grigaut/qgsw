@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
-from qgsw.models.qg.projector import QGProjector
+from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
