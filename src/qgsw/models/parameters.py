@@ -135,7 +135,7 @@ class ModelParamChecker:
     def H(self) -> torch.Tensor:  # noqa: N802
         """Layers thickness.
 
-        └── (n_ens, nl, 1, 1)-shaped.
+        └── (nl, 1, 1)-shaped.
         """
         return self._H
 
@@ -143,7 +143,7 @@ class ModelParamChecker:
     def g_prime(self) -> torch.Tensor:
         """Reduced Gravity.
 
-        └── (n_ens, nl, 1, 1)-shaped
+        └── (nl, 1, 1)-shaped
         """
         return self._g_prime
 
