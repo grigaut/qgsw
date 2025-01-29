@@ -61,7 +61,7 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
             window_radius=self.window_radius,
         )
         self._conv = self._build_convolution()
-        self._conv.weight.data = self.kernel.unsqueeze(0).unsqueeze(0)
+        self._conv.weight.data = self._kernel.unsqueeze(0).unsqueeze(0)
 
     @property
     def window_radius(self) -> int:
