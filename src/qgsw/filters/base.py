@@ -22,8 +22,8 @@ class _Filter(ABC):
     @abstractmethod
     def __call__(self, to_filter: torch.Tensor) -> torch.Tensor: ...
 
-    @staticmethod
-    def compute_window_width(window_radius: int) -> int:
+    @classmethod
+    def compute_window_width(cls, window_radius: int) -> int:
         """Compute the window width.
 
         Args:
