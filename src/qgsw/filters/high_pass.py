@@ -14,7 +14,7 @@ class GaussianHighPass1D(GaussianFilter1D):
         """Convolution kernel."""
         id_ = torch.zeros_like(self._kernel)
         id_[self.window_radius] = 1
-        return (id_ - self._kernel) / self._normalization_factor()
+        return id_ - self._kernel
 
     def __call__(self, to_filter: Tensor) -> Tensor:
         """Perform filtering.
@@ -25,9 +25,7 @@ class GaussianHighPass1D(GaussianFilter1D):
         Returns:
             torch.Tensor: Filtered tensor.
         """
-        return (
-            to_filter - super().__call__(to_filter)
-        ) / self._normalization_factor()
+        return to_filter - super().__call__(to_filter)
 
 
 class GaussianHighPass2D(GaussianFilter2D):
