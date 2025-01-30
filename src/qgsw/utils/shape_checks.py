@@ -37,13 +37,15 @@ def with_shapes(
         """
         # Signature of f
         signature = inspect.signature(f)
-        for key in shapes:
-            if key not in signature.parameters:
-                msg = (
-                    f"'{key}' is not a valid argument"
-                    f" name for {f.__qualname__}()."
-                )
-                raise ValueError(msg)
+        if any(key not in signature.parameters for key in shapes):
+            key = filter(
+                lambda key: key not in signature.parameters,
+                shapes,
+            ).__next__()
+            msg = (
+                f"'{key}' is not a valid argument name for {f.__qualname__}()."
+            )
+            raise ValueError(msg)
 
         @wraps(f)
         def wrapped(*args: Param.args, **kwargs: Param.kwargs) -> T:
@@ -60,14 +62,19 @@ def with_shapes(
             # Apply defaults
             f_params.apply_defaults()
             # Check shapes
-            for key, shape in shapes.items():
-                if (arg_shape := f_params.arguments[key].shape) != shape:
-                    msg = (
-                        f"{f.__qualname__}(): '{key}'"
-                        f" must be a {shape}-shaped tensor,"
-                        f" and not a {arg_shape}-shaped tensor,"
-                    )
-                    raise ShapeValidationError(msg)
+            if any(
+                f_params.arguments[k].shape != s for k, s in shapes.items()
+            ):
+                key, shape = filter(
+                    lambda ks: f_params.arguments[ks[0]].shape != ks[1],
+                    shapes.items(),
+                ).__next__()
+                msg = (
+                    f"{f.__qualname__}(): '{key}'"
+                    f" must be a {shape}-shaped tensor, and not"
+                    f" a {f_params.arguments[key].shape}-shaped tensor."
+                )
+                raise ShapeValidationError(msg)
             # Return result
             return f(*f_params.args, **f_params.kwargs)
 
