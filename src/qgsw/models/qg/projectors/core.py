@@ -14,6 +14,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI_cmm,
 )
 from qgsw.models.core.utils import OptimizableFunction
+from qgsw.models.qg.modified.exceptions import UnsetAError
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
@@ -66,7 +67,10 @@ class QGProjector:
 
         └── (nl,nl)-shaped.
         """
-        return self._A
+        try:
+            return self._A
+        except AttributeError as e:
+            raise UnsetAError from e
 
     @A.setter
     def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803

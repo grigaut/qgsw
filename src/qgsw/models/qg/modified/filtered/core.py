@@ -2,24 +2,38 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
+import torch
+
 from qgsw import verbose
-from qgsw.filters.high_pass import GaussianHighPass2D
+from qgsw.filters.high_pass import (
+    SpectralGaussianHighPass2D,
+)
+from qgsw.models.core.helmholtz import (
+    compute_capacitance_matrices,
+    compute_laplace_dstI,
+    solve_helmholtz_dstI,
+    solve_helmholtz_dstI_cmm,
+)
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
+from qgsw.models.qg.modified.exceptions import UnsetAError, UnsetAlphaError
 from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.stretching_matrix import (
+    compute_layers_to_mode_decomposition,
+)
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     SpaceDiscretization3D,
     keep_top_layer,
 )
+from qgsw.specs import DEVICE
 from qgsw.utils.shape_checks import with_shapes
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    import torch
 
     from qgsw.fields.variables.uvh import UVH
     from qgsw.filters.base import _Filter
@@ -131,6 +145,9 @@ class QGCollinearFilteredSF(QGAlpha):
 class QGCollinearFilteredProjector(QGProjector):
     """QG projector for QGCollinearFilteredSF."""
 
+    _A_set = False
+    _alpha_set = False
+
     @with_shapes(
         A=(1, 1),
         H=(2, 1, 1),
@@ -158,20 +175,40 @@ class QGCollinearFilteredProjector(QGProjector):
             f0 (float): f0.
             masks (Masks): Masks.
         """
-        super().__init__(A, H[:1], space, f0, masks)
+        self._filter = SpectralGaussianHighPass2D(1)
         self._g_prime = g_prime
+        super().__init__(A, H[:1], space, f0, masks)
         self._g_tilde = compute_g_tilde(g_prime[..., 0, 0])
-        self._filter = GaussianHighPass2D.from_span(1)
+
+    @property
+    def filter(self) -> SpectralGaussianHighPass2D:
+        """Filter."""
+        return self._filter
+
+    @QGProjector.A.setter
+    def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803
+        """Set the streching matrix."""
+        self._A = A
+        decomposition = compute_layers_to_mode_decomposition(A)
+        self.Cm2l, lambd, self.Cl2m = decomposition
+        self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
+        with contextlib.suppress(UnsetAlphaError):
+            self._set_helmholtz_solver(self.lambd, self.alpha, self._f0)
 
     @property
     def alpha(self) -> torch.Tensor:
         """Collinearity coefficient."""
-        return self._alpha
+        try:
+            return self._alpha
+        except AttributeError as e:
+            raise UnsetAlphaError from e
 
     @alpha.setter
     @with_shapes(alpha=(1,))
     def alpha(self, alpha: torch.Tensor) -> None:
         self._alpha = alpha
+        with contextlib.suppress(UnsetAError):
+            self._set_helmholtz_solver(self.lambd, self.alpha, self._f0)
 
     @classmethod
     @with_shapes(
@@ -301,3 +338,96 @@ class QGCollinearFilteredProjector(QGProjector):
         h_top_i = points_to_surface(uvh.h[0, 0])
         h_filt = filt(h_top_i).unsqueeze(0).unsqueeze(0)
         return alpha * f0**2 * g_tilde * h_filt / H1 / g2 / ds
+
+    def _set_helmholtz_solver(
+        self,
+        lambd: torch.Tensor,
+        alpha: torch.Tensor,
+        f0: float,
+    ) -> None:
+        """Set the Helmholtz Solver.
+
+        Args:
+            lambd (torch.Tensor): Matrix A's eigenvalues.
+                └── (1, 1, 1, 1)-shaped.
+            alpha (torch.Tensor): Collinearity coefficient.
+                └── (1, 1, 1, 1)-shaped.
+            f0 (float): f0.
+        """
+        # For Helmholtz equations
+        nl, nx, ny = self._space.nl, self._space.nx, self._space.ny
+        dx, dy = self._space.dx, self._space.dy
+        laplace_dstI = (  # noqa: N806
+            compute_laplace_dstI(
+                nx,
+                ny,
+                dx,
+                dy,
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            .unsqueeze(0)
+            .unsqueeze(0)
+        )
+        # Compute "(∆ - (f_0)² Λ)" in Fourier Space
+        helmholtz_dstI = laplace_dstI - f0**2 * lambd  # noqa: N806
+
+        helmholtz_dstI += (  # noqa: N806
+            alpha
+            * f0**2
+            / self.H[0, 0, 0]
+            / self._g_prime[1, 0, 0]
+            * self._points_to_surface(
+                self.filter.compute_kernel(
+                    self.filter.sigma,
+                    nx=nx,
+                    ny=ny,
+                    dtype=torch.float64,
+                    device=DEVICE.get(),
+                ),
+            )
+        )
+        # Constant Omega grid
+        cst_wgrid = torch.ones(
+            (1, nl, nx + 1, ny + 1),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+        if len(self._masks.psi_irrbound_xids) > 0:
+            # Handle Non rectangular geometry
+            cap_matrices = compute_capacitance_matrices(
+                helmholtz_dstI,
+                self._masks.psi_irrbound_xids,
+                self._masks.psi_irrbound_yids,
+            )
+            sol_wgrid = solve_helmholtz_dstI_cmm(
+                (cst_wgrid * self._masks.psi)[..., 1:-1, 1:-1],
+                helmholtz_dstI,
+                cap_matrices,
+                self._masks.psi_irrbound_xids,
+                self._masks.psi_irrbound_yids,
+                self._masks.psi,
+            )
+
+            def compute_p_modes(helmholtz_rhs: torch.Tensor) -> torch.Tensor:
+                return solve_helmholtz_dstI_cmm(
+                    helmholtz_rhs * self._masks.psi[..., 1:-1, 1:-1],
+                    helmholtz_dstI,
+                    cap_matrices,
+                    self._masks.psi_irrbound_xids,
+                    self._masks.psi_irrbound_yids,
+                    self._masks.psi,
+                )
+        else:
+            sol_wgrid = solve_helmholtz_dstI(
+                cst_wgrid[..., 1:-1, 1:-1],
+                helmholtz_dstI,
+            )
+
+            def compute_p_modes(helmholtz_rhs: torch.Tensor) -> torch.Tensor:
+                return solve_helmholtz_dstI(helmholtz_rhs, helmholtz_dstI)
+
+        self._compute_p_modes = compute_p_modes
+        # Compute homogenous solution
+        self.homsol_wgrid = cst_wgrid + sol_wgrid * f0**2 * lambd
+        self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
