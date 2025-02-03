@@ -99,7 +99,6 @@ class SpectralGaussianFilter1D(SpectralGaussianFilter):
             torch.Tensor: Filtered tensor.
         """
         kernel = self.compute_kernel_for(
-            self.sigma,
             to_filter=to_filter,
             d=d,
         )
@@ -195,16 +194,10 @@ class SpectralGaussianFilter2D(SpectralGaussianFilter):
         Returns:
             torch.Tensor: Filtered tensor.
         """
-        nx = to_filter.shape[-2]
-        ny = to_filter.shape[-1]
-        kernel = self.compute_kernel(
-            self.sigma,
-            nx=nx,
-            ny=ny,
+        kernel = self.compute_kernel_for(
+            to_filter,
             dx=dx,
             dy=dy,
-            dtype=to_filter.dtype,
-            device=to_filter.device,
         )
 
         return dstI2D(dstI2D(to_filter) * kernel)

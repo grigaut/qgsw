@@ -10,8 +10,18 @@ from qgsw.filters.gaussian import (
     GaussianFilter1D,
     GaussianFilter2D,
 )
-from qgsw.filters.high_pass import GaussianHighPass1D, GaussianHighPass2D
-from qgsw.filters.low_pass import GaussianLowPass1D, GaussianLowPass2D
+from qgsw.filters.high_pass import (
+    GaussianHighPass1D,
+    GaussianHighPass2D,
+    SpectralGaussianHighPass1D,
+    SpectralGaussianHighPass2D,
+)
+from qgsw.filters.low_pass import (
+    GaussianLowPass1D,
+    GaussianLowPass2D,
+    SpectralGaussianLowPass1D,
+    SpectralGaussianLowPass2D,
+)
 from qgsw.specs import DEVICE
 
 
@@ -26,7 +36,7 @@ def test_gaussian_filter_1d() -> None:
         mode="same",
     )
     assert y_filt.shape == y.shape
-    assert np.isclose(y_filt, y_filt_ref).all()
+    np.testing.assert_allclose(y_filt, y_filt_ref)
 
 
 def test_gaussian_filter_2d() -> None:
@@ -40,7 +50,7 @@ def test_gaussian_filter_2d() -> None:
         mode="same",
     )
     assert y_filt.shape == y.shape
-    assert np.isclose(y_filt, y_filt_ref).all()
+    np.testing.assert_allclose(y_filt, y_filt_ref)
 
 
 testdata = [
@@ -51,10 +61,22 @@ testdata = [
         id="1D",
     ),
     pytest.param(
+        (500,),
+        SpectralGaussianLowPass1D(1),
+        SpectralGaussianHighPass1D(1),
+        id="1D-spectral",
+    ),
+    pytest.param(
         (500, 500),
         GaussianLowPass2D(10),
         GaussianHighPass2D(10),
         id="2D",
+    ),
+    pytest.param(
+        (500, 500),
+        SpectralGaussianLowPass2D(1),
+        SpectralGaussianHighPass2D(1),
+        id="2D-spectral",
     ),
 ]
 
@@ -70,4 +92,4 @@ def test_lp_hp(
 
     y_filt_lp = filt_lp(y)
     y_filt_hp = filt_hp(y)
-    assert torch.isclose(y_filt_hp + y_filt_lp, y).all()
+    torch.testing.assert_close(y_filt_hp + y_filt_lp, y)

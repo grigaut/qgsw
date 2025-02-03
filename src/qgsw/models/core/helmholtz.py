@@ -109,9 +109,47 @@ def solve_helmholtz_dctII(
     )
 
 
+def dstI1Dffreq(
+    n: int,
+    d=float,
+    *,
+    dtype: torch.dtype = None,
+    device: torch.device = None,
+) -> torch.Tensor:
+    """Wraps torch.fft.fftfreq.
+
+    Args:
+        n (int): Input tensor shape.
+        d (float, optional): The sampling length scale.
+        The spacing between individual samples of the FFT input.
+        The default assumes unit spacing, dividing that result by the actual spacing gives
+        the result in physical frequency units.
+        Defaults to 1.0.
+        dtype (torch.dtype, optional): dtype. Defaults to None.
+        device (torch.device, optional): device. Defaults to None.
+
+    Returns:
+        torch.Tensor: torch.fft.ffreq(2*n,d)
+    """
+    return torch.fft.fftfreq(
+        n=2 * n,
+        d=d,
+        dtype=dtype,
+        device=device,
+    )[:n]
+
+
 def dstI1D(x: torch.Tensor, norm: str = "ortho") -> torch.Tensor:
     """1D type-I discrete sine transform (DST-I), forward and inverse
-    since DST-I is auto-inverse."""
+    since DST-I is auto-inverse.
+
+
+    irfft(x) <=> ifft([x[0],...,x[-2],x[-1],x[-2],...,x[1]])
+
+    irfft(-1j*F.pad(x,(1,1))) <=> ifft([0,-1j*x[0],...,-1j*x[-1],0,-1j*x[-1],...,-1j*x[0]])
+
+    ifft([0,-1j*x[0],...,-1j*x[-1],0,-1j*x[-1],...,-1j*x[0]]) =
+    """
     return torch.fft.irfft(-1j * F.pad(x, (1, 1)), dim=-1, norm=norm)[
         ..., 1 : x.shape[-1] + 1
     ]
