@@ -1,9 +1,18 @@
 """Decorator to check tensor shapes."""
 
+from __future__ import annotations
+
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+
 import inspect
-from collections.abc import Callable
 from functools import wraps
-from typing import ParamSpec, TypeVar
+from typing import TYPE_CHECKING, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class ShapeValidationError(Exception):

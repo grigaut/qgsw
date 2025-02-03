@@ -1,6 +1,11 @@
 """Test shape checks."""
 
-from typing import Any, ParamSpec
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+
+from typing import Any
 
 import pytest
 import torch

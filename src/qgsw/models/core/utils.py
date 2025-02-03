@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Generic, ParamSpec, TypeVar
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
