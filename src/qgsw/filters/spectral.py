@@ -2,8 +2,8 @@
 
 import torch
 
+from qgsw import fft
 from qgsw.filters.base import _SpectralFilter
-from qgsw.models.core.helmholtz import dstI1D, dstI1Dffreq, dstI2D
 
 
 class SpectralGaussianFilter(_SpectralFilter):
@@ -52,7 +52,7 @@ class SpectralGaussianFilter1D(SpectralGaussianFilter):
         Returns:
             torch.Tensor: Spectral kernel.
         """
-        freqs = dstI1Dffreq(
+        freqs = fft.dstI1Dffreq(
             n=n,
             d=d,
             dtype=dtype,
@@ -103,7 +103,7 @@ class SpectralGaussianFilter1D(SpectralGaussianFilter):
             d=d,
         )
 
-        return dstI1D(dstI1D(to_filter) * kernel)
+        return fft.dstI1D(fft.dstI1D(to_filter) * kernel)
 
 
 class SpectralGaussianFilter2D(SpectralGaussianFilter):
@@ -135,13 +135,13 @@ class SpectralGaussianFilter2D(SpectralGaussianFilter):
         Returns:
             torch.Tensor: Spectral kernel
         """
-        freqs_x = dstI1Dffreq(
+        freqs_x = fft.dstI1Dffreq(
             n=nx,
             d=dx,
             dtype=dtype,
             device=device,
         )
-        freqs_y = dstI1Dffreq(
+        freqs_y = fft.dstI1Dffreq(
             n=ny,
             d=dy,
             dtype=dtype,
@@ -200,4 +200,4 @@ class SpectralGaussianFilter2D(SpectralGaussianFilter):
             dy=dy,
         )
 
-        return dstI2D(dstI2D(to_filter) * kernel)
+        return fft.dstI2D(fft.dstI2D(to_filter) * kernel)

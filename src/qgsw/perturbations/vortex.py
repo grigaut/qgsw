@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
+from qgsw import fft
+
 try:
     from typing import Self
 except ImportError:
@@ -108,9 +110,9 @@ class RankineVortex2D:
             dtype=torch.float64,
         )
         # Solve problem in Fourier space : "ψ = ω/∆"
-        psi_hat = helmholtz.dstI2D(vor[1:-1, 1:-1]) / laplacian
+        psi_hat = fft.dstI2D(vor[1:-1, 1:-1]) / laplacian
         # Come back to original space
-        psi = F.pad(helmholtz.dstI2D(psi_hat), (1, 1, 1, 1))
+        psi = F.pad(fft.dstI2D(psi_hat), (1, 1, 1, 1))
         return psi.unsqueeze(0).unsqueeze(0)
 
     def _compute_vorticity(
