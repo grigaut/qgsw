@@ -294,6 +294,30 @@ class QGCollinearFilteredProjector(QGProjector):
         )
 
     @classmethod
+    def compute_source_term_factor(
+        cls,
+        alpha: torch.Tensor,
+        H1: torch.Tensor,  # noqa: N803
+        g2: torch.Tensor,
+        f0: float,
+    ) -> torch.Tensor:
+        """Compute source term multiplicative factor.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+                └── (1, )-shaped.
+            H1 (torch.Tensor): Top layer reference depth.
+                └── (1, )-shaped.
+            g2 (torch.Tensor): Reduced gravity in the second layer.
+                └── (1, )-shaped.
+            f0 (float): f0.
+
+        Returns:
+            torch.Tensor: f_0²α/H1/g2
+        """
+        return f0**2 * alpha / H1 / g2
+
+    @classmethod
     @with_shapes(
         alpha=(1,),
         H1=(1,),
@@ -316,9 +340,9 @@ class QGCollinearFilteredProjector(QGProjector):
 
         Args:
             uvh (UVH): Prognostic u,v and h.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
+                ├── u: (n_ens, 1, nx+1, ny)-shaped
+                ├── v: (n_ens, 1, nx, ny+1)-shaped
+                └── h: (n_ens, 1, nx, ny)-shaped
             filt (_Filter): Filter.
             alpha (torch.Tensor): Collinearity coefficient.
             H1 (torch.Tensor): Top layer depth.
@@ -333,11 +357,13 @@ class QGCollinearFilteredProjector(QGProjector):
             to surface interpolation function.
 
         Returns:
-            torch.Tensor: Source term :
+            torch.Tensor: Source term: f_0²αg̃/H1/g2/ds (F^s)⁻¹{K F{h}}.
         """
         h_top_i = points_to_surface(uvh.h[0, 0])
         h_filt = filt(h_top_i).unsqueeze(0).unsqueeze(0)
-        return alpha * f0**2 * g_tilde * h_filt / H1 / g2 / ds
+        h_to_psi = g_tilde * h_filt
+        factor = cls.compute_source_term_factor(alpha, H1, g2, f0)
+        return factor * h_to_psi / ds
 
     def _set_helmholtz_solver(
         self,
@@ -372,21 +398,24 @@ class QGCollinearFilteredProjector(QGProjector):
         # Compute "(∆ - (f_0)² Λ)" in Fourier Space
         helmholtz_dstI = laplace_dstI - f0**2 * lambd  # noqa: N806
 
-        helmholtz_dstI += (  # noqa: N806
-            alpha
-            * f0**2
-            / self.H[0, 0, 0]
-            / self._g_prime[1, 0, 0]
-            * self._points_to_surface(
-                self.filter.compute_kernel(
-                    self.filter.sigma,
-                    nx=nx,
-                    ny=ny,
-                    dtype=torch.float64,
-                    device=DEVICE.get(),
-                ),
-            )
+        factor = self.compute_source_term_factor(
+            alpha,
+            self.H[0, 0, 0],
+            self._g_prime[1, 0, 0],
+            f0,
         )
+
+        K = self.filter.compute_kernel(  # noqa: N806
+            self.filter.sigma,
+            nx=nx,
+            ny=ny,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+
+        # Compute "(∆ - (f_0)² Λ + f_0²αK/H1/g2)" in Fourier Space
+        helmholtz_dstI += factor * self._points_to_surface(K)  # noqa: N806
+
         # Constant Omega grid
         cst_wgrid = torch.ones(
             (1, nl, nx + 1, ny + 1),
