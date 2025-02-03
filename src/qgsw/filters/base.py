@@ -33,3 +33,8 @@ class _Filter(ABC):
             int: Window width
         """
         return window_radius * 2 + 1
+
+
+class _SpectralFilter(ABC):
+    @abstractmethod
+    def __call__(self, to_filter: torch.Tensor) -> torch.Tensor: ...
