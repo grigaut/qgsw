@@ -3,18 +3,16 @@
 from pathlib import Path
 
 import streamlit as st
-import torch
 
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
-from qgsw.fields.variables.variable_sets import create_qg_variable_set
+from qgsw.models.instantiation import get_model_class
 from qgsw.models.qg.modified.utils import is_modified
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,
 )
 from qgsw.plots.scatter import ScatterPlot
-from qgsw.specs import DEVICE
 
 ROOT = Path(__file__).parent.parent.parent
 OUTPUTS = ROOT.joinpath("output")
@@ -29,12 +27,11 @@ folder = st.selectbox("Data source", options=sources)
 
 run = RunOutput(folder)
 config = run.summary.configuration
-vars_dict = create_qg_variable_set(
-    config.physics,
+
+vars_dict = get_model_class(config.model).get_variable_set(
     config.space,
+    config.physics,
     config.model,
-    torch.float64,
-    DEVICE.get(),
 )
 levels_nb = run.summary.configuration.model.h.shape[0]
 if is_modified(run.summary.configuration.model.type):

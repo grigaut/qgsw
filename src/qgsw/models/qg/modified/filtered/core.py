@@ -20,6 +20,9 @@ from qgsw.models.core.helmholtz import (
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
 from qgsw.models.qg.modified.exceptions import UnsetAError, UnsetAlphaError
+from qgsw.models.qg.modified.filtered.variable_set import (
+    QGCollinearFilteredSFVariableSet,
+)
 from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
@@ -35,6 +38,10 @@ from qgsw.utils.shape_checks import with_shapes
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.fields.variables.uvh import UVH
     from qgsw.filters.base import _Filter
     from qgsw.masks import Masks
@@ -139,6 +146,29 @@ class QGCollinearFilteredSF(QGAlpha["QGCollinearFilteredProjector"]):
             space=self.space,
             f0=self.beta_plane.f0,
             masks=self.masks,
+        )
+
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        return QGCollinearFilteredSFVariableSet.get_variable_set(
+            space,
+            physics,
+            model,
         )
 
 

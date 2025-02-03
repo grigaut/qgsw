@@ -32,7 +32,10 @@ class ModelConfig(BaseModel):
 
     @cached_property
     def h(self) -> torch.Tensor:
-        """Vertical layers."""
+        """Vertical layers.
+
+        └── (nl,) shaped
+        """
         return torch.tensor(
             self.layers,
             dtype=torch.float64,
@@ -47,7 +50,10 @@ class ModelConfig(BaseModel):
 
     @cached_property
     def g_prime(self) -> torch.Tensor:
-        """Reduced gravity."""
+        """Reduced gravity.
+
+        └── (nl,) shaped
+        """
         return torch.tensor(
             self.reduced_gravity,
             dtype=torch.float64,

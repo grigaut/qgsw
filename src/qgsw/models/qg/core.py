@@ -11,12 +11,17 @@ from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
+from qgsw.models.qg.variable_set import QGVariableSet
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 if TYPE_CHECKING:
     import torch
 
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.masks import Masks
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
@@ -278,6 +283,25 @@ class QGCore(Model[T], Generic[T, Projector]):
         """
         super().set_wind_forcing(taux, tauy)
         self.sw.set_wind_forcing(taux, tauy)
+
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        return QGVariableSet.get_variable_set(space, physics, model)
 
 
 class QG(QGCore[UVHT, QGProjector]):
