@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from qgsw import verbose
 from qgsw.fields.variables.state import StateAlpha
@@ -14,6 +14,7 @@ from qgsw.models.qg.core import QGCore
 from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
+from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -28,8 +29,10 @@ if TYPE_CHECKING:
         SpaceDiscretization2D,
     )
 
+Projector = TypeVar("Projector", bound=QGProjector)
 
-class QGAlpha(QGCore[UVHTAlpha]):
+
+class QGAlpha(QGCore[UVHTAlpha, Projector]):
     """Collinear QG Model."""
 
     _supported_layers_nb: int
@@ -80,7 +83,7 @@ class QGAlpha(QGCore[UVHTAlpha]):
         super()._set_H(h)
 
 
-class QGCollinearSF(QGAlpha):
+class QGCollinearSF(QGAlpha[QGProjector]):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _type = "QGCollinearSF"

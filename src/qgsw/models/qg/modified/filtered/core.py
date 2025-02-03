@@ -60,7 +60,7 @@ def compute_g_tilde(g_prime: torch.Tensor) -> torch.Tensor:
     return (g1 * g2 / (g1 + g2)).unsqueeze(0)
 
 
-class QGCollinearFilteredSF(QGAlpha):
+class QGCollinearFilteredSF(QGAlpha["QGCollinearFilteredProjector"]):
     """Modified QG Model implementing collinear pv behavior."""
 
     _type = "QGCollinearFilteredSF"
@@ -144,9 +144,6 @@ class QGCollinearFilteredSF(QGAlpha):
 
 class QGCollinearFilteredProjector(QGProjector):
     """QG projector for QGCollinearFilteredSF."""
-
-    _A_set = False
-    _alpha_set = False
 
     @with_shapes(
         A=(1, 1),

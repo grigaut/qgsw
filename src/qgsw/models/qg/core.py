@@ -23,9 +23,10 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T", bound=BasePrognosticTuple)
+Projector = TypeVar("Projector", bound=QGProjector)
 
 
-class QGCore(Model[T], Generic[T]):
+class QGCore(Model[T], Generic[T, Projector]):
     """Quasi Geostrophic Model."""
 
     _type = "QG"
@@ -66,6 +67,11 @@ class QGCore(Model[T], Generic[T]):
             beta_plane=beta_plane,
             optimize=optimize,
         )
+
+    @property
+    def P(self) -> Projector:  # noqa: N802
+        """QG projector."""
+        return self._P
 
     @property
     def sw(self) -> SW:
@@ -274,5 +280,5 @@ class QGCore(Model[T], Generic[T]):
         self.sw.set_wind_forcing(taux, tauy)
 
 
-class QG(QGCore[UVHT]):
+class QG(QGCore[UVHT, QGProjector]):
     """Quasi Geostrophic Model."""
