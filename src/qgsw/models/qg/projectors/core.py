@@ -275,7 +275,7 @@ class QGProjector:
             to surface interpolation function.
 
         Returns:
-            torch.Tensor: Physical Pressure * f0.
+            torch.Tensor: Physical Potential Vorticity * f0.
                 └── (n_ens, nl, nx-1, ny-1)-shaped.
         """
         # Compute ω = ∂_x v - ∂_y u
