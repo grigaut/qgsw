@@ -1,14 +1,20 @@
 """VariableSet related to the model."""
 
-from qgsw.configs.models import ModelConfig
-from qgsw.configs.physics import PhysicsConfig
-from qgsw.configs.space import SpaceConfig
-from qgsw.fields.variables.base import DiagnosticVariable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from qgsw.fields.variables.dynamics import PhysicalVorticity, Vorticity
 from qgsw.models.qg.modified.filtered.pv import (
     CollinearFilteredPotentialVorticity,
 )
 from qgsw.models.qg.variable_set import QGVariableSet
+
+if TYPE_CHECKING:
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
 
 
 class QGCollinearFilteredSFVariableSet(QGVariableSet):
