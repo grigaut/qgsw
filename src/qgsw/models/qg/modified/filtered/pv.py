@@ -4,12 +4,14 @@ from collections.abc import Callable
 
 import torch
 
+from qgsw.fields.scope import Scope
 from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.uvh import UVH, UVHTAlpha
 from qgsw.filters.base import _Filter
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.utils.shape_checks import with_shapes
+from qgsw.utils.units._units import Unit
 
 
 @with_shapes(g_prime=(2,))
@@ -171,6 +173,17 @@ def compute_pv(
 
 class CollinearFilteredPotentialVorticity(DiagnosticVariable):
     """Collinear Filtered PV."""
+
+    """Potential Vorticity.
+
+    └── (n_ens, nl, nx-1, ny-1)-shaped
+    """
+
+    _unit = Unit.S_1
+    _name = "pv"
+    _description = "Potential vorticity"
+    _scope = Scope.POINT_WISE
+    _require_alpha = True
 
     @with_shapes(
         H=(2,),
