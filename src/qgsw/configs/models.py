@@ -29,6 +29,7 @@ class ModelConfig(BaseModel):
         InferredCollinearityCoefConfig,
         None,
     ] = Field(None, discriminator="type")
+    sigma: Union[PositiveFloat, None] = None
 
     @cached_property
     def h(self) -> torch.Tensor:
