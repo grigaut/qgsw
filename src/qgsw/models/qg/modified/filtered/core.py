@@ -188,7 +188,7 @@ class QGCollinearFilteredProjector(QGProjector):
             f0 (float): f0.
             masks (Masks): Masks.
         """
-        self._filter = SpectralGaussianHighPass2D(1)
+        self._filter = self.create_filter(sigma=1)
         self._g_prime = g_prime
         super().__init__(A, H[:1], space, f0, masks)
         self._g_tilde = compute_g_tilde(g_prime[..., 0, 0])
@@ -396,3 +396,15 @@ class QGCollinearFilteredProjector(QGProjector):
         # Compute homogenous solution
         self.homsol_wgrid = cst_wgrid + sol_wgrid * f0**2 * lambd
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
+
+    @classmethod
+    def create_filter(cls, sigma: float) -> SpectralGaussianHighPass2D:
+        """Create filter.
+
+        Args:
+            sigma (float): Filter standard deviation.
+
+        Returns:
+            SpectralGaussianHighPass2D: Filter.
+        """
+        return SpectralGaussianHighPass2D(sigma=sigma)
