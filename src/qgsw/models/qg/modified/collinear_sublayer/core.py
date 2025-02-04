@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from qgsw import verbose
 from qgsw.fields.variables.state import StateAlpha
@@ -14,6 +14,10 @@ from qgsw.models.qg.core import QGCore
 from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
     compute_A_collinear_sf,
 )
+from qgsw.models.qg.modified.collinear_sublayer.variable_set import (
+    QGCollinearSFVariableSet,
+)
+from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -23,13 +27,19 @@ from qgsw.spatial.core.discretization import (
 if TYPE_CHECKING:
     import torch
 
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import (
         SpaceDiscretization2D,
     )
 
+Projector = TypeVar("Projector", bound=QGProjector)
 
-class QGAlpha(QGCore[UVHTAlpha]):
+
+class QGAlpha(QGCore[UVHTAlpha, Projector]):
     """Collinear QG Model."""
 
     _supported_layers_nb: int
@@ -80,7 +90,7 @@ class QGAlpha(QGCore[UVHTAlpha]):
         super()._set_H(h)
 
 
-class QGCollinearSF(QGAlpha):
+class QGCollinearSF(QGAlpha[QGProjector]):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _type = "QGCollinearSF"
@@ -225,3 +235,22 @@ class QGCollinearSF(QGAlpha):
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         return super().step()
+
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        return QGCollinearSFVariableSet.get_variable_set(space, physics, model)

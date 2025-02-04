@@ -14,7 +14,7 @@ from qgsw.models.qg.modified.collinear_sublayer.core import (
 )
 from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
 from qgsw.models.qg.modified.utils import is_modified
-from qgsw.models.qg.projector import QGProjector
+from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
 from qgsw.models.sw.filtering import (
@@ -117,16 +117,8 @@ def _instantiate_sw(
     Returns:
         SW: SW Model.
     """
-    if model_config.type == SW.get_type():
-        model_class = SW
-    elif model_config.type == SWFilterBarotropicSpectral.get_type():
-        model_class = SWFilterBarotropicSpectral
-    elif model_config.type == SWFilterBarotropicExact.get_type():
-        model_class = SWFilterBarotropicExact
-    else:
-        msg = f"Unrecognized model type: {model_config.type}"
-        raise ValueError(msg)
-    model = model_class(
+    model_class = get_model_class(model_config)
+    model: SW = model_class(
         space_2d=space_2d,
         H=model_config.h,
         g_prime=model_config.g_prime,
@@ -228,14 +220,8 @@ def _instantiate_collinear_qg(
     Returns:
         QGAlpha: Modified QG Model.
     """
-    if model_config.type == QGCollinearSF.get_type():
-        model_class = QGCollinearSF
-    elif model_config.type == QGCollinearFilteredSF.get_type():
-        model_class = QGCollinearFilteredSF
-    else:
-        msg = f"Unrecognized model type: {model_config.type}"
-        raise ValueError(msg)
-    model = model_class(
+    model_class = get_model_class(model_config)
+    model: QG = model_class(
         space_2d=space_2d,
         H=model_config.h,
         g_prime=model_config.g_prime,
@@ -286,4 +272,30 @@ def _determine_coef0(perturbation_type: str) -> float:
     if perturbation_type == "none":
         return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     msg = f"Unknown perturbation type: {perturbation_type}"
+    raise ValueError(msg)
+
+
+def get_model_class(
+    model_config: ModelConfig,
+) -> QG | QGCollinearSF | QGCollinearFilteredSF | SW:
+    """Get the model class.
+
+    Args:
+        model_config (ModelConfig): Model configuration.
+
+    Raises:
+        ValueError: If the model type is not recognized.
+
+    Returns:
+        QG | QGCollinearSF | QGCollinearFilteredSF | SW: _description_
+    """
+    if model_config.type == QG.get_type():
+        return QG
+    if model_config.type == QGCollinearSF.get_type():
+        return QGCollinearSF
+    if model_config.type == QGCollinearFilteredSF.get_type():
+        return QGCollinearFilteredSF
+    if model_config.type == SW.get_type():
+        return SW
+    msg = f"Unrecognized model type: {model_config.type}"
     raise ValueError(msg)

@@ -14,6 +14,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI_cmm,
 )
 from qgsw.models.core.utils import OptimizableFunction
+from qgsw.models.qg.modified.exceptions import UnsetAError
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
@@ -44,7 +45,7 @@ class QGProjector:
             A (torch.Tensor): Stretching matrix.
                 └── (nl, nl)-shaped
             H (torch.Tensor): Layers reference thickness.
-                └── (n_ens, nl, 1, 1)-shaped
+                └── (nl, 1, 1)-shaped
             space (SpaceDiscretization3D): 3D space discretization.
             f0 (float): f0.
             masks (Masks): Masks.
@@ -66,7 +67,10 @@ class QGProjector:
 
         └── (nl,nl)-shaped.
         """
-        return self._A
+        try:
+            return self._A
+        except AttributeError as e:
+            raise UnsetAError from e
 
     @A.setter
     def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803
@@ -172,8 +176,9 @@ class QGProjector:
         self.homsol_wgrid = cst_wgrid + sol_wgrid * f0**2 * lambd
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
 
-    @staticmethod
+    @classmethod
     def G(  # noqa: N802
+        cls,
         p: torch.Tensor,
         A: torch.Tensor,  # noqa: N803
         H: torch.Tensor,  # noqa: N803
@@ -246,8 +251,9 @@ class QGProjector:
             points_to_surfaces=self._points_to_surface,
         )
 
-    @staticmethod
+    @classmethod
     def Q(  # noqa: N802
+        cls,
         uvh: UVH,
         H: torch.Tensor,  # noqa: N803
         f0: float,
@@ -262,15 +268,15 @@ class QGProjector:
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             H (torch.Tensor): Layers reference thickness.
-                └── (n_ens,nl,1,1)-shaped.
+                └── (nl, 1, 1)-shaped.
             f0 (float): f0.
             ds (float): ds.
             points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface interpolation function.
 
         Returns:
-            torch.Tensor: Pressure.
-                └── (n_ens,nl,nx,ny)-shaped.
+            torch.Tensor: Physical Pressure * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
         """
         # Compute ω = ∂_x v - ∂_y u
         omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
@@ -290,8 +296,8 @@ class QGProjector:
                 └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Pressure.
-                └── (n_ens,nl,nx,ny)-shaped.
+            torch.Tensor: Physical Pressure * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
         """
         return self.Q(
             uvh=uvh,

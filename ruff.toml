@@ -13,8 +13,10 @@ ignore = [
     "INP001",
     # Too many arguments to function call
     "PLR0913",
-    #
+    # ambiguous-unicode-character-docstring
     "RUF002",
+    # ambiguous-unicode-character-comment
+    "RUF003",
 ]
 unfixable = [
     # Remove unused-imports

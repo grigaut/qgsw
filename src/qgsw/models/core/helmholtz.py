@@ -10,6 +10,7 @@ Louis Thiry, 2023.
 
 import torch
 import torch.nn.functional as F
+from qgsw import fft
 from qgsw.specs import DEVICE
 
 
@@ -32,68 +33,6 @@ def compute_laplace_dctII(
     )
 
 
-def dctII(x: torch.Tensor, exp_vec: torch.Tensor) -> torch.Tensor:
-    """
-    1D forward type-II discrete cosine transform (DCT-II)
-    using fft and precomputed auxillary vector exp_vec.
-    """
-    v = torch.cat([x[..., ::2], torch.flip(x, dims=(-1,))[..., ::2]], dim=-1)
-    V = torch.fft.fft(v)
-    return (V * exp_vec).real
-
-
-def idctII(x: torch.Tensor, iexp_vec: torch.Tensor) -> torch.Tensor:
-    """
-    1D inverse type-II discrete cosine transform (DCT-II)
-    using fft and precomputed auxillary vector iexp_vec.
-    """
-    N = x.shape[-1]
-    x_rev = torch.flip(x, dims=(-1,))[..., :-1]
-    v = (
-        torch.cat(
-            [x[..., 0:1], iexp_vec[..., 1:N] * (x[..., 1:N] - 1j * x_rev)],
-            dim=-1,
-        )
-        / 2
-    )
-    V = torch.fft.ifft(v)
-    y = torch.zeros_like(x)
-    y[..., ::2] = V[..., : N // 2].real
-    y[..., 1::2] = torch.flip(V, dims=(-1,))[..., : N // 2].real
-    return y
-
-
-def dctII2D(
-    x: torch.Tensor, exp_vec_x: torch.Tensor, exp_vec_y: torch.Tensor
-) -> torch.Tensor:
-    """2D forward DCT-II."""
-    return dctII(dctII(x, exp_vec_y).transpose(-1, -2), exp_vec_x).transpose(
-        -1, -2
-    )
-
-
-def idctII2D(
-    x: torch.Tensor, iexp_vec_x: torch.Tensor, iexp_vec_y: torch.Tensor
-) -> torch.Tensor:
-    """2D inverse DCT-II."""
-    return idctII(
-        idctII(x, iexp_vec_y).transpose(-1, -2), iexp_vec_x
-    ).transpose(-1, -2)
-
-
-def compute_dctII_exp_vecs(
-    N: int,
-    dtype,
-    device: str,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Compute auxillary exp_vec and iexp_vec used in
-    fast DCT-II computations with FFTs."""
-    N_range = torch.arange(N, dtype=dtype, device=device)
-    exp_vec = 2 * torch.exp(-1j * torch.pi * N_range / (2 * N))
-    iexp_vec = torch.exp(1j * torch.pi * N_range / (2 * N))
-    return exp_vec, iexp_vec
-
-
 def solve_helmholtz_dctII(
     rhs: torch.Tensor,
     helmholtz_dctII: torch.Tensor,
@@ -103,28 +42,12 @@ def solve_helmholtz_dctII(
     iexp_vec_y: torch.Tensor,
 ) -> torch.Tensor:
     """Solves Helmholtz equation with DCT-II fast diagonalisation."""
-    rhs_dctII = dctII2D(rhs.type(helmholtz_dctII.dtype), exp_vec_x, exp_vec_y)
-    return idctII2D(rhs_dctII / helmholtz_dctII, iexp_vec_x, iexp_vec_y).type(
-        rhs.dtype
+    rhs_dctII = fft.dctII2D(
+        rhs.type(helmholtz_dctII.dtype), exp_vec_x, exp_vec_y
     )
-
-
-def dstI1D(x: torch.Tensor, norm: str = "ortho") -> torch.Tensor:
-    """1D type-I discrete sine transform (DST-I), forward and inverse
-    since DST-I is auto-inverse."""
-    return torch.fft.irfft(-1j * F.pad(x, (1, 1)), dim=-1, norm=norm)[
-        ..., 1 : x.shape[-1] + 1
-    ]
-
-
-def dstI2D(x: torch.Tensor, norm: str = "ortho"):
-    """2D DST-I.
-
-    2D Discrete Sine Transform.
-    """
-    return dstI1D(dstI1D(x, norm=norm).transpose(-1, -2), norm=norm).transpose(
-        -1, -2
-    )
+    return fft.idctII2D(
+        rhs_dctII / helmholtz_dctII, iexp_vec_x, iexp_vec_y
+    ).type(rhs.dtype)
 
 
 def compute_laplace_dstI(
@@ -158,7 +81,9 @@ def solve_helmholtz_dstI(
     - Perform inverse DST-I to com eback to original space.
     """
     return F.pad(
-        dstI2D(dstI2D(rhs.type(helmholtz_dstI.dtype)) / helmholtz_dstI),
+        fft.dstI2D(
+            fft.dstI2D(rhs.type(helmholtz_dstI.dtype)) / helmholtz_dstI
+        ),
         (1, 1, 1, 1),
     ).type(rhs.dtype)
 
@@ -183,7 +108,7 @@ def compute_capacitance_matrices(
     for m in range(M):
         rhs.fill_(0)
         rhs[..., bound_xids[m], bound_yids[m]] = 1
-        sol = dstI2D(dstI2D(rhs) / helmholtz_dstI.type(torch.float64))
+        sol = fft.dstI2D(fft.dstI2D(rhs) / helmholtz_dstI.type(torch.float64))
         inv_cap_matrices[:, m] = sol[..., bound_xids, bound_yids].to(
             device=DEVICE
         )
@@ -204,8 +129,8 @@ def solve_helmholtz_dstI_cmm(
     bound_yids: torch.Tensor,
     mask: torch.Tensor,
 ) -> torch.Tensor:
-    sol_1 = dstI2D(
-        dstI2D(rhs.type(helmholtz_dstI.dtype)) / helmholtz_dstI
+    sol_1 = fft.dstI2D(
+        fft.dstI2D(rhs.type(helmholtz_dstI.dtype)) / helmholtz_dstI
     ).type(rhs.dtype)
     alphas = torch.einsum(
         "...ij,...j->...i", cap_matrices, -sol_1[..., bound_xids, bound_yids]
@@ -234,8 +159,8 @@ class HelmholtzNeumannSolver:
         )
 
         # auxillary vectors for DCT-II computations
-        exp_vec_x, iexp_vec_x = compute_dctII_exp_vecs(nx, dtype, device)
-        exp_vec_y, iexp_vec_y = compute_dctII_exp_vecs(ny, dtype, device)
+        exp_vec_x, iexp_vec_x = fft.compute_dctII_exp_vecs(nx, dtype, device)
+        exp_vec_y, iexp_vec_y = fft.compute_dctII_exp_vecs(ny, dtype, device)
         self.exp_vec_x = exp_vec_x.unsqueeze(0).unsqueeze(0)
         self.iexp_vec_x = iexp_vec_x.unsqueeze(0).unsqueeze(0)
         self.exp_vec_y = exp_vec_y.unsqueeze(0).unsqueeze(0)

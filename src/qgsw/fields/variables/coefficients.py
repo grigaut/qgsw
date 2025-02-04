@@ -9,14 +9,13 @@ from qgsw.fields.variables.dynamics import (
     PhysicalSurfaceHeightAnomaly,
     Pressure,
 )
-from qgsw.models.qg.core import QG
-from qgsw.models.sw.core import SW
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
 
+import contextlib
 from abc import ABC, abstractmethod
 
 import torch
@@ -55,11 +54,8 @@ class Coefficient(DiagnosticVariable, ABC):
         Args:
             model (QGAlpha): Model to update.
         """
-        if model.get_type() == QG.get_type():
-            return
-        if model.get_type() == SW.get_type():
-            return
-        model.alpha = self.compute_no_slice(model.prognostic)
+        with contextlib.suppress(AttributeError):
+            model.alpha = self.compute_no_slice(model.prognostic)
 
     @classmethod
     @abstractmethod

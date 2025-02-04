@@ -3,16 +3,14 @@
 from pathlib import Path
 
 import streamlit as st
-import torch
 
 from qgsw.fields.errors.error_sets import create_errors_set
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
-from qgsw.fields.variables.variable_sets import create_qg_variable_set
+from qgsw.models.instantiation import get_model_class
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import AnimatedHeatmaps
 from qgsw.plots.scatter import ScatterPlot
-from qgsw.specs import DEVICE
 
 ROOT = Path(__file__).parent.parent.parent
 OUTPUTS = ROOT.joinpath("output")
@@ -35,24 +33,22 @@ config = run.summary.configuration
 
 errors = create_errors_set()
 
-vars_dict = create_qg_variable_set(
-    config.physics,
+
+vars_dict = get_model_class(config.model).get_variable_set(
     config.space,
+    config.physics,
     config.model,
-    torch.float64,
-    DEVICE.get(),
 )
 st.write(run)
 
 model_config_ref = run.summary.configuration.simulation.reference
 run_ref = RunOutput(folder, model_config=model_config_ref)
 
-vars_dict_ref = create_qg_variable_set(
-    config.physics,
+
+vars_dict_ref = get_model_class(config.simulation.reference).get_variable_set(
     config.space,
+    config.physics,
     config.simulation.reference,
-    torch.float64,
-    DEVICE.get(),
 )
 levels_nb = run.summary.configuration.model.h.shape[0]
 

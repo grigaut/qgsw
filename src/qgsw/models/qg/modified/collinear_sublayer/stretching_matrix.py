@@ -30,7 +30,7 @@ def compute_A_collinear_sf(  # noqa: N802
                 └── (2, 2) shaped
     """
     A = compute_A(H=H, g_prime=g_prime, dtype=dtype, device=device)  # noqa: N806
-    # Create layers coefficients vector [1, α]  # noqa: RUF003
+    # Create layers coefficients vector [1, α]
     layers_coefs = torch.tensor(
         [1, alpha],
         dtype=dtype,

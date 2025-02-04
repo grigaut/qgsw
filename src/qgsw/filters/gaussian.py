@@ -31,7 +31,6 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
         Args:
             sigma (float): Standard deviation.
         """
-        self._mu = self._set_null_mu()
         self.sigma = sigma
 
     @property
@@ -59,24 +58,15 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
         self._sigma = value
         self._kernel = self.compute_kernel(
             self._sigma,
-            mu=self._mu,
             window_radius=self.window_radius,
         )
         self._conv = self._build_convolution()
-        self._conv.weight.data = self.kernel.unsqueeze(0).unsqueeze(0)
+        self._conv.weight.data = self._kernel.unsqueeze(0).unsqueeze(0)
 
     @property
     def window_radius(self) -> int:
         """Window radius."""
         return int(self._windows_width_factor * self._sigma) + 1
-
-    @abstractmethod
-    def _set_null_mu(self) -> torch.Tensor:
-        """Compute null mu.
-
-        Returns:
-            torch.Tensor: mu
-        """
 
     @abstractmethod
     def _build_convolution(self) -> T:
@@ -99,8 +89,8 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
         filtered: torch.Tensor = self._conv(to_filter_expanded).detach()
         return filtered.squeeze(0).squeeze(0)
 
-    @staticmethod
-    def compute_sigma_from_span(span: float, threshold: float) -> float:
+    @classmethod
+    def compute_sigma_from_span(cls, span: float, threshold: float) -> float:
         """Compute the standard deviation givent the span.
 
         Args:
@@ -117,8 +107,8 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
         )
         return (span / torch.sqrt(-8 * torch.log(thres))).item()
 
-    @staticmethod
-    def compute_span_from_sigma(sigma: float, threshold: float) -> float:
+    @classmethod
+    def compute_span_from_sigma(cls, sigma: float, threshold: float) -> float:
         """Compute the standard deviation givent the span.
 
         Args:
@@ -135,18 +125,17 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
         )
         return (sigma * torch.sqrt(-8 * torch.log(thres))).item()
 
-    @staticmethod
+    @classmethod
     @abstractmethod
     def compute_kernel(
+        cls,
         sigma: float,
-        mu: torch.Tensor,
         window_radius: int,
     ) -> torch.Tensor:
         """Compute the gaussian kernel.
 
         Args:
             sigma (float): Standard deviation.
-            mu (torch.Tensor): Expected value.
             window_radius (int): Window radius.
 
         Returns:
@@ -174,13 +163,6 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
 class GaussianFilter1D(GaussianFilter[torch.nn.Conv1d]):
     """1D Gaussian Filter."""
 
-    def _set_null_mu(self) -> torch.Tensor:
-        return torch.zeros(
-            (1,),
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-
     def _build_convolution(self) -> torch.nn.Conv1d:
         return torch.nn.Conv1d(
             in_channels=1,
@@ -192,17 +174,16 @@ class GaussianFilter1D(GaussianFilter[torch.nn.Conv1d]):
             device=DEVICE.get(),
         )
 
-    @staticmethod
-    def compute_kernel(
+    @classmethod
+    def compute_kernel_profile(
+        cls,
         sigma: float,
-        mu: torch.Tensor,
         window_radius: int,
     ) -> torch.Tensor:
         """Compute the gaussian kernel.
 
         Args:
             sigma (float): Standard deviation.
-            mu (torch.Tensor): Expected value, (1,)-shaped.
             window_radius (int): Window radius.
 
         Returns:
@@ -214,49 +195,100 @@ class GaussianFilter1D(GaussianFilter[torch.nn.Conv1d]):
             device=DEVICE.get(),
             dtype=torch.float64,
         )
-        r = x - mu
-        kernel = torch.exp(-(r**2 / (2 * sigma**2)))
-        kernel /= torch.sum(kernel)
-        return kernel
+        return torch.exp(-(x**2 / (2 * sigma**2)))
 
-
-class GaussianFilter2D(GaussianFilter[torch.nn.Conv2d]):
-    """2D Gaussian Filter."""
-
-    def _set_null_mu(self) -> torch.Tensor:
-        return torch.zeros(
-            (2,),
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-
-    def _build_convolution(self) -> torch.nn.Conv2d:
-        return torch.nn.Conv2d(
-            in_channels=1,
-            out_channels=1,
-            kernel_size=(self.window_width, self.window_width),
-            padding=self.window_width // 2,
-            bias=False,
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-
-    @staticmethod
+    @classmethod
     def compute_kernel(
+        cls,
         sigma: float,
-        mu: torch.Tensor,
         window_radius: int,
     ) -> torch.Tensor:
         """Compute the gaussian kernel.
 
         Args:
             sigma (float): Standard deviation.
-            mu (torch.Tensor): Expected value, (2,)-shaped.
             window_radius (int): Window radius.
 
         Returns:
-            torch.Tensor: Gaussian kernel
-            (2*windows_radius+1,2*windows_radius+1)-shaped.
+            torch.Tensor: Gaussian kernel (2*windows_radius+1,)-shaped.
+        """
+        kernel = cls.compute_kernel_profile(
+            sigma=sigma,
+            window_radius=window_radius,
+        )
+        return kernel / torch.sum(kernel)
+
+
+class GaussianFilter2D(
+    GaussianFilter[tuple[torch.nn.Conv2d, torch.nn.Conv2d]],
+):
+    """2D Gaussian Filter."""
+
+    def _build_convolution(self) -> tuple[torch.nn.Conv2d, torch.nn.Conv2d]:
+        conv1 = torch.nn.Conv2d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=(self.window_width, 1),
+            padding=(self.window_width // 2, 0),
+            bias=False,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+        conv2 = torch.nn.Conv2d(
+            in_channels=1,
+            out_channels=1,
+            kernel_size=(1, self.window_width),
+            padding=(0, self.window_width // 2),
+            bias=False,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+        return conv1, conv2
+
+    @GaussianFilter.sigma.setter
+    def sigma(self, value: float) -> None:
+        """Setter for sigma."""
+        self._sigma = value
+        self._kernel = self.compute_kernel(
+            self._sigma,
+            window_radius=self.window_radius,
+        )
+        kernel_1d = self.compute_kernel_profile(
+            self._sigma,
+            window_radius=self.window_radius,
+        )
+        self._conv = self._build_convolution()
+        self._conv[0].weight.data = kernel_1d.unsqueeze(0).unsqueeze(0)
+        self._conv[1].weight.data = kernel_1d.T.unsqueeze(0).unsqueeze(0)
+
+    def __call__(self, to_filter: torch.Tensor) -> torch.Tensor:
+        """Perform filtering.
+
+        Args:
+            to_filter (torch.Tensor): Tensor to filter, (p,q)-shaped.
+
+        Returns:
+            torch.Tensor: Filtered tensor.
+        """
+        conv1, conv2 = self._conv
+        to_filter_expanded = to_filter.unsqueeze(0).unsqueeze(0)
+        filtered: torch.Tensor = conv2(conv1(to_filter_expanded)).detach()
+        return filtered.squeeze(0).squeeze(0)
+
+    @classmethod
+    def compute_kernel_profile(
+        cls,
+        sigma: float,
+        window_radius: int,
+    ) -> torch.Tensor:
+        """Compute the gaussian kernel.
+
+        Args:
+            sigma (float): Standard deviation.
+            window_radius (int): Window radius.
+
+        Returns:
+            torch.Tensor: Gaussian kernel (2*windows_radius+1,)-shaped.
         """
         x = torch.arange(
             -window_radius,
@@ -264,11 +296,29 @@ class GaussianFilter2D(GaussianFilter[torch.nn.Conv2d]):
             device=DEVICE.get(),
             dtype=torch.float64,
         )
-        xy = torch.stack(torch.meshgrid(x, x, indexing="xy"))
-        mu_reshaped = mu.reshape((-1, 1, 1))
+        r = x
+        kernel_1d = torch.exp(-(r**2 / (2 * sigma**2))).unsqueeze(-1)
+        kernel_1d /= (kernel_1d @ kernel_1d.T).sum().sqrt()
+        return kernel_1d
 
-        r = torch.norm(xy - mu_reshaped, dim=0)
+    @classmethod
+    def compute_kernel(
+        cls,
+        sigma: float,
+        window_radius: int,
+    ) -> torch.Tensor:
+        """Compute the gaussian kernel.
 
-        kernel = torch.exp(-(r**2 / (2 * sigma**2)))
-        kernel /= torch.sum(kernel)
-        return kernel
+        Args:
+            sigma (float): Standard deviation.
+            window_radius (int): Window radius.
+
+        Returns:
+            torch.Tensor: Gaussian kernel
+            (2*windows_radius+1,2*windows_radius+1)-shaped.
+        """
+        kernel = cls.compute_kernel_profile(
+            sigma=sigma,
+            window_radius=window_radius,
+        )
+        return kernel @ kernel.T

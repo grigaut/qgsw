@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+
 from collections.abc import Callable
 from typing import Any, TypeVar
-
-from typing_extensions import ParamSpec
 
 F = TypeVar("F", bound=Callable[..., Any])
 T = TypeVar("T")

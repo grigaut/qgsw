@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+try:
+    from typing import ParamSpec
+except ImportError:
+    from typing_extensions import ParamSpec
+
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
@@ -11,14 +16,14 @@ from qgsw import verbose
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-Input = TypeVar("Input", bound=list)
-Output = TypeVar("Output")
+Param = ParamSpec("Param")
+T = TypeVar("T")
 
 
-class OptimizableFunction(Generic[Input, Output]):
+class OptimizableFunction(Generic[Param, T]):
     """Optimize functions."""
 
-    def __init__(self, func: Callable[[Input], Output]) -> None:
+    def __init__(self, func: Callable[Param, T]) -> None:
         """Instantiate the OptimizableFunction.
 
         Args:
@@ -34,7 +39,7 @@ class OptimizableFunction(Generic[Input, Output]):
             self._func = func
             self._core = self._trace
 
-    def _trace(self, *args: Input) -> Output:
+    def _trace(self, *args: Param.args, **kwargs: Param.kwargs) -> T:
         """Trace the core function.
 
         Returns:
@@ -45,12 +50,12 @@ class OptimizableFunction(Generic[Input, Output]):
             trigger_level=2,
         )
         self._core = torch.jit.trace(self._func, args)
-        return self._core(*args)
+        return self._core(*args, **kwargs)
 
-    def __call__(self, *args: Input) -> Output:
+    def __call__(self, *args: Param.args, **kwargs: Param.kwargs) -> T:
         """Function call.
 
         Returns:
             Any: Core function output.
         """
-        return self._core(*args)
+        return self._core(*args, **kwargs)
