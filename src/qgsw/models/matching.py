@@ -3,70 +3,50 @@
 import torch
 
 from qgsw.fields.variables.uvh import UVH
+from qgsw.models.core.finite_diff import reverse_cumsum
+from qgsw.specs import DEVICE
+from qgsw.utils.dim_checks import with_dims
 
 
-def n_layers_to_collinear_1_layer(
-    uvh_nl: UVH,
-    g_prime_nl: torch.Tensor,
-    alpha: torch.Tensor,
-    g_prime: torch.Tensor,
-) -> UVH:
-    """Match n-layers uvh to 1 collinear layer.
-
-    Args:
-        uvh_nl (UVH): n-layers uvh.
-        g_prime_nl (torch.Tensor): g' for the n-layers model.
-            └── (nl,)-shaped.
-        alpha (torch.Tensor): Collinearity coefficient.
-        g_prime (torch.Tensor): g' for the 1-layer collinear model.
-            └── (2,)-shaped.
-
-    Raises:
-        ValueError: If g' shape is not (2,)
-
-    Returns:
-        UVH: 1-layer uvh
-    """
-    if g_prime.shape != (2,):
-        msg = "g' is expected to be (2,)-shaped"
-        raise ValueError(msg)
-    g1 = g_prime[0]
-    g2 = g_prime[1]
-    g1_nl = g_prime_nl[0]
-
-    h_tot = torch.sum(uvh_nl.h, dim=-3, keepdim=True)
-    h = h_tot * g1_nl * (g2 + (1 - alpha) * g1) / (g1 * g2)
-
-    return UVH(uvh_nl.u[:, :1, ...], uvh_nl.v[:, :1, ...], h)
-
-
-def n_layers_to_1_layer(
+@with_dims(
+    g_prime_nl=1,
+    g_prime=1,
+)
+def match_psi(
     uvh_nl: UVH,
     g_prime_nl: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> UVH:
-    """Match n-layers uvh to 1 collinear layer.
+    """Compute valid prognostic values.
+
+    Ensure that the streamfunction of both models are the same.
 
     Args:
-        uvh_nl (UVH): n-layers uvh.
-        g_prime_nl (torch.Tensor): g' for the n-layers model.
+        uvh_nl (UVH): UVH from the reference model.
+            ├── u: (n_ens, nl, nx+1, ny)-shaped
+            ├── v: (n_ens, nl, nx, ny+1)-shaped
+            └── h: (n_ens, nl, nx, ny)-shaped
+        g_prime_nl (torch.Tensor): Reduced gravity for the reference model.
             └── (nl,)-shaped
-        g_prime (torch.Tensor): g' for the 1-layer collinear model.
-            └── (1,)-shaped
-
-    Raises:
-        ValueError: If g' shape is not (1,)
+        g_prime (torch.Tensor): Reduced gravity for the model
+        to compute UVH for.
+            └── (n,)-shaped
 
     Returns:
-        UVH: 1-layer uvh
+        UVH: Corresponding UVH.
+            ├── u: (n_ens, n, nx+1, ny)-shaped
+            ├── v: (n_ens, n, nx, ny+1)-shaped
+            └── h: (n_ens, n, nx, ny)-shaped
     """
-    if g_prime.shape != (1,):
-        msg = "g' is expected to be (1,)-shaped"
-        raise ValueError(msg)
-    g1 = g_prime[0]
-    g1_nl = g_prime_nl[0]
-
-    h_tot = torch.sum(uvh_nl.h, dim=-3, keepdim=True)
-    h = h_tot * g1_nl / g1
-
-    return UVH(uvh_nl.u[:, :1, ...], uvh_nl.v[:, :1, ...], h)
+    u_nl, v_nl, h_nl = uvh_nl
+    n = g_prime.shape[0]
+    u = u_nl[:, :n, ...]
+    v = v_nl[:, :n, ...]
+    B = (  # noqa: N806
+        g_prime_nl[None, :n, None, None]
+        * reverse_cumsum(h_nl, dim=1)[:, :n, ...]
+    )
+    A = torch.ones((n, n), dtype=torch.float64, device=DEVICE.get()).triu()  # noqa: N806
+    A *= g_prime.unsqueeze(-1)  # noqa: N806
+    h = torch.einsum("lp,...pxy->...lxy", torch.linalg.inv(A), B)
+    return UVH(u, v, h)

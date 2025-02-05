@@ -3,6 +3,28 @@
 import torch
 
 from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.utils.shape_checks import with_shapes
+
+
+@with_shapes(g_prime=(2,), alpha=(1,))
+def compute_g_tilde(
+    g_prime: torch.Tensor,
+    alpha: torch.Tensor,
+) -> torch.Tensor:
+    """Compute g_tilde = g_1 g_2 / (g_1 + g_2).
+
+    Args:
+        g_prime (torch.Tensor): Reduced gravity tensor.
+            └── (2,) shaped
+        alpha (torch.Tensor): Collinearity coefficient.
+            └── (1,) shaped
+
+    Returns:
+        torch.Tensor: g_tilde = g_1 g_2 / ((1-α)g_1 + g_2)
+            └── (1,) shaped
+    """
+    g1, g2 = g_prime
+    return g1 * g2 / ((1 - alpha) * g1 + g2)
 
 
 def compute_A_collinear_sf(  # noqa: N802

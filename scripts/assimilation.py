@@ -16,6 +16,14 @@ from qgsw.fields.variables.uvh import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model
+from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
+from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
+    compute_g_tilde as g_tilde_qg_col,
+)
+from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
+from qgsw.models.qg.modified.filtered.pv import (
+    compute_g_tilde as g_tilde_qg_filt,
+)
 from qgsw.models.qg.modified.utils import is_modified
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
@@ -187,22 +195,26 @@ with Progress() as progress:
         progress.advance(simulation)
         if fork:
             prognostic = model_ref.prognostic
-            if is_modified(config.model.type):
+            if config.model.type == QGCollinearSF.get_type():
                 model.alpha = alpha.compute_no_slice(prognostic)
-                uvh = matching.n_layers_to_collinear_1_layer(
+                uvh = matching.match_psi(
                     prognostic.uvh,
                     config.simulation.reference.g_prime,
-                    model.alpha,
-                    config.model.g_prime,
+                    g_tilde_qg_col(config.model.g_prime),
                 )
-            elif nl == 1:
-                uvh = matching.n_layers_to_1_layer(
+            if config.model.type == QGCollinearFilteredSF.get_type():
+                model.alpha = alpha.compute_no_slice(prognostic)
+                uvh = matching.match_psi(
                     prognostic.uvh,
                     config.simulation.reference.g_prime,
-                    config.model.g_prime,
+                    g_tilde_qg_filt(config.model.g_prime),
                 )
             else:
-                uvh = prognostic.uvh
+                uvh = matching.match_psi(
+                    prognostic.uvh,
+                    config.simulation.reference.g_prime,
+                    config.model.g_prime,
+                )
             model.set_uvh(
                 torch.clone(uvh.u),
                 torch.clone(uvh.v),
