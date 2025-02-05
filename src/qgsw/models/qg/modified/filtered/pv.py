@@ -75,8 +75,7 @@ def compute_source_term(
     g2: torch.Tensor,
     g_tilde: torch.Tensor,
     f0: float,
-    ds: float,
-    points_to_surface: Callable[[torch.Tensor], torch.Tensor],
+    points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
 ) -> torch.Tensor:
     """Compute source term.
 
@@ -94,18 +93,17 @@ def compute_source_term(
         g_tilde (torch.Tensor): Equivalent reduced gravity.
             └── (1, )-shaped.
         f0 (float): f0.
-        ds (float): ds.
-        points_to_surface (Callable[[torch.Tensor], torch.Tensor]): Points
+        points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
         to surface interpolation function.
 
     Returns:
         torch.Tensor: Source term: f_0αg̃/H1/g2/ds (F^s)⁻¹{K F{h}}.
     """
-    h_top_i = points_to_surface(uvh.h[0, 0])
+    h_top_i = points_to_surfaces(uvh.h[0, 0])
     h_filt = filt(h_top_i).unsqueeze(0).unsqueeze(0)
-    h_to_psi = g_tilde * h_filt / f0
+    psi = g_tilde * h_filt / f0
     factor = compute_source_term_factor(alpha, H1, g2, f0)
-    return (factor * h_to_psi) / ds
+    return factor * psi
 
 
 @with_shapes(
@@ -157,16 +155,18 @@ def compute_pv(
     )
     # Compute ω-f_0*h/H
     pv = (omega - f0 * points_to_surfaces(uvh.h) / H) / ds
-    source_term = compute_source_term(
-        uvh=uvh,
-        filt=filt,
-        H1=H[..., 0, 0],
-        g2=g_prime[1:, 0, 0],
-        g_tilde=g_tilde,
-        alpha=alpha,
-        f0=f0,
-        ds=ds,
-        points_to_surface=points_to_surfaces,
+    source_term = (
+        compute_source_term(
+            uvh=uvh,
+            filt=filt,
+            H1=H[..., 0, 0],
+            g2=g_prime[1:, 0, 0],
+            g_tilde=g_tilde,
+            alpha=alpha,
+            f0=f0,
+            points_to_surfaces=points_to_surfaces,
+        )
+        / ds
     )
     return pv + source_term
 
@@ -201,7 +201,9 @@ class CollinearFilteredPotentialVorticity(DiagnosticVariable):
 
         Args:
             H (torch.Tensor): Layers reference thickness.
+                └── (2,)-shaped.
             g_prime (torch.Tensor): Reduced gravity tensor.
+                └── (2,)-shaped.
             f0 (float): _description_
             ds (float): _description_
             filt (_Filter): _description_
@@ -217,8 +219,8 @@ class CollinearFilteredPotentialVorticity(DiagnosticVariable):
     def _compute(self, prognostic: UVHTAlpha) -> torch.Tensor:
         return compute_pv(
             prognostic.uvh,
-            self._H,
-            self._g_prime,
+            self._H[:1].unsqueeze(-1).unsqueeze(-1),
+            self._g_prime.unsqueeze(-1).unsqueeze(-1),
             self._g_tilde,
             self._f0,
             self._ds,

@@ -286,7 +286,7 @@ class QGCollinearFilteredProjector(QGProjector):
                 └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Physical Pressure * f0.
+            torch.Tensor: Physical Potential Vorticity * f0.
                 └── (n_ens, nl, nx-1, ny-1)-shaped.
         """
         return self.Q(

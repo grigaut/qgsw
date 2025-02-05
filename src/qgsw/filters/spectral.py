@@ -200,4 +200,7 @@ class SpectralGaussianFilter2D(SpectralGaussianFilter):
             dy=dy,
         )
 
-        return fft.dstI2D(fft.dstI2D(to_filter) * kernel)
+        return fft.dstI2D(
+            fft.dstI2D(to_filter, norm="ortho") * kernel,
+            norm="ortho",
+        )

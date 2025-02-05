@@ -610,19 +610,19 @@ class PotentialVorticity(DiagnosticVariable):
 
     def __init__(
         self,
-        h_ref: torch.Tensor,
+        H: torch.Tensor,  # noqa: N803
         ds: float,
         f0: float,
     ) -> None:
         """Instantiate variable.
 
         Args:
-            h_ref (torch.Tensor): Reference heights.
+            H (torch.Tensor): Reference thickness values.
                 └── (1, nl, 1, 1)-shaped
             ds (float): Elementary area.
             f0 (float): Coriolis parameter.
         """
-        self._h_ref = h_ref
+        self._H = H
         self._ds = ds
         self._f0 = f0
         self._interp = OptimizableFunction(points_to_surfaces)
@@ -649,7 +649,7 @@ class PotentialVorticity(DiagnosticVariable):
             dim=-1,
         )
         h = self._interp(prognostic.h)
-        return (omega - self._f0 * h / self._h_ref) / self._ds
+        return (omega - self._f0 * h / self._H) / self._ds
 
 
 class StreamFunction(DiagnosticVariable):

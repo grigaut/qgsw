@@ -41,18 +41,20 @@ vars_dict = get_model_class(config.model).get_variable_set(
 )
 st.write(run)
 
-model_config_ref = run.summary.configuration.simulation.reference
+model_config_ref = config.simulation.reference
 run_ref = RunOutput(folder, model_config=model_config_ref)
 
 
-vars_dict_ref = get_model_class(config.simulation.reference).get_variable_set(
+vars_dict_ref = get_model_class(model_config_ref).get_variable_set(
     config.space,
     config.physics,
-    config.simulation.reference,
+    model_config_ref,
 )
-levels_nb = run.summary.configuration.model.h.shape[0]
+levels_nb = config.model.h.shape[0]
 
-if run.summary.configuration.model.type == "QGCollinearSF":
+if config.model.type == "QGCollinearSF":
+    levels_nb -= 1
+if config.model.type == "QGCollinearFilteredSF":
     levels_nb -= 1
 
 if not run.summary.is_finished:
