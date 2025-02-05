@@ -221,7 +221,7 @@ def _instantiate_collinear_qg(
         QGAlpha: Modified QG Model.
     """
     model_class = get_model_class(model_config)
-    model: QG = model_class(
+    model: QGCollinearFilteredSF | QGCollinearSF = model_class(
         space_2d=space_2d,
         H=model_config.h,
         g_prime=model_config.g_prime,
@@ -233,6 +233,8 @@ def _instantiate_collinear_qg(
         Ro,
     )
     model.alpha = _determine_coef0(perturbation.type)
+    if model.get_type() == QGCollinearFilteredSF.get_type():
+        model.P.filter.sigma = model_config.sigma
     uvh0 = QGProjector.G(
         p0,
         A=model.A,

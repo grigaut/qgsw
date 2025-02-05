@@ -169,8 +169,7 @@ class QGVariableSet:
             space.ds,
         )
         var_dict[PotentialVorticity.get_name()] = PotentialVorticity(
-            var_dict[PhysicalVorticity.get_name()],
-            model.h.unsqueeze(0).unsqueeze(-1).unsqueeze(-1) * space.ds,
+            model.h.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
             space.ds,
             physics.f0,
         )

@@ -93,8 +93,7 @@ class QGCollinearSFVariableSet(QGVariableSet):
             space.ds,
         )
         var_dict[PotentialVorticity.get_name()] = PotentialVorticity(
-            var_dict[PhysicalVorticity.get_name()],
-            model.h[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1) * space.ds,
+            model.h[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
             space.ds,
             physics.f0,
         )

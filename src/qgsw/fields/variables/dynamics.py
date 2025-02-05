@@ -399,7 +399,7 @@ class Vorticity(DiagnosticVariable):
 
         Returns:
             torch.Tensor: Vorticity.
-                └── (n_ens, nl, nx, ny)-shaped
+                └── (n_ens, nl, nx-1, ny-1)-shaped
         """
         return torch.diff(prognostic.v[..., 1:-1], dim=-2) - torch.diff(
             prognostic.u[..., 1:-1, :],
@@ -600,7 +600,7 @@ class PressureTilde(Pressure):
 class PotentialVorticity(DiagnosticVariable):
     """Potential Vorticity.
 
-    └── (n_ens, nl, nx, ny)-shaped
+    └── (n_ens, nl, nx-1, ny-1)-shaped
     """
 
     _unit = Unit.S_1
@@ -610,28 +610,22 @@ class PotentialVorticity(DiagnosticVariable):
 
     def __init__(
         self,
-        vorticity_phys: PhysicalVorticity,
-        h_ref: torch.Tensor,
+        H: torch.Tensor,  # noqa: N803
         ds: float,
         f0: float,
     ) -> None:
         """Instantiate variable.
 
         Args:
-            vorticity_phys (PhysicalVorticity): Physical vorticity.
-            h_ref (torch.Tensor): Reference heights.
+            H (torch.Tensor): Reference thickness values.
                 └── (1, nl, 1, 1)-shaped
             ds (float): Elementary area.
             f0 (float): Coriolis parameter.
         """
-        self._h_ref = h_ref
+        self._H = H
         self._ds = ds
         self._f0 = f0
-        self._vorticity_phys = vorticity_phys
         self._interp = OptimizableFunction(points_to_surfaces)
-
-        self._require_alpha |= vorticity_phys.require_alpha
-        self._require_time |= vorticity_phys.require_time
 
     def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
         """Compute the value of the variable.
@@ -647,28 +641,15 @@ class PotentialVorticity(DiagnosticVariable):
 
         Returns:
             torch.Tensor: Value
-                └── (n_ens, nl, nx, ny)-shaped
+                └── (n_ens, nl, nx-1, ny-1)-shaped
         """
-        vorticity_phys = self._interp(
-            self._vorticity_phys.compute_no_slice(prognostic),
+        # Compute ω = ∂_x v - ∂_y u
+        omega = torch.diff(prognostic.v[..., 1:-1], dim=-2) - torch.diff(
+            prognostic.u[..., 1:-1, :],
+            dim=-1,
         )
-        return vorticity_phys - self._f0 * prognostic.h / self._h_ref
-
-    def bind(
-        self,
-        state: State,
-    ) -> BoundDiagnosticVariable[Self]:
-        """Bind the variable to a given state.
-
-        Args:
-            state (State): State to bind the variable to.
-
-        Returns:
-            BoundDiagnosticVariable: Bound variable.
-        """
-        # Bind the vorticity_phys variable
-        self._vorticity_phys = self._vorticity_phys.bind(state)
-        return super().bind(state)
+        h = self._interp(prognostic.h)
+        return (omega - self._f0 * h / self._H) / self._ds
 
 
 class StreamFunction(DiagnosticVariable):
