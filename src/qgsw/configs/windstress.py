@@ -6,8 +6,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union
 
+from qgsw.forcing.names import WindForcingName
+from qgsw.utils.named_object import NamedObjectConfig
+
 if TYPE_CHECKING:
     from pathlib import Path
+
 
 from pydantic import (
     BaseModel,
@@ -16,10 +20,9 @@ from pydantic import (
 )
 
 
-class WindStressConfig(BaseModel):
+class WindStressConfig(NamedObjectConfig[WindForcingName], BaseModel):
     """Windstress configuration."""
 
-    type: str
     magnitude: Union[NonNegativeFloat, None] = None
     drag_coefficient: Union[NonNegativeFloat, None] = None
     data: Union[WindStressDataConfig, None] = None

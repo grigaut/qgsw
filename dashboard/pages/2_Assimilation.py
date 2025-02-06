@@ -8,9 +8,11 @@ from qgsw.fields.errors.error_sets import create_errors_set
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
 from qgsw.models.instantiation import get_model_class
+from qgsw.models.names import ModelName
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import AnimatedHeatmaps
 from qgsw.plots.scatter import ScatterPlot
+from qgsw.simulation.names import SimulationName
 
 ROOT = Path(__file__).parent.parent.parent
 OUTPUTS = ROOT.joinpath("output")
@@ -25,7 +27,7 @@ folder = st.selectbox("Data source", options=sources)
 
 run = RunOutput(folder)
 
-if run.summary.configuration.simulation.kind != "assimilation":
+if run.summary.configuration.simulation.type != SimulationName.ASSIMILATION:
     st.error("The selected simulation is not an assimilation one.", icon="⚠️")
     st.stop()
 
@@ -52,9 +54,9 @@ vars_dict_ref = get_model_class(model_config_ref).get_variable_set(
 )
 levels_nb = config.model.h.shape[0]
 
-if config.model.type == "QGCollinearSF":
+if config.model.type == ModelName.QG_COLLINEAR_SF:
     levels_nb -= 1
-if config.model.type == "QGCollinearFilteredSF":
+if config.model.type == ModelName.QG_FILTERED:
     levels_nb -= 1
 
 if not run.summary.is_finished:

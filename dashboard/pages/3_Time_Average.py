@@ -13,6 +13,7 @@ from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,
 )
+from qgsw.simulation.names import SimulationName
 
 ROOT = Path(__file__).parent.parent.parent
 OUTPUTS = ROOT.joinpath("output")
@@ -45,7 +46,7 @@ if not run.summary.is_finished:
 
 st.title("Point-wise variables")
 
-if run.summary.configuration.simulation.kind == "assimilation":
+if run.summary.configuration.simulation.type == SimulationName.ASSIMILATION:
     show_error_pts = st.toggle("Display Errors", key="toggle-pts")
 
     if show_error_pts:
@@ -71,7 +72,7 @@ vars_pts = [var for var in vars_dict.values() if var.scope == Scope.POINT_WISE]
 selected_var_pts = st.selectbox("Variable to display", vars_pts)
 
 if (
-    run.summary.configuration.simulation.kind == "assimilation"
+    run.summary.configuration.simulation.type == SimulationName.ASSIMILATION
     and show_error_pts
 ):
     selected_var_pts_ref = vars_dict_ref[selected_var_pts.name]
@@ -86,7 +87,8 @@ with st.form(key="var-form"):
 if submit_pts:
     uvhs = [(output.read() for output in run.outputs()) for _ in levels]
     if (
-        run.summary.configuration.simulation.kind == "assimilation"
+        run.summary.configuration.simulation.type
+        == SimulationName.ASSIMILATION
         and show_error_pts
     ):
         uvhs_ref = [

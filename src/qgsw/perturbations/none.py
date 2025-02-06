@@ -9,6 +9,7 @@ import torch
 
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.perturbations.base import BarotropicPerturbation
+from qgsw.perturbations.names import PertubationName
 from qgsw.spatial.core.grid import Grid2D, Grid3D
 from qgsw.specs import DEVICE
 
@@ -16,7 +17,7 @@ from qgsw.specs import DEVICE
 class NoPerturbation(BarotropicPerturbation):
     """No Perturbation."""
 
-    _type = "none"
+    _type = PertubationName.NONE
 
     def __init__(self) -> None:
         """Instantiate NoPerturbation."""

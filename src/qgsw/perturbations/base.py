@@ -2,6 +2,8 @@
 
 from abc import ABCMeta, abstractmethod
 
+from qgsw.perturbations.names import PertubationName
+
 try:
     from typing import Self
 except ImportError:
@@ -12,7 +14,7 @@ import torch
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.spatial.core.grid import Grid2D, Grid3D
 from qgsw.specs import DEVICE
-from qgsw.utils.type_switch import TypeSwitch
+from qgsw.utils.named_object import NamedObject
 
 
 def grad_perp(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
@@ -22,14 +24,12 @@ def grad_perp(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
     ) / dx
 
 
-class _Perturbation(TypeSwitch, metaclass=ABCMeta):
+class _Perturbation(NamedObject[PertubationName], metaclass=ABCMeta):
     """Perturbation base class."""
 
-    _type: str
     _ratio_sub_top: float
 
     def __init__(self, magnitude: float = 1e-3) -> None:
-        super(TypeSwitch).__init__()
         self._magnitude = magnitude
 
     @property

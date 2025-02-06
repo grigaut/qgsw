@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from qgsw.configs.models import ModelConfig
+from qgsw.models.names import ModelName
 from qgsw.specs import DEVICE
 
 
@@ -11,7 +12,7 @@ from qgsw.specs import DEVICE
 def model_config() -> ModelConfig:
     """Define model config."""
     return ModelConfig(
-        type="QG",
+        type=ModelName.QUASI_GEOSTROPHIC,
         prefix="",
         layers=[100, 200],
         reduced_gravity=[10, 0.05],

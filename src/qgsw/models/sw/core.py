@@ -25,6 +25,7 @@ from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple, UVHTAlpha
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import (
@@ -88,7 +89,7 @@ class SWCore(Model[T], Generic[T]):
 
     """
 
-    _type = "SW"
+    _type = ModelName.SHALLOW_WATER
     _pressure_name: str
 
     def __init__(
