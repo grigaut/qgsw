@@ -28,15 +28,6 @@ class NamedObject(Generic[T]):
         """
         return cls._type
 
-    @classmethod
-    def get_name(cls) -> str:
-        """Get the object name.
-
-        Returns:
-            str: Name.
-        """
-        return cls.get_type().value
-
 
 class NamedObjectConfig(BaseModel, Generic[T]):
     """Named object config."""

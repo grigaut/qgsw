@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qgsw.fields.variables.coef_names import CoefficientName
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
     Pressure,
 )
+from qgsw.utils.named_object import NamedObject
 
 try:
     from typing import Self
@@ -42,9 +44,10 @@ if TYPE_CHECKING:
     from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
 
 
-class Coefficient(DiagnosticVariable, ABC):
+class Coefficient(NamedObject[CoefficientName], DiagnosticVariable, ABC):
     """Coefficient."""
 
+    _type = CoefficientName.CONSTANT
     _unit = Unit._
     _scope = Scope.ENSEMBLE_WISE
 
@@ -77,12 +80,13 @@ class Coefficient(DiagnosticVariable, ABC):
         """
 
 
-class LSRSFInferredAlpha(Coefficient):
+class LSRSFInferredAlpha(NamedObject[CoefficientName], Coefficient):
     """Inferred collinearity from the streamfunction.
 
     Performs linear least squares regression to infer alpha.
     """
 
+    _type = CoefficientName.LSR_INFERRED
     _name = "alpha_lsr_sf"
     _description = "LSR-Stream function inferred coefficient"
 

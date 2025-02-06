@@ -13,6 +13,7 @@ from pydantic import (
     PositiveFloat,
 )
 
+from qgsw.fields.variables.coef_names import CoefficientName
 from qgsw.models.names import ModelName
 from qgsw.models.qg.modified.utils import is_modified
 from qgsw.specs import DEVICE
@@ -63,17 +64,20 @@ class ModelConfig(NamedObjectConfig[ModelName], BaseModel):
         )
 
 
-class ConstantCollinearityCoefConfig(BaseModel):
+class ConstantCollinearityCoefConfig(
+    NamedObjectConfig[CoefficientName],
+    BaseModel,
+):
     """Constant collinearity model configuration."""
 
-    type: Literal["alpha_constant"]
+    type: Literal[CoefficientName.CONSTANT]
     value: float
 
 
 class InferredCollinearityCoefConfig(BaseModel):
     """Inferred collinearity coeffciient."""
 
-    type: Literal["alpha_lsr_sf"]
+    type: Literal[CoefficientName.LSR_INFERRED]
     initial: float
 
 
