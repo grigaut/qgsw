@@ -3,8 +3,10 @@
 from enum import Enum
 
 
-class Unit(Enum):
+class Unit(str, Enum):
     """Unit."""
+
+    __slots__ = ()
 
     _ = " "
     S = "s"
