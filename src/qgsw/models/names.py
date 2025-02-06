@@ -10,5 +10,6 @@ class ModelName(Name):
     QUASI_GEOSTROPHIC = "QG"
     QG_COLLINEAR_SF = "QGCollinearSF"
     QG_FILTERED = "QGCollinearFilteredSF"
+    QG_SANITY_CHECK = "QGSanityCheck"
     SW_FILTER_SPECTRAL = "SWFilterBaroptropicSpectral"
     SW_FILTER_EXACT = "SWFilterBaroptropicExact"

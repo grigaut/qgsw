@@ -36,8 +36,6 @@ Projector = TypeVar("Projector", bound=QGProjector)
 class QGCore(Model[T], Generic[T, Projector]):
     """Quasi Geostrophic Model."""
 
-    _type = ModelName.QUASI_GEOSTROPHIC
-
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,
@@ -322,3 +320,5 @@ class QGCore(Model[T], Generic[T, Projector]):
 
 class QG(QGCore[UVHT, QGProjector]):
     """Quasi Geostrophic Model."""
+
+    _type = ModelName.QUASI_GEOSTROPHIC

@@ -17,6 +17,7 @@ from qgsw.fields.variables.state import StateAlpha
 from qgsw.fields.variables.uvh import UVH, UVHTAlpha
 from qgsw.models import matching
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
 from qgsw.models.qg.core import QG, QGCore
 from qgsw.models.qg.modified.exceptions import UnsetAlphaError
 from qgsw.models.qg.modified.filtered.pv import compute_g_tilde
@@ -36,6 +37,8 @@ if TYPE_CHECKING:
 
 class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
     """QG Sanity-Checks."""
+
+    _type = ModelName.QG_SANITY_CHECK
 
     @with_shapes(
         H=(2,),
