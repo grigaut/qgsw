@@ -1,21 +1,28 @@
 """Main perturbation class."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
 
-import torch
 
-from qgsw.configs.perturbation import PerturbationConfig
-from qgsw.perturbations.base import _Perturbation
 from qgsw.perturbations.none import NoPerturbation
 from qgsw.perturbations.vortex import (
     BaroclinicVortex,
     BarotropicVortex,
     HalfBarotropicVortex,
 )
-from qgsw.spatial.core.grid import Grid3D
+
+if TYPE_CHECKING:
+    import torch
+
+    from qgsw.configs.perturbation import PerturbationConfig
+    from qgsw.perturbations.base import _Perturbation
+    from qgsw.spatial.core.grid import Grid3D
 
 
 class Perturbation:

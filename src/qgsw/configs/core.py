@@ -40,7 +40,7 @@ class Configuration(BaseModel):
     simulation: Union[
         ModelRunSimulationConfig,
         AssimilationSimulationConfig,
-    ] = Field(discriminator="kind")
+    ] = Field(discriminator="type")
     model: ModelConfig
     space: SpaceConfig
     windstress: WindStressConfig
@@ -57,3 +57,6 @@ class Configuration(BaseModel):
             Self: Configuration.
         """
         return cls(**toml.load(file))
+
+
+Configuration.model_rebuild()
