@@ -15,7 +15,7 @@ beta = 1.754e-11                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 3.60577e-8
 
 [simulation]
-kind = "assimilation"
+type = "assimilation"
 duration = 31_536_000       # seconds
 dt = 3600                   # seconds
 fork_interval = 1_728_000   # seconds

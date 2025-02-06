@@ -1,11 +1,11 @@
 [io]
 name = "Two Layers Model"
 [io.output]
-save=false
+save=true
 type = "quantity"           # "interval"
 quantity = 100
 # interval_duration = 3600  # seconds
-directory = "results"
+directory = "tmp"
 
 [physics]
 rho = 1000
@@ -15,7 +15,7 @@ beta = 0                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 0
 
 [simulation]
-kind = "simple-run"
+type = "simple-run"
 duration = 2_389_333.3   # seconds
 dt = 26                 # in seconds
 
