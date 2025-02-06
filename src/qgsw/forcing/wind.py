@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
+from qgsw.forcing.names import WindForcingName
+
 try:
     from typing import Self
 except ImportError:
@@ -22,7 +24,7 @@ from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
 from qgsw.specs import DEVICE
-from qgsw.utils.type_switch import TypeSwitch
+from qgsw.utils.named_object import NamedObject
 
 if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
@@ -30,10 +32,8 @@ if TYPE_CHECKING:
     from qgsw.configs.windstress import WindStressConfig
 
 
-class _WindForcing(TypeSwitch, metaclass=ABCMeta):
+class _WindForcing(NamedObject[WindForcingName], metaclass=ABCMeta):
     """Wind Forcing Representation."""
-
-    _type: str
 
     @abstractmethod
     def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
@@ -56,7 +56,7 @@ class _WindForcing(TypeSwitch, metaclass=ABCMeta):
 class CosineZonalWindForcing(_WindForcing):
     """Simple Cosine Zonal Wind."""
 
-    _type = "cosine"
+    _type = WindForcingName.COSINE
 
     def __init__(
         self,
@@ -125,7 +125,7 @@ class CosineZonalWindForcing(_WindForcing):
 class DataWindForcing(_WindForcing):
     """Wind Forcing object to handle data-based wind forcing."""
 
-    _type = "data"
+    _type = WindForcingName.DATA
 
     def __init__(
         self,
@@ -146,7 +146,6 @@ class DataWindForcing(_WindForcing):
             drag_coef (float): Drag coefficient.
             data_type (str): Type of data.
         """
-        TypeSwitch.__init__(self)
         self._space = space
         self._rho = rho
         self._drag = drag_coef
@@ -323,7 +322,7 @@ class DataWindForcing(_WindForcing):
 class NoWindForcing(_WindForcing):
     """No wind forcing."""
 
-    _type = "none"
+    _type = WindForcingName.NONE
 
     def __init__(self) -> None:
         """Instantiate the NoWindForcing."""

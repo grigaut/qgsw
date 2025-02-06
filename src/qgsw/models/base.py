@@ -19,9 +19,11 @@ from qgsw.models.exceptions import (
     IncoherentWithMaskError,
 )
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.specs import DEVICE
+from qgsw.utils.named_object import NamedObject
 
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -32,7 +34,12 @@ if TYPE_CHECKING:
 Prognostic = TypeVar("Prognostic", bound=BasePrognosticTuple)
 
 
-class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
+class Model(
+    ModelParamChecker,
+    Generic[Prognostic],
+    NamedObject[ModelName],
+    metaclass=ABCMeta,
+):
     """Base class for models.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -64,8 +71,6 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
         - dx_p_ref
         - dy_p_ref
     """
-
-    _type: str
 
     dtype = torch.float64
     device: Device = DEVICE
@@ -410,12 +415,3 @@ class Model(ModelParamChecker, Generic[Prognostic], metaclass=ABCMeta):
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.increment_time(self.dt)
         self._state.update_uvh(self.update(self._state.prognostic.uvh))
-
-    @classmethod
-    def get_type(cls) -> str:
-        """Get the model type.
-
-        Returns:
-            str: Model type.
-        """
-        return cls._type

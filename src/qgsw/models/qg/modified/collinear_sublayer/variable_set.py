@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw.fields.variables.base import DiagnosticVariable
+from qgsw.fields.variables.coef_names import CoefficientName
 from qgsw.fields.variables.dynamics import (
     CollinearityCoefficientDiag,
     PhysicalSurfaceHeightAnomaly,
@@ -114,9 +115,9 @@ class QGCollinearSFVariableSet(QGVariableSet):
             model (ModelConfig): Model Configuration.
             physics (PhysicsConfig): Physics Configuration.
         """
-        if model.collinearity_coef.type == "alpha_constant":
+        if model.collinearity_coef.type == CoefficientName.CONSTANT:
             alpha = model.collinearity_coef.value
-        elif model.collinearity_coef.type == "alpha_lsr_sf":
+        elif model.collinearity_coef.type == CoefficientName.LSR_INFERRED:
             alpha = model.collinearity_coef.initial
         A = compute_A_collinear_sf(  # noqa: N806
             model.h,

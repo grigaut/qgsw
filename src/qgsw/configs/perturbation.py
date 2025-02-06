@@ -7,9 +7,11 @@ from pydantic import (
     NonNegativeFloat,
 )
 
+from qgsw.perturbations.names import PertubationName
+from qgsw.utils.named_object import NamedObjectConfig
 
-class PerturbationConfig(BaseModel):
+
+class PerturbationConfig(NamedObjectConfig[PertubationName], BaseModel):
     """Perturbation configuration."""
 
-    type: str
     perturbation_magnitude: NonNegativeFloat

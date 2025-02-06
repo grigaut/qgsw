@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qgsw.fields.variables.coef_names import CoefficientName
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
     Pressure,
 )
+from qgsw.utils.named_object import NamedObject
 
 try:
     from typing import Self
@@ -42,7 +44,7 @@ if TYPE_CHECKING:
     from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
 
 
-class Coefficient(DiagnosticVariable, ABC):
+class Coefficient(NamedObject[CoefficientName], DiagnosticVariable, ABC):
     """Coefficient."""
 
     _unit = Unit._
@@ -83,6 +85,7 @@ class LSRSFInferredAlpha(Coefficient):
     Performs linear least squares regression to infer alpha.
     """
 
+    _type = CoefficientName.LSR_INFERRED
     _name = "alpha_lsr_sf"
     _description = "LSR-Stream function inferred coefficient"
 
@@ -164,6 +167,7 @@ class LSRSFInferredAlpha(Coefficient):
 class ConstantCoefficient(Coefficient):
     """Constant collinearity coefficient."""
 
+    _type = CoefficientName.CONSTANT
     _name = "alpha_constant"
     _description = "Constant coefficient"
 
@@ -230,19 +234,19 @@ def create_coefficient(
         ConstantCoefficient | LSRSFInferredAlpha: Coefficient
     """
     coef_type = config.model.collinearity_coef.type
-    if coef_type == ConstantCoefficient.get_name():
+    if coef_type == CoefficientName.CONSTANT:
         return ConstantCoefficient.from_config(
             model_config=config.model,
             physics_config=config.physics,
             space_config=config.space,
         )
-    if coef_type == LSRSFInferredAlpha.get_name():
+    if coef_type == CoefficientName.LSR_INFERRED:
         return LSRSFInferredAlpha.from_config(
             model_config=config.simulation.reference,
             physics_config=config.physics,
             space_config=config.space,
         )
-    msg = "Possible coeffciient types are: "
+    msg = "Possible coefficient types are: "
     coef_types = [
         ConstantCoefficient.get_name(),
         LSRSFInferredAlpha.get_name(),
