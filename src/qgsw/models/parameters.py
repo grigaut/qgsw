@@ -8,7 +8,10 @@ import torch
 
 from qgsw import verbose
 from qgsw.masks import Masks
-from qgsw.models.exceptions import InvalidModelParameterError
+from qgsw.models.exceptions import (
+    InvalidModelParameterError,
+    UnsetTimestepError,
+)
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.utils.units._units import Unit
@@ -76,7 +79,10 @@ class ModelParamChecker:
     @property
     def dt(self) -> float:
         """Timestep value."""
-        return self._dt
+        try:
+            return self._dt
+        except AttributeError as e:
+            raise UnsetTimestepError from e
 
     @dt.setter
     def dt(self, dt: float) -> None:

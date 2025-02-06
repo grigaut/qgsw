@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
+from qgsw.models.exceptions import UnsetTimestepError
 from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
@@ -130,6 +131,10 @@ class QGCore(Model[T], Generic[T, Projector]):
             ),
             f"├── dt: {self.dt} s",
         ]
+        try:
+            msg_parts.append(f"├── dt: {self.dt} s")
+        except UnsetTimestepError:
+            msg_parts.append("├── dt: unset yet")
         space_repr_ = self.space.get_repr_parts()
         space_repr = ["├── " + space_repr_.pop(0)]
         space_repr = space_repr + ["│\t" + txt for txt in space_repr_]
@@ -230,12 +235,12 @@ class QGCore(Model[T], Generic[T, Projector]):
 
     def compute_time_derivatives(
         self,
-        prognostic: UVH,
+        uvh: UVH,
     ) -> UVH:
         """Compute the prognostic variables derivatives dt_u, dt_v, dt_h.
 
         Args:
-            prognostic (UVH): u,v and h.
+            uvh (UVH): u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
@@ -246,8 +251,9 @@ class QGCore(Model[T], Generic[T, Projector]):
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        dt_prognostic_sw = self.sw.compute_time_derivatives(prognostic)
-        return self._P.project(dt_prognostic_sw)
+        dt_prognostic_sw = self.sw.compute_time_derivatives(uvh)
+        self._uvh_dt = self._P.project(dt_prognostic_sw)
+        return self._uvh_dt
 
     def update(self, uvh: UVH) -> UVH:
         """Update uvh.
