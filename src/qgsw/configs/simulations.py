@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Union
+from typing import TYPE_CHECKING, Literal, Union
 
 from pydantic import (
     BaseModel,
@@ -13,13 +13,17 @@ from pydantic import (
     PositiveFloat,
 )
 
-from qgsw.configs.models import ModelConfig  # noqa: TC001
+from qgsw.simulation.names import SimulationName
+from qgsw.utils.named_object import NamedObjectConfig
+
+if TYPE_CHECKING:
+    from qgsw.configs.models import ModelConfig
 
 
-class SimulationConfig(BaseModel):
+class SimulationConfig(NamedObjectConfig[SimulationName], BaseModel):
     """Simulation configuration."""
 
-    kind: Literal["simple-run", "assimilation"]
+    type: Literal[SimulationName.RUN, SimulationName.ASSIMILATION]
     duration: PositiveFloat
     dt: PositiveFloat
 
@@ -27,13 +31,13 @@ class SimulationConfig(BaseModel):
 class ModelRunSimulationConfig(SimulationConfig):
     """Model run simulaton configuration."""
 
-    kind: Literal["simple-run"]
+    type: Literal[SimulationName.RUN]
 
 
 class AssimilationSimulationConfig(SimulationConfig):
     """Assimilation simulation configuration."""
 
-    kind: Literal["assimilation"]
+    type: Literal[SimulationName.ASSIMILATION]
     fork_interval: PositiveFloat
     reference: ModelConfig
     startup_file_str: Union[str, None] = Field(None, alias="startup_file")

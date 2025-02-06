@@ -1,7 +1,6 @@
 """Utils for modified models."""
 
-from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
-from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
+from qgsw.models.names import ModelName
 
 
 def is_modified(model_type: str) -> bool:
@@ -13,8 +12,8 @@ def is_modified(model_type: str) -> bool:
     Returns:
         bool: Whether the model is modified or not.
     """
-    if model_type == QGCollinearSF.get_type():
+    if model_type == ModelName.QG_COLLINEAR_SF:
         return True
-    if model_type == QGCollinearFilteredSF.get_type():  # noqa: SIM103
+    if model_type == ModelName.QG_FILTERED:  # noqa: SIM103
         return True
     return False

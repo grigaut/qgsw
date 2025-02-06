@@ -12,6 +12,7 @@ from qgsw import verbose
 from qgsw.fields.variables.uvh import UVH
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
+from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.sw.core import SW
 from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -115,6 +116,8 @@ class BaseSWFilterBarotropic(ABC, SW):
 class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
     """Rotating Shallow Water model with spectral barotropic filtering."""
 
+    _type = ModelName.SW_FILTER_SPECTRAL
+
     def _set_solver(self) -> None:
         """Set Helmoltz Solver for barotropic and spectral."""
         verbose.display(
@@ -194,6 +197,8 @@ class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
 
 class SWFilterBarotropicExact(BaseSWFilterBarotropic):
     """Rotating Shallow Water model with barotropic filtering."""
+
+    _type = ModelName.SW_FILTER_EXACT
 
     def _set_solver(self) -> None:
         """Set Helmoltz Solver for barotropic and exact form."""

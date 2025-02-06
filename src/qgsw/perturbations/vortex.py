@@ -6,6 +6,7 @@ from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING
 
 from qgsw import fft
+from qgsw.perturbations.names import PertubationName
 
 try:
     from typing import Self
@@ -215,7 +216,7 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
 class BarotropicVortex(RankineVortex3D, BarotropicPerturbation):
     """3D Rankine Vortex with similar vortex behavior accross all layers."""
 
-    _type = "vortex-barotropic"
+    _type = PertubationName.BAROTROPIC_VORTEX
 
     def _set_2d_vortex(self, magnitude: float) -> None:
         """Set the 2D  vortex.
@@ -229,7 +230,7 @@ class BarotropicVortex(RankineVortex3D, BarotropicPerturbation):
 class HalfBarotropicVortex(RankineVortex3D, HalfBarotropicPerturbation):
     """3D Rankine Vortex with similar vortex behavior accross all layers."""
 
-    _type = "vortex-half-barotropic"
+    _type = PertubationName.HALF_BAROTROPIC_VORTEX
 
     def _set_2d_vortex(self, magnitude: float) -> None:
         """Set the 2D  vortex.
@@ -243,7 +244,7 @@ class HalfBarotropicVortex(RankineVortex3D, HalfBarotropicPerturbation):
 class BaroclinicVortex(RankineVortex3D, BaroclinicPerturbation):
     """3D Rankine Vortex with only superior layer active."""
 
-    _type = "vortex-baroclinic"
+    _type = PertubationName.BAROCLINIC_VORTEX
 
     def _set_2d_vortex(self, magnitude: float) -> None:
         """Set the 2D  vortex.

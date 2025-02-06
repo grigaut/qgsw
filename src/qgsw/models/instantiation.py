@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from qgsw.models.names import ModelName
 from qgsw.models.qg.core import QG
 from qgsw.models.qg.exceptions import UnrecognizedQGModelError
 from qgsw.models.qg.modified.collinear_sublayer.core import (
@@ -17,16 +18,16 @@ from qgsw.models.qg.modified.utils import is_modified
 from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
-from qgsw.models.sw.filtering import (
-    SWFilterBarotropicExact,
-    SWFilterBarotropicSpectral,
-)
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.models import (
         ModelConfig,
+    )
+    from qgsw.models.sw.filtering import (
+        SWFilterBarotropicExact,
+        SWFilterBarotropicSpectral,
     )
     from qgsw.perturbations.core import Perturbation
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -65,9 +66,9 @@ def instantiate_model(
         Model: Model.
     """
     if model_config.type in [
-        SW.get_type(),
-        SWFilterBarotropicSpectral.get_type(),
-        SWFilterBarotropicExact.get_type(),
+        ModelName.SHALLOW_WATER,
+        ModelName.SW_FILTER_EXACT,
+        ModelName.SW_FILTER_SPECTRAL,
     ]:
         model = _instantiate_sw(
             model_config=model_config,
@@ -76,7 +77,7 @@ def instantiate_model(
             beta_plane=beta_plane,
             Ro=Ro,
         )
-    elif model_config.type == QG.get_type():
+    elif model_config.type == ModelName.QUASI_GEOSTROPHIC:
         model = _instantiate_qg(
             model_config=model_config,
             space_2d=space_2d,
@@ -233,7 +234,7 @@ def _instantiate_collinear_qg(
         Ro,
     )
     model.alpha = _determine_coef0(perturbation.type)
-    if model.get_type() == QGCollinearFilteredSF.get_type():
+    if model.get_type() == ModelName.QG_FILTERED:
         model.P.filter.sigma = model_config.sigma
     uvh0 = QGProjector.G(
         p0,
@@ -291,13 +292,13 @@ def get_model_class(
     Returns:
         QG | QGCollinearSF | QGCollinearFilteredSF | SW: _description_
     """
-    if model_config.type == QG.get_type():
+    if model_config.type == ModelName.QUASI_GEOSTROPHIC:
         return QG
-    if model_config.type == QGCollinearSF.get_type():
+    if model_config.type == ModelName.QG_COLLINEAR_SF:
         return QGCollinearSF
-    if model_config.type == QGCollinearFilteredSF.get_type():
+    if model_config.type == ModelName.QG_FILTERED:
         return QGCollinearFilteredSF
-    if model_config.type == SW.get_type():
+    if model_config.type == ModelName.SHALLOW_WATER:
         return SW
     msg = f"Unrecognized model type: {model_config.type}"
     raise ValueError(msg)

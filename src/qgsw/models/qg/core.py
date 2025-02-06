@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
+from qgsw.models.names import ModelName
 from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
@@ -34,7 +35,7 @@ Projector = TypeVar("Projector", bound=QGProjector)
 class QGCore(Model[T], Generic[T, Projector]):
     """Quasi Geostrophic Model."""
 
-    _type = "QG"
+    _type = ModelName.QUASI_GEOSTROPHIC
 
     def __init__(
         self,

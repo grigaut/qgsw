@@ -9,6 +9,7 @@ from qgsw.fields.variables.state import StateAlpha
 from qgsw.fields.variables.uvh import UVHTAlpha
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.core import QGCore
 from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
@@ -93,7 +94,7 @@ class QGAlpha(QGCore[UVHTAlpha, Projector]):
 class QGCollinearSF(QGAlpha[QGProjector]):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
-    _type = "QGCollinearSF"
+    _type = ModelName.QG_COLLINEAR_SF
 
     _supported_layers_nb: int = 2
     _coefficient_set = False

@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 import torch
 from pydantic import (
     BaseModel,
-    Field,
     PositiveInt,
+    field_serializer,
 )
 
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
+
+if TYPE_CHECKING:
+    from qgsw.utils.units._units import Unit
 
 
 class SpaceConfig(BaseModel):
@@ -20,16 +23,11 @@ class SpaceConfig(BaseModel):
 
     nx: PositiveInt
     ny: PositiveInt
-    unit_str: str = Field(alias="unit")
+    unit: Unit
     x_min: float
     x_max: float
     y_min: float
     y_max: float
-
-    @cached_property
-    def unit(self) -> Unit:
-        """Space Unit."""
-        return Unit(self.unit_str)
 
     @cached_property
     def dx(self) -> torch.Tensor:
@@ -62,3 +60,15 @@ class SpaceConfig(BaseModel):
         ds = dx * dy
         """
         return self.dx * self.dy
+
+    @field_serializer("unit")
+    def serialize_unit_as_str(self, unit: Unit) -> str:
+        """Serialize unit as str.
+
+        Args:
+            unit (Unit): Unit
+
+        Returns:
+            str: Unit value.
+        """
+        return unit.value

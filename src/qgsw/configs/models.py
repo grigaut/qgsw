@@ -13,14 +13,15 @@ from pydantic import (
     PositiveFloat,
 )
 
+from qgsw.models.names import ModelName
 from qgsw.models.qg.modified.utils import is_modified
 from qgsw.specs import DEVICE
+from qgsw.utils.named_object import NamedObjectConfig
 
 
-class ModelConfig(BaseModel):
+class ModelConfig(NamedObjectConfig[ModelName], BaseModel):
     """Model configuration."""
 
-    type: str
     prefix: str
     layers: list[PositiveFloat]
     reduced_gravity: list[PositiveFloat]

@@ -17,6 +17,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
+from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
 from qgsw.models.qg.modified.exceptions import UnsetAError, UnsetAlphaError
@@ -56,7 +57,7 @@ if TYPE_CHECKING:
 class QGCollinearFilteredSF(QGAlpha["QGCollinearFilteredProjector"]):
     """Modified QG Model implementing collinear pv behavior."""
 
-    _type = "QGCollinearFilteredSF"
+    _type = ModelName.QG_FILTERED
     _supported_layers_nb = 2
 
     @with_shapes(H=(2,), g_prime=(2,))
