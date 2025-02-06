@@ -47,7 +47,6 @@ if TYPE_CHECKING:
 class Coefficient(NamedObject[CoefficientName], DiagnosticVariable, ABC):
     """Coefficient."""
 
-    _type = CoefficientName.CONSTANT
     _unit = Unit._
     _scope = Scope.ENSEMBLE_WISE
 
@@ -80,7 +79,7 @@ class Coefficient(NamedObject[CoefficientName], DiagnosticVariable, ABC):
         """
 
 
-class LSRSFInferredAlpha(NamedObject[CoefficientName], Coefficient):
+class LSRSFInferredAlpha(Coefficient):
     """Inferred collinearity from the streamfunction.
 
     Performs linear least squares regression to infer alpha.
@@ -168,6 +167,7 @@ class LSRSFInferredAlpha(NamedObject[CoefficientName], Coefficient):
 class ConstantCoefficient(Coefficient):
     """Constant collinearity coefficient."""
 
+    _type = CoefficientName.CONSTANT
     _name = "alpha_constant"
     _description = "Constant coefficient"
 
@@ -234,19 +234,19 @@ def create_coefficient(
         ConstantCoefficient | LSRSFInferredAlpha: Coefficient
     """
     coef_type = config.model.collinearity_coef.type
-    if coef_type == ConstantCoefficient.get_name():
+    if coef_type == CoefficientName.CONSTANT:
         return ConstantCoefficient.from_config(
             model_config=config.model,
             physics_config=config.physics,
             space_config=config.space,
         )
-    if coef_type == LSRSFInferredAlpha.get_name():
+    if coef_type == CoefficientName.LSR_INFERRED:
         return LSRSFInferredAlpha.from_config(
             model_config=config.simulation.reference,
             physics_config=config.physics,
             space_config=config.space,
         )
-    msg = "Possible coeffciient types are: "
+    msg = "Possible coefficient types are: "
     coef_types = [
         ConstantCoefficient.get_name(),
         LSRSFInferredAlpha.get_name(),
