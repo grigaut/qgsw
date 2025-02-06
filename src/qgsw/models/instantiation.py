@@ -18,6 +18,7 @@ from qgsw.models.qg.modified.utils import is_modified
 from qgsw.models.qg.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
+from qgsw.perturbations.names import PertubationName
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 
@@ -266,13 +267,13 @@ def _determine_coef0(perturbation_type: str) -> float:
     Returns:
         float: Initial coefficient value.
     """
-    if perturbation_type == "vortex-baroclinic":
+    if perturbation_type == PertubationName.BAROCLINIC_VORTEX:
         return torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
-    if perturbation_type == "vortex-half-barotropic":
+    if perturbation_type == PertubationName.HALF_BAROTROPIC_VORTEX:
         return torch.tensor([0.5], dtype=torch.float64, device=DEVICE.get())
-    if perturbation_type == "vortex-barotropic":
+    if perturbation_type == PertubationName.BAROTROPIC_VORTEX:
         return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
-    if perturbation_type == "none":
+    if perturbation_type == PertubationName.NONE:
         return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     msg = f"Unknown perturbation type: {perturbation_type}"
     raise ValueError(msg)
