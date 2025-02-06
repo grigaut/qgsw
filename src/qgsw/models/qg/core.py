@@ -115,6 +115,16 @@ class QGCore(Model[T], Generic[T, Projector]):
         Model.n_ens.fset(self, n_ens)
         self.sw.n_ens = n_ens
 
+    @property
+    def uvh_dt(self) -> UVH:
+        """Prognostic variable increment from previous iteration.
+
+        ├── u_dt: (n_ens, nl, nx+1, ny)-shaped
+        ├── v_dt: (n_ens, nl, nx, ny+1)-shaped
+        └── h_dt: (n_ens, nl, nx, ny)-shaped
+        """
+        return self._uvh_dt
+
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
 
@@ -129,7 +139,6 @@ class QGCore(Model[T], Generic[T, Projector]):
                 f"├── Beta plane: f0 = {self.beta_plane.f0} "
                 f"- β = {self.beta_plane.beta}"
             ),
-            f"├── dt: {self.dt} s",
         ]
         try:
             msg_parts.append(f"├── dt: {self.dt} s")
