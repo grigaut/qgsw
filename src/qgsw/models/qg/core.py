@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic, TypeVar
 
+import torch
+
 from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
@@ -35,6 +37,8 @@ Projector = TypeVar("Projector", bound=QGProjector)
 
 class QGCore(Model[T], Generic[T, Projector]):
     """Quasi Geostrophic Model."""
+
+    _save_p_values = False
 
     def __init__(
         self,
@@ -72,6 +76,26 @@ class QGCore(Model[T], Generic[T, Projector]):
             beta_plane=beta_plane,
             optimize=optimize,
         )
+
+    @property
+    def save_p_values(self) -> bool:
+        """Whether to save pressure values from integration steps or not."""
+        return self._save_p_values
+
+    @property
+    def intermediate_p_values(self) -> list[tuple[torch.Tensor, torch.Tensor]]:
+        """Intermediate pressure values.
+
+        Raises:
+            AttributeError: If the model does not save pressure values.
+        """
+        if self.save_p_values:
+            return self._p_vals
+        msg = (
+            "The model does not save intermediate p values."
+            "Call .save_intermediate_p() to access this attribute"
+        )
+        raise AttributeError(msg)
 
     @property
     def P(self) -> Projector:  # noqa: N802
@@ -123,6 +147,10 @@ class QGCore(Model[T], Generic[T, Projector]):
         └── h_dt: (n_ens, nl, nx, ny)-shaped
         """
         return self._uvh_dt
+
+    def save_intermediate_p(self) -> None:
+        """Save intermediate pressure values from P."""
+        self._save_p_values = True
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -261,6 +289,9 @@ class QGCore(Model[T], Generic[T, Projector]):
         """
         dt_prognostic_sw = self.sw.compute_time_derivatives(uvh)
         self._uvh_dt = self._P.project(dt_prognostic_sw)
+        if self.save_p_values:
+            p, p_i = self.P.compute_p(dt_prognostic_sw)
+            self._p_vals.append((p, p_i))
         return self._uvh_dt
 
     def update(self, uvh: UVH) -> UVH:
@@ -278,6 +309,8 @@ class QGCore(Model[T], Generic[T, Projector]):
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
+        if self.save_p_values:
+            self._p_vals = []
         return schemes.rk3_ssp(
             uvh,
             self.dt,
