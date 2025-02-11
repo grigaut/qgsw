@@ -1,6 +1,10 @@
 """Models-related exceptions."""
 
 
+class UnsetTimestepError(Exception):
+    """When alpha is not yet set."""
+
+
 class InvalidSavingFileError(Exception):
     """Raised when wrong file are given as save files."""
 

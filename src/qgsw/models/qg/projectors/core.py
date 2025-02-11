@@ -299,13 +299,15 @@ class QGProjector:
             torch.Tensor: Physical Pressure * f0.
                 └── (n_ens, nl, nx-1, ny-1)-shaped.
         """
-        return self.Q(
+        q = self.Q(
             uvh=uvh,
             f0=self._f0,
             H=self.H,
             ds=self._space.ds,
             points_to_surfaces=self._points_to_surface,
         )
+        self.q = q
+        return q
 
     def QoG_inv(  # noqa: N802
         self,
@@ -361,3 +363,14 @@ class QGProjector:
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
         return self._G(*self.QoG_inv(self._Q(uvh)))
+
+    def compute_p(self, uvh: UVH) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute pressure values.
+
+        Args:
+            uvh (UVH): Prognostic UVH.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Pressure, Pressure interpolated.
+        """
+        return self.QoG_inv(self._Q(uvh))

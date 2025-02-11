@@ -17,6 +17,7 @@ from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.exceptions import (
     IncoherentWithMaskError,
+    UnsetTimestepError,
 )
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
@@ -133,8 +134,11 @@ class Model(
                 f"├── Beta plane: f0 = {self.beta_plane.f0} "
                 f"- β = {self.beta_plane.beta}"
             ),
-            f"├── dt: {self.dt} s",
         ]
+        try:
+            msg_parts.append(f"├── dt: {self.dt} s")
+        except UnsetTimestepError:
+            msg_parts.append("├── dt: unset yet")
         space_repr_ = self.space.get_repr_parts()
         space_repr = ["├── " + space_repr_.pop(0)]
         space_repr = space_repr + ["│\t" + txt for txt in space_repr_]
