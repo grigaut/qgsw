@@ -14,7 +14,6 @@ from qgsw.specs import DEVICE
 from qgsw.utils.shape_checks import (
     ShapeValidationError,
     with_shapes,
-    with_variable_shapes,
 )
 from qgsw.utils.size import Size
 
@@ -94,7 +93,7 @@ sizex = Size(1)
 sizey = Size(1)
 
 
-@with_variable_shapes(
+@with_shapes(
     x=(sizex + 1,),
     y=(sizey,),
 )
@@ -127,7 +126,7 @@ def test_variable_shape_errors(
     x: torch.Tensor,
     y: torch.Tensor,
 ) -> None:
-    """Ensure with_variable_shapes raises errors."""
+    """Ensure with_shapes raises errors."""
     sizex.update(size_x)
     sizey.update(size_y)
     with pytest.raises(ShapeValidationError):
@@ -150,7 +149,7 @@ def test_variable_shape_valid(
     x: torch.Tensor,
     y: torch.Tensor,
 ) -> None:
-    """Ensure with_variable_shapes raises errors."""
+    """Ensure with_shapes raises errors."""
     sizex.update(size_x)
     sizey.update(size_y)
     try:
