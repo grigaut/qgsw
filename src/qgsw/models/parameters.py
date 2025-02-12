@@ -14,8 +14,6 @@ from qgsw.models.exceptions import (
 )
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
-from qgsw.utils.shape_checks import with_shapes
-from qgsw.utils.size import Size
 from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
@@ -29,11 +27,6 @@ if TYPE_CHECKING:
 class ModelParamChecker:
     """Model Parameters."""
 
-    _size_ens = Size()
-    _sizel = Size()
-    _sizex = Size()
-    _sizey = Size()
-
     dtype: torch.dtype
     device: Device
     _n_ens: int = 1
@@ -43,8 +36,6 @@ class ModelParamChecker:
     _bottom_drag: float = 0.0
     _taux: torch.Tensor | float
     _tauy: torch.Tensor | float
-
-    _size_ens.set_to(_n_ens)
 
     def __init__(
         self,
@@ -73,9 +64,9 @@ class ModelParamChecker:
         )
         ## Space
         self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
-        self._sizel.set_to(self.space.nl)
-        self._sizex.set_to(self.space.nx)
-        self._sizey.set_to(self.space.ny)
+        self.sizel.set_to(self.space.nl)
+        self.sizex.set_to(self.space.nx)
+        self.sizey.set_to(self.space.ny)
         # Beta-plane
         self._set_beta_plane(beta_plane)
         # h
@@ -270,9 +261,6 @@ class ModelParamChecker:
             trigger_level=2,
         )
 
-    @with_shapes(
-        g_prime=(_sizel, 1, 1),
-    )
     def _set_g_prime(self, g_prime: torch.Tensor) -> None:
         """Set g_prime values.
 

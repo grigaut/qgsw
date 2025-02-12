@@ -14,8 +14,6 @@ from typing import TYPE_CHECKING, TypeVar
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qgsw.utils.size import Size
-
 
 class ShapeValidationError(Exception):
     """Shape Validation Error."""
@@ -26,7 +24,7 @@ T = TypeVar("T")
 
 
 def with_shapes(
-    **shapes: tuple[int | Size, ...],
+    **shapes: tuple[int, ...],
 ) -> Callable[[Callable[Param, T]], Callable[Param, T]]:
     """Validate input shapes.
 
@@ -36,10 +34,6 @@ def with_shapes(
     Returns:
         Callable[Param, Callable[Param, T]]: Wrapper.
     """
-    shapes: dict[str, tuple[Callable[[], int], ...]] = {
-        k: tuple((lambda s=s: s) if isinstance(s, int) else s for s in v)
-        for k, v in shapes.items()
-    }
 
     def wrapper(f: Callable[Param, T]) -> Callable[Param, T]:
         """Wrapper.
@@ -76,15 +70,13 @@ def with_shapes(
             f_params = signature.bind(*args, **kwargs)
             # Apply defaults
             f_params.apply_defaults()
-            eval_shapes = {k: tuple(e() for e in s) for k, s in shapes.items()}
             # Check shapes
             if any(
-                f_params.arguments[k].shape != s
-                for k, s in eval_shapes.items()
+                f_params.arguments[k].shape != s for k, s in shapes.items()
             ):
                 key, shape = filter(
                     lambda ks: f_params.arguments[ks[0]].shape != ks[1],
-                    eval_shapes.items(),
+                    shapes.items(),
                 ).__next__()
                 msg = (
                     f"{f.__qualname__}(): '{key}'"
