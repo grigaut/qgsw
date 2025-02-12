@@ -71,6 +71,8 @@ class Masks:
         self._generate_masks(mask_h=mask_hgrid)
 
         self._compute_vorticity_bounds()
+        self._generate_u_distbounds()
+        self._generate_v_distbounds()
 
         # Irregular boundary indices
         self._compute_psi_irregular_bounds()
@@ -389,6 +391,66 @@ class Masks:
         self._generate_w_stencil_in_x()
         self._generate_w_stencil_in_y()
 
+    def _generate_u_distbounds(self) -> None:
+        self.u_distbound1 = torch.logical_and(
+            F.avg_pool2d(
+                self.u.type(self._mtype),
+                (3, 1),
+                stride=(1, 1),
+                padding=(1, 0),
+            )
+            < 5 / 6,
+            self.u,
+        )
+        self.u_distbound2plus = torch.logical_and(
+            torch.logical_not(self.u_distbound1),
+            self.u,
+        )
+        self.u_distbound2 = torch.logical_and(
+            F.avg_pool2d(
+                self.u.type(self._mtype),
+                (5, 1),
+                stride=(1, 1),
+                padding=(2, 0),
+            )
+            < 9 / 10,
+            self.u_distbound2plus,
+        )
+        self.u_distbound3plus = torch.logical_and(
+            torch.logical_not(self.u_distbound2),
+            self.u_distbound2plus,
+        )
+
+    def _generate_v_distbounds(self) -> None:
+        self.v_distbound1 = torch.logical_and(
+            F.avg_pool2d(
+                self.v.type(self._mtype),
+                (1, 3),
+                stride=(1, 1),
+                padding=(0, 1),
+            )
+            < 5 / 6,
+            self.v,
+        )
+        self.v_distbound2plus = torch.logical_and(
+            torch.logical_not(self.v_distbound1),
+            self.v,
+        )
+        self.v_distbound2 = torch.logical_and(
+            F.avg_pool2d(
+                self.v.type(self._mtype),
+                (1, 5),
+                stride=(1, 1),
+                padding=(0, 2),
+            )
+            < 9 / 10,
+            self.v_distbound2plus,
+        )
+        self.v_distbound3plus = torch.logical_and(
+            torch.logical_not(self.v_distbound2),
+            self.v_distbound2plus,
+        )
+
     def _convert_types(self) -> None:
         """Convert masks to correct data type."""
         self.h = self.h.type(self._mtype)
@@ -443,251 +505,3 @@ class Masks:
             Self: Mask
         """
         return cls(torch.ones((nx, ny), device=device))
-
-
-if __name__ == "__main__":
-    import matplotlib as mpl
-    import numpy as np
-
-    mpl.rcParams.update({"font.size": 24})
-    import matplotlib.pyplot as plt
-
-    n = 6
-    mask_1 = torch.ones(n, n)
-
-    mask_2 = torch.ones(n, n)
-    mask_2[1, 0] = 0.0
-    mask_2[n - 1, 2] = 0.0
-    mask_2[0, n - 2] = 0.0
-    mask_2[1, n - 2] = 0.0
-    mask_2[0, n - 1] = 0.0
-    mask_2[1, n - 1] = 0.0
-    mask_2[2, n - 1] = 0.0
-
-    plt.ion()
-    for mask, title in [
-        (mask_1, "rect. domain"),
-        (mask_2, "non-rect. domain"),
-    ]:
-        masks = Masks(mask)
-
-        for stencil_var in ["h", "w"]:
-            f, a = plt.subplots(figsize=(14, 9))
-            f.suptitle(f"{title}, {stencil_var}-stencil masks")
-            a.imshow(
-                mask.T,
-                origin="lower",
-                cmap="Greys_r",
-                interpolation=None,
-                vmin=-1,
-            )
-            (
-                a.set_xticks(np.arange(-0.5, n + 0.5)),
-                a.set_yticks(np.arange(-0.5, n + 0.5)),
-            )
-            a.grid()
-
-            # h mask
-            size = 90
-            size2 = 130
-            q_xmin, q_ymin = 0, 0
-            mask_h_ids = torch.argwhere(masks.h.squeeze())
-            a.scatter(
-                q_xmin + mask_h_ids[:, 0],
-                q_ymin + mask_h_ids[:, 1],
-                s=size,
-                marker="o",
-                label="h",
-                color="mediumseagreen",
-            )
-
-            # w, psi plain and boundary mask
-            w_xmin, w_ymin = -0.5, -0.5
-            # w
-            mask_w_ids = torch.argwhere(masks.w.squeeze())
-            a.scatter(
-                w_xmin + mask_w_ids[:, 0],
-                w_ymin + mask_w_ids[:, 1],
-                s=size,
-                marker="s",
-                label="$w$",
-                color="pink",
-            )
-            mask_w_hb_ids = torch.argwhere(masks.w_horizontal_bound.squeeze())
-            a.scatter(
-                w_xmin + mask_w_hb_ids[:, 0],
-                w_ymin + mask_w_hb_ids[:, 1],
-                s=2 * size,
-                marker="4",
-                label="$w$ horiz",
-                color="red",
-            )
-            mask_w_vb_ids = torch.argwhere(masks.w_vertical_bound.squeeze())
-            a.scatter(
-                w_xmin + mask_w_vb_ids[:, 0],
-                w_ymin + mask_w_vb_ids[:, 1],
-                s=2 * size,
-                marker="2",
-                label="$w$ vert",
-                color="green",
-            )
-            mask_w_cob_ids = torch.argwhere(masks.w_cornerout_bound.squeeze())
-            a.scatter(
-                w_xmin + mask_w_cob_ids[:, 0],
-                w_ymin + mask_w_cob_ids[:, 1],
-                s=2 * size,
-                marker="x",
-                label="$w$ c_out",
-                color="cyan",
-            )
-            mask_w_valid_ids = torch.argwhere(masks.w_valid.squeeze())
-            a.scatter(
-                w_xmin + mask_w_valid_ids[:, 0],
-                w_ymin + mask_w_valid_ids[:, 1],
-                s=2 * size,
-                marker="*",
-                label="$w$ valid",
-                color="cyan",
-                alpha=0.4,
-            )
-            # psi
-            mask_psi_ids = torch.argwhere(masks.psi.squeeze())
-            a.scatter(
-                w_xmin + mask_psi_ids[:, 0],
-                w_ymin + mask_psi_ids[:, 1],
-                s=size / 2,
-                marker="D",
-                label="$\\psi$",
-                color="brown",
-                alpha=0.5,
-            )
-            a.scatter(
-                w_xmin + 1 + masks.psi_irrbound_xids,
-                w_ymin + 1 + masks.psi_irrbound_yids,
-                s=size,
-                marker="o",
-                label="$\\mathcal{I}$",
-                color="purple",
-                alpha=0.5,
-            )
-
-            if stencil_var == "h":
-                u_xmin, u_ymin = -0.5, 0
-                mask_u_ids = torch.argwhere(masks.u_sten_hx_eq2.squeeze())
-                a.scatter(
-                    u_xmin + mask_u_ids[:, 0],
-                    u_ymin + mask_u_ids[:, 1],
-                    s=size2,
-                    marker=">",
-                    label="u_sten_hx_eq2",
-                    color="lightblue",
-                )
-                mask_u_ids = torch.argwhere(masks.u_sten_hx_eq4.squeeze())
-                a.scatter(
-                    u_xmin + mask_u_ids[:, 0],
-                    u_ymin + mask_u_ids[:, 1],
-                    s=size2,
-                    marker=">",
-                    label="u_sten_hx_eq4",
-                    color="cornflowerblue",
-                )
-                mask_u_ids = torch.argwhere(masks.u_sten_hx_gt6.squeeze())
-                a.scatter(
-                    u_xmin + mask_u_ids[:, 0],
-                    u_ymin + mask_u_ids[:, 1],
-                    s=size2,
-                    marker=">",
-                    label="u_sten_hx_gt6",
-                    color="navy",
-                )
-
-                v_xmin, v_ymin = 0, -0.5
-                mask_v_ids = torch.argwhere(masks.v_sten_hy_eq2.squeeze())
-                a.scatter(
-                    v_xmin + mask_v_ids[:, 0],
-                    v_ymin + mask_v_ids[:, 1],
-                    s=size2,
-                    marker="^",
-                    label="v_sten_hy_eq2",
-                    color="gold",
-                )
-                mask_v_ids = torch.argwhere(masks.v_sten_hy_eq4.squeeze())
-                a.scatter(
-                    v_xmin + mask_v_ids[:, 0],
-                    v_ymin + mask_v_ids[:, 1],
-                    s=size2,
-                    marker="^",
-                    label="v_sten_hy_eq4",
-                    color="darkorange",
-                )
-                mask_v_ids = torch.argwhere(masks.v_sten_hy_gt6.squeeze())
-                a.scatter(
-                    v_xmin + mask_v_ids[:, 0],
-                    v_ymin + mask_v_ids[:, 1],
-                    s=size2,
-                    marker="^",
-                    label="v_sten_hy_gt6",
-                    color="firebrick",
-                )
-            elif stencil_var == "w":
-                u_xmin, u_ymin = -0.5, 0
-                mask_u_ids = torch.argwhere(masks.u_sten_wy_eq2.squeeze())
-                a.scatter(
-                    u_xmin + mask_u_ids[:, 0],
-                    u_ymin + mask_u_ids[:, 1],
-                    s=size2,
-                    marker=">",
-                    label="u_sten_wy_eq2",
-                    color="lightblue",
-                )
-                mask_u_ids = torch.argwhere(masks.u_sten_wy_eq4.squeeze())
-                a.scatter(
-                    u_xmin + mask_u_ids[:, 0],
-                    u_ymin + mask_u_ids[:, 1],
-                    s=size2,
-                    marker=">",
-                    label="u_sten_wy_eq4",
-                    color="cornflowerblue",
-                )
-                mask_u_ids = torch.argwhere(masks.u_sten_wy_gt6.squeeze())
-                a.scatter(
-                    u_xmin + mask_u_ids[:, 0],
-                    u_ymin + mask_u_ids[:, 1],
-                    s=size2,
-                    marker=">",
-                    label="u_sten_wy_gt6",
-                    color="navy",
-                )
-
-                v_xmin, v_ymin = 0, -0.5
-                mask_v_ids = torch.argwhere(masks.v_sten_wx_eq2.squeeze())
-                a.scatter(
-                    v_xmin + mask_v_ids[:, 0],
-                    v_ymin + mask_v_ids[:, 1],
-                    s=size2,
-                    marker="^",
-                    label="v_sten_wx_eq2",
-                    color="gold",
-                )
-                mask_v_ids = torch.argwhere(masks.v_sten_wx_eq4.squeeze())
-                a.scatter(
-                    v_xmin + mask_v_ids[:, 0],
-                    v_ymin + mask_v_ids[:, 1],
-                    s=size2,
-                    marker="^",
-                    label="v_sten_wx_eq4",
-                    color="darkorange",
-                )
-                mask_v_ids = torch.argwhere(masks.v_sten_wx_gt6.squeeze())
-                a.scatter(
-                    v_xmin + mask_v_ids[:, 0],
-                    v_ymin + mask_v_ids[:, 1],
-                    s=size2,
-                    marker="^",
-                    label="v_sten_wx_gt6",
-                    color="firebrick",
-                )
-
-            f.legend(loc="upper left")
-            plt.setp(a.get_xticklabels(), visible=False)
-            plt.setp(a.get_yticklabels(), visible=False)
