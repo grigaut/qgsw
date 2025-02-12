@@ -38,6 +38,17 @@ def laplacian(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
     ) / dy**2
 
 
+def laplacian_h(f, dx, dy):
+    return F.pad(
+        (f[..., 2:, 1:-1] + f[..., :-2, 1:-1] - 2 * f[..., 1:-1, 1:-1]) / dx**2
+        + (f[..., 1:-1, 2:] + f[..., 1:-1, :-2] - 2 * f[..., 1:-1, 1:-1])
+        / dy**2,
+        (1, 1, 1, 1),
+        mode="constant",
+        value=0.0,
+    )
+
+
 def grad_perp(f: torch.Tensor) -> torch.Tensor:
     """Orthogonal gradient"""
     return f[..., :-1] - f[..., 1:], f[..., 1:, :] - f[..., :-1, :]

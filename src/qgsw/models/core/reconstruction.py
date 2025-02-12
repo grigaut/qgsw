@@ -7,6 +7,32 @@ Louis Thiry, 2023
 import torch
 
 
+def linear3_left(qm, q0, qp):
+    """
+    3-points linear left-biased stencil reconstruction:
+
+    qm-----q0--x--qp
+
+    """
+    return -1.0 / 6.0 * qm + 5.0 / 6.0 * q0 + 1.0 / 3.0 * qp
+
+
+def linear5_left(qmm, qm, q0, qp, qpp):
+    """
+    5-points linear left-biased stencil reconstruction
+
+    qmm----qm-----q0--x--qp----qpp
+
+    """
+    return (
+        1.0 / 30.0 * qmm
+        - 13.0 / 60.0 * qm
+        + 47.0 / 60.0 * q0
+        + 9.0 / 20.0 * qp
+        - 1 / 20 * qpp
+    )
+
+
 def linear2_centered(qm, qp):
     """
     2-points linear centered reconstruction:
@@ -66,6 +92,33 @@ def linear6_left(qmmm, qmm, qm, qp, qpp, qppp):
         + 9.0 / 20.0 * qp
         - 1 / 20 * qpp
     )
+
+
+def weno3z(qm, q0, qp):
+    """
+    3-points non-linear left-biased stencil reconstruction:
+
+    qm-----q0--x--qp
+
+    An improved weighted essentially non-oscillatory scheme for hyperbolic
+    conservation laws, Borges et al, Journal of Computational Physics 227 (2008).
+    """
+    eps = 1e-14
+
+    qi1 = -1.0 / 2.0 * qm + 3.0 / 2.0 * q0
+    qi2 = 1.0 / 2.0 * (q0 + qp)
+
+    beta1 = (q0 - qm) ** 2
+    beta2 = (qp - q0) ** 2
+    tau = torch.abs(beta2 - beta1)
+
+    g1, g2 = 1.0 / 3.0, 2.0 / 3.0
+    w1 = g1 * (1.0 + tau / (beta1 + eps))
+    w2 = g2 * (1.0 + tau / (beta2 + eps))
+
+    qi_weno3 = (w1 * qi1 + w2 * qi2) / (w1 + w2)
+
+    return qi_weno3
 
 
 def wenojs4_left(qmm, qm, qp, qpp):
