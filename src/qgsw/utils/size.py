@@ -6,15 +6,14 @@ from collections.abc import Callable
 class Size:
     """Dimension."""
 
-    def __init__(self, size: int) -> None:
+    def __init__(self) -> None:
         """Instantiate the size.
 
         Args:
             size (int): Size initial value.
         """
-        self._size = size
 
-    def update(self, size: int) -> None:
+    def set_to(self, size: int) -> None:
         """Update the size value.
 
         Args:
@@ -28,8 +27,16 @@ class Size:
         Returns:
             int: Size value.
         """
-        return self._size
+        try:
+            return self._size
+        except AttributeError as e:
+            msg = "Call `set_to` method to set the size first."
+            raise AttributeError(msg) from e
 
     def __add__(self, add_to_size: int) -> Callable[[], int]:
         """Magic method for the '+' operator."""
         return lambda: self() + add_to_size
+
+    def __repr__(self) -> str:
+        """String representation of Size."""
+        return self.__call__().__repr__()

@@ -406,6 +406,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
             beta_plane=beta_plane,
         )
         self._space = keep_top_layer(self._space)
+        self._sizel.set_to(self._space.nl)
         self._compute_coriolis(self._space.omega.remove_z_h())
         ##Topography and Ref values
         self._set_ref_variables()

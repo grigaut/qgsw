@@ -14,6 +14,8 @@ from qgsw.models.exceptions import (
 )
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.utils.shape_checks import with_shapes
+from qgsw.utils.size import Size
 from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
@@ -27,6 +29,11 @@ if TYPE_CHECKING:
 class ModelParamChecker:
     """Model Parameters."""
 
+    _size_ens = Size()
+    _sizel = Size()
+    _sizex = Size()
+    _sizey = Size()
+
     dtype: torch.dtype
     device: Device
     _n_ens: int = 1
@@ -36,6 +43,8 @@ class ModelParamChecker:
     _bottom_drag: float = 0.0
     _taux: torch.Tensor | float
     _tauy: torch.Tensor | float
+
+    _size_ens.set_to(_n_ens)
 
     def __init__(
         self,
@@ -64,6 +73,9 @@ class ModelParamChecker:
         )
         ## Space
         self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
+        self._sizel.set_to(self.space.nl)
+        self._sizex.set_to(self.space.nx)
+        self._sizey.set_to(self.space.ny)
         # Beta-plane
         self._set_beta_plane(beta_plane)
         # h
@@ -86,7 +98,14 @@ class ModelParamChecker:
 
     @dt.setter
     def dt(self, dt: float) -> None:
-        self._set_dt(dt)
+        if dt <= 0:
+            msg = "Timestep must be greater than 0."
+            raise InvalidModelParameterError(msg)
+        self._dt = dt
+        verbose.display(
+            f"{self.__class__.__name__}: dt set to {self.dt}",
+            trigger_level=1,
+        )
 
     @property
     def slip_coef(self) -> float:
@@ -95,7 +114,16 @@ class ModelParamChecker:
 
     @slip_coef.setter
     def slip_coef(self, slip_coefficient: float) -> None:
-        self._set_slip_coef(slip_coefficient)
+        # Verify value in [0,1]
+        if (slip_coefficient < 0) or (slip_coefficient > 1):
+            msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
+            raise InvalidModelParameterError(msg)
+        self._slip_coef = slip_coefficient
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: Slip coefficient set to {slip_coefficient}",
+            trigger_level=2,
+        )
 
     @property
     def bottom_drag_coef(self) -> float:
@@ -104,7 +132,12 @@ class ModelParamChecker:
 
     @bottom_drag_coef.setter
     def bottom_drag_coef(self, bottom_drag: float) -> None:
-        self._set_bottom_drag(bottom_drag)
+        self._bottom_drag = bottom_drag
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: Bottom drag set to {bottom_drag}",
+            trigger_level=2,
+        )
 
     @property
     def n_ens(self) -> int:
@@ -113,7 +146,19 @@ class ModelParamChecker:
 
     @n_ens.setter
     def n_ens(self, n_ens: int) -> None:
-        self._set_n_ens(n_ens)
+        if not isinstance(n_ens, int):
+            msg = "n_ens must be an integer."
+            raise InvalidModelParameterError(msg)
+        if n_ens <= 0:
+            msg = "n_ens must be greater than 1."
+            raise InvalidModelParameterError(msg)
+        self._n_ens = n_ens
+        self._size_ens.set_to(self._n_ens)
+        name = self.__class__.__name__
+        verbose.display(
+            f"{name}: Number of ensembles set to {n_ens}",
+            trigger_level=2,
+        )
 
     @property
     def masks(self) -> Masks:
@@ -130,7 +175,27 @@ class ModelParamChecker:
 
     @masks.setter
     def masks(self, mask: torch.Tensor) -> None:
-        self._set_masks(mask)
+        shape = mask.shape[0], mask.shape[1]
+        # Verify shape
+        if shape != (self.space.nx, self.space.ny):
+            msg = (
+                "Invalid mask shape "
+                f"{shape}!=({self.space.nx},{self.space.ny})"
+            )
+            raise InvalidModelParameterError(msg)
+        vals = torch.unique(mask).tolist()
+        # Verify mask values
+        if not all(v in [0, 1] for v in vals) or vals == [0]:
+            msg = f"Invalid mask with non-binary values : {vals}"
+            raise InvalidModelParameterError(msg)
+        verbose.display(
+            msg=(
+                f"{'Non-trivial' if len(vals) == 2 else 'Trivial'}"  # noqa: PLR2004
+                " mask provided"
+            ),
+            trigger_level=2,
+        )
+        self._masks = Masks(mask)
 
     @property
     def beta_plane(self) -> BetaPlane:
@@ -181,112 +246,6 @@ class ModelParamChecker:
         )
         self._beta_plane = beta_plane
 
-    def _set_dt(self, dt: float) -> None:
-        """TimeStep Setter.
-
-        Args:
-            dt (float): Timestep (s)
-
-        Raises:
-            InvalidModelParameterError: If the timestep is negative.
-        """
-        if dt <= 0:
-            msg = "Timestep must be greater than 0."
-            raise InvalidModelParameterError(msg)
-        self._dt = dt
-        verbose.display(
-            f"{self.__class__.__name__}: dt set to {self.dt}",
-            trigger_level=1,
-        )
-
-    def _set_slip_coef(self, slip_coefficient: float) -> None:
-        """Set the slip coefficient.
-
-        Args:
-            slip_coefficient (float): Slip coefficient.
-
-        Raises:
-            InvalidModelParameterError: If the lsip coef is not in [0,1]
-        """
-        # Verify value in [0,1]
-        if (slip_coefficient < 0) or (slip_coefficient > 1):
-            msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
-            raise InvalidModelParameterError(msg)
-        self._slip_coef = slip_coefficient
-        name = self.__class__.__name__
-        verbose.display(
-            f"{name}: Slip coefficient set to {slip_coefficient}",
-            trigger_level=2,
-        )
-
-    def _set_bottom_drag(self, bottom_drag: float) -> None:
-        """Set th ebottom drag coefficient.
-
-        Args:
-            bottom_drag (float): Bottom drag coefficient.
-        """
-        self._bottom_drag = bottom_drag
-        name = self.__class__.__name__
-        verbose.display(
-            f"{name}: Bottom drag set to {bottom_drag}",
-            trigger_level=2,
-        )
-
-    def _set_n_ens(self, n_ens: int) -> None:
-        """Set the number of ensembles.
-
-        Args:
-            n_ens (int): Number of ensembles.
-
-        Raises:
-            InvalidModelParameterError: If the number of instance is not an int
-            InvalidModelParameterError: If the number of ensemble is negative.
-        """
-        if not isinstance(n_ens, int):
-            msg = "n_ens must be an integer."
-            raise InvalidModelParameterError(msg)
-        if n_ens <= 0:
-            msg = "n_ens must be greater than 1."
-            raise InvalidModelParameterError(msg)
-        self._n_ens = n_ens
-        name = self.__class__.__name__
-        verbose.display(
-            f"{name}: Number of ensembles set to {n_ens}",
-            trigger_level=2,
-        )
-
-    def _set_masks(self, mask: torch.Tensor) -> None:
-        """Set the masks.
-
-        Args:
-            mask (torch.Tensor): Mask tensor.
-
-        Raises:
-            InvalidModelParameterError: If the mask has incorrect shape.
-            InvalidModelParameterError: If the mask is not inly 1s and 0s.
-        """
-        shape = mask.shape[0], mask.shape[1]
-        # Verify shape
-        if shape != (self.space.nx, self.space.ny):
-            msg = (
-                "Invalid mask shape "
-                f"{shape}!=({self.space.nx},{self.space.ny})"
-            )
-            raise InvalidModelParameterError(msg)
-        vals = torch.unique(mask).tolist()
-        # Verify mask values
-        if not all(v in [0, 1] for v in vals) or vals == [0]:
-            msg = f"Invalid mask with non-binary values : {vals}"
-            raise InvalidModelParameterError(msg)
-        verbose.display(
-            msg=(
-                f"{'Non-trivial' if len(vals) == 2 else 'Trivial'}"  # noqa: PLR2004
-                " mask provided"
-            ),
-            trigger_level=2,
-        )
-        self._masks = Masks(mask)
-
     def _set_H(  # noqa: N802
         self,
         h: torch.Tensor,
@@ -311,6 +270,9 @@ class ModelParamChecker:
             trigger_level=2,
         )
 
+    @with_shapes(
+        g_prime=(_sizel, 1, 1),
+    )
     def _set_g_prime(self, g_prime: torch.Tensor) -> None:
         """Set g_prime values.
 

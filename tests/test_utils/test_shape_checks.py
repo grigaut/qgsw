@@ -89,8 +89,8 @@ def test_with_shapes_valid(args: Any, kwargs: Any) -> None:  # noqa: ANN401
         raise AssertionError from err
 
 
-sizex = Size(1)
-sizey = Size(1)
+sizex = Size()
+sizey = Size()
 
 
 @with_shapes(
@@ -127,8 +127,8 @@ def test_variable_shape_errors(
     y: torch.Tensor,
 ) -> None:
     """Ensure with_shapes raises errors."""
-    sizex.update(size_x)
-    sizey.update(size_y)
+    sizex.set_to(size_x)
+    sizey.set_to(size_y)
     with pytest.raises(ShapeValidationError):
         func2(x, y)
 
@@ -150,8 +150,8 @@ def test_variable_shape_valid(
     y: torch.Tensor,
 ) -> None:
     """Ensure with_shapes raises errors."""
-    sizex.update(size_x)
-    sizey.update(size_y)
+    sizex.set_to(size_x)
+    sizey.set_to(size_y)
     try:
         func2(x, y)
     except ShapeValidationError as err:
