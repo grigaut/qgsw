@@ -11,7 +11,12 @@ import pytest
 import torch
 
 from qgsw.specs import DEVICE
-from qgsw.utils.shape_checks import ShapeValidationError, with_shapes
+from qgsw.utils.shape_checks import (
+    ShapeValidationError,
+    with_shapes,
+    with_variable_shapes,
+)
+from qgsw.utils.size import Size
 
 Param = ParamSpec("Param")
 
@@ -81,5 +86,74 @@ def test_with_shapes_valid(args: Any, kwargs: Any) -> None:  # noqa: ANN401
     """Ensure with_shapes does not raise errors."""
     try:
         func(*args, **kwargs)
+    except ShapeValidationError as err:
+        raise AssertionError from err
+
+
+sizex = Size(1)
+sizey = Size(1)
+
+
+@with_variable_shapes(
+    x=(sizex + 1,),
+    y=(sizey,),
+)
+def func2(x: torch.Tensor, y: torch.Tensor) -> None:  # noqa: ARG001
+    """Random function.
+
+    Args:
+        x (torch.Tensor): Tensor.
+        y (torch.Tensor): Tensor.
+    """
+    return
+
+
+testdata = [
+    pytest.param(5, 5, torch.ones((6, 1)), torch.ones((5,))),
+    pytest.param(5, 5, torch.ones(5), torch.ones((5, 1))),
+    pytest.param(5, 5, torch.ones(4), torch.ones((5, 1))),
+    pytest.param(5, 5, torch.ones(5), torch.ones(5)),
+    pytest.param(5, 5, torch.ones(5), torch.ones(5)),
+]
+
+
+@pytest.mark.parametrize(
+    ("size_x", "size_y", "x", "y"),
+    testdata,
+)
+def test_variable_shape_errors(
+    size_x: int,
+    size_y: int,
+    x: torch.Tensor,
+    y: torch.Tensor,
+) -> None:
+    """Ensure with_variable_shapes raises errors."""
+    sizex.update(size_x)
+    sizey.update(size_y)
+    with pytest.raises(ShapeValidationError):
+        func2(x, y)
+
+
+testdata = [
+    pytest.param(5, 5, torch.ones((6,)), torch.ones((5,))),
+    pytest.param(10, 4, torch.ones((11,)), torch.ones((4,))),
+]
+
+
+@pytest.mark.parametrize(
+    ("size_x", "size_y", "x", "y"),
+    testdata,
+)
+def test_variable_shape_valid(
+    size_x: int,
+    size_y: int,
+    x: torch.Tensor,
+    y: torch.Tensor,
+) -> None:
+    """Ensure with_variable_shapes raises errors."""
+    sizex.update(size_x)
+    sizey.update(size_y)
+    try:
+        func2(x, y)
     except ShapeValidationError as err:
         raise AssertionError from err
