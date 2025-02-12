@@ -64,9 +64,6 @@ class ModelParamChecker:
         )
         ## Space
         self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
-        self.sizel.set_to(self.space.nl)
-        self.sizex.set_to(self.space.nx)
-        self.sizey.set_to(self.space.ny)
         # Beta-plane
         self._set_beta_plane(beta_plane)
         # h
