@@ -11,14 +11,14 @@ from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.core import QGCore
-from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
+from qgsw.models.qg.projected.core import QGCore
+from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
     compute_A_collinear_sf,
 )
-from qgsw.models.qg.modified.collinear_sublayer.variable_set import (
+from qgsw.models.qg.projected.modified.collinear.variable_set import (
     QGCollinearSFVariableSet,
 )
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,

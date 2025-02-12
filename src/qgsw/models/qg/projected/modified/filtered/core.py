@@ -19,17 +19,20 @@ from qgsw.models.core.helmholtz import (
 )
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
-from qgsw.models.qg.modified.exceptions import UnsetAError, UnsetAlphaError
-from qgsw.models.qg.modified.filtered.pv import (
+from qgsw.models.qg.projected.modified.collinear.core import QGAlpha
+from qgsw.models.qg.projected.modified.exceptions import (
+    UnsetAError,
+    UnsetAlphaError,
+)
+from qgsw.models.qg.projected.modified.filtered.pv import (
     compute_g_tilde,
     compute_pv,
     compute_source_term_factor,
 )
-from qgsw.models.qg.modified.filtered.variable_set import (
+from qgsw.models.qg.projected.modified.filtered.variable_set import (
     QGCollinearFilteredSFVariableSet,
 )
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )

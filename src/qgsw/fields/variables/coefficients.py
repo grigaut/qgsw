@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.state import State
     from qgsw.fields.variables.uvh import BasePrognosticTuple
-    from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
+    from qgsw.models.qg.projected.modified.collinear.core import QGAlpha
 
 
 class Coefficient(NamedObject[CoefficientName], DiagnosticVariable, ABC):

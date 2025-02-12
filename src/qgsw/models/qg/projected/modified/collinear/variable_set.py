@@ -25,10 +25,10 @@ from qgsw.fields.variables.energetics import (
     TotalEnergy,
     TotalKineticEnergy,
 )
-from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
+from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
     compute_A_collinear_sf,
 )
-from qgsw.models.qg.variable_set import QGVariableSet
+from qgsw.models.qg.projected.variable_set import QGVariableSet
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:

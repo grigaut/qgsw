@@ -7,15 +7,17 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw.models.names import ModelName
-from qgsw.models.qg.core import QG
 from qgsw.models.qg.exceptions import UnrecognizedQGModelError
-from qgsw.models.qg.modified.collinear_sublayer.core import (
+from qgsw.models.qg.projected.core import QG
+from qgsw.models.qg.projected.modified.collinear.core import (
     QGAlpha,
     QGCollinearSF,
 )
-from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
-from qgsw.models.qg.modified.utils import is_modified
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.modified.filtered.core import (
+    QGCollinearFilteredSF,
+)
+from qgsw.models.qg.projected.modified.utils import is_modified
+from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.sw.core import SW
 from qgsw.perturbations.names import PertubationName

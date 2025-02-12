@@ -10,9 +10,9 @@ from qgsw.fields.variables.state import StateAlpha
 from qgsw.fields.variables.uvh import UVH, UVHTAlpha
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
-from qgsw.models.qg.core import QG, QGCore
-from qgsw.models.qg.modified.filtered.pv import compute_g_tilde
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.core import QG, QGCore
+from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
+from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,

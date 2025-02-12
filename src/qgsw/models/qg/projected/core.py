@@ -11,11 +11,11 @@ from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.exceptions import UnsetTimestepError
 from qgsw.models.names import ModelName
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.projectors.core import QGProjector
+from qgsw.models.qg.projected.variable_set import QGVariableSet
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
-from qgsw.models.qg.variable_set import QGVariableSet
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
