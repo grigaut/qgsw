@@ -298,11 +298,11 @@ class QGCore(ModelUVH[T], Generic[T, Projector]):
             self._p_vals.append((p, p_i))
         return self._uvh_dt
 
-    def update(self, uvh: UVH) -> UVH:
-        """Update uvh.
+    def update(self, prognostic: UVH) -> UVH:
+        """Update prognostic.
 
         Args:
-            uvh (UVH): u,v and h.
+            prognostic (UVH): u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
@@ -316,7 +316,7 @@ class QGCore(ModelUVH[T], Generic[T, Projector]):
         if self.save_p_values:
             self._p_vals = []
         return schemes.rk3_ssp(
-            uvh,
+            prognostic,
             self.dt,
             self.compute_time_derivatives,
         )

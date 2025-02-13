@@ -2,6 +2,10 @@
 
 import torch
 
+from qgsw.fields.variables.prognostic_tuples import PSIQ, PSIQT
+from qgsw.fields.variables.state import StatePSIQ
+from qgsw.models.base import _Model
+from qgsw.models.core import schemes
 from qgsw.models.core.finite_diff import grad_perp, laplacian_h
 from qgsw.models.core.flux import (
     div_flux_3pts,
@@ -16,6 +20,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI_cmm,
 )
 from qgsw.models.core.utils import OptimizableFunction
+from qgsw.models.io import IO
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
@@ -27,7 +32,7 @@ from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 
 
-class QGSFPV(ModelParamChecker):
+class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
     """Finite volume multi-layer QG solver."""
 
     flux_stencil = 5
@@ -186,17 +191,39 @@ class QGSFPV(ModelParamChecker):
         )
         self.helmholtz_dst = self.helmholtz_dst.type(torch.float32)
 
+    @property
+    def psi(self) -> torch.Tensor:
+        """StatePSIQ Variable psi: Stream function.
+
+        └── (n_ens, nl, nx+1,ny+1)-shaped.
+        """
+        return self._state.psi.get()
+
+    @property
+    def q(self) -> torch.Tensor:
+        """StatePSIQ Variable q: Potential Vorticity.
+
+        └── (n_ens, nl, nx,ny)-shaped.
+        """
+        return self._state.q.get()
+
     def _set_state(self) -> None:
-        n_ens = self.n_ens
-        nl = self.space.nl
-        nx = self.space.nx
-        ny = self.space.ny
-        self.psi = torch.zeros(
-            (n_ens, nl, nx + 1, ny + 1),
-            dtype=torch.float64,
-            device=DEVICE.get(),
+        """Set the state."""
+        self._state = StatePSIQ.steady(
+            n_ens=self.n_ens,
+            nl=self.space.nl,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
         )
-        self.compute_q_from_psi()
+        self._io = IO(
+            t=self._state.t,
+            psi=self._state.psi,
+            q=self._state.q,
+        )
+        q = self._compute_q_from_psi(self.psi)
+        self._state.update_psiq(PSIQ(self.psi, q))
 
     def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
         if optimize:
@@ -240,16 +267,16 @@ class QGSFPV(ModelParamChecker):
         )
         self.helmholtz_dst = laplace_dst - self.beta_plane.f0**2 * self.lambd
 
-    def compute_q_from_psi(self) -> None:
+    def _compute_q_from_psi(self, psi: torch.Tensor) -> None:
         """Compute potential vorticity from stream function."""
-        lap_psi = laplacian_h(self.psi, self.space.dx, self.space.dy)
+        lap_psi = laplacian_h(psi, self.space.dx, self.space.dy)
         stretching = self.beta_plane.f0**2 * torch.einsum(
             "lm,...mxy->...lxy",
             self.A,
-            self.psi,
+            psi,
         )
         beta_effect = self.beta_plane.beta * (self._y - self._y0)
-        self.q = self.masks.h * (
+        return self.masks.h * (
             self._points_to_surfaces(
                 self.masks.psi * (lap_psi - stretching),
             )
@@ -282,13 +309,6 @@ class QGSFPV(ModelParamChecker):
         psi_modes += alpha * self.homsol
         return torch.einsum("lm,...mxy->...lxy", self.Cm2l, psi_modes)
 
-    def compute_psi_from_q(self) -> None:
-        """PV inversion."""
-        elliptic_rhs = self._points_to_surfaces(
-            self.q - self.beta_plane.beta * (self._y - self._y0),
-        )
-        self.psi = self._compute_psi_from_q(elliptic_rhs)
-
     def set_wind_forcing(self, curl_tau: torch.Tensor) -> None:
         """Set the wind forcing.
 
@@ -297,20 +317,21 @@ class QGSFPV(ModelParamChecker):
         """
         self.wind_forcing = curl_tau / self.H[0]
 
-    def advection_rhs(self) -> torch.Tensor:
+    def advection_rhs(self, prognostic: PSIQ) -> torch.Tensor:
         """Right hand side advection."""
-        u, v = self._grad_perp(self.psi)
+        psi, q = prognostic
+        u, v = self._grad_perp(psi)
         u /= self.space.dy
         v /= self.space.dx
         div_flux = self.div_flux(
-            self.q,
+            q,
             u[..., 1:-1, :],
             v[..., 1:-1],
         )
 
         # wind forcing + bottom drag
         omega = self._points_to_surfaces(
-            self._laplacian_h(self.psi, self.space.dx, self.space.dy)
+            self._laplacian_h(psi, self.space.dx, self.space.dy)
             * self.masks.psi,
         )
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
@@ -326,30 +347,59 @@ class QGSFPV(ModelParamChecker):
 
         return (-div_flux + fcg_drag) * self.masks.h
 
-    def compute_time_derivatives(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def compute_time_derivatives(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute time derivatives.
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: dpsi, dq
         """
-        dq = self.advection_rhs()
+        dq = self.advection_rhs(prognostic)
 
         # Solve Helmholtz equation
         dq_i = self._points_to_surfaces(dq)
         dpsi = self._compute_psi_from_q(dq_i)
 
-        return dpsi, dq
+        return PSIQ(dpsi, dq)
+
+    def set_q(self, q: torch.Tensor) -> None:
+        """Set the value of potential vorticity.
+
+        Args:
+            q (torch.Tensor): Potential vorticity.
+        """
+        q_i = self._points_to_surfaces(q)
+        psi = self._compute_psi_from_q(q_i)
+        self._state.update_psiq(PSIQ(psi, q))
+
+    def set_psi(self, psi: torch.Tensor) -> None:
+        """Set the value of stream function.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+        """
+        q = self._compute_q_from_psi(psi)
+        self._state.update_psiq(PSIQ(psi, q))
+
+    def update(self, prognostic: PSIQ) -> PSIQ:
+        """Update prognostic tuple.
+
+        Args:
+            prognostic (PSIQ): Prognostic variable to advect.
+
+        Returns:
+            PSIQ: Updated prognostic variable to advect.
+        """
+        return schemes.rk3_ssp(
+            prog=prognostic,
+            dt=self.dt,
+            time_derivation_func=self.compute_time_derivatives,
+        )
 
     def step(self) -> None:
         """Time itegration with SSP-RK3 scheme."""
-        dpsi_0, dq_0 = self.compute_time_derivatives()
-        self.q += self.dt * dq_0
-        self.psi += self.dt * dpsi_0
-
-        dpsi_1, dq_1 = self.compute_time_derivatives()
-        self.q += (self.dt / 4) * (dq_1 - 3 * dq_0)
-        self.psi += (self.dt / 4) * (dpsi_1 - 3 * dpsi_0)
-
-        dpsi_2, dq_2 = self.compute_time_derivatives()
-        self.q += (self.dt / 12) * (8 * dq_2 - dq_1 - dq_0)
-        self.psi += (self.dt / 12) * (8 * dpsi_2 - dpsi_1 - dpsi_0)
+        """Performs one step time-integration with RK3-SSP scheme."""
+        super().step()
+        self._state.update_psiq(self.update(self._state.prognostic.psiq))

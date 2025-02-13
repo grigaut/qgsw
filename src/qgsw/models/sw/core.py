@@ -220,17 +220,17 @@ class SWCore(ModelUVH[T], Generic[T]):
         p.bind(state)
         k_energy.bind(state)
 
-    def update(self, uvh: UVH) -> UVH:
+    def update(self, prognostic: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
 
         Agrs:
-            uvh (UVH): u,v and h.
+            prognostic (UVH): u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
         return schemes.rk3_ssp(
-            uvh,
+            prognostic,
             self.dt,
             self.compute_time_derivatives,
         )

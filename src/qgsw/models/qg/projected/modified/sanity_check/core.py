@@ -148,11 +148,11 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
         self._baseline.step()
         super().step()
 
-    def update(self, uvh: UVH) -> UVH:
-        """Update uvh.
+    def update(self, prognostic: UVH) -> UVH:
+        """Update prognostic.
 
         Args:
-            uvh (UVH): u,v and h.
+            prognostic (UVH): u,v and h.
                 ├── u: (n_ens, 1, nx+1, ny)-shaped
                 ├── v: (n_ens, 1, nx, ny+1)-shaped
                 └── h: (n_ens, 1, nx, ny)-shaped
@@ -164,7 +164,7 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
                 └── h: (n_ens, 1, nx, ny)-shaped
         """
         self._rk3_i = 0
-        return super().update(uvh)
+        return super().update(prognostic)
 
     def set_wind_forcing(
         self,

@@ -210,20 +210,14 @@ class _Model(
         """
 
     @abstractmethod
-    def update(self, uvh: AdvectedPrognostic) -> AdvectedPrognostic:
-        """Update u,v and h.
+    def update(self, prognostic: AdvectedPrognostic) -> AdvectedPrognostic:
+        """Update prognostic tuple.
 
         Args:
-            uvh (UVH): u,v and h.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
+            prognostic (AdvectedPrognostic): Prognostic variable to advect.
 
         Returns:
-            UVH: update prognostic variables.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
+            AdvectedPrognostic: Updated prognostic variable to advect.
         """
 
     @abstractmethod
