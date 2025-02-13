@@ -26,6 +26,7 @@ from qgsw.models.core.helmholtz import (
 )
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
@@ -40,6 +41,8 @@ from qgsw.specs import DEVICE
 
 class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
     """Finite volume multi-layer QG solver."""
+
+    _type = ModelName.QUASI_GEOSTROPHIC_USUAL
 
     dtype = torch.float64
     device = DEVICE
