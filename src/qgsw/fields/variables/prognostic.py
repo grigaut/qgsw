@@ -48,3 +48,21 @@ class CollinearityCoefficient(PrognosticVariable):
     _unit = Unit._
     _name = "alpha"
     _description = "Collinearity coefficient"
+
+
+class PrognosticStreamFunction(PrognosticVariable):
+    """Prognostic stream function."""
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.M2S_1
+    _name = "psi"
+    _description = "Stream function"
+
+
+class PrognosticPotentialVorticity(PrognosticVariable):
+    """Prognostic potential vorticity."""
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.S_1
+    _name = "q"
+    _description = "Potetntial vorticity"

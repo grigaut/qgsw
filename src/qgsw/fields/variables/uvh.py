@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
     MeridionalVelocity,
+    PrognosticPotentialVorticity,
+    PrognosticStreamFunction,
     Time,
     ZonalVelocity,
 )
@@ -26,17 +28,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class BasePrognosticTuple(ABC):
+class BasePrognosticTuple:
     """Prognostic tuple base class."""
-
-    u: torch.Tensor
-    v: torch.Tensor
-    h: torch.Tensor
-
-    @property
-    @abstractmethod
-    def uvh(self) -> UVH:
-        """UVH."""
 
     def __mul__(self, other: float) -> Self:
         """Left multiplication."""
@@ -53,6 +46,208 @@ class BasePrognosticTuple(ABC):
     def __sub__(self, other: Self) -> Self:
         """Substraction."""
         return self.__add__(-1 * other)
+
+
+class BasePrognosticPSIQ(BasePrognosticTuple, metaclass=ABCMeta):
+    """Base Prognostic tuple for PSIQ tuple."""
+
+    psi: torch.Tensor
+    q: torch.Tensor
+
+    @property
+    @abstractmethod
+    def psiq(self) -> PSIQ:
+        """PSIQ."""
+
+
+class BasePrognosticUVH(BasePrognosticTuple, metaclass=ABCMeta):
+    """Base Prognostic tuple for UVH tuple."""
+
+    u: torch.Tensor
+    v: torch.Tensor
+    h: torch.Tensor
+
+    @property
+    @abstractmethod
+    def uvh(self) -> UVH:
+        """UVH."""
+
+
+class _PSIQ(NamedTuple):
+    """Stream function and potential vorticity."""
+
+    psi: torch.Tensor
+    q: torch.Tensor
+
+
+class _PSIQT(NamedTuple):
+    """Stream function, potential vorticity and time."""
+
+    psi: torch.Tensor
+    q: torch.Tensor
+    t: torch.Tensor
+
+
+class PSIQ(BasePrognosticPSIQ, _PSIQ):
+    """Stream function and potential vorticity."""
+
+    @property
+    def psiq(self) -> PSIQ:
+        """PSIQ."""
+        return self
+
+    @classmethod
+    def steady(
+        cls,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> Self:
+        """Instantiate a steady PSIQ with zero-filled prognostic variables.
+
+        Args:
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype): Data type.
+            device (torch.device): Device to use.
+
+        Returns:
+            Self: PSIQ.
+        """
+        psi = torch.zeros(
+            (n_ens, nl, nx + 1, ny + 1),
+            dtype=dtype,
+            device=device,
+        )
+        q = torch.zeros(
+            (n_ens, nl, nx, ny),
+            dtype=dtype,
+            device=device,
+        )
+        return cls(psi=psi, q=q)
+
+    @classmethod
+    def from_file(
+        cls,
+        file: Path,
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> Self:
+        """Instantiate PSIQ from a file.
+
+        Args:
+            file (Path): File to read.
+            dtype (torch.dtype): Data type.
+            device (torch.device): Device to use.
+
+        Returns:
+            Self: PSIQ.
+        """
+        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        psi_name = PrognosticStreamFunction.get_name()
+        psi = data[psi_name].to(dtype=dtype, device=device)
+        q_name = PrognosticPotentialVorticity.get_name()
+        q = data[q_name].to(dtype=dtype, device=device)
+        return cls(psi=psi, q=q)
+
+
+class PSIQT(BasePrognosticPSIQ, _PSIQT):
+    """Stream function, potential vorticity and time."""
+
+    @property
+    def psiq(self) -> PSIQ:
+        """PSIQ."""
+        return PSIQ(self.psi, self.q)
+
+    def __mul__(self, other: float) -> PSIQT:
+        """Left multiplication."""
+        return PSIQT.from_psiq(self.t, self.psiq.__mul__(other))
+
+    def __add__(self, other: PSIQT) -> PSIQT:
+        """Addition."""
+        return PSIQT.from_psiq(self.t, self.psiq.__add__(other))
+
+    def increment_time(self, dt: float) -> PSIQT:
+        """Increment time.
+
+        Args:
+            dt (float): Timestep.
+
+        Returns:
+            PSIQT: PSIQT
+        """
+        return PSIQT.from_psiq(self.t + dt, self.psiq)
+
+    @classmethod
+    def from_psiq(cls, t: torch.Tensor, psiq: PSIQ) -> Self:
+        """Instantiate from PSIQ.
+
+        Args:
+            t (torch.Tensor): Time.
+            psiq (PSIQ): PSIQ.
+
+        Returns:
+            Self: PSIQT
+        """
+        return cls(psiq.psi, psiq.q, t)
+
+    @classmethod
+    def steady(
+        cls,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> Self:
+        """Instantiate a PSIQT with zero-filled prognostic variables.
+
+        Args:
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype): Data type.
+            device (torch.device): Device to use.
+
+        Returns:
+            Self: PSIQT.
+        """
+        return cls.from_psiq(
+            torch.zeros((n_ens,), dtype=dtype, device=device),
+            PSIQ.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
+        )
+
+    @classmethod
+    def from_file(
+        cls,
+        file: Path,
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> Self:
+        """Instantiate PSIQT from a file.
+
+        Args:
+            file (Path): File to read.
+            dtype (torch.dtype): Data type.
+            device (torch.device): Device to use.
+
+        Returns:
+            Self: PSIQT.
+        """
+        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        t = data[Time.get_name()].to(dtype=dtype, device=device)
+        return cls.from_psiq(t, PSIQ.from_file(file, dtype, device))
 
 
 class _UVH(NamedTuple):
@@ -82,7 +277,7 @@ class _UVHTAlpha(NamedTuple):
     alpha: torch.Tensor
 
 
-class UVH(BasePrognosticTuple, _UVH):
+class UVH(BasePrognosticUVH, _UVH):
     """Zonal velocity, meridional velocity and layer thickness."""
 
     @property
@@ -154,7 +349,7 @@ class UVH(BasePrognosticTuple, _UVH):
         return cls(u=u, v=v, h=h)
 
 
-class UVHT(BasePrognosticTuple, _UVHT):
+class UVHT(BasePrognosticUVH, _UVHT):
     """Time, Zonal velocity, meridional velocity and layer thickness."""
 
     @property
@@ -201,6 +396,7 @@ class UVHT(BasePrognosticTuple, _UVHT):
         nl: int,
         nx: int,
         ny: int,
+        *,
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
@@ -219,13 +415,14 @@ class UVHT(BasePrognosticTuple, _UVHT):
         """
         return cls.from_uvh(
             torch.zeros((n_ens,), dtype=dtype, device=device),
-            UVH.steady(n_ens, nl, nx, ny, dtype, device),
+            UVH.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
         )
 
     @classmethod
     def from_file(
         cls,
         file: Path,
+        *,
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
@@ -241,10 +438,10 @@ class UVHT(BasePrognosticTuple, _UVHT):
         """
         data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
         t = data[Time.get_name()].to(dtype=dtype, device=device)
-        return cls.from_uvh(t, UVH.from_file(file, dtype, device))
+        return cls.from_uvh(t, UVH.from_file(file, dtype=dtype, device=device))
 
 
-class UVHTAlpha(BasePrognosticTuple, _UVHTAlpha):
+class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
     """Time, alpha, Zonal velocity,meridional velocity and layer thickness."""
 
     @property
@@ -318,6 +515,7 @@ class UVHTAlpha(BasePrognosticTuple, _UVHTAlpha):
         nl: int,
         nx: int,
         ny: int,
+        *,
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
@@ -337,7 +535,7 @@ class UVHTAlpha(BasePrognosticTuple, _UVHTAlpha):
         """
         return cls.from_uvht(
             torch.zeros((n_ens,), dtype=dtype, device=device),
-            UVHT.steady(n_ens, nl, nx, ny, dtype, device),
+            UVHT.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
         )
 
     @classmethod
