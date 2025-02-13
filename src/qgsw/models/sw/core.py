@@ -32,11 +32,14 @@ from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
+from qgsw.models.qg.projected.projectors.core import QGProjector
+from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     keep_top_layer,
 )
+from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import StateUVH
@@ -234,6 +237,30 @@ class SWCore(ModelUVH[T], Generic[T]):
             self.dt,
             self.compute_time_derivatives,
         )
+
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        uvh = QGProjector.G(
+            p,
+            compute_A(
+                self.H[:, 0, 0],
+                self.g_prime[:, 0, 0],
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            ),
+            self.H,
+            self._space.dx,
+            self._space.dy,
+            self._space.ds,
+            self.beta_plane.f0,
+            self.points_to_surfaces,
+        )
+        self.set_uvh(*uvh)
 
     def advection_momentum(
         self,

@@ -170,6 +170,15 @@ class _Model(
         self._set_tauy(tauy)
 
     @abstractmethod
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+
+    @abstractmethod
     def _set_state(self) -> None:
         """Set the state."""
 

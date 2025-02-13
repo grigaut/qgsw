@@ -475,6 +475,15 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         return PSIQ(dpsi, dq)
 
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        return self.set_psi(p / self.beta_plane.f0)
+
     def set_q(self, q: torch.Tensor) -> None:
         """Set the value of potential vorticity.
 
