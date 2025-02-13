@@ -1,9 +1,13 @@
 """Usual QG Model."""
 
+import contextlib
+
 import torch
 
+from qgsw import verbose
 from qgsw.fields.variables.prognostic_tuples import PSIQ, PSIQT
 from qgsw.fields.variables.state import StatePSIQ
+from qgsw.masks import Masks
 from qgsw.models.base import _Model
 from qgsw.models.core import schemes
 from qgsw.models.core.finite_diff import grad_perp, laplacian_h
@@ -26,6 +30,7 @@ from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
 )
+from qgsw.models.qg.usual.exceptions import UnsetStencilError
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
@@ -35,7 +40,6 @@ from qgsw.specs import DEVICE
 class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
     """Finite volume multi-layer QG solver."""
 
-    flux_stencil = 5
     dtype = torch.float64
     device = DEVICE
 
@@ -61,12 +65,13 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
             not. Defaults to True.
         """
         # physical params
-        ModelParamChecker.__init__(
+        _Model.__init__(
             self,
             space_2d=space_2d,
             H=H,
             g_prime=g_prime,
             beta_plane=beta_plane,
+            optimize=True,
         )
 
         # grid params
@@ -84,7 +89,7 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         # initialize state variables
         self._set_utils(optimize)
-        self._set_state()
+        self._optim = optimize
 
         self.zeros_inside = (
             torch.zeros(
@@ -103,11 +108,117 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
             device=DEVICE.get(),
         )
 
-    @ModelParamChecker.masks.setter
+    @property
+    def flux_stencil(self) -> int:
+        """Flux stencil size."""
+        try:
+            return self._flux_stencil
+        except AttributeError as e:
+            msg = "Please set the flux stencil."
+            raise UnsetStencilError(msg) from e
+
+    @flux_stencil.setter
+    def flux_stencil(self, stencil: int) -> None:
+        stencil = int(stencil)
+        if stencil not in (3, 5):
+            msg = "The stencil can only be 3 or 5."
+            raise ValueError(msg)
+        self._flux_stencil = stencil
+        self._set_flux()
+
+    @property
+    def masks(self) -> Masks:
+        """Masks."""
+        try:
+            return self._masks
+        except AttributeError:
+            self.masks = Masks.empty_tensor(
+                self.space.nx,
+                self.space.ny,
+                device=DEVICE.get(),
+            )
+            return self._masks
+
+    @masks.setter
     def masks(self, mask: torch.Tensor) -> None:
         """Masks setter."""
         ModelParamChecker.masks.fset(self, mask)
+        # Set state
+        if hasattr(self, "_state"):
+            verbose.display(
+                "WARNING: The masks have been modified."
+                " The stream function and potential have"
+                " therefore been set to 0.",
+                trigger_level=1,
+            )
+        self._set_state()
+        self._create_diagnostic_vars(self._state)
+        # Set solver
+        self._set_solver()
         # flux computations
+        with contextlib.suppress(UnsetStencilError):
+            self._set_flux()
+
+    @property
+    def psi(self) -> torch.Tensor:
+        """StatePSIQ Variable psi: Stream function.
+
+        └── (n_ens, nl, nx+1,ny+1)-shaped.
+        """
+        return self._state.psi.get()
+
+    @property
+    def q(self) -> torch.Tensor:
+        """StatePSIQ Variable q: Potential Vorticity.
+
+        └── (n_ens, nl, nx,ny)-shaped.
+        """
+        return self._state.q.get()
+
+    def _set_solver(self) -> None:
+        """Set Helmholtz equation solver."""
+        # homogeneous Helmholtz solutions
+        cst = torch.ones(
+            (1, self.space.nl, self.space.nx + 1, self.space.ny + 1),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+        if len(self.masks.psi_irrbound_xids) > 0:
+            self.cap_matrices = compute_capacitance_matrices(
+                self.helmholtz_dst,
+                self.masks.psi_irrbound_xids,
+                self.masks.psi_irrbound_yids,
+            )
+            sol = solve_helmholtz_dstI_cmm(
+                (cst * self.masks.psi)[..., 1:-1, 1:-1],
+                self.helmholtz_dst,
+                self.cap_matrices,
+                self.masks.psi_irrbound_xids,
+                self.masks.psi_irrbound_yids,
+                self.masks.psi,
+            )
+        else:
+            self.cap_matrices = None
+            sol = solve_helmholtz_dstI(
+                cst[..., 1:-1, 1:-1],
+                self.helmholtz_dst,
+            )
+
+        self.homsol = cst + sol * self.beta_plane.f0**2 * self.lambd
+        self.homsol_mean = (
+            points_to_surfaces(self.homsol) * self.masks.h
+        ).mean(
+            (-1, -2),
+            keepdim=True,
+        )
+        self.helmholtz_dst = self.helmholtz_dst.type(torch.float32)
+
+    def _set_flux(self) -> None:
+        """Set the flux.
+
+        Raises:
+            ValueError: If invalid stencil.
+        """
         if self.flux_stencil == 5:  # noqa: PLR2004
             if len(self.masks.psi_irrbound_xids) > 0:
                 div_flux = lambda q, u, v: div_flux_5pts_mask(
@@ -152,60 +263,13 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
                     self.space.dx,
                     self.space.dy,
                 )
-
-        self.div_flux = OptimizableFunction(div_flux) if True else div_flux
-
-        # homogeneous Helmholtz solutions
-        cst = torch.ones(
-            (1, self.space.nl, self.space.nx + 1, self.space.ny + 1),
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
-        if len(self.masks.psi_irrbound_xids) > 0:
-            self.cap_matrices = compute_capacitance_matrices(
-                self.helmholtz_dst,
-                self.masks.psi_irrbound_xids,
-                self.masks.psi_irrbound_yids,
-            )
-            sol = solve_helmholtz_dstI_cmm(
-                (cst * self.masks.psi)[..., 1:-1, 1:-1],
-                self.helmholtz_dst,
-                self.cap_matrices,
-                self.masks.psi_irrbound_xids,
-                self.masks.psi_irrbound_yids,
-                self.masks.psi,
-            )
         else:
-            self.cap_matrices = None
-            sol = solve_helmholtz_dstI(
-                cst[..., 1:-1, 1:-1],
-                self.helmholtz_dst,
-            )
+            msg = f"Invalid stencil value: {self.flux_stencil}"
+            raise ValueError(msg)
 
-        self.homsol = cst + sol * self.beta_plane.f0**2 * self.lambd
-        self.homsol_mean = (
-            points_to_surfaces(self.homsol) * self.masks.h
-        ).mean(
-            (-1, -2),
-            keepdim=True,
+        self.div_flux = (
+            OptimizableFunction(div_flux) if self._optim else div_flux
         )
-        self.helmholtz_dst = self.helmholtz_dst.type(torch.float32)
-
-    @property
-    def psi(self) -> torch.Tensor:
-        """StatePSIQ Variable psi: Stream function.
-
-        └── (n_ens, nl, nx+1,ny+1)-shaped.
-        """
-        return self._state.psi.get()
-
-    @property
-    def q(self) -> torch.Tensor:
-        """StatePSIQ Variable q: Potential Vorticity.
-
-        └── (n_ens, nl, nx,ny)-shaped.
-        """
-        return self._state.q.get()
 
     def _set_state(self) -> None:
         """Set the state."""
@@ -226,6 +290,11 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         self._state.update_psiq(PSIQ(self.psi, q))
 
     def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
+        """Set utils.
+
+        Args:
+            optimize (bool): Whether to optimize or not.
+        """
         if optimize:
             self._grad_perp = OptimizableFunction(grad_perp)
             self._points_to_surfaces = OptimizableFunction(points_to_surfaces)
@@ -268,7 +337,14 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         self.helmholtz_dst = laplace_dst - self.beta_plane.f0**2 * self.lambd
 
     def _compute_q_from_psi(self, psi: torch.Tensor) -> None:
-        """Compute potential vorticity from stream function."""
+        """Compute stream function from stream function.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+
+        Returns:
+            torch.Tensor: Potential vorticity.
+        """
         lap_psi = laplacian_h(psi, self.space.dx, self.space.dy)
         stretching = self.beta_plane.f0**2 * torch.einsum(
             "lm,...mxy->...lxy",
@@ -283,11 +359,19 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
             + beta_effect
         )
 
-    def _compute_psi_from_q(self, q_rhs: torch.Tensor) -> torch.Tensor:
+    def _compute_psi_from_q(self, q: torch.Tensor) -> torch.Tensor:
+        """Compute stream function from potential vorticity.
+
+        Args:
+            q (torch.Tensor): Potential vorticity.
+
+        Returns:
+            torch.Tensor: Stream function.
+        """
         helmholtz_rhs = torch.einsum(
             "lm,...mxy->...lxy",
             self.Cl2m,
-            q_rhs,
+            q,
         )
         if self.cap_matrices is not None:
             psi_modes = solve_helmholtz_dstI_cmm(
@@ -399,7 +483,6 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         )
 
     def step(self) -> None:
-        """Time itegration with SSP-RK3 scheme."""
         """Performs one step time-integration with RK3-SSP scheme."""
         super().step()
         self._state.update_psiq(self.update(self._state.prognostic.psiq))

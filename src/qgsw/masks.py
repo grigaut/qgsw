@@ -504,4 +504,24 @@ class Masks:
         Returns:
             Self: Mask
         """
-        return cls(torch.ones((nx, ny), device=device))
+        return cls(cls.empty_tensor(nx=nx, ny=ny, device=device))
+
+    @classmethod
+    def empty_tensor(
+        cls,
+        nx: int,
+        ny: int,
+        *,
+        device: torch.device,
+    ) -> torch.Tensor:
+        """Create an empty mask.
+
+        Args:
+            nx (int): Number of points in the X direction.
+            ny (int): Number of points in the Y direction.
+            device (torch.device): Device.
+
+        Returns:
+            Self: torch.Tensor
+        """
+        return torch.ones((nx, ny), device=device)

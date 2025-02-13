@@ -14,6 +14,7 @@ from qgsw.models.exceptions import (
 )
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
@@ -30,7 +31,7 @@ class ModelParamChecker:
     dtype: torch.dtype
     device: Device
     _n_ens: int = 1
-    _masks: Masks = None
+    _masks: Masks
     _dt: float
     _slip_coef: float = 0.0
     _bottom_drag: float = 0.0
@@ -151,15 +152,14 @@ class ModelParamChecker:
     @property
     def masks(self) -> Masks:
         """Masks."""
-        if self._masks is None:
-            mask = torch.ones(
+        try:
+            return self._masks
+        except AttributeError:
+            return Masks.empty(
                 self.space.nx,
                 self.space.ny,
-                dtype=self.dtype,
-                device=self.device.get(),
+                device=DEVICE.get(),
             )
-            self._masks = Masks(mask)
-        return self._masks
 
     @masks.setter
     def masks(self, mask: torch.Tensor) -> None:

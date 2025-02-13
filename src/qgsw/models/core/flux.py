@@ -365,7 +365,13 @@ def div_flux_5pts(q, u, v, dx, dy):
     )
 
 
-def flux_3pts_mask(q, u, dim, mask_u_d1, mask_u_d2plus):
+def flux_3pts_mask(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    dim: int,
+    mask_u_d1: torch.Tensor,
+    mask_u_d2plus: torch.Tensor,
+) -> torch.Tensor:
     n = q.shape[dim]
     pad1 = () if dim == -1 else (0, 0)
     pad2 = (0, 0) if dim == -1 else ()
@@ -389,8 +395,16 @@ def flux_3pts_mask(q, u, dim, mask_u_d1, mask_u_d2plus):
 
 
 def div_flux_3pts_mask(
-    q, u, v, dx, dy, mask_u_d1, mask_u_d2plus, mask_v_d1, mask_v_d2plus
-):
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+    mask_u_d1: torch.Tensor,
+    mask_u_d2plus: torch.Tensor,
+    mask_v_d1: torch.Tensor,
+    mask_v_d2plus: torch.Tensor,
+) -> torch.Tensor:
     q_flux_y = flux_3pts_mask(q, v, -1, mask_v_d1, mask_v_d2plus)
     q_flux_x = flux_3pts_mask(q, u, -2, mask_u_d1, mask_u_d2plus)
     return (
@@ -399,7 +413,14 @@ def div_flux_3pts_mask(
     )
 
 
-def flux_5pts_mask(q, u, dim, mask_u_d1, mask_u_d2, mask_u_d3plus):
+def flux_5pts_mask(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    dim: int,
+    mask_u_d1: torch.Tensor,
+    mask_u_d2: torch.Tensor,
+    mask_u_d3plus: torch.Tensor,
+) -> torch.Tensor:
     n = q.shape[dim]
     pad1 = () if dim == -1 else (0, 0)
     pad2 = (0, 0) if dim == -1 else ()
@@ -453,18 +474,18 @@ def flux_5pts_mask(q, u, dim, mask_u_d1, mask_u_d2, mask_u_d3plus):
 
 
 def div_flux_5pts_mask(
-    q,
-    u,
-    v,
-    dx,
-    dy,
-    mask_u_d1,
-    mask_u_d2,
-    mask_u_d3plus,
-    mask_v_d1,
-    mask_v_d2,
-    mask_v_d3plus,
-):
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+    mask_u_d1: torch.Tensor,
+    mask_u_d2: torch.Tensor,
+    mask_u_d3plus: torch.Tensor,
+    mask_v_d1: torch.Tensor,
+    mask_v_d2: torch.Tensor,
+    mask_v_d3plus: torch.Tensor,
+) -> torch.Tensor:
     q_flux_y = flux_5pts_mask(q, v, -1, mask_v_d1, mask_v_d2, mask_v_d3plus)
     q_flux_x = flux_5pts_mask(q, u, -2, mask_u_d1, mask_u_d2, mask_u_d3plus)
 

@@ -68,7 +68,7 @@ class _Model(
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        optimize: bool = True,
+        optimize: bool = True,  # noqa: ARG002
     ) -> None:
         """Model Instantiation.
 
@@ -94,11 +94,6 @@ class _Model(
             beta_plane=beta_plane,
         )
         self._compute_coriolis(self._space.omega.remove_z_h())
-        # initialize state
-        self._set_state()
-        # initialize variables
-        self._create_diagnostic_vars(self._state)
-        self._set_utils(optimize)
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -290,6 +285,11 @@ class ModelUVH(
             beta_plane=beta_plane,
             optimize=optimize,
         )
+        # initialize state
+        self._set_state()
+        # initialize variables
+        self._create_diagnostic_vars(self._state)
+        self._set_utils(optimize)
 
         # Ref values
         self._set_ref_variables()
