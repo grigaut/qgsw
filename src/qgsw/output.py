@@ -16,7 +16,11 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityDiag,
 )
 from qgsw.fields.variables.prognostic import CollinearityCoefficient, Time
-from qgsw.fields.variables.uvh import UVHT, BasePrognosticTuple, UVHTAlpha
+from qgsw.fields.variables.prognostic_tuples import (
+    UVHT,
+    BasePrognosticTuple,
+    UVHTAlpha,
+)
 from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE

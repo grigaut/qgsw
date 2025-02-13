@@ -20,8 +20,13 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.energetics import KineticEnergy
+from qgsw.fields.variables.prognostic_tuples import (
+    UVH,
+    UVHT,
+    BasePrognosticTuple,
+    UVHTAlpha,
+)
 from qgsw.fields.variables.state import StateUVHAlpha
-from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple, UVHTAlpha
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO

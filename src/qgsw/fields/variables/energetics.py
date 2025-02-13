@@ -18,10 +18,10 @@ from qgsw.fields.variables.dynamics import (
     StreamFunction,
     ZonalVelocityFlux,
 )
-from qgsw.fields.variables.state import StateUVH
-from qgsw.fields.variables.uvh import (
+from qgsw.fields.variables.prognostic_tuples import (
     BasePrognosticTuple,
 )
+from qgsw.fields.variables.state import StateUVH
 from qgsw.masks import Masks
 from qgsw.models.core import finite_diff
 from qgsw.models.core.utils import OptimizableFunction

@@ -6,7 +6,7 @@ import torch
 
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.uvh import UVH, UVHTAlpha
+from qgsw.fields.variables.prognostic_tuples import UVH, UVHTAlpha
 from qgsw.filters.base import _Filter
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.spatial.core.grid_conversion import points_to_surfaces

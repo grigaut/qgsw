@@ -7,8 +7,8 @@ from qgsw.fields.variables.dynamics import (
     PhysicalSurfaceHeightAnomaly,
     PressureTilde,
 )
+from qgsw.fields.variables.prognostic_tuples import PSIQ, UVH
 from qgsw.fields.variables.state import StatePSIQ, StateUVH, StateUVHAlpha
-from qgsw.fields.variables.uvh import PSIQ, UVH
 from qgsw.specs import DEVICE
 
 

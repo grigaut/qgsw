@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
-    from qgsw.fields.variables.uvh import UVH
+    from qgsw.fields.variables.prognostic_tuples import UVH
     from qgsw.filters.base import _Filter
     from qgsw.masks import Masks
     from qgsw.physics.coriolis.beta_plane import BetaPlane

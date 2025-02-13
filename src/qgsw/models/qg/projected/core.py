@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
+from qgsw.fields.variables.prognostic_tuples import (
+    UVH,
+    UVHT,
+    BasePrognosticTuple,
+)
 from qgsw.models.base import Model
 from qgsw.models.core import schemes
 from qgsw.models.exceptions import UnsetTimestepError

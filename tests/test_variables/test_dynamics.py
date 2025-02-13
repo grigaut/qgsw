@@ -12,8 +12,8 @@ from qgsw.fields.variables.dynamics import (
     Pressure,
     ZonalVelocityFlux,
 )
+from qgsw.fields.variables.prognostic_tuples import UVHT
 from qgsw.fields.variables.state import StateUVH
-from qgsw.fields.variables.uvh import UVHT
 from qgsw.specs import DEVICE
 
 

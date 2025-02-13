@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 
     import torch
 
+    from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
     from qgsw.fields.variables.state import StateUVH
-    from qgsw.fields.variables.uvh import BasePrognosticTuple
     from qgsw.utils.units._units import Unit
 
 

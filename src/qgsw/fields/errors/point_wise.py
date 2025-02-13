@@ -3,7 +3,7 @@
 import torch
 
 from qgsw.fields.errors.base import PointWiseError
-from qgsw.fields.variables.uvh import BasePrognosticTuple
+from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
 
 
 class RMSE(PointWiseError):  # noqa: N818

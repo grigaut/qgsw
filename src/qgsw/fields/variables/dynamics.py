@@ -10,8 +10,8 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
+from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
 from qgsw.fields.variables.state import StateUVH
-from qgsw.fields.variables.uvh import BasePrognosticTuple
 from qgsw.models.core.helmholtz import (
     compute_laplace_dstI,
     solve_helmholtz_dstI,
@@ -38,8 +38,11 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
+    from qgsw.fields.variables.prognostic_tuples import (
+        BasePrognosticTuple,
+        UVHTAlpha,
+    )
     from qgsw.fields.variables.state import StateUVH
-    from qgsw.fields.variables.uvh import BasePrognosticTuple, UVHTAlpha
     from qgsw.masks import Masks
 
 

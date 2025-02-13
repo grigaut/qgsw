@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeVar
 
 from qgsw import verbose
+from qgsw.fields.variables.prognostic_tuples import UVHTAlpha
 from qgsw.fields.variables.state import StateUVHAlpha
-from qgsw.fields.variables.uvh import UVHTAlpha
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName

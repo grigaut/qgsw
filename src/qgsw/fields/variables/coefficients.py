@@ -39,8 +39,8 @@ if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
     from qgsw.fields.variables.state import StateUVH
-    from qgsw.fields.variables.uvh import BasePrognosticTuple
     from qgsw.models.qg.projected.modified.collinear.core import QGAlpha
 
 

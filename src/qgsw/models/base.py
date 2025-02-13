@@ -10,8 +10,8 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.fields.variables.prognostic_tuples import UVH, BasePrognosticTuple
 from qgsw.fields.variables.state import StateUVH
-from qgsw.fields.variables.uvh import UVH, BasePrognosticTuple
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction

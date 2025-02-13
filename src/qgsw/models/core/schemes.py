@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic_tuples import UVH
 
 
 def rk3_ssp(

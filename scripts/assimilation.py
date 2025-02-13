@@ -12,7 +12,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients import (
     create_coefficient,
 )
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model

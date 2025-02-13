@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from qgsw.fields.variables.uvh import UVH, UVHT, UVHTAlpha
+from qgsw.fields.variables.prognostic_tuples import UVH, UVHT, UVHTAlpha
 from qgsw.specs import DEVICE
 
 

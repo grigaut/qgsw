@@ -20,7 +20,7 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
-from qgsw.fields.variables.uvh import (
+from qgsw.fields.variables.prognostic_tuples import (
     PSIQ,
     PSIQT,
     UVH,
