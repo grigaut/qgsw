@@ -3,6 +3,7 @@
 import contextlib
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.fields.variables.prognostic_tuples import PSIQ, PSIQT
@@ -402,13 +403,13 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         Args:
             taux (torch.Tensor): Wind stress in the x direction.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, nl, nx, ny)-shaped
             tauy (torch.Tensor): Wind stress in the y direction.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, nl, nx, ny)-shaped
         """
         curl_tau = (
-            torch.diff(tauy) / self._space.dx
-            - torch.diff(taux) / self._space.dy
+            torch.diff(F.pad(tauy, (0, 1, 0, 0))) / self._space.dx
+            - torch.diff(F.pad(taux, (0, 0, 0, 1))) / self._space.dy
         )
         self._curl_tau = curl_tau / self.H[0]
 
