@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.state import StateAlpha
+from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.fields.variables.uvh import UVH, UVHTAlpha
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
@@ -104,11 +104,11 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
         of the model.
 
         Args:
-            u (torch.Tensor): State variable u.
+            u (torch.Tensor): StateUVH variable u.
                 └── (n_ens, 2, nx+1, ny)-shaped
-            v (torch.Tensor): State variable v.
+            v (torch.Tensor): StateUVH variable v.
                 └── (n_ens, 2, nx, ny+1)-shaped
-            h (torch.Tensor): State variable h.
+            h (torch.Tensor): StateUVH variable h.
                 └── (n_ens, 2, nx, ny)-shaped
         """
         self._baseline.set_uvh(u, v, h)
@@ -116,7 +116,7 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
 
     def _set_state(self) -> None:
         """Set the state."""
-        self._state = StateAlpha.steady(
+        self._state = StateUVHAlpha.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,

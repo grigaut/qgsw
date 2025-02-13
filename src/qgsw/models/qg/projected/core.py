@@ -220,11 +220,11 @@ class QGCore(Model[T], Generic[T, Projector]):
         of the model.
 
         Args:
-            u (torch.Tensor): State variable u.
+            u (torch.Tensor): StateUVH variable u.
                 └── (n_ens, nl, nx+1, ny)-shaped
-            v (torch.Tensor): State variable v.
+            v (torch.Tensor): StateUVH variable v.
                 └── (n_ens, nl, nx, ny+1)-shaped
-            h (torch.Tensor): State variable h.
+            h (torch.Tensor): StateUVH variable h.
                 └── (n_ens, nl, nx, ny)-shaped
         """
         self.sw.set_uvh(u, v, h)

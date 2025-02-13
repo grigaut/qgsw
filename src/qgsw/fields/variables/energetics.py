@@ -18,7 +18,7 @@ from qgsw.fields.variables.dynamics import (
     StreamFunction,
     ZonalVelocityFlux,
 )
-from qgsw.fields.variables.state import State
+from qgsw.fields.variables.state import StateUVH
 from qgsw.fields.variables.uvh import (
     BasePrognosticTuple,
 )
@@ -102,12 +102,12 @@ class KineticEnergy(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -199,12 +199,12 @@ class ModalKineticEnergy(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -284,12 +284,12 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -349,12 +349,12 @@ class ModalEnergy(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -438,12 +438,12 @@ class TotalKineticEnergy(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -523,12 +523,12 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -589,12 +589,12 @@ class TotalEnergy(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.

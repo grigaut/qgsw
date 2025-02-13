@@ -10,7 +10,7 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
-from qgsw.fields.variables.state import State
+from qgsw.fields.variables.state import StateUVH
 from qgsw.fields.variables.uvh import BasePrognosticTuple
 from qgsw.models.core.helmholtz import (
     compute_laplace_dstI,
@@ -38,7 +38,7 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.state import State
+    from qgsw.fields.variables.state import StateUVH
     from qgsw.fields.variables.uvh import BasePrognosticTuple, UVHTAlpha
     from qgsw.masks import Masks
 
@@ -311,12 +311,12 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -451,12 +451,12 @@ class PhysicalVorticity(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -519,12 +519,12 @@ class Pressure(DiagnosticVariable):
 
     def bind(
         self,
-        state: State,
+        state: StateUVH,
     ) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -694,11 +694,11 @@ class StreamFunction(DiagnosticVariable):
         """
         return self._p.compute_no_slice(prognostic) / self._f0
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -775,11 +775,11 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
             solve_helmholtz_dstI(vorticity, self._laplacian),
         )
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -831,11 +831,11 @@ class Enstrophy(DiagnosticVariable):
             dim=(-1, -2),
         )
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a state.
 
         Args:
-            state (State): State.
+            state (StateUVH): StateUVH.
 
         Returns:
             BoundDiagnosticVariable[Self]: Bound variable.

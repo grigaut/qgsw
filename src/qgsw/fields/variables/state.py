@@ -206,7 +206,7 @@ class BaseState(ABC, Generic[T]):
         """
 
 
-class State(BaseState[UVHT]):
+class StateUVH(BaseState[UVHT]):
     """State: wrapper for UVH state variables.
 
     This wrapper links uvh variables to diagnostic variables.
@@ -249,7 +249,7 @@ class State(BaseState[UVHT]):
             device (torch.device): Device to use.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
         return cls(UVHT.steady(n_ens, nl, nx, ny, dtype, device))
 
@@ -268,13 +268,13 @@ class State(BaseState[UVHT]):
             h (torch.Tensor): Surface height anomaly.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
         return cls(UVH(u, v, h))
 
 
-class StateAlpha(BaseState[UVHTAlpha]):
-    """StateAlpha: wrapper for UVHTAlpha state variables.
+class StateUVHAlpha(BaseState[UVHTAlpha]):
+    """StateUVHAlpha: wrapper for UVHTAlpha state variables.
 
     This wrapper links uvh variables to diagnostic variables.
     Diagnostic variables can be bound to the state so that they are updated
@@ -282,7 +282,7 @@ class StateAlpha(BaseState[UVHTAlpha]):
     """
 
     def __init__(self, prognostic: UVHTAlpha) -> None:
-        """Instantiate StateAlpha.
+        """Instantiate StateUVHAlpha.
 
         Args:
             prognostic (UVHTAlpha): Core prognostic variables.
@@ -357,7 +357,7 @@ class StateAlpha(BaseState[UVHTAlpha]):
             device (torch.device): Device to use.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
         return cls(UVHTAlpha.steady(n_ens, nl, nx, ny, dtype, device))
 
@@ -378,6 +378,6 @@ class StateAlpha(BaseState[UVHTAlpha]):
             alpha (torch.Tensor): Collinearity coefficient.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
         return cls(UVHTAlpha(u, v, h, alpha))

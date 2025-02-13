@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeVar
 
 from qgsw import verbose
-from qgsw.fields.variables.state import StateAlpha
+from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.fields.variables.uvh import UVHTAlpha
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
@@ -57,7 +57,7 @@ class QGAlpha(QGCore[UVHTAlpha, Projector]):
 
     def _set_state(self) -> None:
         """Set the state."""
-        self._state = StateAlpha.steady(
+        self._state = StateUVHAlpha.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,

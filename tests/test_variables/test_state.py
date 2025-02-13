@@ -7,7 +7,7 @@ from qgsw.fields.variables.dynamics import (
     PhysicalSurfaceHeightAnomaly,
     PressureTilde,
 )
-from qgsw.fields.variables.state import State, StateAlpha
+from qgsw.fields.variables.state import StateUVH, StateUVHAlpha
 from qgsw.fields.variables.uvh import UVH
 from qgsw.specs import DEVICE
 
@@ -18,7 +18,7 @@ def test_init_update() -> None:
     nl = 2
     nx = 10
     ny = 10
-    state = State.steady(
+    state = StateUVH.steady(
         n_ens,
         nl,
         nx,
@@ -63,7 +63,7 @@ def test_init_update() -> None:
 def test_nested_bound_variables() -> None:
     """Verify the behavior of nested variables."""
     # Define state
-    state = State.steady(1, 2, 10, 10, torch.float64, DEVICE.get())
+    state = StateUVH.steady(1, 2, 10, 10, torch.float64, DEVICE.get())
     # Define variables
     h = PhysicalLayerDepthAnomaly(ds=1)
     eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h)
@@ -90,8 +90,8 @@ def test_nested_bound_variables() -> None:
 
 
 def test_state_alpha_updates() -> None:
-    """Test updates on StateAlpha."""
-    state = StateAlpha.steady(
+    """Test updates on StateUVHAlpha."""
+    state = StateUVHAlpha.steady(
         1,
         2,
         10,
@@ -109,7 +109,7 @@ def test_state_alpha_updates() -> None:
 
 def test_sate_update_only_alpha() -> None:
     """Test that updating only state does not reload all variables."""
-    state = StateAlpha.steady(
+    state = StateUVHAlpha.steady(
         1,
         1,
         10,

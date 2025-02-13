@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     import torch
 
-    from qgsw.fields.variables.state import State
+    from qgsw.fields.variables.state import StateUVH
     from qgsw.fields.variables.uvh import BasePrognosticTuple
     from qgsw.utils.units._units import Unit
 
@@ -187,11 +187,11 @@ class DiagnosticVariable(Variable, ABC):
         """
         return self._compute(prognostic)
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.
@@ -209,11 +209,11 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
 
     _up_to_date = False
 
-    def __init__(self, state: State, variable: DiagVar) -> None:
+    def __init__(self, state: StateUVH, variable: DiagVar) -> None:
         """Instantiate the bound variable.
 
         Args:
-            state (State): State to bound to.
+            state (StateUVH): StateUVH to bound to.
             variable (DiagnosticVariable): Variable to bound.
         """
         self._var = variable
@@ -282,11 +282,11 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         """
         self._up_to_date = False
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[DiagVar]:
+    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[DiagVar]:
         """Bind the variable to another state if required.
 
         Args:
-            state (State): State to bound to
+            state (StateUVH): StateUVH to bound to
 
         Returns:
             BoundDiagnosticVariable: Bound variable.

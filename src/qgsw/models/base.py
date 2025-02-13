@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
-from qgsw.fields.variables.state import State
+from qgsw.fields.variables.state import StateUVH
 from qgsw.fields.variables.uvh import UVH, BasePrognosticTuple
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
@@ -163,7 +163,7 @@ class Model(
 
     @property
     def u(self) -> torch.Tensor:
-        """State Variable u: Zonal Speed.
+        """StateUVH Variable u: Zonal Speed.
 
         └── (n_ens, nl, nx+1,ny)-shaped.
         """
@@ -171,7 +171,7 @@ class Model(
 
     @property
     def v(self) -> torch.Tensor:
-        """State Variable v: Meridional Speed.
+        """StateUVH Variable v: Meridional Speed.
 
         └── (n_ens, nl, nx,ny+1)-shaped.
         """
@@ -179,7 +179,7 @@ class Model(
 
     @property
     def h(self) -> torch.Tensor:
-        """State Variable h: Layers Thickness.
+        """StateUVH Variable h: Layers Thickness.
 
         └── (n_ens, nl, nx,ny)-shaped.
         """
@@ -252,7 +252,7 @@ class Model(
 
     def _set_state(self) -> None:
         """Set the state."""
-        self._state = State.steady(
+        self._state = StateUVH.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,
@@ -290,7 +290,7 @@ class Model(
         """
         self._fluxes = flux.Fluxes(masks=self.masks, optimize=optimize)
 
-    def _create_diagnostic_vars(self, state: State) -> None:
+    def _create_diagnostic_vars(self, state: StateUVH) -> None:
         state.unbind()
 
     def set_physical_uvh(
@@ -349,11 +349,11 @@ class Model(
         of the model.
 
         Args:
-            u (torch.Tensor): State variable u.
+            u (torch.Tensor): StateUVH variable u.
                 └── (n_ens, nl, nx+1, ny)-shaped.
-            v (torch.Tensor): State variable v.
+            v (torch.Tensor): StateUVH variable v.
                 └── (n_ens, nl, nx, ny+1)-shaped.
-            h (torch.Tensor): State variable h.
+            h (torch.Tensor): StateUVH variable h.
                 └── (n_ens, nl, nx, ny)-shaped.
         """
         u = u.to(self.device.get())

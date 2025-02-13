@@ -20,7 +20,7 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.energetics import KineticEnergy
-from qgsw.fields.variables.state import StateAlpha
+from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple, UVHTAlpha
 from qgsw.models.base import Model
 from qgsw.models.core import finite_diff, schemes
@@ -34,7 +34,7 @@ from qgsw.spatial.core.discretization import (
 )
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.state import State
+    from qgsw.fields.variables.state import StateUVH
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
@@ -192,11 +192,11 @@ class SWCore(Model[T], Generic[T]):
         dv[..., -1, :, :] += -coef * prognostic.v[..., -1, :, 1:-1]
         return du, dv
 
-    def _create_diagnostic_vars(self, state: State) -> None:
+    def _create_diagnostic_vars(self, state: StateUVH) -> None:
         """Create diagnostic variables and bind them to state.
 
         Args:
-            state (State): state.
+            state (StateUVH): state.
         """
         super()._create_diagnostic_vars(state)
 
@@ -433,7 +433,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
 
-    def _create_diagnostic_vars(self, state: StateAlpha) -> None:
+    def _create_diagnostic_vars(self, state: StateUVHAlpha) -> None:
         self._state.unbind()
 
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
@@ -452,7 +452,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
         k_energy.bind(state)
 
     def _set_state(self) -> None:
-        self._state = StateAlpha.steady(
+        self._state = StateUVHAlpha.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,
