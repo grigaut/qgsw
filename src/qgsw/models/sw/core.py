@@ -27,7 +27,7 @@ from qgsw.fields.variables.prognostic_tuples import (
     UVHTAlpha,
 )
 from qgsw.fields.variables.state import StateUVHAlpha
-from qgsw.models.base import Model
+from qgsw.models.base import ModelUVH
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
@@ -61,7 +61,7 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
 T = TypeVar("T", bound=BasePrognosticTuple)
 
 
-class SWCore(Model[T], Generic[T]):
+class SWCore(ModelUVH[T], Generic[T]):
     """Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .

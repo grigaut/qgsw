@@ -246,12 +246,12 @@ class BaseStatePSIQ(BaseState[TPSIQT], Generic[TPSIQT], metaclass=ABCMeta):
         self._prog_vars[PrognosticPotentialVorticity.get_name()] = self._q
 
     @property
-    def psi(self) -> ZonalVelocity:
+    def psi(self) -> PrognosticStreamFunction:
         """Prognostic stream function."""
         return self._psi
 
     @property
-    def q(self) -> MeridionalVelocity:
+    def q(self) -> PrognosticPotentialVorticity:
         """Prognostic potential vorticity."""
         return self._q
 

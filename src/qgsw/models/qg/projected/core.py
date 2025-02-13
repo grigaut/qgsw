@@ -11,7 +11,7 @@ from qgsw.fields.variables.prognostic_tuples import (
     UVHT,
     BasePrognosticTuple,
 )
-from qgsw.models.base import Model
+from qgsw.models.base import ModelUVH
 from qgsw.models.core import schemes
 from qgsw.models.exceptions import UnsetTimestepError
 from qgsw.models.names import ModelName
@@ -39,7 +39,7 @@ T = TypeVar("T", bound=BasePrognosticTuple)
 Projector = TypeVar("Projector", bound=QGProjector)
 
 
-class QGCore(Model[T], Generic[T, Projector]):
+class QGCore(ModelUVH[T], Generic[T, Projector]):
     """Quasi Geostrophic Model."""
 
     _save_p_values = False
@@ -111,35 +111,35 @@ class QGCore(Model[T], Generic[T, Projector]):
         """Core Shallow Water Model."""
         return self._core
 
-    @Model.slip_coef.setter
+    @ModelUVH.slip_coef.setter
     def slip_coef(self, slip_coef: float) -> None:
         """Slip coefficient setter."""
-        Model.slip_coef.fset(self, slip_coef)
+        ModelUVH.slip_coef.fset(self, slip_coef)
         self.sw.slip_coef = slip_coef
 
-    @Model.bottom_drag_coef.setter
+    @ModelUVH.bottom_drag_coef.setter
     def bottom_drag_coef(self, bottom_drag_coef: float) -> None:
         """Beta-plane setter."""
-        Model.bottom_drag_coef.fset(self, bottom_drag_coef)
+        ModelUVH.bottom_drag_coef.fset(self, bottom_drag_coef)
         self.sw.bottom_drag_coef = bottom_drag_coef
 
-    @Model.dt.setter
+    @ModelUVH.dt.setter
     def dt(self, dt: float) -> None:
         """Timesetp setter."""
-        Model.dt.fset(self, dt)
+        ModelUVH.dt.fset(self, dt)
         self.sw.dt = dt
 
-    @Model.masks.setter
+    @ModelUVH.masks.setter
     def masks(self, masks: Masks) -> None:
         """Masks setter."""
-        Model.masks.fset(self, masks)
+        ModelUVH.masks.fset(self, masks)
         self.sw.masks = masks
         self._P.masks = masks
 
-    @Model.n_ens.setter
+    @ModelUVH.n_ens.setter
     def n_ens(self, n_ens: int) -> None:
         """Ensemble number setter."""
-        Model.n_ens.fset(self, n_ens)
+        ModelUVH.n_ens.fset(self, n_ens)
         self.sw.n_ens = n_ens
 
     @property
