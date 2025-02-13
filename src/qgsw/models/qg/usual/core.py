@@ -102,7 +102,7 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         )
 
         # wind forcing
-        self.wind_forcing = torch.zeros(
+        self._curl_tau = torch.zeros(
             (1, 1, self.space.nx, self.space.ny),
             dtype=torch.float64,
             device=DEVICE.get(),
@@ -341,9 +341,11 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         Args:
             psi (torch.Tensor): Stream function.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
 
         Returns:
             torch.Tensor: Potential vorticity.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         lap_psi = laplacian_h(psi, self.space.dx, self.space.dy)
         stretching = self.beta_plane.f0**2 * torch.einsum(
@@ -364,9 +366,11 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         Args:
             q (torch.Tensor): Potential vorticity.
+                └── (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Stream function.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
         """
         helmholtz_rhs = torch.einsum(
             "lm,...mxy->...lxy",
@@ -393,16 +397,33 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         psi_modes += alpha * self.homsol
         return torch.einsum("lm,...mxy->...lxy", self.Cm2l, psi_modes)
 
-    def set_wind_forcing(self, curl_tau: torch.Tensor) -> None:
+    def set_wind_forcing(self, taux: torch.Tensor, tauy: torch.Tensor) -> None:
         """Set the wind forcing.
 
         Args:
-            curl_tau (torch.Tensor): Wind curl.
+            taux (torch.Tensor): Wind stress in the x direction.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+            tauy (torch.Tensor): Wind stress in the y direction.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
         """
-        self.wind_forcing = curl_tau / self.H[0]
+        curl_tau = (
+            torch.diff(tauy) / self._space.dx
+            - torch.diff(taux) / self._space.dy
+        )
+        self._curl_tau = curl_tau / self.H[0]
 
     def advection_rhs(self, prognostic: PSIQ) -> torch.Tensor:
-        """Right hand side advection."""
+        """Right hand side advection.
+
+        Args:
+            prognostic (PSIQ): Prognostic psi and q.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: dq.
+                └── dq: (n_ens, nl, nx, ny)-shaped
+        """
         psi, q = prognostic
         u, v = self._grad_perp(psi)
         u /= self.space.dy
@@ -420,12 +441,12 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         )
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
-            fcg_drag = self.wind_forcing + bottom_drag
+            fcg_drag = self._curl_tau + bottom_drag
         elif self.space.nl == 2:  # noqa: PLR2004
-            fcg_drag = torch.cat([self.wind_forcing, bottom_drag], dim=-3)
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
         else:
             fcg_drag = torch.cat(
-                [self.wind_forcing, self.zeros_inside, bottom_drag],
+                [self._curl_tau, self.zeros_inside, bottom_drag],
                 dim=-3,
             )
 
@@ -439,6 +460,8 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
         """
         dq = self.advection_rhs(prognostic)
 
@@ -453,6 +476,7 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         Args:
             q (torch.Tensor): Potential vorticity.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         q_i = self._points_to_surfaces(q)
         psi = self._compute_psi_from_q(q_i)
@@ -463,6 +487,7 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         Args:
             psi (torch.Tensor): Stream function.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
         """
         q = self._compute_q_from_psi(psi)
         self._state.update_psiq(PSIQ(psi, q))
@@ -472,9 +497,13 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
 
         Args:
             prognostic (PSIQ): Prognostic variable to advect.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
 
         Returns:
             PSIQ: Updated prognostic variable to advect.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
         """
         return schemes.rk3_ssp(
             prog=prognostic,
