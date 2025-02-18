@@ -17,7 +17,7 @@ from qgsw.fields.variables.prognostic_tuples import (
     BasePrognosticTuple,
     BasePrognosticUVH,
 )
-from qgsw.fields.variables.state import BaseState, StateUVH
+from qgsw.fields.variables.state import BaseState, BaseStateUVH, StateUVH
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -230,9 +230,12 @@ class _Model(
         self._state.increment_time(self.dt)
 
 
+State_uvh = TypeVar("State_uvh", bound=BaseStateUVH)
+
+
 class ModelUVH(
-    _Model[PrognosticUVH, State, UVH],
-    Generic[PrognosticUVH, State],
+    _Model[PrognosticUVH, State_uvh, UVH],
+    Generic[PrognosticUVH, State_uvh],
 ):
     """Base class for UVH models.
 
