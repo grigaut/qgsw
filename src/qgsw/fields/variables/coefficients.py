@@ -39,9 +39,9 @@ if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
-    from qgsw.fields.variables.state import State
-    from qgsw.fields.variables.uvh import BasePrognosticTuple
-    from qgsw.models.qg.modified.collinear_sublayer.core import QGAlpha
+    from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
+    from qgsw.fields.variables.state import StateUVH
+    from qgsw.models.qg.projected.modified.collinear.core import QGAlpha
 
 
 class Coefficient(NamedObject[CoefficientName], DiagnosticVariable, ABC):
@@ -122,11 +122,11 @@ class LSRSFInferredAlpha(Coefficient):
                 device=DEVICE.get(),
             )
 
-    def bind(self, state: State) -> BoundDiagnosticVariable[Self]:
+    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[Self]:
         """Bind the variable to a given state.
 
         Args:
-            state (State): State to bind the variable to.
+            state (StateUVH): StateUVH to bind the variable to.
 
         Returns:
             BoundDiagnosticVariable: Bound variable.

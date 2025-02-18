@@ -16,7 +16,7 @@ from qgsw.fields.variables.energetics import (
     TotalKineticEnergy,
     compute_W,
 )
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.specs import DEVICE
 

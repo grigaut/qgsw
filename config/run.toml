@@ -1,7 +1,7 @@
 [io]
 name = "Two Layers Model"
 [io.output]
-save=true
+save=false
 type = "quantity"           # "interval"
 quantity = 100
 # interval_duration = 3600  # seconds

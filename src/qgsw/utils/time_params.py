@@ -2,7 +2,7 @@
 
 import torch
 
-from qgsw.fields.variables.uvh import BasePrognosticTuple
+from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs import DEVICE
 

@@ -8,7 +8,7 @@ import torch
 from qgsw.fields.errors.error_sets import create_errors_set
 from qgsw.fields.scope import Scope
 from qgsw.models.instantiation import get_model_class
-from qgsw.models.qg.modified.utils import is_modified
+from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,

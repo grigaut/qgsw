@@ -12,7 +12,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients import create_coefficient
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
-from qgsw.models.qg.modified.utils import is_modified
+from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.perturbations.core import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary
@@ -72,7 +72,6 @@ if np.isnan(config.simulation.dt):
     )
 else:
     model.dt = config.simulation.dt
-model.compute_time_derivatives(model.prognostic)
 model.set_wind_forcing(taux, tauy)
 
 ## Compute Burger Number

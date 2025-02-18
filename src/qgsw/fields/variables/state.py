@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar, Union
 
 try:
@@ -15,10 +15,18 @@ from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
     MeridionalVelocity,
+    PrognosticPotentialVorticity,
+    PrognosticStreamFunction,
     Time,
     ZonalVelocity,
 )
-from qgsw.fields.variables.uvh import UVH, UVHT, UVHTAlpha
+from qgsw.fields.variables.prognostic_tuples import (
+    PSIQ,
+    PSIQT,
+    UVH,
+    UVHT,
+    UVHTAlpha,
+)
 
 if TYPE_CHECKING:
     import torch
@@ -29,7 +37,7 @@ if TYPE_CHECKING:
     )
 
 
-T = TypeVar("T", bound=Union[UVHT, UVHTAlpha])
+T = TypeVar("T", bound=Union[PSIQT, UVHT])
 
 
 class BaseState(ABC, Generic[T]):
@@ -44,15 +52,7 @@ class BaseState(ABC, Generic[T]):
         self.unbind()
         self._prog = prognostic
         self._t = Time(prognostic.t)
-        self._u = ZonalVelocity(prognostic.u)
-        self._v = MeridionalVelocity(prognostic.v)
-        self._h = LayerDepthAnomaly(prognostic.h)
-        self._prog_vars = {
-            Time.get_name(): self._t,
-            ZonalVelocity.get_name(): self._u,
-            MeridionalVelocity.get_name(): self._v,
-            LayerDepthAnomaly.get_name(): self._h,
-        }
+        self._prog_vars = {Time.get_name(): self._t}
 
     @property
     def t(self) -> Time:
@@ -62,21 +62,6 @@ class BaseState(ABC, Generic[T]):
     @t.setter
     def t(self, time: torch.Tensor) -> None:
         self.update_time(time)
-
-    @property
-    def u(self) -> ZonalVelocity:
-        """Prognostic zonal velocity."""
-        return self._u
-
-    @property
-    def v(self) -> MeridionalVelocity:
-        """Prognostic meriodional velocity."""
-        return self._v
-
-    @property
-    def h(self) -> LayerDepthAnomaly:
-        """Prognostic layer thickness anomaly."""
-        return self._h
 
     @property
     def prognostic(self) -> T:
@@ -111,22 +96,19 @@ class BaseState(ABC, Generic[T]):
         Returns:
             list[str]: String representation parts.
         """
-        if not self.diag_vars:
-            return [
-                "State",
-                "└── Prognostic Variables",
-                f"\t├── {self.u}",
-                f"\t├── {self.v}",
-                f"\t└── {self.h}",
-            ]
         txt = [
             "State",
-            "├── Prognostic Variables",
-            f"│\t├── {self.u}",
-            f"│\t├── {self.v}",
-            f"│\t└── {self.h}",
-            "└── Diagnostic Variables",
+            "└── Prognostic Variables",
         ]
+        txt_prog = [f"\t├── {var}" for var in self.prog_vars.values()]
+        chars = txt_prog.pop(-1).split()
+        chars[0] = "\t└──"
+        txt_prog.append(" ".join(chars))
+        txt = txt + txt_prog
+        if not self.diag_vars:
+            return txt
+        txt[1] = "├── Prognostic Variables"
+        txt.append("└── Diagnostic Variables")
         txt_end = [f"\t├── {var}" for var in self.diag_vars.values()]
         chars = txt_end.pop(-1).split()
         chars[0] = "\t└──"
@@ -197,6 +179,42 @@ class BaseState(ABC, Generic[T]):
     @abstractmethod
     def _update_prognostic_vars(self, prognostic: T) -> None: ...
 
+
+TUVHT = TypeVar("TUVHT", bound=UVHT)
+
+
+class BaseStateUVH(BaseState[TUVHT], Generic[TUVHT], metaclass=ABCMeta):
+    """Base State for UVH models."""
+
+    def __init__(self, prognostic: TUVHT) -> None:
+        """Instantaite the state.
+
+        Args:
+            prognostic (TUVHT): Prognostic tuple.
+        """
+        super().__init__(prognostic)
+        self._u = ZonalVelocity(prognostic.u)
+        self._v = MeridionalVelocity(prognostic.v)
+        self._h = LayerDepthAnomaly(prognostic.h)
+        self._prog_vars[ZonalVelocity.get_name()] = self._u
+        self._prog_vars[MeridionalVelocity.get_name()] = self._v
+        self._prog_vars[LayerDepthAnomaly.get_name()] = self._h
+
+    @property
+    def u(self) -> ZonalVelocity:
+        """Prognostic zonal velocity."""
+        return self._u
+
+    @property
+    def v(self) -> MeridionalVelocity:
+        """Prognostic meriodional velocity."""
+        return self._v
+
+    @property
+    def h(self) -> LayerDepthAnomaly:
+        """Prognostic layer thickness anomaly."""
+        return self._h
+
     @abstractmethod
     def update_uvh(self, uvh: UVH) -> None:
         """Update u,v and h.
@@ -206,7 +224,109 @@ class BaseState(ABC, Generic[T]):
         """
 
 
-class State(BaseState[UVHT]):
+TPSIQT = TypeVar("TPSIQT", bound=PSIQT)
+
+
+class BaseStatePSIQ(BaseState[TPSIQT], Generic[TPSIQT], metaclass=ABCMeta):
+    """Base State for PSIQ models."""
+
+    def __init__(self, prognostic: TPSIQT) -> None:
+        """Instantaite the state.
+
+        Args:
+            prognostic (TPSIQT): Prognostic tuple.
+        """
+        super().__init__(prognostic)
+        self._psi = PrognosticStreamFunction(prognostic.psi)
+        self._q = PrognosticPotentialVorticity(prognostic.q)
+        self._prog_vars[PrognosticStreamFunction.get_name()] = self._psi
+        self._prog_vars[PrognosticPotentialVorticity.get_name()] = self._q
+
+    @property
+    def psi(self) -> PrognosticStreamFunction:
+        """Prognostic stream function."""
+        return self._psi
+
+    @property
+    def q(self) -> PrognosticPotentialVorticity:
+        """Prognostic potential vorticity."""
+        return self._q
+
+    @abstractmethod
+    def update_psiq(self, psiq: PSIQ) -> None:
+        """Update psi and q.
+
+        Args:
+            psiq (PSIQ): Prognostic psi and q.
+        """
+
+
+class StatePSIQ(BaseStatePSIQ[PSIQT]):
+    """State: wrapper for PSIQT state variables.
+
+    This wrapper links psiq variables to diagnostic variables.
+    Diagnostic variables can be bound to the state so that they are updated
+    only when the state has changed.
+    """
+
+    def _update_prognostic_vars(self, prognostic: PSIQT) -> None:
+        self._t.update(prognostic.t)
+        self._psi.update(prognostic.psi)
+        self._q.update(prognostic.q)
+
+    def update_psiq(self, psiq: PSIQ) -> None:
+        """Update psi and q.
+
+        Args:
+            psiq (PSIQ): Prognostic psi and q.
+        """
+        self.prognostic = PSIQT.from_psiq(self.t.get(), psiq)
+
+    @classmethod
+    def steady(
+        cls,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> Self:
+        """Instantiate a steady state with zero-filled prognostic variables.
+
+        Args:
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype): Data type.
+            device (torch.device): Device to use.
+
+        Returns:
+            Self: StatePSIQT.
+        """
+        return cls(PSIQT.steady(n_ens, nl, nx, ny, dtype=dtype, device=device))
+
+    @classmethod
+    def from_tensors(
+        cls,
+        psi: torch.Tensor,
+        q: torch.Tensor,
+    ) -> Self:
+        """Instantiate the state from tensors.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+            q (torch.Tensor): POtential vorticity.
+
+        Returns:
+            Self: StateUVH.
+        """
+        return cls(PSIQ(psi, q))
+
+
+class StateUVH(BaseStateUVH[UVHT]):
     """State: wrapper for UVH state variables.
 
     This wrapper links uvh variables to diagnostic variables.
@@ -235,6 +355,7 @@ class State(BaseState[UVHT]):
         nl: int,
         nx: int,
         ny: int,
+        *,
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
@@ -249,9 +370,9 @@ class State(BaseState[UVHT]):
             device (torch.device): Device to use.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
-        return cls(UVHT.steady(n_ens, nl, nx, ny, dtype, device))
+        return cls(UVHT.steady(n_ens, nl, nx, ny, dtype=dtype, device=device))
 
     @classmethod
     def from_tensors(
@@ -268,13 +389,13 @@ class State(BaseState[UVHT]):
             h (torch.Tensor): Surface height anomaly.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
         return cls(UVH(u, v, h))
 
 
-class StateAlpha(BaseState[UVHTAlpha]):
-    """StateAlpha: wrapper for UVHTAlpha state variables.
+class StateUVHAlpha(BaseStateUVH[UVHTAlpha]):
+    """StateUVHAlpha: wrapper for UVHTAlpha state variables.
 
     This wrapper links uvh variables to diagnostic variables.
     Diagnostic variables can be bound to the state so that they are updated
@@ -282,7 +403,7 @@ class StateAlpha(BaseState[UVHTAlpha]):
     """
 
     def __init__(self, prognostic: UVHTAlpha) -> None:
-        """Instantiate StateAlpha.
+        """Instantiate StateUVHAlpha.
 
         Args:
             prognostic (UVHTAlpha): Core prognostic variables.
@@ -342,6 +463,7 @@ class StateAlpha(BaseState[UVHTAlpha]):
         nl: int,
         nx: int,
         ny: int,
+        *,
         dtype: torch.dtype,
         device: torch.device,
     ) -> Self:
@@ -357,9 +479,11 @@ class StateAlpha(BaseState[UVHTAlpha]):
             device (torch.device): Device to use.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
-        return cls(UVHTAlpha.steady(n_ens, nl, nx, ny, dtype, device))
+        return cls(
+            UVHTAlpha.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
+        )
 
     @classmethod
     def from_tensors(
@@ -378,6 +502,6 @@ class StateAlpha(BaseState[UVHTAlpha]):
             alpha (torch.Tensor): Collinearity coefficient.
 
         Returns:
-            Self: State.
+            Self: StateUVH.
         """
         return cls(UVHTAlpha(u, v, h, alpha))

@@ -7,7 +7,7 @@ import streamlit as st
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.utils import check_unit_compatibility
 from qgsw.models.instantiation import get_model_class
-from qgsw.models.qg.modified.utils import is_modified
+from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.output import RunOutput
 from qgsw.plots.heatmaps import (
     AnimatedHeatmaps,

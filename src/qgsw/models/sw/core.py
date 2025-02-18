@@ -20,21 +20,33 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityFlux,
 )
 from qgsw.fields.variables.energetics import KineticEnergy
-from qgsw.fields.variables.state import StateAlpha
-from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple, UVHTAlpha
-from qgsw.models.base import Model
+from qgsw.fields.variables.prognostic_tuples import (
+    UVH,
+    UVHT,
+    BasePrognosticTuple,
+    UVHTAlpha,
+)
+from qgsw.fields.variables.state import StateUVH, StateUVHAlpha
+from qgsw.models.base import ModelUVH
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
+from qgsw.models.qg.projected.projectors.core import QGProjector
+from qgsw.models.qg.projected.variable_set import QGVariableSet
+from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     keep_top_layer,
 )
+from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.state import State
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
@@ -56,7 +68,7 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
 T = TypeVar("T", bound=BasePrognosticTuple)
 
 
-class SWCore(Model[T], Generic[T]):
+class SWCore(ModelUVH[T, StateUVH], Generic[T]):
     """Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -192,11 +204,11 @@ class SWCore(Model[T], Generic[T]):
         dv[..., -1, :, :] += -coef * prognostic.v[..., -1, :, 1:-1]
         return du, dv
 
-    def _create_diagnostic_vars(self, state: State) -> None:
+    def _create_diagnostic_vars(self, state: StateUVH) -> None:
         """Create diagnostic variables and bind them to state.
 
         Args:
-            state (State): state.
+            state (StateUVH): state.
         """
         super()._create_diagnostic_vars(state)
 
@@ -215,20 +227,44 @@ class SWCore(Model[T], Generic[T]):
         p.bind(state)
         k_energy.bind(state)
 
-    def update(self, uvh: UVH) -> UVH:
+    def update(self, prognostic: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
 
         Agrs:
-            uvh (UVH): u,v and h.
+            prognostic (UVH): u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
         return schemes.rk3_ssp(
-            uvh,
+            prognostic,
             self.dt,
             self.compute_time_derivatives,
         )
+
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        uvh = QGProjector.G(
+            p,
+            compute_A(
+                self.H[:, 0, 0],
+                self.g_prime[:, 0, 0],
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            ),
+            self.H,
+            self._space.dx,
+            self._space.dy,
+            self._space.ds,
+            self.beta_plane.f0,
+            self.points_to_surfaces,
+        )
+        self.set_uvh(*uvh)
 
     def advection_momentum(
         self,
@@ -341,6 +377,25 @@ class SWCore(Model[T], Generic[T]):
             dt_h,
         )
 
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        return QGVariableSet.get_variable_set(space, physics, model)
+
 
 class SW(SWCore[UVHT]):
     """Implementation of multilayer rotating shallow-water model.
@@ -406,6 +461,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
             beta_plane=beta_plane,
         )
         self._space = keep_top_layer(self._space)
+
         self._compute_coriolis(self._space.omega.remove_z_h())
         ##Topography and Ref values
         self._set_ref_variables()
@@ -432,7 +488,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
 
-    def _create_diagnostic_vars(self, state: StateAlpha) -> None:
+    def _create_diagnostic_vars(self, state: StateUVHAlpha) -> None:
         self._state.unbind()
 
         h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
@@ -451,7 +507,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha]):
         k_energy.bind(state)
 
     def _set_state(self) -> None:
-        self._state = StateAlpha.steady(
+        self._state = StateUVHAlpha.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,

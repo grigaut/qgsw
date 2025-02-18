@@ -7,6 +7,7 @@ class ModelName(Name):
     """Model names."""
 
     SHALLOW_WATER = "SW"
+    QUASI_GEOSTROPHIC_USUAL = "QGPSIQ"
     QUASI_GEOSTROPHIC = "QG"
     QG_COLLINEAR_SF = "QGCollinearSF"
     QG_FILTERED = "QGCollinearFilteredSF"

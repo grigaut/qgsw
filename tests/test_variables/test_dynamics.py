@@ -12,13 +12,13 @@ from qgsw.fields.variables.dynamics import (
     Pressure,
     ZonalVelocityFlux,
 )
-from qgsw.fields.variables.state import State
-from qgsw.fields.variables.uvh import UVHT
+from qgsw.fields.variables.prognostic_tuples import UVHT
+from qgsw.fields.variables.state import StateUVH
 from qgsw.specs import DEVICE
 
 
 @pytest.fixture
-def state() -> State:
+def state() -> StateUVH:
     """Instantiate a state variable."""
     # Shapes
     n_ens = 1
@@ -46,10 +46,10 @@ def state() -> State:
         dtype=torch.float64,
         device=DEVICE.get(),
     )
-    return State(UVHT(u, v, h, t))
+    return StateUVH(UVHT(u, v, h, t))
 
 
-def test_slicing(state: State) -> None:
+def test_slicing(state: StateUVH) -> None:
     """Test slicing with variables."""
     dx = 2
     dy = 3
@@ -66,7 +66,7 @@ def test_slicing(state: State) -> None:
     assert (h_no_slice.__getitem__(h_phys.slices) == h).shape
 
 
-def test_slicing_bound(state: State) -> None:
+def test_slicing_bound(state: StateUVH) -> None:
     """Test slicing with bounded variables."""
     dx = 2
     dy = 3
@@ -94,7 +94,7 @@ def test_slicing_bound(state: State) -> None:
     assert (p_no_slice.__getitem__(p_bound.slices) == p_value).shape
 
 
-def test_physical_prognostic_variables(state: State) -> None:
+def test_physical_prognostic_variables(state: StateUVH) -> None:
     """Test the physical prognostic variables."""
     dx = 2
     dy = 3
@@ -112,7 +112,7 @@ def test_physical_prognostic_variables(state: State) -> None:
     assert (h_phys == state.prognostic.h / (dx * dy)).all()
 
 
-def test_velocity_flux(state: State) -> None:
+def test_velocity_flux(state: StateUVH) -> None:
     """Test the velocity flux."""
     dx = 2
     dy = 3

@@ -14,11 +14,11 @@ from qgsw.fields.variables.dynamics import (
     Vorticity,
 )
 from qgsw.filters.spectral import SpectralGaussianFilter2D
-from qgsw.models.qg.modified.filtered.pv import (
+from qgsw.models.qg.projected.modified.filtered.pv import (
     CollinearFilteredPotentialVorticity,
     compute_g_tilde,
 )
-from qgsw.models.qg.variable_set import QGVariableSet
+from qgsw.models.qg.projected.variable_set import QGVariableSet
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig

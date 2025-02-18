@@ -5,20 +5,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeVar
 
 from qgsw import verbose
-from qgsw.fields.variables.state import StateAlpha
-from qgsw.fields.variables.uvh import UVHTAlpha
+from qgsw.fields.variables.prognostic_tuples import UVHTAlpha
+from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.models.exceptions import InvalidLayersDefinitionError
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.core import QGCore
-from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
+from qgsw.models.qg.projected.core import QGCore
+from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
     compute_A_collinear_sf,
 )
-from qgsw.models.qg.modified.collinear_sublayer.variable_set import (
+from qgsw.models.qg.projected.modified.collinear.variable_set import (
     QGCollinearSFVariableSet,
 )
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 Projector = TypeVar("Projector", bound=QGProjector)
 
 
-class QGAlpha(QGCore[UVHTAlpha, Projector]):
+class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
     """Collinear QG Model."""
 
     _supported_layers_nb: int
@@ -57,7 +57,7 @@ class QGAlpha(QGCore[UVHTAlpha, Projector]):
 
     def _set_state(self) -> None:
         """Set the state."""
-        self._state = StateAlpha.steady(
+        self._state = StateUVHAlpha.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,
@@ -132,6 +132,7 @@ class QGCollinearSF(QGAlpha[QGProjector]):
             beta_plane=beta_plane,
         )
         self._space = keep_top_layer(self._space)
+
         self._compute_coriolis(self._space.omega.remove_z_h())
         ##Topography and Ref values
         self._set_ref_variables()

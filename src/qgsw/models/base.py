@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar, Union
 
 import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
-from qgsw.fields.variables.state import State
-from qgsw.fields.variables.uvh import UVH, BasePrognosticTuple
+from qgsw.fields.variables.prognostic_tuples import (
+    PSIQ,
+    UVH,
+    BasePrognosticPSIQ,
+    BasePrognosticTuple,
+    BasePrognosticUVH,
+)
+from qgsw.fields.variables.state import BaseState, BaseStateUVH, StateUVH
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -22,57 +28,38 @@ from qgsw.models.exceptions import (
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
+from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
 from qgsw.utils.named_object import NamedObject
 
 if TYPE_CHECKING:
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
     from qgsw.specs._utils import Device
 
 Prognostic = TypeVar("Prognostic", bound=BasePrognosticTuple)
+AdvectedPrognostic = TypeVar("AdvectedPrognostic", bound=Union[UVH, PSIQ])
+State = TypeVar("State", bound=BaseState)
+PrognosticUVH = TypeVar("PrognosticUVH", bound=BasePrognosticUVH)
+PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePrognosticPSIQ)
 
 
-class Model(
+class _Model(
     ModelParamChecker,
-    Generic[Prognostic],
+    Generic[Prognostic, State, AdvectedPrognostic],
     NamedObject[ModelName],
     metaclass=ABCMeta,
 ):
-    """Base class for models.
+    """Base class for models."""
 
-    Following https://doi.org/10.1029/2021MS002663 .
-
-    Physical Variables are :
-        - u_phys: Zonal velocity
-        - v_phys: Meridional Velocity
-        - h_phys: layers thickness
-
-    Prognostic Variables are linked to physical variables through:
-        - u = u_phys x dx
-        - v = v_phys x dy
-        - h = h_phys x dx x dy
-
-    Diagnostic variables are:
-        - U = u_phys / dx
-        - V = v_phys / dx
-        - omega = omega_phys x dx x dy    (rel. vorticity)
-        - eta_phys = eta_phys                  (interface height)
-        - p = p_phys                      (hydrostratic pressure)
-        - k_energy = k_energy_phys        (kinetic energy)
-
-    References variables are denoted with the subscript _ref:
-        - h_ref
-        - eta_ref
-        - p_ref
-        - h_ref_ugrid
-        - h_ref_vgrid
-        - dx_p_ref
-        - dy_p_ref
-    """
-
+    _state: State
     dtype = torch.float64
     device: Device = DEVICE
     _taux: torch.Tensor | float = 0.0
@@ -85,14 +72,16 @@ class Model(
         H: torch.Tensor,  # noqa: N803
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
-        optimize: bool = True,
+        optimize: bool = True,  # noqa: ARG002
     ) -> None:
         """Model Instantiation.
 
         Args:
             space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor, (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor, (nl,) shaped.
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity tensor.
+                └── (nl,) shaped.
             beta_plane (Beta_Plane): Beta plane.
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
@@ -109,16 +98,6 @@ class Model(
             beta_plane=beta_plane,
         )
         self._compute_coriolis(self._space.omega.remove_z_h())
-        ##Topography and Ref values
-        self._set_ref_variables()
-
-        # initialize state
-        self._set_state()
-        # initialize variables
-        self._create_diagnostic_vars(self._state)
-
-        self._set_utils(optimize)
-        self._set_fluxes(optimize)
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -161,30 +140,6 @@ class Model(
         """Prognostic tuple."""
         return self._state.prognostic
 
-    @property
-    def u(self) -> torch.Tensor:
-        """State Variable u: Zonal Speed.
-
-        └── (n_ens, nl, nx+1,ny)-shaped.
-        """
-        return self._state.u.get()
-
-    @property
-    def v(self) -> torch.Tensor:
-        """State Variable v: Meridional Speed.
-
-        └── (n_ens, nl, nx,ny+1)-shaped.
-        """
-        return self._state.v.get()
-
-    @property
-    def h(self) -> torch.Tensor:
-        """State Variable h: Layers Thickness.
-
-        └── (n_ens, nl, nx,ny)-shaped.
-        """
-        return self._state.h.get()
-
     @ModelParamChecker.slip_coef.setter
     def slip_coef(self, slip_coef: float) -> None:
         """Slip coefficient setter."""
@@ -218,6 +173,227 @@ class Model(
         self._set_taux(taux)
         self._set_tauy(tauy)
 
+    @abstractmethod
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+
+    @abstractmethod
+    def _set_state(self) -> None:
+        """Set the state."""
+
+    @abstractmethod
+    def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
+        """Set utils functions.
+
+        Args:
+            optimize (bool): Whether to optimize the function.
+        """
+
+    def _create_diagnostic_vars(self, state: State) -> None:
+        state.unbind()
+
+    @abstractmethod
+    def compute_time_derivatives(
+        self,
+        prognostic: AdvectedPrognostic,
+    ) -> AdvectedPrognostic:
+        """Compute the state variables derivatives dt_u, dt_v, dt_h.
+
+        Args:
+            prognostic (UVH): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            UVH: dt_u, dt_v, dt_h
+                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
+                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
+                └── dt_h: (n_ens, nl, nx, ny)-shaped
+        """
+
+    @abstractmethod
+    def update(self, prognostic: AdvectedPrognostic) -> AdvectedPrognostic:
+        """Update prognostic tuple.
+
+        Args:
+            prognostic (AdvectedPrognostic): Prognostic variable to advect.
+
+        Returns:
+            AdvectedPrognostic: Updated prognostic variable to advect.
+        """
+
+    @abstractmethod
+    def step(self) -> None:
+        """Performs one step time-integration with RK3-SSP scheme."""
+        self._state.increment_time(self.dt)
+
+    @classmethod
+    @abstractmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+
+
+State_uvh = TypeVar("State_uvh", bound=BaseStateUVH)
+
+
+class ModelUVH(
+    _Model[PrognosticUVH, State_uvh, UVH],
+    Generic[PrognosticUVH, State_uvh],
+):
+    """Base class for UVH models.
+
+    Following https://doi.org/10.1029/2021MS002663 .
+
+    Physical Variables are :
+        - u_phys: Zonal velocity
+        - v_phys: Meridional Velocity
+        - h_phys: layers thickness
+
+    Prognostic Variables are linked to physical variables through:
+        - u = u_phys x dx
+        - v = v_phys x dy
+        - h = h_phys x dx x dy
+
+    Diagnostic variables are:
+        - U = u_phys / dx
+        - V = v_phys / dx
+        - omega = omega_phys x dx x dy    (rel. vorticity)
+        - eta_phys = eta_phys                  (interface height)
+        - p = p_phys                      (hydrostratic pressure)
+        - k_energy = k_energy_phys        (kinetic energy)
+
+    References variables are denoted with the subscript _ref:
+        - h_ref
+        - eta_ref
+        - p_ref
+        - h_ref_ugrid
+        - h_ref_vgrid
+        - dx_p_ref
+        - dy_p_ref
+    """
+
+    def __init__(
+        self,
+        *,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        optimize: bool = True,
+    ) -> None:
+        """Model Instantiation.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced gravity tensor.
+                └── (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        super().__init__(
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            optimize=optimize,
+        )
+        # initialize state
+        self._set_state()
+        # initialize variables
+        self._create_diagnostic_vars(self._state)
+        self._set_utils(optimize)
+
+        # Ref values
+        self._set_ref_variables()
+        self._set_fluxes(optimize)
+
+    @property
+    def u(self) -> torch.Tensor:
+        """StateUVH Variable u: Zonal Speed.
+
+        └── (n_ens, nl, nx+1,ny)-shaped.
+        """
+        return self._state.u.get()
+
+    @property
+    def v(self) -> torch.Tensor:
+        """StateUVH Variable v: Meridional Speed.
+
+        └── (n_ens, nl, nx,ny+1)-shaped.
+        """
+        return self._state.v.get()
+
+    @property
+    def h(self) -> torch.Tensor:
+        """StateUVH Variable h: Layers Thickness.
+
+        └── (n_ens, nl, nx,ny)-shaped.
+        """
+        return self._state.h.get()
+
+    def _set_state(self) -> None:
+        """Set the state."""
+        self._state = StateUVH.steady(
+            n_ens=self.n_ens,
+            nl=self.space.nl,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
+        self._io = IO(
+            t=self._state.t,
+            u=self._state.u,
+            v=self._state.v,
+            h=self._state.h,
+        )
+
+    def _set_fluxes(self, optimize: bool) -> None:  # noqa: FBT001
+        """Set fluxes.
+
+        Args:
+            optimize (bool): Whether to optimize the fluxes.
+        """
+        self._fluxes = flux.Fluxes(masks=self.masks, optimize=optimize)
+
+    def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
+        """Set utils functions.
+
+        Args:
+            optimize (bool): Whether to optimize the function.
+        """
+        if optimize:
+            self.comp_ke = OptimizableFunction(finite_diff.comp_ke)
+            self.points_to_surfaces = OptimizableFunction(
+                convert.points_to_surfaces,
+            )
+        else:
+            self.comp_ke = finite_diff.comp_ke
+            self.points_to_surfaces = convert.points_to_surfaces
+
     def _set_ref_variables(self) -> None:
         """Set reference variables values.
 
@@ -249,49 +425,6 @@ class Model(
             self.h_ref_vgrid = self.h_ref
             self.dx_p_ref = 0.0
             self.dy_p_ref = 0.0
-
-    def _set_state(self) -> None:
-        """Set the state."""
-        self._state = State.steady(
-            n_ens=self.n_ens,
-            nl=self.space.nl,
-            nx=self.space.nx,
-            ny=self.space.ny,
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
-        self._io = IO(
-            t=self._state.t,
-            u=self._state.u,
-            v=self._state.v,
-            h=self._state.h,
-        )
-
-    def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
-        """Set utils functions.
-
-        Args:
-            optimize (bool): Whether to optimize the function.
-        """
-        if optimize:
-            self.comp_ke = OptimizableFunction(finite_diff.comp_ke)
-            self.points_to_surfaces = OptimizableFunction(
-                convert.points_to_surfaces,
-            )
-        else:
-            self.comp_ke = finite_diff.comp_ke
-            self.points_to_surfaces = convert.points_to_surfaces
-
-    def _set_fluxes(self, optimize: bool) -> None:  # noqa: FBT001
-        """Set fluxes.
-
-        Args:
-            optimize (bool): Whether to optimize the fluxes.
-        """
-        self._fluxes = flux.Fluxes(masks=self.masks, optimize=optimize)
-
-    def _create_diagnostic_vars(self, state: State) -> None:
-        state.unbind()
 
     def set_physical_uvh(
         self,
@@ -349,11 +482,11 @@ class Model(
         of the model.
 
         Args:
-            u (torch.Tensor): State variable u.
+            u (torch.Tensor): StateUVH variable u.
                 └── (n_ens, nl, nx+1, ny)-shaped.
-            v (torch.Tensor): State variable v.
+            v (torch.Tensor): StateUVH variable v.
                 └── (n_ens, nl, nx, ny+1)-shaped.
-            h (torch.Tensor): State variable h.
+            h (torch.Tensor): StateUVH variable h.
                 └── (n_ens, nl, nx, ny)-shaped.
         """
         u = u.to(self.device.get())
@@ -378,44 +511,7 @@ class Model(
         h = h.type(self.dtype) * self.masks.h
         self._state.update_uvh(UVH(u, v, h))
 
-    @abstractmethod
-    def compute_time_derivatives(
-        self,
-        prognostic: UVH,
-    ) -> UVH:
-        """Compute the state variables derivatives dt_u, dt_v, dt_h.
-
-        Args:
-            prognostic (UVH): u,v and h.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            UVH: dt_u, dt_v, dt_h
-                ├── dt_u: (n_ens, nl, nx+1, ny)-shaped
-                ├── dt_v: (n_ens, nl, nx, ny+1)-shaped
-                └── dt_h: (n_ens, nl, nx, ny)-shaped
-        """
-
-    @abstractmethod
-    def update(self, uvh: UVH) -> UVH:
-        """Update u,v and h.
-
-        Args:
-            uvh (UVH): u,v and h.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            UVH: update prognostic variables.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
-        """
-
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        self._state.increment_time(self.dt)
+        super().step()
         self._state.update_uvh(self.update(self._state.prognostic.uvh))

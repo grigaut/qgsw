@@ -2,7 +2,7 @@
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.specs import DEVICE
 from qgsw.utils.dim_checks import with_dims

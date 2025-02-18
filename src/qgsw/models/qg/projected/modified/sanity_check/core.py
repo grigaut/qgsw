@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.state import StateAlpha
-from qgsw.fields.variables.uvh import UVH, UVHTAlpha
+from qgsw.fields.variables.prognostic_tuples import UVH, UVHTAlpha
+from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
-from qgsw.models.qg.core import QG, QGCore
-from qgsw.models.qg.modified.filtered.pv import compute_g_tilde
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.core import QG, QGCore
+from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
+from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -30,7 +30,9 @@ if TYPE_CHECKING:
     )
 
 
-class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
+class QGSanityCheck(
+    QGCore[UVHTAlpha, StateUVHAlpha, "QGSanityCheckProjector"],
+):
     """QG Sanity-Checks."""
 
     _type = ModelName.QG_SANITY_CHECK
@@ -104,11 +106,11 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
         of the model.
 
         Args:
-            u (torch.Tensor): State variable u.
+            u (torch.Tensor): StateUVH variable u.
                 └── (n_ens, 2, nx+1, ny)-shaped
-            v (torch.Tensor): State variable v.
+            v (torch.Tensor): StateUVH variable v.
                 └── (n_ens, 2, nx, ny+1)-shaped
-            h (torch.Tensor): State variable h.
+            h (torch.Tensor): StateUVH variable h.
                 └── (n_ens, 2, nx, ny)-shaped
         """
         self._baseline.set_uvh(u, v, h)
@@ -116,7 +118,7 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
 
     def _set_state(self) -> None:
         """Set the state."""
-        self._state = StateAlpha.steady(
+        self._state = StateUVHAlpha.steady(
             n_ens=self.n_ens,
             nl=self.space.nl,
             nx=self.space.nx,
@@ -148,11 +150,11 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
         self._baseline.step()
         super().step()
 
-    def update(self, uvh: UVH) -> UVH:
-        """Update uvh.
+    def update(self, prognostic: UVH) -> UVH:
+        """Update prognostic.
 
         Args:
-            uvh (UVH): u,v and h.
+            prognostic (UVH): u,v and h.
                 ├── u: (n_ens, 1, nx+1, ny)-shaped
                 ├── v: (n_ens, 1, nx, ny+1)-shaped
                 └── h: (n_ens, 1, nx, ny)-shaped
@@ -164,7 +166,7 @@ class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
                 └── h: (n_ens, 1, nx, ny)-shaped
         """
         self._rk3_i = 0
-        return super().update(uvh)
+        return super().update(prognostic)
 
     def set_wind_forcing(
         self,
@@ -367,7 +369,7 @@ class QGSanityCheckProjector(QGProjector):
             dy=self._space.dy,
             ds=self._space.ds,
             f0=self._f0,
-            p2=self.p2_i_baseline,
+            p2_i=self.p2_i_baseline,
             g2=self._g2,
             points_to_surfaces=self._points_to_surface,
         )

@@ -6,16 +6,21 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH, UVHT, BasePrognosticTuple
-from qgsw.models.base import Model
+from qgsw.fields.variables.prognostic_tuples import (
+    UVH,
+    UVHT,
+    BasePrognosticTuple,
+)
+from qgsw.fields.variables.state import StateUVH
+from qgsw.models.base import ModelUVH
 from qgsw.models.core import schemes
 from qgsw.models.exceptions import UnsetTimestepError
 from qgsw.models.names import ModelName
-from qgsw.models.qg.projectors.core import QGProjector
+from qgsw.models.qg.projected.projectors.core import QGProjector
+from qgsw.models.qg.projected.variable_set import QGVariableSet
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
-from qgsw.models.qg.variable_set import QGVariableSet
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
@@ -33,9 +38,10 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound=BasePrognosticTuple)
 Projector = TypeVar("Projector", bound=QGProjector)
+State = TypeVar("State", bound=StateUVH)
 
 
-class QGCore(Model[T], Generic[T, Projector]):
+class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
     """Quasi Geostrophic Model."""
 
     _save_p_values = False
@@ -107,35 +113,35 @@ class QGCore(Model[T], Generic[T, Projector]):
         """Core Shallow Water Model."""
         return self._core
 
-    @Model.slip_coef.setter
+    @ModelUVH.slip_coef.setter
     def slip_coef(self, slip_coef: float) -> None:
         """Slip coefficient setter."""
-        Model.slip_coef.fset(self, slip_coef)
+        ModelUVH.slip_coef.fset(self, slip_coef)
         self.sw.slip_coef = slip_coef
 
-    @Model.bottom_drag_coef.setter
+    @ModelUVH.bottom_drag_coef.setter
     def bottom_drag_coef(self, bottom_drag_coef: float) -> None:
         """Beta-plane setter."""
-        Model.bottom_drag_coef.fset(self, bottom_drag_coef)
+        ModelUVH.bottom_drag_coef.fset(self, bottom_drag_coef)
         self.sw.bottom_drag_coef = bottom_drag_coef
 
-    @Model.dt.setter
+    @ModelUVH.dt.setter
     def dt(self, dt: float) -> None:
         """Timesetp setter."""
-        Model.dt.fset(self, dt)
+        ModelUVH.dt.fset(self, dt)
         self.sw.dt = dt
 
-    @Model.masks.setter
+    @ModelUVH.masks.setter
     def masks(self, masks: Masks) -> None:
         """Masks setter."""
-        Model.masks.fset(self, masks)
+        ModelUVH.masks.fset(self, masks)
         self.sw.masks = masks
         self._P.masks = masks
 
-    @Model.n_ens.setter
+    @ModelUVH.n_ens.setter
     def n_ens(self, n_ens: int) -> None:
         """Ensemble number setter."""
-        Model.n_ens.fset(self, n_ens)
+        ModelUVH.n_ens.fset(self, n_ens)
         self.sw.n_ens = n_ens
 
     @property
@@ -207,6 +213,25 @@ class QGCore(Model[T], Generic[T, Projector]):
             device=self.device.get(),
         )
 
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        uvh = self.P.G(
+            p,
+            self.A,
+            self.H,
+            self._space.dx,
+            self._space.dy,
+            self._space.ds,
+            self.beta_plane.f0,
+            self.points_to_surfaces,
+        )
+        self.set_uvh(*uvh)
+
     def set_uvh(
         self,
         u: torch.Tensor,
@@ -220,11 +245,11 @@ class QGCore(Model[T], Generic[T, Projector]):
         of the model.
 
         Args:
-            u (torch.Tensor): State variable u.
+            u (torch.Tensor): StateUVH variable u.
                 └── (n_ens, nl, nx+1, ny)-shaped
-            v (torch.Tensor): State variable v.
+            v (torch.Tensor): StateUVH variable v.
                 └── (n_ens, nl, nx, ny+1)-shaped
-            h (torch.Tensor): State variable h.
+            h (torch.Tensor): StateUVH variable h.
                 └── (n_ens, nl, nx, ny)-shaped
         """
         self.sw.set_uvh(u, v, h)
@@ -294,11 +319,11 @@ class QGCore(Model[T], Generic[T, Projector]):
             self._p_vals.append((p, p_i))
         return self._uvh_dt
 
-    def update(self, uvh: UVH) -> UVH:
-        """Update uvh.
+    def update(self, prognostic: UVH) -> UVH:
+        """Update prognostic.
 
         Args:
-            uvh (UVH): u,v and h.
+            prognostic (UVH): u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
@@ -312,7 +337,7 @@ class QGCore(Model[T], Generic[T, Projector]):
         if self.save_p_values:
             self._p_vals = []
         return schemes.rk3_ssp(
-            uvh,
+            prognostic,
             self.dt,
             self.compute_time_derivatives,
         )
@@ -351,7 +376,7 @@ class QGCore(Model[T], Generic[T, Projector]):
         return QGVariableSet.get_variable_set(space, physics, model)
 
 
-class QG(QGCore[UVHT, QGProjector]):
+class QG(QGCore[UVHT, StateUVH, QGProjector]):
     """Quasi Geostrophic Model."""
 
     _type = ModelName.QUASI_GEOSTROPHIC

@@ -12,19 +12,23 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients import (
     create_coefficient,
 )
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model
-from qgsw.models.qg.modified.collinear_sublayer.core import QGCollinearSF
-from qgsw.models.qg.modified.collinear_sublayer.stretching_matrix import (
+from qgsw.models.qg.projected.modified.collinear.core import (
+    QGCollinearSF,
+)
+from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
     compute_g_tilde as g_tilde_qg_col,
 )
-from qgsw.models.qg.modified.filtered.core import QGCollinearFilteredSF
-from qgsw.models.qg.modified.filtered.pv import (
+from qgsw.models.qg.projected.modified.filtered.core import (
+    QGCollinearFilteredSF,
+)
+from qgsw.models.qg.projected.modified.filtered.pv import (
     compute_g_tilde as g_tilde_qg_filt,
 )
-from qgsw.models.qg.modified.utils import is_modified
+from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps

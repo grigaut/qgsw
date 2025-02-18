@@ -7,18 +7,18 @@ from qgsw.fields.variables.dynamics import (
     PhysicalSurfaceHeightAnomaly,
     PressureTilde,
 )
-from qgsw.fields.variables.state import State, StateAlpha
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic_tuples import PSIQ, UVH
+from qgsw.fields.variables.state import StatePSIQ, StateUVH, StateUVHAlpha
 from qgsw.specs import DEVICE
 
 
-def test_init_update() -> None:
-    """Test state initialization. and updates."""
+def test_uvh_init_update() -> None:
+    """Test state initialization and updates."""
     n_ens = 1
     nl = 2
     nx = 10
     ny = 10
-    state = State.steady(
+    state = StateUVH.steady(
         n_ens,
         nl,
         nx,
@@ -60,10 +60,58 @@ def test_init_update() -> None:
     assert (state.h.get() == h).all()
 
 
+def test_psiq_init_update() -> None:
+    """Test state initialization and updates."""
+    n_ens = 1
+    nl = 2
+    nx = 10
+    ny = 10
+    state = StatePSIQ.steady(
+        n_ens,
+        nl,
+        nx,
+        ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+
+    psi = state.psi.get()
+    q = state.q.get()
+
+    assert psi.shape == (n_ens, nl, nx + 1, ny + 1)
+    assert q.shape == (n_ens, nl, nx, ny)
+
+    assert (psi == 0).all()
+    assert (q == 0).all()
+
+    psi = torch.clone(psi) + 1
+    q = torch.clone(q) + 2
+
+    state.update_psiq(PSIQ(psi, q))
+
+    assert (state.psi.get() == psi).all()
+    assert (state.q.get() == q).all()
+
+    psi += 1
+    q += 2
+
+    state.update_psiq(PSIQ(psi, q))
+
+    assert (state.psi.get() == psi).all()
+    assert (state.q.get() == q).all()
+
+
 def test_nested_bound_variables() -> None:
     """Verify the behavior of nested variables."""
     # Define state
-    state = State.steady(1, 2, 10, 10, torch.float64, DEVICE.get())
+    state = StateUVH.steady(
+        1,
+        2,
+        10,
+        10,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
     # Define variables
     h = PhysicalLayerDepthAnomaly(ds=1)
     eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h)
@@ -90,14 +138,14 @@ def test_nested_bound_variables() -> None:
 
 
 def test_state_alpha_updates() -> None:
-    """Test updates on StateAlpha."""
-    state = StateAlpha.steady(
+    """Test updates on StateUVHAlpha."""
+    state = StateUVHAlpha.steady(
         1,
         2,
         10,
         10,
-        torch.float64,
-        DEVICE.get(),
+        dtype=torch.float64,
+        device=DEVICE.get(),
     )
     alpha0 = state.alpha
     state.update_uvh(UVH(state.u.get() + 2, state.v.get(), state.h.get()))
@@ -107,15 +155,15 @@ def test_state_alpha_updates() -> None:
     assert state.prognostic.uvh == uvh0
 
 
-def test_sate_update_only_alpha() -> None:
+def test_state_update_only_alpha() -> None:
     """Test that updating only state does not reload all variables."""
-    state = StateAlpha.steady(
+    state = StateUVHAlpha.steady(
         1,
         1,
         10,
         10,
-        torch.float64,
-        DEVICE.get(),
+        dtype=torch.float64,
+        device=DEVICE.get(),
     )
     state.update_uvh(
         UVH(

@@ -16,8 +16,14 @@ from qgsw.fields.variables.dynamics import (
     ZonalVelocityDiag,
 )
 from qgsw.fields.variables.prognostic import CollinearityCoefficient, Time
-from qgsw.fields.variables.uvh import UVHT, BasePrognosticTuple, UVHTAlpha
-from qgsw.models.qg.modified.utils import is_modified
+from qgsw.fields.variables.prognostic_tuples import (
+    PSIQT,
+    UVHT,
+    BasePrognosticTuple,
+    UVHTAlpha,
+)
+from qgsw.models.names import ModelName
+from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
 from qgsw.utils.sorting import sort_files
@@ -55,7 +61,23 @@ class _OutputReader(ABC, Generic[T]):
     def read(self) -> T: ...
 
 
-class OutputFile(_OutputReader[UVHT], _OutputFile):
+class OutputFilePSIQ(_OutputReader[PSIQT], _OutputFile):
+    """Output file wrapper."""
+
+    def read(self) -> PSIQT:
+        """Read the file data.
+
+        Returns:
+            PSIQT: Data.
+        """
+        return PSIQT.from_file(
+            self.path,
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+
+
+class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
     """Output file wrapper."""
 
     def read(self) -> UVHT:
@@ -145,10 +167,19 @@ class RunOutput:
                 )
                 for i in range(len(files))
             ]
-
+        elif model_type == ModelName.QUASI_GEOSTROPHIC_USUAL:
+            self._outputs = [
+                OutputFilePSIQ(
+                    step=steps[i],
+                    timestep=timesteps[i],
+                    path=files[i],
+                    second=seconds[i],
+                )
+                for i in range(len(files))
+            ]
         else:
             self._outputs = [
-                OutputFile(
+                OutputFileUVH(
                     step=steps[i],
                     timestep=timesteps[i],
                     path=files[i],

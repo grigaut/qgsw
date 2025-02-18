@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     except ImportError:
         EllipsisType = type(...)
     from qgsw.fields.variables.base import DiagnosticVariable
-    from qgsw.fields.variables.uvh import BasePrognosticTuple
+    from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
 
 
 class Error(ABC, Field):

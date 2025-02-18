@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.uvh import UVH
+from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.models.core.helmholtz import (
     compute_capacitance_matrices,
     compute_laplace_dstI,
@@ -14,7 +14,7 @@ from qgsw.models.core.helmholtz import (
     solve_helmholtz_dstI_cmm,
 )
 from qgsw.models.core.utils import OptimizableFunction
-from qgsw.models.qg.modified.exceptions import UnsetAError
+from qgsw.models.qg.projected.modified.exceptions import UnsetAError
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )

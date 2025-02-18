@@ -11,7 +11,10 @@ import pytest
 import torch
 
 from qgsw.specs import DEVICE
-from qgsw.utils.shape_checks import ShapeValidationError, with_shapes
+from qgsw.utils.shape_checks import (
+    ShapeValidationError,
+    with_shapes,
+)
 
 Param = ParamSpec("Param")
 
