@@ -155,11 +155,12 @@ class ModelParamChecker:
         try:
             return self._masks
         except AttributeError:
-            return Masks.empty(
+            self.masks = Masks.empty_tensor(
                 self.space.nx,
                 self.space.ny,
                 device=DEVICE.get(),
             )
+            return self._masks
 
     @masks.setter
     def masks(self, mask: torch.Tensor) -> None:
