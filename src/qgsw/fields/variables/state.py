@@ -108,6 +108,7 @@ class BaseState(ABC, Generic[T]):
         if not self.diag_vars:
             return txt
         txt[1] = "├── Prognostic Variables"
+        txt.append("└── Diagnostic Variables")
         txt_end = [f"\t├── {var}" for var in self.diag_vars.values()]
         chars = txt_end.pop(-1).split()
         chars[0] = "\t└──"
