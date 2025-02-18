@@ -9,7 +9,6 @@ import torch
 from qgsw.models.names import ModelName
 from qgsw.models.qg.projected.core import QG
 from qgsw.models.qg.projected.modified.collinear.core import (
-    QGAlpha,
     QGCollinearSF,
 )
 from qgsw.models.qg.projected.modified.filtered.core import (
@@ -93,7 +92,7 @@ def _instantiate_model(
     perturbation: Perturbation,
     beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
-) -> SW:
+) -> QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ | SW:
     """Instantiate SW model from Configuration.
 
     Args:
@@ -104,46 +103,15 @@ def _instantiate_model(
         Ro (float): Rossby Number.
 
     Returns:
-        SW: SW Model.
+        QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ | SW: Model.
     """
-    if model_config.type == ModelName.QUASI_GEOSTROPHIC_USUAL:
-        model = QGPSIQ(
-            space_2d=space_2d,
-            H=model_config.h,
-            g_prime=model_config.g_prime,
-            beta_plane=beta_plane,
-        )
-    elif model_config.type == ModelName.QUASI_GEOSTROPHIC:
-        model = QG(
-            space_2d=space_2d,
-            H=model_config.h,
-            g_prime=model_config.g_prime,
-            beta_plane=beta_plane,
-        )
-    elif model_config.type == ModelName.QG_COLLINEAR_SF:
-        model = QGCollinearSF(
-            space_2d=space_2d,
-            H=model_config.h,
-            g_prime=model_config.g_prime,
-            beta_plane=beta_plane,
-        )
-    elif model_config.type == ModelName.QG_FILTERED:
-        model = QGCollinearFilteredSF(
-            space_2d=space_2d,
-            H=model_config.h,
-            g_prime=model_config.g_prime,
-            beta_plane=beta_plane,
-        )
-    elif model_config.type == ModelName.SHALLOW_WATER:
-        model = SW(
-            space_2d=space_2d,
-            H=model_config.h,
-            g_prime=model_config.g_prime,
-            beta_plane=beta_plane,
-        )
-    else:
-        msg = f"Unrecognized model type: {model_config.type}"
-        raise ValueError(msg)
+    model_class = get_model_class(model_config)
+    model = model_class(
+        space_2d=space_2d,
+        H=model_config.h,
+        g_prime=model_config.g_prime,
+        beta_plane=beta_plane,
+    )
     p0 = perturbation.compute_initial_pressure(
         model.space.omega,
         model.beta_plane.f0,
@@ -161,7 +129,7 @@ def _instantiate_collinear_qg(
     perturbation: Perturbation,
     beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
-) -> QGAlpha:
+) -> QGCollinearFilteredSF | QGCollinearSF:
     """Instantiate Modified QG Models.
 
     Args:
@@ -172,26 +140,15 @@ def _instantiate_collinear_qg(
         Ro (float): Rossby Number.
 
     Returns:
-        QGAlpha: Modified QG Model.
+        QGCollinearFilteredSF | QGCollinearSF: Modified QG Model.
     """
-    if model_config.type == ModelName.QG_COLLINEAR_SF:
-        model = QGCollinearSF(
-            space_2d=space_2d,
-            H=model_config.h,
-            g_prime=model_config.g_prime,
-            beta_plane=beta_plane,
-        )
-    elif model_config.type == ModelName.QG_FILTERED:
-        model = QGCollinearFilteredSF(
-            space_2d=space_2d,
-            H=model_config.h,
-            g_prime=model_config.g_prime,
-            beta_plane=beta_plane,
-        )
-        model.P.filter.sigma = model_config.sigma
-    else:
-        msg = f"Unrecognized model type: {model_config.type}"
-        raise ValueError(msg)
+    model_class = get_model_class(model_config)
+    model = model_class(
+        space_2d=space_2d,
+        H=model_config.h,
+        g_prime=model_config.g_prime,
+        beta_plane=beta_plane,
+    )
     p0 = perturbation.compute_initial_pressure(
         model.space.omega,
         model.beta_plane.f0,
@@ -237,4 +194,35 @@ def _determine_coef0(perturbation_type: str) -> float:
     if perturbation_type == PertubationName.NONE:
         return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
     msg = f"Unknown perturbation type: {perturbation_type}"
+    raise ValueError(msg)
+
+
+def get_model_class(
+    model_config: ModelConfig,
+) -> type[SW | QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ]:
+    """Get the model class.
+
+    Args:
+        model_config (ModelConfig): Model configuration.
+
+    Raises:
+        ValueError: If the model type is not recognized.
+
+    Returns:
+        type[SW | QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ]: Model
+        class.
+    """
+    model_type = model_config.type
+
+    if model_type == ModelName.SHALLOW_WATER:
+        return SW
+    if model_type == ModelName.QUASI_GEOSTROPHIC:
+        return QG
+    if model_type == ModelName.QUASI_GEOSTROPHIC_USUAL:
+        return QGPSIQ
+    if model_type == ModelName.QG_COLLINEAR_SF:
+        return QGCollinearSF
+    if model_type == ModelName.QG_FILTERED:
+        return QGCollinearFilteredSF
+    msg = f"Unrecognized model type: {model_config.type}"
     raise ValueError(msg)
