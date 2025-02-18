@@ -35,6 +35,10 @@ from qgsw.specs import DEVICE
 from qgsw.utils.named_object import NamedObject
 
 if TYPE_CHECKING:
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
@@ -228,6 +232,25 @@ class _Model(
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.increment_time(self.dt)
+
+    @abstractmethod
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
 
 
 State_uvh = TypeVar("State_uvh", bound=BaseStateUVH)

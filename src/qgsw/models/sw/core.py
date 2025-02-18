@@ -33,6 +33,7 @@ from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.projected.projectors.core import QGProjector
+from qgsw.models.qg.projected.variable_set import QGVariableSet
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import (
@@ -42,6 +43,10 @@ from qgsw.spatial.core.discretization import (
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
@@ -371,6 +376,25 @@ class SWCore(ModelUVH[T, StateUVH], Generic[T]):
             dt_v,
             dt_h,
         )
+
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        return QGVariableSet.get_variable_set(space, physics, model)
 
 
 class SW(SWCore[UVHT]):
