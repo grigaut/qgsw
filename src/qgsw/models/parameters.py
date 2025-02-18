@@ -155,7 +155,7 @@ class ModelParamChecker:
         try:
             return self._masks
         except AttributeError:
-            self.masks = Masks.empty_tensor(
+            self._masks = Masks.empty(
                 self.space.nx,
                 self.space.ny,
                 device=DEVICE.get(),
