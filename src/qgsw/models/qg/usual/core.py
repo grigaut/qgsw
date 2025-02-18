@@ -36,10 +36,15 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.models.qg.usual.exceptions import UnsetStencilError
+from qgsw.models.qg.usual.variable_sets import QGPSIQVariableSet
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
@@ -542,3 +547,22 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         """Performs one step time-integration with RK3-SSP scheme."""
         super().step()
         self._state.update_psiq(self.update(self._state.prognostic.psiq))
+
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        return QGPSIQVariableSet.get_variable_set(space, physics, model)

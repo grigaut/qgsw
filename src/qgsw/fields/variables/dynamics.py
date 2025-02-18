@@ -7,10 +7,11 @@ from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
     MeridionalVelocity,
+    PrognosticPotentialVorticity,
+    PrognosticStreamFunction,
     Time,
     ZonalVelocity,
 )
-from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
 from qgsw.fields.variables.state import StateUVH
 from qgsw.models.core.helmholtz import (
     compute_laplace_dstI,
@@ -39,7 +40,8 @@ from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.prognostic_tuples import (
-        BasePrognosticTuple,
+        BasePrognosticPSIQ,
+        BasePrognosticUVH,
         UVHTAlpha,
     )
     from qgsw.fields.variables.state import StateUVH
@@ -65,11 +67,11 @@ class PhysicalZonalVelocity(DiagnosticVariable):
         """
         self._dx = dx
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -103,11 +105,11 @@ class PhysicalMeridionalVelocity(DiagnosticVariable):
         """
         self._dy = dy
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -141,11 +143,11 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
         """
         self._ds = ds
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -179,11 +181,11 @@ class ZonalVelocityFlux(DiagnosticVariable):
         """
         self._dx = dx
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -192,7 +194,7 @@ class ZonalVelocityFlux(DiagnosticVariable):
                 └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            BasePrognosticTuple: Value
+            BasePrognosticUVH: Value
                 └── (n_ens, nl, nx+1, ny)-shaped
         """
         return prognostic.u / self._dx**2
@@ -217,11 +219,11 @@ class MeridionalVelocityFlux(DiagnosticVariable):
         """
         self._dy = dy
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -230,7 +232,7 @@ class MeridionalVelocityFlux(DiagnosticVariable):
                 └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            BasePrognosticTuple: Value
+            BasePrognosticUVH: Value
                 └── (n_ens, nl, nx, ny+1)-shaped
         """
         return prognostic.v / self._dy**2
@@ -250,11 +252,11 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
     def __init__(self) -> None:
         """Instantiate variable."""
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -291,11 +293,11 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
         self._require_alpha |= h_phys.require_alpha
         self._require_time |= h_phys.require_time
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -357,11 +359,11 @@ class MaskedVorticity(DiagnosticVariable):
         self._w_vertical_bound = masks.w_vertical_bound
         self._w_horizontal_bound = masks.w_horizontal_bound
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
 
         Returns:
             torch.Tensor: Vorticity
@@ -394,11 +396,11 @@ class Vorticity(DiagnosticVariable):
     _description = "Vorticity"
     _scope = Scope.POINT_WISE
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic tuple.
+            prognostic (BasePrognosticUVH): Prognostic tuple.
 
         Returns:
             torch.Tensor: Vorticity.
@@ -434,11 +436,11 @@ class PhysicalVorticity(DiagnosticVariable):
         self._require_alpha |= vorticity.require_alpha
         self._require_time |= vorticity.require_time
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -499,11 +501,11 @@ class Pressure(DiagnosticVariable):
         self._require_alpha |= eta_phys.require_alpha
         self._require_time |= eta_phys.require_time
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -630,11 +632,11 @@ class PotentialVorticity(DiagnosticVariable):
         self._f0 = f0
         self._interp = OptimizableFunction(points_to_surfaces)
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -679,11 +681,11 @@ class StreamFunction(DiagnosticVariable):
         self._require_alpha |= pressure.require_alpha
         self._require_time |= pressure.require_time
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -757,11 +759,11 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
             .unsqueeze(0)
         )
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -813,11 +815,11 @@ class Enstrophy(DiagnosticVariable):
         self._require_alpha |= pv.require_alpha
         self._require_time |= pv.require_time
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -858,11 +860,11 @@ class TotalEnstrophy(Enstrophy):
     _description = "Total enstrophy"
     _scope = Scope.ENSEMBLE_WISE
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -891,11 +893,11 @@ class ZonalVelocityDiag(DiagnosticVariable):
     _description = ZonalVelocity.get_description()
     _scope = ZonalVelocity.get_scope()
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -921,11 +923,11 @@ class MeridionalVelocityDiag(DiagnosticVariable):
     _description = MeridionalVelocity.get_description()
     _scope = MeridionalVelocity.get_scope()
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -951,11 +953,11 @@ class LayerDepthAnomalyDiag(DiagnosticVariable):
     _description = LayerDepthAnomaly.get_description()
     _scope = LayerDepthAnomaly.get_scope()
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -981,11 +983,11 @@ class TimeDiag(DiagnosticVariable):
     _description = Time.get_description()
     _scope = Time.get_scope()
 
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
         """Compute variable value.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables
+            prognostic (BasePrognosticUVH): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -998,6 +1000,8 @@ class TimeDiag(DiagnosticVariable):
                 └── (n_ens, )-shaped
         """
         return prognostic.t
+
+        return prognostic.psi
 
 
 class CollinearityCoefficientDiag(DiagnosticVariable):
@@ -1028,3 +1032,59 @@ class CollinearityCoefficientDiag(DiagnosticVariable):
                 └── (n_ens, )-shaped
         """
         return prognostic.alpha
+
+
+class ProgStreamFunctionDiag(DiagnosticVariable):
+    """Diagnostic Stream Function.
+
+    └── (n_ens, nl, nx+1, ny+1)-shaped
+    """
+
+    _unit = PrognosticStreamFunction.get_unit()
+    _name = PrognosticStreamFunction.get_name()
+    _description = PrognosticStreamFunction.get_description()
+    _scope = PrognosticStreamFunction.get_scope()
+
+    def _compute(self, prognostic: BasePrognosticPSIQ) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t,) psi and q.
+                ├── (t: (n_ens,)-shaped)
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └── q: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Value.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        return prognostic.psi
+
+
+class ProgPotentialVorticityDiag(DiagnosticVariable):
+    """Diagnostic Potential Vorticity.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
+
+    _unit = PrognosticPotentialVorticity.get_unit()
+    _name = PrognosticPotentialVorticity.get_name()
+    _description = PrognosticPotentialVorticity.get_description()
+    _scope = PrognosticPotentialVorticity.get_scope()
+
+    def _compute(self, prognostic: BasePrognosticPSIQ) -> torch.Tensor:
+        """Compute variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t,) psi and q.
+                ├── (t: (n_ens,)-shaped)
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └── q: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Value.
+                └── (n_ens, nl, nx, ny)-shaped
+        """
+        return prognostic.psi
