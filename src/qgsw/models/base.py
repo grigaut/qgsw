@@ -233,8 +233,8 @@ class _Model(
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.increment_time(self.dt)
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def get_variable_set(
         cls,
         space: SpaceConfig,
