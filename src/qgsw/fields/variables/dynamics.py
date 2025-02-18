@@ -1087,4 +1087,4 @@ class ProgPotentialVorticityDiag(DiagnosticVariable):
             torch.Tensor: Value.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        return prognostic.psi
+        return prognostic.q
