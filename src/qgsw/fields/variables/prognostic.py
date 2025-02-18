@@ -65,4 +65,4 @@ class PrognosticPotentialVorticity(PrognosticVariable):
     _scope = Scope.POINT_WISE
     _unit = Unit.S_1
     _name = "q"
-    _description = "Potetntial vorticity"
+    _description = "Potential vorticity"
