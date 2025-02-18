@@ -369,7 +369,7 @@ class QGSanityCheckProjector(QGProjector):
             dy=self._space.dy,
             ds=self._space.ds,
             f0=self._f0,
-            p2=self.p2_i_baseline,
+            p2_i=self.p2_i_baseline,
             g2=self._g2,
             points_to_surfaces=self._points_to_surface,
         )
