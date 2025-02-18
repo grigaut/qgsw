@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 Projector = TypeVar("Projector", bound=QGProjector)
 
 
-class QGAlpha(QGCore[UVHTAlpha, Projector]):
+class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
     """Collinear QG Model."""
 
     _supported_layers_nb: int

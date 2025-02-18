@@ -231,8 +231,8 @@ class _Model(
 
 
 class ModelUVH(
-    _Model[PrognosticUVH, StateUVH, UVH],
-    Generic[PrognosticUVH],
+    _Model[PrognosticUVH, State, UVH],
+    Generic[PrognosticUVH, State],
 ):
     """Base class for UVH models.
 

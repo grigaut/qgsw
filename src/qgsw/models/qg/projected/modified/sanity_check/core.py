@@ -30,7 +30,9 @@ if TYPE_CHECKING:
     )
 
 
-class QGSanityCheck(QGCore[UVHTAlpha, "QGSanityCheckProjector"]):
+class QGSanityCheck(
+    QGCore[UVHTAlpha, StateUVHAlpha, "QGSanityCheckProjector"],
+):
     """QG Sanity-Checks."""
 
     _type = ModelName.QG_SANITY_CHECK

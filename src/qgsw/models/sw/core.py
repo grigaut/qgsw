@@ -26,7 +26,7 @@ from qgsw.fields.variables.prognostic_tuples import (
     BasePrognosticTuple,
     UVHTAlpha,
 )
-from qgsw.fields.variables.state import StateUVHAlpha
+from qgsw.fields.variables.state import StateUVH, StateUVHAlpha
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
@@ -42,7 +42,6 @@ from qgsw.spatial.core.discretization import (
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.state import StateUVH
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
@@ -64,7 +63,7 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
 T = TypeVar("T", bound=BasePrognosticTuple)
 
 
-class SWCore(ModelUVH[T], Generic[T]):
+class SWCore(ModelUVH[T, StateUVH], Generic[T]):
     """Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .

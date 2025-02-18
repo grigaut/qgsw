@@ -72,7 +72,6 @@ if np.isnan(config.simulation.dt):
     )
 else:
     model.dt = config.simulation.dt
-model.compute_time_derivatives(model.prognostic)
 model.set_wind_forcing(taux, tauy)
 
 ## Compute Burger Number

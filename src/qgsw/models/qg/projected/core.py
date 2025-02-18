@@ -11,6 +11,7 @@ from qgsw.fields.variables.prognostic_tuples import (
     UVHT,
     BasePrognosticTuple,
 )
+from qgsw.fields.variables.state import StateUVH
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import schemes
 from qgsw.models.exceptions import UnsetTimestepError
@@ -37,9 +38,10 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound=BasePrognosticTuple)
 Projector = TypeVar("Projector", bound=QGProjector)
+State = TypeVar("State", bound=StateUVH)
 
 
-class QGCore(ModelUVH[T], Generic[T, Projector]):
+class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
     """Quasi Geostrophic Model."""
 
     _save_p_values = False
@@ -374,7 +376,7 @@ class QGCore(ModelUVH[T], Generic[T, Projector]):
         return QGVariableSet.get_variable_set(space, physics, model)
 
 
-class QG(QGCore[UVHT, QGProjector]):
+class QG(QGCore[UVHT, StateUVH, QGProjector]):
     """Quasi Geostrophic Model."""
 
     _type = ModelName.QUASI_GEOSTROPHIC

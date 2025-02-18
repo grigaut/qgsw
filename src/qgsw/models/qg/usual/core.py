@@ -1,6 +1,9 @@
 """Usual QG Model."""
 
+from __future__ import annotations
+
 import contextlib
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F  # noqa: N812
@@ -33,16 +36,19 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.models.qg.usual.exceptions import UnsetStencilError
-from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
+
+if TYPE_CHECKING:
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
 class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
     """Finite volume multi-layer QG solver."""
 
     _type = ModelName.QUASI_GEOSTROPHIC_USUAL
+    _flux_stencil = 5
 
     dtype = torch.float64
     device = DEVICE
@@ -104,13 +110,8 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
             if (self.space.nl - 2) > 0
             else None
         )
-
         # wind forcing
-        self._curl_tau = torch.zeros(
-            (1, 1, self.space.nx, self.space.ny),
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        )
+        self.set_wind_forcing(0.0, 0.0)
 
     @property
     def flux_stencil(self) -> int:
@@ -401,8 +402,14 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
         psi_modes += alpha * self.homsol
         return torch.einsum("lm,...mxy->...lxy", self.Cm2l, psi_modes)
 
-    def set_wind_forcing(self, taux: torch.Tensor, tauy: torch.Tensor) -> None:
+    def set_wind_forcing(
+        self,
+        taux: torch.Tensor | float,
+        tauy: torch.Tensor | float,
+    ) -> None:
         """Set the wind forcing.
+
+        WARNING: Both taux and tauy are padded on the right.
 
         Args:
             taux (torch.Tensor): Wind stress in the x direction.
@@ -410,6 +417,13 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
             tauy (torch.Tensor): Wind stress in the y direction.
                 └── (n_ens, nl, nx, ny)-shaped
         """
+        if isinstance(taux, float) and isinstance(tauy, float):
+            self._curl_tau = torch.zeros(
+                (self.n_ens, 1, self.space.nx, self.space.ny),
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            return
         curl_tau = (
             torch.diff(F.pad(tauy, (0, 1, 0, 0))) / self._space.dx
             - torch.diff(F.pad(taux, (0, 0, 0, 1))) / self._space.dy

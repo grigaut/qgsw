@@ -96,22 +96,18 @@ class BaseState(ABC, Generic[T]):
         Returns:
             list[str]: String representation parts.
         """
-        if not self.diag_vars:
-            return [
-                "State",
-                "└── Prognostic Variables",
-                f"\t├── {self.u}",
-                f"\t├── {self.v}",
-                f"\t└── {self.h}",
-            ]
         txt = [
             "State",
-            "├── Prognostic Variables",
-            f"│\t├── {self.u}",
-            f"│\t├── {self.v}",
-            f"│\t└── {self.h}",
-            "└── Diagnostic Variables",
+            "└── Prognostic Variables",
         ]
+        txt_prog = [f"\t├── {var}" for var in self.prog_vars.values()]
+        chars = txt_prog.pop(-1).split()
+        chars[0] = "\t└──"
+        txt_prog.append(" ".join(chars))
+        txt = txt + txt_prog
+        if not self.diag_vars:
+            return txt
+        txt[1] = "├── Prognostic Variables"
         txt_end = [f"\t├── {var}" for var in self.diag_vars.values()]
         chars = txt_end.pop(-1).split()
         chars[0] = "\t└──"

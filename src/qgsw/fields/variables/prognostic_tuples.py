@@ -247,7 +247,10 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
         """
         data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
         t = data[Time.get_name()].to(dtype=dtype, device=device)
-        return cls.from_psiq(t, PSIQ.from_file(file, dtype, device))
+        return cls.from_psiq(
+            t,
+            PSIQ.from_file(file, dtype=dtype, device=device),
+        )
 
 
 class _UVH(NamedTuple):
