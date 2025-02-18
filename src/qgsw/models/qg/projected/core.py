@@ -66,6 +66,13 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self._core = self._init_core_model(
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            optimize=optimize,
+        )
         super().__init__(
             space_2d=space_2d,
             H=H,
@@ -75,13 +82,6 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
         )
         self.A = self.compute_A(H, g_prime)
         self._set_projector()
-        self._core = self._init_core_model(
-            space_2d=space_2d,
-            H=H,
-            g_prime=g_prime,
-            beta_plane=beta_plane,
-            optimize=optimize,
-        )
 
     @property
     def save_p_values(self) -> bool:
