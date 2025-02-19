@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw import verbose
+from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.filters.high_pass import (
     SpectralGaussianHighPass2D,
 )
@@ -26,7 +27,6 @@ from qgsw.models.qg.projected.modified.exceptions import (
 )
 from qgsw.models.qg.projected.modified.filtered.pv import (
     compute_g_tilde,
-    compute_pv,
     compute_source_term_factor,
 )
 from qgsw.models.qg.projected.modified.filtered.variable_set import (
@@ -51,8 +51,6 @@ if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
-    from qgsw.fields.variables.prognostic_tuples import UVH
-    from qgsw.filters.base import _Filter
     from qgsw.masks import Masks
     from qgsw.physics.coriolis.beta_plane import BetaPlane
 
@@ -228,84 +226,6 @@ class QGCollinearFilteredProjector(QGProjector):
         with contextlib.suppress(UnsetAError):
             self._set_helmholtz_solver(self.lambd, self.alpha, self._f0)
 
-    @classmethod
-    def Q(  # noqa: N802
-        cls,
-        uvh: UVH,
-        H: torch.Tensor,  # noqa: N803
-        g_prime: torch.Tensor,
-        g_tilde: torch.Tensor,
-        f0: float,
-        ds: float,
-        filt: _Filter,
-        alpha: torch.Tensor,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
-    ) -> torch.Tensor:
-        """PV linear operator.
-
-        Args:
-            uvh (UVH): Prognostic u,v and h.
-                ├── u: (n_ens, 1, nx+1, ny)-shaped
-                ├── v: (n_ens, 1, nx, ny+1)-shaped
-                └── h: (n_ens, 1, nx, ny)-shaped
-            H (torch.Tensor): Layers reference thickness.
-                └── (1, 1, 1)-shaped.
-            g_prime (torch.Tensor): Reduced gravity.
-                └── (2, 1, 1)-shaped.
-            g_tilde (torch.Tensor): Equivalent reduced gravity.
-                └── (1, )-shaped.
-            f0 (float): f0.
-            ds (float): ds.
-            filt (_Filter): Filter.
-            alpha (torch.Tensor): Collinearity coefficient.
-                └── (1, )-shaped.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
-            to surface interpolation function.
-
-        Returns:
-            torch.Tensor: Physical Potential Vorticity * f0.
-                └── (n_ens, nl, nx-1, ny-1)-shaped.
-        """
-        return (
-            compute_pv(
-                uvh,
-                H,
-                g_prime,
-                g_tilde,
-                f0,
-                ds,
-                filt,
-                alpha,
-                points_to_surfaces,
-            )
-            * f0
-        )
-
-    def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
-        """PV linear operator.
-
-        Args:
-            uvh (UVH): Prognostic u,v and h.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            torch.Tensor: Physical Potential Vorticity * f0.
-                └── (n_ens, nl, nx-1, ny-1)-shaped.
-        """
-        return self.Q(
-            uvh=uvh,
-            H=self.H,
-            g_prime=self._g_prime,
-            g_tilde=self._g_tilde,
-            f0=self._f0,
-            ds=self._space.ds,
-            filt=self._filter,
-            alpha=self.alpha,
-            points_to_surfaces=self._points_to_surface,
-        )
-
     def _set_helmholtz_solver(
         self,
         lambd: torch.Tensor,
@@ -401,6 +321,96 @@ class QGCollinearFilteredProjector(QGProjector):
         # Compute homogenous solution
         self.homsol_wgrid = cst_wgrid + sol_wgrid * f0**2 * lambd
         self.homsol_wgrid_mean = self.homsol_wgrid.mean((-1, -2), keepdim=True)
+
+    @classmethod
+    @with_shapes(
+        g2=(1,),
+        H=(1, 1, 1),
+        alpha=(1,),
+    )
+    def G(  # noqa: N802
+        cls,
+        p: torch.Tensor,
+        A: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,  # noqa: N803
+        dx: float,
+        dy: float,
+        ds: float,
+        f0: float,
+        g2: torch.Tensor,
+        alpha: torch.Tensor,
+        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        p_i: torch.Tensor | None = None,
+    ) -> UVH:
+        """Geostrophic operator.
+
+        Args:
+            p (torch.float):Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+            A (torch.Tensor): Stretching matrix.
+                └── (nl,nl)-shaped.
+            H (torch.Tensor): Layers reference thickness.
+                └── (nl, 1, 1)-shaped.
+            dx (float): dx.
+            dy (float): dy.
+            ds (float): ds.
+            f0 (float): f0.
+            g2 (torch.Tensor): Reduced gravity in the second layer.
+                └── (1,)-shaped
+            alpha (torch.Tensor): Collinearity coefficient.
+                └── (1,)-shaped
+            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            to surface function.
+            p_i (torch.Tensor | None, optional): Interpolated pressure.
+            Defaults to None.
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            UVH: Prognostic variables u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+        """
+        p_i = points_to_surfaces(p) if p_i is None else p_i
+
+        # geostrophic balance
+        u = -torch.diff(p, dim=-1) / dy / f0 * dx
+        v = torch.diff(p, dim=-2) / dx / f0 * dy
+        # source_term = A_{1,2} p_2
+        source_term = alpha / H[0, 0, 0] / g2 * p_i
+        # h = diag(H)(Ap-A_{1,2}p_2)
+        h = H * (torch.einsum("lm,...mxy->...lxy", A, p_i) - source_term) * ds
+
+        return UVH(u, v, h)
+
+    def _G(self, p: torch.Tensor, p_i: torch.Tensor | None) -> UVH:  # noqa: N802
+        """Geostrophic operator.
+
+        Args:
+            p (torch.float):Pressure, (n_ens, nl, nx+1, ny+1)-shaped.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+            p_i (torch.Tensor | None): Interpolated pressure.
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            UVH: Prognostic variables u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+        """
+        return self.G(
+            p=p,
+            p_i=p_i,
+            A=self._A,
+            H=self._H,
+            dx=self._space.dx,
+            dy=self._space.dy,
+            ds=self._space.ds,
+            f0=self._f0,
+            g2=self._g_prime[1:2, 0, 0],
+            alpha=self.alpha,
+            points_to_surfaces=self._points_to_surface,
+        )
 
     @classmethod
     def create_filter(cls, sigma: float) -> SpectralGaussianHighPass2D:
