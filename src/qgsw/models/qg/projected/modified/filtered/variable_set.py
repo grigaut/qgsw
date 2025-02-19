@@ -8,22 +8,16 @@ from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
-    PhysicalVorticity,
     Pressure,
     SurfaceHeightAnomaly,
-    Vorticity,
 )
-from qgsw.filters.spectral import SpectralGaussianFilter2D
 from qgsw.models.qg.projected.modified.filtered.pv import (
-    CollinearFilteredPotentialVorticity,
     compute_g_tilde,
 )
 from qgsw.models.qg.projected.variable_set import QGVariableSet
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
-    from qgsw.configs.physics import PhysicsConfig
-    from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
 
 
@@ -55,34 +49,4 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
             .unsqueeze(-1)
             .unsqueeze(-1),
             var_dict[eta_phys_name],
-        )
-
-    @classmethod
-    def add_vorticity(
-        cls,
-        var_dict: dict[str, DiagnosticVariable],
-        space: SpaceConfig,
-        model: ModelConfig,
-        physics: PhysicsConfig,
-    ) -> None:
-        """Add vorticity.
-
-        Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
-            space (SpaceConfig): Space configuration.
-            model (ModelConfig): Model Configuration.
-            physics (PhysicsConfig): Physics Confdiguration.
-        """
-        var_dict[Vorticity.get_name()] = Vorticity()
-        var_dict[PhysicalVorticity.get_name()] = PhysicalVorticity(
-            var_dict[Vorticity.get_name()],
-            space.ds,
-        )
-        cf_pv_name = CollinearFilteredPotentialVorticity.get_name()
-        var_dict[cf_pv_name] = CollinearFilteredPotentialVorticity(
-            H=model.h,
-            g_prime=model.g_prime,
-            f0=physics.f0,
-            ds=space.ds,
-            filt=SpectralGaussianFilter2D(model.sigma),
         )
