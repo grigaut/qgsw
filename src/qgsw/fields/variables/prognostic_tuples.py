@@ -13,6 +13,7 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
+from qgsw.specs import defaults
 
 try:
     from typing import Self
@@ -104,8 +105,8 @@ class PSIQ(BasePrognosticPSIQ, _PSIQ):
         nx: int,
         ny: int,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a steady PSIQ with zero-filled prognostic variables.
 
@@ -114,12 +115,14 @@ class PSIQ(BasePrognosticPSIQ, _PSIQ):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: PSIQ.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         psi = torch.zeros(
             (n_ens, nl, nx + 1, ny + 1),
             dtype=dtype,
@@ -137,19 +140,21 @@ class PSIQ(BasePrognosticPSIQ, _PSIQ):
         cls,
         file: Path,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate PSIQ from a file.
 
         Args:
             file (Path): File to read.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: PSIQ.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
         psi_name = PrognosticStreamFunction.get_name()
         psi = data[psi_name].to(dtype=dtype, device=device)
@@ -206,8 +211,8 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
         nx: int,
         ny: int,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a PSIQT with zero-filled prognostic variables.
 
@@ -216,12 +221,14 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: PSIQT.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         return cls.from_psiq(
             torch.zeros((n_ens,), dtype=dtype, device=device),
             PSIQ.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
@@ -232,19 +239,21 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
         cls,
         file: Path,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate PSIQT from a file.
 
         Args:
             file (Path): File to read.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: PSIQT.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
         t = data[Time.get_name()].to(dtype=dtype, device=device)
         return cls.from_psiq(
@@ -295,8 +304,8 @@ class UVH(BasePrognosticUVH, _UVH):
         nl: int,
         nx: int,
         ny: int,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a steady UVH with zero-filled prognostic variables.
 
@@ -305,12 +314,14 @@ class UVH(BasePrognosticUVH, _UVH):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: UVH.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         h = torch.zeros(
             (n_ens, nl, nx, ny),
             dtype=dtype,
@@ -332,19 +343,21 @@ class UVH(BasePrognosticUVH, _UVH):
     def from_file(
         cls,
         file: Path,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate UVH from a file.
 
         Args:
             file (Path): File to read.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: UVH.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
         u = data[ZonalVelocity.get_name()].to(dtype=dtype, device=device)
         v = data[MeridionalVelocity.get_name()].to(dtype=dtype, device=device)
@@ -400,8 +413,8 @@ class UVHT(BasePrognosticUVH, _UVHT):
         nx: int,
         ny: int,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a UVHT with zero-filled prognostic variables.
 
@@ -410,12 +423,14 @@ class UVHT(BasePrognosticUVH, _UVHT):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: UVHT.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         return cls.from_uvh(
             torch.zeros((n_ens,), dtype=dtype, device=device),
             UVH.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
@@ -426,19 +441,21 @@ class UVHT(BasePrognosticUVH, _UVHT):
         cls,
         file: Path,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate UVHT from a file.
 
         Args:
             file (Path): File to read.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: UVHT.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
         t = data[Time.get_name()].to(dtype=dtype, device=device)
         return cls.from_uvh(t, UVH.from_file(file, dtype=dtype, device=device))
@@ -519,8 +536,8 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
         nx: int,
         ny: int,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a UVHTAlpha with zero-filled prognostic variables.
 
@@ -530,12 +547,14 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: UVHTAlpha.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         return cls.from_uvht(
             torch.zeros((n_ens,), dtype=dtype, device=device),
             UVHT.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
@@ -545,19 +564,21 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
     def from_file(
         cls,
         file: Path,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate UVHTAlpha from a file.
 
         Args:
             file (Path): File to read.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: UVHTAlpha.
         """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
         data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
         alpha = data[CollinearityCoefficient.get_name()].to(
             dtype=dtype,

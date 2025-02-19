@@ -290,8 +290,8 @@ class StatePSIQ(BaseStatePSIQ[PSIQT]):
         nx: int,
         ny: int,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a steady state with zero-filled prognostic variables.
 
@@ -300,8 +300,8 @@ class StatePSIQ(BaseStatePSIQ[PSIQT]):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: StatePSIQT.
@@ -356,8 +356,8 @@ class StateUVH(BaseStateUVH[UVHT]):
         nx: int,
         ny: int,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a steady state with zero-filled prognostic variables.
 
@@ -366,8 +366,8 @@ class StateUVH(BaseStateUVH[UVHT]):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: StateUVH.
@@ -464,8 +464,8 @@ class StateUVHAlpha(BaseStateUVH[UVHTAlpha]):
         nx: int,
         ny: int,
         *,
-        dtype: torch.dtype,
-        device: torch.device,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
     ) -> Self:
         """Instantiate a steady state with zero-filled prognostic variables.
 
@@ -475,8 +475,8 @@ class StateUVHAlpha(BaseStateUVH[UVHTAlpha]):
             nl (int): Number of layers.
             nx (int): Number of points in the x direction.
             ny (int): Number of points in the y direction.
-            dtype (torch.dtype): Data type.
-            device (torch.device): Device to use.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
 
         Returns:
             Self: StateUVH.
