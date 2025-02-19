@@ -324,7 +324,9 @@ class QGCollinearFilteredProjector(QGProjector):
 
     @classmethod
     @with_shapes(
+        g2=(1,),
         H=(1, 1, 1),
+        alpha=(1,),
     )
     def G(  # noqa: N802
         cls,
@@ -335,6 +337,8 @@ class QGCollinearFilteredProjector(QGProjector):
         dy: float,
         ds: float,
         f0: float,
+        g2: torch.Tensor,
+        alpha: torch.Tensor,
         points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
         p_i: torch.Tensor | None = None,
     ) -> UVH:
@@ -351,12 +355,12 @@ class QGCollinearFilteredProjector(QGProjector):
             dy (float): dy.
             ds (float): ds.
             f0 (float): f0.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
-            to surface function.
             g2 (torch.Tensor): Reduced gravity in the second layer.
                 └── (1,)-shaped
-            p2_i (torch.Tensor): Interpolated pressure of second layer.
-                └── (n_ens, nl, nx, ny)-shaped
+            alpha (torch.Tensor): Collinearity coefficient.
+                └── (1,)-shaped
+            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            to surface function.
             p_i (torch.Tensor | None, optional): Interpolated pressure.
             Defaults to None.
                 └── (n_ens, nl, nx, ny)-shaped
@@ -373,7 +377,7 @@ class QGCollinearFilteredProjector(QGProjector):
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
         v = torch.diff(p, dim=-2) / dx / f0 * dy
         # source_term = A_{1,2} p_2
-        source_term = 1 / H[0, 0, 0] / 0.025 * p_i
+        source_term = alpha / H[0, 0, 0] / g2 * p_i
         # h = diag(H)(Ap-A_{1,2}p_2)
         h = H * (torch.einsum("lm,...mxy->...lxy", A, p_i) - source_term) * ds
 
@@ -403,6 +407,8 @@ class QGCollinearFilteredProjector(QGProjector):
             dy=self._space.dy,
             ds=self._space.ds,
             f0=self._f0,
+            g2=self._g_prime[1:2, 0, 0],
+            alpha=self.alpha,
             points_to_surfaces=self._points_to_surface,
         )
 
