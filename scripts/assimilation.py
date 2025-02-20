@@ -16,18 +16,7 @@ from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model
-from qgsw.models.qg.projected.modified.collinear.core import (
-    QGCollinearSF,
-)
-from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
-    compute_g_tilde as g_tilde_qg_col,
-)
-from qgsw.models.qg.projected.modified.filtered.core import (
-    QGCollinearFilteredSF,
-)
-from qgsw.models.qg.projected.modified.filtered.pv import (
-    compute_g_tilde as g_tilde_qg_filt,
-)
+from qgsw.models.names import ModelName
 from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
@@ -119,13 +108,6 @@ verbose.display(msg=model.__repr__(), trigger_level=1)
 nl_ref = model_ref.space.nl
 nl = model.space.nl
 
-if nl not in [1, nl_ref]:
-    msg = (
-        "This script only runs for model with 1 layer or as many layers as "
-        f"the reference model, hence {nl_ref}"
-    )
-    raise ValueError(msg)
-
 nx = model.space.nx
 ny = model.space.ny
 
@@ -199,26 +181,15 @@ with Progress() as progress:
         progress.advance(simulation)
         if fork:
             prognostic = model_ref.prognostic
-            if config.model.type == QGCollinearSF.get_type():
+            if config.model.type in [
+                ModelName.QG_COLLINEAR_SF,
+                ModelName.QG_FILTERED,
+            ]:
                 model.alpha = alpha.compute_no_slice(prognostic)
-                uvh = matching.match_psi(
-                    prognostic.uvh,
-                    config.simulation.reference.g_prime,
-                    g_tilde_qg_col(config.model.g_prime),
-                )
-            if config.model.type == QGCollinearFilteredSF.get_type():
-                model.alpha = alpha.compute_no_slice(prognostic)
-                uvh = matching.match_psi(
-                    prognostic.uvh,
-                    config.simulation.reference.g_prime,
-                    g_tilde_qg_filt(config.model.g_prime),
-                )
-            else:
-                uvh = matching.match_psi(
-                    prognostic.uvh,
-                    config.simulation.reference.g_prime,
-                    config.model.g_prime,
-                )
+            uvh = matching.match_pv(
+                prognostic.uvh,
+                nl,
+            )
             model.set_uvh(
                 torch.clone(uvh.u),
                 torch.clone(uvh.v),

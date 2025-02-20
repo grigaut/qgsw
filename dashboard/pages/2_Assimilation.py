@@ -82,7 +82,7 @@ selected_var_pts_ref = vars_dict_ref[selected_var_pts.name]
 
 if show_error_pts:
     error_pts = error_type_pts(selected_var_pts, selected_var_pts_ref)
-    error_pts.slices = [slice(None, None), slice(0, 1), ...]
+    error_pts.slices = [slice(None, None), slice(0, levels_nb), ...]
 
 with st.form(key="var-form"):
     level = st.selectbox("Level", list(range(levels_nb)))
@@ -151,19 +151,23 @@ if not check_unit_compatibility(*selected_vars_lvl):
     st.error("Selected variables don't have the same unit.")
     st.stop()
 
-if show_error_lvl:
-    errors_lvl = [
-        error_type_lvl(var, var_ref)
-        for var, var_ref in zip(selected_vars_lvl, selected_vars_lvl_ref)
-    ]
-    for error in errors_lvl:
-        error.slices = [slice(None, None), slice(0, 1), ...]
 
 with st.form(key="var-form-level-wise"):
     levels = list(range(levels_nb))
     selected_lvl = st.multiselect("Level(s)", levels)
     submit_lvl = st.form_submit_button("Display")
 
+if show_error_lvl:
+    errors_lvl = [
+        error_type_lvl(var, var_ref)
+        for var, var_ref in zip(selected_vars_lvl, selected_vars_lvl_ref)
+    ]
+    for error in errors_lvl:
+        error.slices = [
+            slice(None, None),
+            slice(0, levels_nb),
+            ...,
+        ]
 
 if submit_lvl:
     if not show_error_lvl:
@@ -213,21 +217,22 @@ if submit_lvl:
         plot_lvl.set_xs(*xs, *xs_ref)
     else:
         uvhs = [
-            (output.read() for output in run.outputs())
-            for _ in selected_lvl
+            [(output.read() for output in run.outputs()) for _ in selected_lvl]
             for _ in selected_vars_lvl
         ]
         uvhs_ref = [
-            (output.read() for output in run_ref.outputs())
-            for _ in selected_lvl
+            [
+                (output.read() for output in run_ref.outputs())
+                for _ in selected_lvl
+            ]
             for _ in selected_vars_lvl
         ]
         datas = [
             [
                 errors_lvl[k].compute_level_wise(uvh, uvh_ref)[0, lvl].cpu()
-                for uvh, uvh_ref in zip(uvhs[k], uvhs_ref[k])
+                for uvh, uvh_ref in zip(uvhs[k][i], uvhs_ref[k][i])
             ]
-            for lvl in selected_lvl
+            for i, lvl in enumerate(selected_lvl)
             for k in range(len(selected_vars_lvl))
         ]
         names = [
@@ -281,6 +286,8 @@ if show_error_ens:
         error_type_ens(var, var_ref)
         for var, var_ref in zip(selected_vars_ens, selected_vars_ens_ref)
     ]
+    for error in errors_ens:
+        error.slices = [slice(None, None), slice(0, levels_nb), ...]
 
 with st.form(key="var-form-ensemble-wise"):
     submit_ensemble = st.form_submit_button("Display")
