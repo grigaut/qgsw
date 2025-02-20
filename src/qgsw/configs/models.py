@@ -74,7 +74,10 @@ class ConstantCollinearityCoefConfig(
     value: float
 
 
-class InferredCollinearityCoefConfig(BaseModel):
+class InferredCollinearityCoefConfig(
+    NamedObjectConfig[CoefficientName],
+    BaseModel,
+):
     """Inferred collinearity coeffciient."""
 
     type: Literal[CoefficientName.LSR_INFERRED]
