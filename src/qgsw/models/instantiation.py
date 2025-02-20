@@ -68,7 +68,7 @@ def instantiate_model(
         Model: Model.
     """
     if is_modified(model_config.type):
-        model = _instantiate_collinear_qg(
+        model = _instantiate_modified(
             model_config=model_config,
             space_2d=space_2d,
             perturbation=perturbation,
@@ -123,7 +123,7 @@ def _instantiate_model(
     return model
 
 
-def _instantiate_collinear_qg(
+def _instantiate_modified(
     model_config: ModelConfig,
     space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
@@ -154,6 +154,8 @@ def _instantiate_collinear_qg(
         model.beta_plane.f0,
         Ro,
     )
+    if model_config.type == ModelName.QG_FILTERED:
+        model.P.filter.sigma = model_config.sigma
     model.alpha = _determine_coef0(perturbation.type)
     uvh0 = QGProjector.G(
         p0,
