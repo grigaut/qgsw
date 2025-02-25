@@ -10,6 +10,7 @@ from qgsw.fields.variables.prognostic_tuples import UVH, UVHTAlpha
 from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
+from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.projected.core import QG, QGCore
 from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
 from qgsw.models.qg.projected.projectors.core import QGProjector
@@ -78,6 +79,11 @@ class QGSanityCheck(
             optimize,
         )
 
+    @property
+    def baseline(self) -> QG:
+        """Baseline model."""
+        return self._baseline
+
     @QGCore.dt.setter
     def dt(self, dt: float) -> None:
         """Timestep."""
@@ -92,6 +98,37 @@ class QGSanityCheck(
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
+
+    @ModelParamChecker.slip_coef.setter
+    def slip_coef(self, slip_coefficient: float) -> None:
+        """Slip coefficient."""
+        ModelParamChecker.slip_coef.fset(self, slip_coefficient)
+        self._baseline.slip_coef = slip_coefficient
+
+    @ModelParamChecker.bottom_drag_coef.setter
+    def bottom_drag_coef(self, bottom_drag: float) -> None:
+        """Bottom drag coefficient."""
+        ModelParamChecker.bottom_drag_coef.fset(self, bottom_drag)
+        self._baseline.bottom_drag_coef = bottom_drag
+
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        uvh = self._baseline.P.G(
+            p,
+            self._baseline.A,
+            self._baseline.H,
+            self._space.dx,
+            self._space.dy,
+            self._space.ds,
+            self.beta_plane.f0,
+            self.points_to_surfaces,
+        )
+        self.set_uvh(*uvh)
 
     def set_uvh(
         self,
