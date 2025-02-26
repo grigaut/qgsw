@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 import torch
 
 from qgsw.specs import DEVICE
@@ -33,3 +35,22 @@ def get_device(device: torch.device | None = None) -> torch.device:
     if device is None:
         return DEVICE.get()
     return device
+
+
+class DefaultSpecs(TypedDict):
+    """Defaults specs."""
+
+    dtype: torch.dtype
+    device: torch.device
+
+
+def get() -> DefaultSpecs:
+    """Get defaults.
+
+    Returns:
+        DefaultSpecs: Default specs.
+    """
+    return DefaultSpecs(
+        dtype=get_dtype(),
+        device=get_device(),
+    )
