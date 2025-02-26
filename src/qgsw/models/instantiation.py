@@ -14,6 +14,7 @@ from qgsw.models.qg.projected.modified.collinear.core import (
 from qgsw.models.qg.projected.modified.filtered.core import (
     QGCollinearFilteredSF,
 )
+from qgsw.models.qg.projected.modified.sanity_check.core import QGSanityCheck
 from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.usual.core import QGPSIQ
@@ -112,8 +113,13 @@ def _instantiate_model(
         g_prime=model_config.g_prime,
         beta_plane=beta_plane,
     )
+    if model.get_type() == ModelName.QG_SANITY_CHECK:
+        omega_grid = model.baseline.space.omega
+    else:
+        omega_grid = model.space.omega
+
     p0 = perturbation.compute_initial_pressure(
-        model.space.omega,
+        omega_grid,
         model.beta_plane.f0,
         Ro,
     )
@@ -199,9 +205,14 @@ def _determine_coef0(perturbation_type: str) -> float:
     raise ValueError(msg)
 
 
+ModelClass = type[
+    SW | QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ | QGSanityCheck
+]
+
+
 def get_model_class(
     model_config: ModelConfig,
-) -> type[SW | QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ]:
+) -> ModelClass:
     """Get the model class.
 
     Args:
@@ -211,8 +222,7 @@ def get_model_class(
         ValueError: If the model type is not recognized.
 
     Returns:
-        type[SW | QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ]: Model
-        class.
+        ModelClass: Model class.
     """
     model_type = model_config.type
 
@@ -226,5 +236,7 @@ def get_model_class(
         return QGCollinearSF
     if model_type == ModelName.QG_FILTERED:
         return QGCollinearFilteredSF
+    if model_type == ModelName.QG_SANITY_CHECK:
+        return QGSanityCheck
     msg = f"Unrecognized model type: {model_config.type}"
     raise ValueError(msg)
