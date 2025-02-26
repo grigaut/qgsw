@@ -96,7 +96,6 @@ if np.isnan(config.simulation.dt):
     )
 else:
     model.dt = config.simulation.dt
-model.compute_time_derivatives(model.prognostic.uvh)
 model.set_wind_forcing(taux, tauy)
 
 
@@ -107,6 +106,8 @@ verbose.display(msg=model.__repr__(), trigger_level=1)
 
 nl_ref = model_ref.space.nl
 nl = model.space.nl
+if model.get_type() == ModelName.QG_SANITY_CHECK:
+    nl += 1
 
 nx = model.space.nx
 ny = model.space.ny
