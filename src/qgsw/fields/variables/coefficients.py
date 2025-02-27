@@ -5,11 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qgsw.fields.variables.coef_names import CoefficientName
-from qgsw.fields.variables.dynamics import (
-    PhysicalLayerDepthAnomaly,
-    PhysicalSurfaceHeightAnomaly,
-    Pressure,
-)
 from qgsw.utils.named_object import NamedObject
 
 try:
@@ -17,18 +12,14 @@ try:
 except ImportError:
     from typing_extensions import Self
 
-import contextlib
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
+from collections.abc import Iterable
+from typing import Generic, TypeVar
 
 import torch
 
-from qgsw.fields.scope import Scope
-from qgsw.fields.variables.base import (
-    BoundDiagnosticVariable,
-    DiagnosticVariable,
-)
-from qgsw.fields.variables.dynamics import StreamFunction
-from qgsw.specs import DEVICE
+from qgsw.fields.variables.base import Variable
+from qgsw.specs import defaults
 from qgsw.utils.least_squares_regression import (
     perform_linear_least_squares_regression,
 )
@@ -36,192 +27,283 @@ from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.core import Configuration
-    from qgsw.configs.models import ModelConfig
-    from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
-    from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
-    from qgsw.fields.variables.state import StateUVH
-    from qgsw.models.qg.projected.modified.collinear.core import QGAlpha
+
+Values = TypeVar("Values")
 
 
-class Coefficient(NamedObject[CoefficientName], DiagnosticVariable, ABC):
-    """Coefficient."""
+class Coefficient(
+    Generic[Values],
+    NamedObject[CoefficientName],
+    Variable,
+    metaclass=ABCMeta,
+):
+    """Coefficient base class."""
 
     _unit = Unit._
-    _scope = Scope.ENSEMBLE_WISE
 
-    def update_model(self, model: QGAlpha) -> None:
-        """Update a model coefficient value.
+    _nl = 1
+
+    def __init__(
+        self,
+        *,
+        nx: int,
+        ny: int,
+        n_ens: int = 1,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> None:
+        """Instantiate the coefficient.
 
         Args:
-            model (QGAlpha): Model to update.
+            nx (int): Points in the x direction.
+            ny (int): Points in the y direction.
+            n_ens (int, optional): Number of ensemble. Defaults to 1.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device. Defaults to None.
         """
-        with contextlib.suppress(AttributeError):
-            model.alpha = self.compute_no_slice(model.prognostic)
+        self._core = torch.ones(
+            (n_ens, self._nl, nx, ny),
+            **defaults.get(dtype=dtype, device=device),
+        )
+
+    @abstractmethod
+    def update(self, values: Values) -> None:
+        """Update the Coefficient value.
+
+        Args:
+            values (Values): Values to use for update.
+        """
+
+    def get(self) -> torch.Tensor:
+        """Get the coefficient value.
+
+        Returns:
+            torch.Tensor: Coefficient value.
+        """
+        return self._core
 
     @classmethod
-    @abstractmethod
-    def from_config(
-        cls,
-        model_config: ModelConfig,
-        physics_config: PhysicsConfig,
-        space_config: SpaceConfig,
-    ) -> Self:
-        """Instantiate coeffcient from configuration.
+    def from_config(cls, space_config: SpaceConfig) -> Self:
+        """Instantiate the coefficient from configuration.
 
         Args:
-            model_config (ModelConfig): Model configuration.
-            physics_config (PhysicsConfig): Physics configuration.
             space_config (SpaceConfig): Space configuration.
 
         Returns:
-            Self: Coefficient.
+            Self: Coefficient
         """
+        return cls(nx=space_config.nx, ny=space_config.ny)
 
 
-class LSRSFInferredAlpha(Coefficient):
+class UniformCoefficient(Coefficient[float]):
+    """Space-uniform coefficient."""
+
+    _type = CoefficientName.UNIFORM
+
+    def __init__(
+        self,
+        *,
+        nx: int,
+        ny: int,
+        n_ens: int = 1,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> None:
+        """Instantiate the coefficient.
+
+        Args:
+            nx (int): Points in the x direction.
+            ny (int): Points in the y direction.
+            n_ens (int, optional): Number of ensemble. Defaults to 1.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device. Defaults to None.
+        """
+        super().__init__(
+            nx=nx,
+            ny=ny,
+            n_ens=n_ens,
+            dtype=dtype,
+            device=device,
+        )
+
+    def update(self, values: float) -> None:
+        """Update core value.
+
+        Args:
+            values (float): Float value.
+        """
+        self._core = values * self._core
+
+
+class NonUniformCoefficient(Coefficient[torch.Tensor]):
+    """Non-space-uniform coefficient."""
+
+    _type = CoefficientName.NON_UNIFORM
+
+    sigma = 1
+
+    def __init__(
+        self,
+        *,
+        nx: int,
+        ny: int,
+        n_ens: int = 1,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> None:
+        """Instantiate the coefficient.
+
+        Args:
+            nx (int): Points in the x direction.
+            ny (int): Points in the y direction.
+            n_ens (int, optional): Number of ensemble. Defaults to 1.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device. Defaults to None.
+        """
+        self._shape = (n_ens, self._nl, nx, ny)
+        self._dtype = defaults.get_dtype(dtype)
+        self._device = defaults.get_device(device)
+
+    def update(
+        self,
+        values: torch.Tensor,
+    ) -> None:
+        """Update core value.
+
+        Args:
+            values (torch.Tensor): Coefficient value.
+        """
+        if values.shape != self._shape:
+            msg = f"Invalid shape, it should be {self._shape}-shaped."
+            raise ValueError(msg)
+        if values.dtype != self._dtype:
+            msg = f"Invalid dtype, it should be {self._dtype}."
+            raise ValueError(msg)
+        self._core = values
+
+
+class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
+    """Non-space-uniform coefficient smoothed by gaussians."""
+
+    _type = CoefficientName.SMOOOTH_NON_UNIFORM
+
+    sigma = 1
+
+    def __init__(
+        self,
+        *,
+        nx: int,
+        ny: int,
+        n_ens: int = 1,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> None:
+        """Instantiate the coefficient.
+
+        Args:
+            nx (int): Points in the x direction.
+            ny (int): Points in the y direction.
+            n_ens (int, optional): Number of ensemble. Defaults to 1.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device. Defaults to None.
+        """
+        super().__init__(
+            nx=nx,
+            ny=ny,
+            n_ens=n_ens,
+            dtype=dtype,
+            device=device,
+        )
+
+    def update(
+        self,
+        values: Iterable[float],
+        locations: Iterable[tuple[int, int]] | None = None,
+    ) -> None:
+        """Update core value.
+
+        Args:
+            values (Iterable[float]): Float value.
+            locations (Iterable[tuple[int, int]] | None, optional): Center
+            points indexes. Defaults to None.
+        """
+        core = torch.zeros_like(self._core)
+
+        x, y = torch.meshgrid(
+            torch.arange(
+                0,
+                core.shape[-2],
+                dtype=core.dtype,
+                device=core.device,
+            ),
+            torch.arange(
+                0,
+                core.shape[-1],
+                dtype=core.dtype,
+                device=core.device,
+            ),
+        )
+
+        norm = torch.zeros_like(core)
+
+        for alpha, loc in zip(values, locations):
+            i, j = loc
+            exp_factor = torch.exp(
+                -((x - i) ** 2 + (y - j) ** 2) / 2 / self.sigma**2,
+            )
+            norm[..., :, :] += exp_factor
+            core[..., :, :] += alpha * exp_factor
+
+        self._core = core / norm
+
+
+class LSRUniformCoefficient(UniformCoefficient):
     """Inferred collinearity from the streamfunction.
 
     Performs linear least squares regression to infer alpha.
     """
 
-    _type = CoefficientName.LSR_INFERRED
+    _type = CoefficientName.LSR_INFERRED_UNIFORM
     _name = "alpha_lsr_sf"
     _description = "LSR-Stream function inferred coefficient"
 
-    def __init__(self, psi_ref: StreamFunction) -> None:
-        """Instantiate the variable.
+    @classmethod
+    def compute_coefficient(
+        cls,
+        p: torch.Tensor,
+    ) -> float:
+        """Compute collinearity coefficient.
 
         Args:
-            psi_ref (StreamFunction): Reference stream function.
-        """
-        self._psi = psi_ref
-
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:
-        """Compute the value of alpha.
-
-        Args:
-            prognostic (BasePrognosticTuple): Prognostic variables.
+           p (torch.Tensor): Reference pressure (2-layered at least).
 
         Returns:
-            Tensor: Alpha
+            Self: Coefficient.
         """
-        psi = self._psi.compute_no_slice(prognostic)
-        psi_1 = psi[:, 0, ...]  # (n_ens,nx,ny)-shaped
-        psi_2 = psi[:, 1, ...]  # (n_ens,nx,ny)-shaped
+        p_1 = p[0, 0, ...]  # (nx,ny)-shaped
+        p_2 = p[0, 1, ...]  # (nx,ny)-shaped
 
-        x = psi_1.flatten(-2, -1).unsqueeze(-1)  # (n_ens,nx*ny,1)-shaped
-        y = psi_2.flatten(-2, -1)  # (n_ens,nx*ny)-shaped
+        x = p_1.flatten(-2, -1).unsqueeze(-1)  # (nx*ny,1)-shaped
+        y = p_2.flatten(-2, -1)  # (nx*ny)-shaped
 
         try:
-            return perform_linear_least_squares_regression(x, y)[:, 0]
+            return perform_linear_least_squares_regression(x, y).item()
         except torch.linalg.LinAlgError:
-            return torch.zeros(
-                (y.shape[0],),
-                dtype=torch.float64,
-                device=DEVICE.get(),
-            )
-
-    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[Self]:
-        """Bind the variable to a given state.
-
-        Args:
-            state (StateUVH): StateUVH to bind the variable to.
-
-        Returns:
-            BoundDiagnosticVariable: Bound variable.
-        """
-        # Bind the psi variable
-        self._psi = self._psi.bind(state)
-        return super().bind(state)
-
-    @classmethod
-    def from_config(
-        cls,
-        model_config: ModelConfig,
-        physics_config: PhysicsConfig,
-        space_config: SpaceConfig,
-    ) -> Self:
-        """Instantiate coeffcient from configuration.
-
-        Args:
-            model_config (ModelConfig): Model configuration.
-            physics_config (PhysicsConfig): Physics configuration.
-            space_config (SpaceConfig): Space configuration.
-
-        Returns:
-            Self: Coefficient.
-        """
-        h_phys = PhysicalLayerDepthAnomaly(space_config.ds)
-        eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
-        p = Pressure(
-            g_prime=model_config.g_prime.unsqueeze(0)
-            .unsqueeze(-1)
-            .unsqueeze(-1),
-            eta_phys=eta_phys,
-        )
-        psi = StreamFunction(p, physics_config.f0)
-        return cls(psi)
+            return 0
 
 
-class ConstantCoefficient(Coefficient):
-    """Constant collinearity coefficient."""
-
-    _type = CoefficientName.CONSTANT
-    _name = "alpha_constant"
-    _description = "Constant coefficient"
-
-    def __init__(self, value: torch.Tensor) -> None:
-        """Instantiate the coefficient.
-
-        Args:
-            value (torch.Tensor): Coefficient value.
-        """
-        self._value = value
-
-    def _compute(self, prognostic: BasePrognosticTuple) -> torch.Tensor:  # noqa: ARG002
-        """Compute the value of alpha.
-
-        Args:
-            prognostic (BasePrognosticTuple): Useless, for compatibility
-            reasons.
-
-        Returns:
-            Tensor: Alpha.
-        """
-        return self._value
-
-    @classmethod
-    def from_config(
-        cls,
-        model_config: ModelConfig,
-        physics_config: PhysicsConfig,  # noqa: ARG003
-        space_config: SpaceConfig,  # noqa: ARG003
-    ) -> Self:
-        """Instantiate coeffcient from configuration.
-
-        Args:
-            model_config (ModelConfig): Model configuration.
-            physics_config (PhysicsConfig): Physics configuration,
-            for compatibility.
-            space_config (SpaceConfig): Space configuration,
-            for compatibility.
-
-        Returns:
-            Self: Coefficient.
-        """
-        return cls(
-            torch.tensor(
-                [model_config.collinearity_coef.value],
-                dtype=torch.float64,
-                device=DEVICE.get(),
-            ),
-        )
+CoefType = (
+    UniformCoefficient
+    | NonUniformCoefficient
+    | SmoothNonUniformCoefficient
+    | LSRUniformCoefficient
+)
 
 
 def create_coefficient(
     config: Configuration,
-) -> ConstantCoefficient | LSRSFInferredAlpha:
+) -> CoefType:
     """Create the coefficient.
 
     Args:
@@ -231,24 +313,30 @@ def create_coefficient(
         ValueError: If the coefficient is not valid.
 
     Returns:
-        ConstantCoefficient | LSRSFInferredAlpha: Coefficient
+        CoefType: Coefficient
     """
     coef_type = config.model.collinearity_coef.type
-    if coef_type == CoefficientName.CONSTANT:
-        return ConstantCoefficient.from_config(
-            model_config=config.model,
-            physics_config=config.physics,
+    if coef_type == CoefficientName.UNIFORM:
+        return UniformCoefficient.from_config(
             space_config=config.space,
         )
-    if coef_type == CoefficientName.LSR_INFERRED:
-        return LSRSFInferredAlpha.from_config(
-            model_config=config.simulation.reference,
-            physics_config=config.physics,
+    if coef_type == CoefficientName.NON_UNIFORM:
+        return NonUniformCoefficient.from_config(
+            space_config=config.space,
+        )
+    if coef_type == CoefficientName.SMOOOTH_NON_UNIFORM:
+        return SmoothNonUniformCoefficient.from_config(
+            space_config=config.space,
+        )
+    if coef_type == CoefficientName.LSR_INFERRED_UNIFORM:
+        return LSRUniformCoefficient.from_config(
             space_config=config.space,
         )
     msg = "Possible coefficient types are: "
     coef_types = [
-        ConstantCoefficient.get_name(),
-        LSRSFInferredAlpha.get_name(),
+        UniformCoefficient.get_name(),
+        NonUniformCoefficient.get_name(),
+        SmoothNonUniformCoefficient.get_name(),
+        LSRUniformCoefficient.get_name(),
     ]
     raise ValueError(msg + ", ".join(coef_types))
