@@ -121,7 +121,6 @@ class QGCollinearFilteredSF(QGAlpha["QGCollinearFilteredProjector"]):
         self._set_projector()
 
     @QGAlpha.alpha.setter
-    @with_shapes(alpha=(1,))
     def alpha(self, alpha: torch.Tensor) -> None:
         """Setter for alpha."""
         QGAlpha.alpha.fset(self, alpha)
@@ -220,7 +219,6 @@ class QGCollinearFilteredProjector(QGProjector):
             raise UnsetAlphaError from e
 
     @alpha.setter
-    @with_shapes(alpha=(1,))
     def alpha(self, alpha: torch.Tensor) -> None:
         self._alpha = alpha
         with contextlib.suppress(UnsetAError):
