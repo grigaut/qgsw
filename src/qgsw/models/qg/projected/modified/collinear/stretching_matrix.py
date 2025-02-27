@@ -6,7 +6,7 @@ from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.utils.shape_checks import with_shapes
 
 
-@with_shapes(g_prime=(2,), alpha=(1,))
+@with_shapes(g_prime=(2,))
 def compute_g_tilde(
     g_prime: torch.Tensor,
     alpha: torch.Tensor,

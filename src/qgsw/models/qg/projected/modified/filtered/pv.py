@@ -25,7 +25,6 @@ def compute_g_tilde(g_prime: torch.Tensor) -> torch.Tensor:
 
 
 @with_shapes(
-    alpha=(1,),
     H1=(1,),
     g2=(1,),
 )

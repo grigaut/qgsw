@@ -324,7 +324,6 @@ class QGCollinearFilteredProjector(QGProjector):
     @with_shapes(
         g2=(1,),
         H=(1, 1, 1),
-        alpha=(1,),
     )
     def G(  # noqa: N802
         cls,
