@@ -398,7 +398,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         return QGVariableSet.get_variable_set(space, physics, model)
 
 
-class SW(SWCore[UVHT]):
+class SW(SWCore[UVHT, StateUVH]):
     """Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .
