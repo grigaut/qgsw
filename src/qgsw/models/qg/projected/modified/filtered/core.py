@@ -260,7 +260,7 @@ class QGCollinearFilteredProjector(QGProjector):
         factor = compute_source_term_factor(
             alpha,
             self.H[:1, 0, 0],
-            self._g_prime[:1, 0, 0],
+            self._g_prime[1:2, 0, 0],
             f0,
         )
 
@@ -337,6 +337,7 @@ class QGCollinearFilteredProjector(QGProjector):
         f0: float,
         g2: torch.Tensor,
         alpha: torch.Tensor,
+        p_filt: torch.Tensor,
         points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
         p_i: torch.Tensor | None = None,
     ) -> UVH:
@@ -357,6 +358,7 @@ class QGCollinearFilteredProjector(QGProjector):
                 └── (1,)-shaped
             alpha (torch.Tensor): Collinearity coefficient.
                 └── (1,)-shaped
+            p_filt (torch.Tensor): Filtered interpolated pressure.
             points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface function.
             p_i (torch.Tensor | None, optional): Interpolated pressure.
@@ -375,7 +377,7 @@ class QGCollinearFilteredProjector(QGProjector):
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
         v = torch.diff(p, dim=-2) / dx / f0 * dy
         # source_term = A_{1,2} p_2
-        source_term = alpha / H[0, 0, 0] / g2 * p_i
+        source_term = alpha / H[0, 0, 0] / g2 * p_filt
         # h = diag(H)(Ap-A_{1,2}p_2)
         h = H * (torch.einsum("lm,...mxy->...lxy", A, p_i) - source_term) * ds
 
@@ -407,6 +409,7 @@ class QGCollinearFilteredProjector(QGProjector):
             f0=self._f0,
             g2=self._g_prime[1:2, 0, 0],
             alpha=self.alpha,
+            p_filt=self.filter(p_i),
             points_to_surfaces=self._points_to_surface,
         )
 
