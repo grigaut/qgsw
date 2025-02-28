@@ -9,7 +9,7 @@ from rich.progress import Progress
 from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
-from qgsw.fields.variables.coefficients import create_coefficient
+from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
 from qgsw.models.qg.projected.modified.utils import is_modified
@@ -57,9 +57,10 @@ model = instantiate_model(
     Ro=Ro,
 )
 # Collinearity Coefficient
-if is_modified(config.model.type):
-    alpha = create_coefficient(config)
-    model.alpha = alpha.compute(model.prognostic)
+modified = is_modified(config.model.type)
+if modified:
+    coef = instantiate_coef(config.model, config.space)
+    model.alpha = coef.update(config.model.collinearity_coef.initial)
 
 model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coefficient
