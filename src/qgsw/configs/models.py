@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Literal, Union
+from typing import Generic, Literal, TypeVar, Union
 
 import torch
 from pydantic import (
@@ -13,24 +13,105 @@ from pydantic import (
     PositiveFloat,
 )
 
-from qgsw.fields.variables.coef_names import CoefficientName
+from qgsw.fields.variables.coefficients.coef_names import CoefficientName
+from qgsw.fields.variables.coefficients.core import NonUniformCoefficient
 from qgsw.models.names import ModelName
 from qgsw.models.qg.projected.modified.utils import is_modified
-from qgsw.specs import DEVICE
+from qgsw.specs import DEVICE, defaults
 from qgsw.utils.named_object import NamedObjectConfig
 
 
-class ModelConfig(NamedObjectConfig[ModelName], BaseModel):
+class UniformCoefConfig(
+    NamedObjectConfig[CoefficientName],
+    BaseModel,
+):
+    """Uniform collinearity configuration."""
+
+    type: Literal[CoefficientName.UNIFORM]
+    initial: float
+
+
+class NonUniformCoefConfig(
+    NamedObjectConfig[CoefficientName],
+    BaseModel,
+):
+    """Non uniform collinearity configuration."""
+
+    type: Literal[CoefficientName.NON_UNIFORM]
+    initial: list[list[float]]
+
+    @cached_property
+    def matrix(self) -> torch.Tensor:
+        """Values matrix.
+
+        └── (1, 1, nx, ny) shaped
+        """
+        matrix = torch.tensor(
+            self.initial,
+            **defaults.get(),
+        )
+        return matrix.unsqueeze(0).unsqueeze(0)
+
+
+class SmoothUniformCoefConfig(
+    NamedObjectConfig[CoefficientName],
+    BaseModel,
+):
+    """Non uniform collinearity configuration."""
+
+    type: Literal[CoefficientName.SMOOOTH_NON_UNIFORM]
+    initial: list[float]
+    locations: list[tuple[int, int]]
+
+
+class LSRUniformCoefConfig(
+    NamedObjectConfig[CoefficientName],
+    BaseModel,
+):
+    """Inferred collinearity coeffciient."""
+
+    type: Literal[CoefficientName.LSR_INFERRED_UNIFORM]
+    initial: float
+
+
+CollinearityCoefficientConfig = Union[
+    UniformCoefConfig,
+    NonUniformCoefficient,
+    LSRUniformCoefConfig,
+]
+
+CoefConfig = Union[
+    UniformCoefConfig,
+    NonUniformCoefConfig,
+    SmoothUniformCoefConfig,
+    LSRUniformCoefConfig,
+]
+
+CoefConfigVar = TypeVar(
+    "CoefConfigVar",
+    bound=Union[
+        UniformCoefConfig,
+        NonUniformCoefConfig,
+        SmoothUniformCoefConfig,
+        LSRUniformCoefConfig,
+    ],
+)
+
+
+class ModelConfig(
+    NamedObjectConfig[ModelName],
+    BaseModel,
+    Generic[CoefConfigVar],
+):
     """Model configuration."""
 
     prefix: str
     layers: list[PositiveFloat]
     reduced_gravity: list[PositiveFloat]
-    collinearity_coef: Union[
-        ConstantCollinearityCoefConfig,
-        InferredCollinearityCoefConfig,
+    collinearity_coef: Union[CoefConfigVar, None] = Field(
         None,
-    ] = Field(None, discriminator="type")
+        discriminator="type",
+    )
     sigma: Union[PositiveFloat, None] = None
 
     @cached_property
@@ -62,29 +143,3 @@ class ModelConfig(NamedObjectConfig[ModelName], BaseModel):
             dtype=torch.float64,
             device=DEVICE.get(),
         )
-
-
-class ConstantCollinearityCoefConfig(
-    NamedObjectConfig[CoefficientName],
-    BaseModel,
-):
-    """Constant collinearity model configuration."""
-
-    type: Literal[CoefficientName.CONSTANT]
-    value: float
-
-
-class InferredCollinearityCoefConfig(
-    NamedObjectConfig[CoefficientName],
-    BaseModel,
-):
-    """Inferred collinearity coeffciient."""
-
-    type: Literal[CoefficientName.LSR_INFERRED]
-    initial: float
-
-
-CollinearityCoefficientConfig = Union[
-    ConstantCollinearityCoefConfig,
-    InferredCollinearityCoefConfig,
-]

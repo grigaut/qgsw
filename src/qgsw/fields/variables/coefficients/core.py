@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from qgsw.fields.variables.coef_names import CoefficientName
+from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.utils.named_object import NamedObject
 
 try:
@@ -26,7 +26,6 @@ from qgsw.utils.least_squares_regression import (
 from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
-    from qgsw.configs.core import Configuration
     from qgsw.configs.space import SpaceConfig
 
 Values = TypeVar("Values")
@@ -299,44 +298,3 @@ CoefType = (
     | SmoothNonUniformCoefficient
     | LSRUniformCoefficient
 )
-
-
-def create_coefficient(
-    config: Configuration,
-) -> CoefType:
-    """Create the coefficient.
-
-    Args:
-        config (Configuration): Model Configuration.
-
-    Raises:
-        ValueError: If the coefficient is not valid.
-
-    Returns:
-        CoefType: Coefficient
-    """
-    coef_type = config.model.collinearity_coef.type
-    if coef_type == CoefficientName.UNIFORM:
-        return UniformCoefficient.from_config(
-            space_config=config.space,
-        )
-    if coef_type == CoefficientName.NON_UNIFORM:
-        return NonUniformCoefficient.from_config(
-            space_config=config.space,
-        )
-    if coef_type == CoefficientName.SMOOOTH_NON_UNIFORM:
-        return SmoothNonUniformCoefficient.from_config(
-            space_config=config.space,
-        )
-    if coef_type == CoefficientName.LSR_INFERRED_UNIFORM:
-        return LSRUniformCoefficient.from_config(
-            space_config=config.space,
-        )
-    msg = "Possible coefficient types are: "
-    coef_types = [
-        UniformCoefficient.get_name(),
-        NonUniformCoefficient.get_name(),
-        SmoothNonUniformCoefficient.get_name(),
-        LSRUniformCoefficient.get_name(),
-    ]
-    raise ValueError(msg + ", ".join(coef_types))

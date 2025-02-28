@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 
 from qgsw.configs.io import IOConfig
-from qgsw.configs.models import ModelConfig
+from qgsw.configs.models import CoefConfig, ModelConfig
 from qgsw.configs.perturbation import PerturbationConfig
 from qgsw.configs.physics import PhysicsConfig
 from qgsw.configs.simulations import (
@@ -41,7 +41,7 @@ class Configuration(BaseModel):
         ModelRunSimulationConfig,
         AssimilationSimulationConfig,
     ] = Field(discriminator="type")
-    model: ModelConfig
+    model: ModelConfig[Union[CoefConfig, None]]
     space: SpaceConfig
     windstress: WindStressConfig
     perturbation: PerturbationConfig
