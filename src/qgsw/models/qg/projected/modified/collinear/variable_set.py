@@ -4,32 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import torch
-
 from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.coef_names import CoefficientName
 from qgsw.fields.variables.dynamics import (
     CollinearityCoefficientDiag,
     PhysicalSurfaceHeightAnomaly,
     PhysicalVorticity,
     PotentialVorticity,
     PressureTilde,
-    StreamFunction,
     Vorticity,
 )
-from qgsw.fields.variables.energetics import (
-    ModalAvailablePotentialEnergy,
-    ModalEnergy,
-    ModalKineticEnergy,
-    TotalAvailablePotentialEnergy,
-    TotalEnergy,
-    TotalKineticEnergy,
-)
-from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
-    compute_A_collinear_sf,
-)
 from qgsw.models.qg.projected.variable_set import QGVariableSet
-from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
@@ -115,51 +99,54 @@ class QGCollinearSFVariableSet(QGVariableSet):
             model (ModelConfig): Model Configuration.
             physics (PhysicsConfig): Physics Configuration.
         """
-        if model.collinearity_coef.type == CoefficientName.CONSTANT:
-            alpha = model.collinearity_coef.value
-        elif model.collinearity_coef.type == CoefficientName.LSR_INFERRED:
-            alpha = model.collinearity_coef.initial
-        A = compute_A_collinear_sf(  # noqa: N806
-            model.h,
-            model.g_prime,
-            alpha,
-            torch.float64,
-            DEVICE.get(),
-        )
-        var_dict[ModalKineticEnergy.get_name()] = ModalKineticEnergy(
-            A,
-            var_dict[StreamFunction.get_name()],
-            model.h[:1],
-            space.dx,
-            space.dy,
-        )
-        var_dict[ModalAvailablePotentialEnergy.get_name()] = (
-            ModalAvailablePotentialEnergy(
-                A,
-                var_dict[StreamFunction.get_name()],
-                model.h[:1],
-                physics.f0,
-            )
-        )
-        var_dict[ModalEnergy.get_name()] = ModalEnergy(
-            var_dict[ModalKineticEnergy.get_name()],
-            var_dict[ModalAvailablePotentialEnergy.get_name()],
-        )
-        var_dict[TotalKineticEnergy.get_name()] = TotalKineticEnergy(
-            var_dict[StreamFunction.get_name()],
-            model.h[:1],
-            space.dx,
-            space.dy,
-        )
-        var_dict[TotalAvailablePotentialEnergy.get_name()] = (
-            TotalAvailablePotentialEnergy(
-                A,
-                var_dict[StreamFunction.get_name()],
-                model.h[:1],
-                physics.f0,
-            )
-        )
-        var_dict[TotalEnergy.get_name()] = TotalEnergy(
-            var_dict[TotalKineticEnergy.get_name()],
-            var_dict[TotalAvailablePotentialEnergy.get_name()],
-        )
+        # ruff: noqa: ERA001
+        # if model.collinearity_coef.type == CoefficientName.UNIFORM or (
+        #     model.collinearity_coef.type
+        #     == CoefficientName.LSR_INFERRED_UNIFORM
+        # ):
+        #     alpha = model.collinearity_coef.initial
+        #
+        # A = compute_A_collinear_sf(
+        #     model.h,
+        #     model.g_prime,
+        #     alpha,
+        #     torch.float64,
+        #     DEVICE.get(),
+        # )
+        # var_dict[ModalKineticEnergy.get_name()] = ModalKineticEnergy(
+        #     A,
+        #     var_dict[StreamFunction.get_name()],
+        #     model.h[:1],
+        #     space.dx,
+        #     space.dy,
+        # )
+        # var_dict[ModalAvailablePotentialEnergy.get_name()] = (
+        #     ModalAvailablePotentialEnergy(
+        #         A,
+        #         var_dict[StreamFunction.get_name()],
+        #         model.h[:1],
+        #         physics.f0,
+        #     )
+        # )
+        # var_dict[ModalEnergy.get_name()] = ModalEnergy(
+        #     var_dict[ModalKineticEnergy.get_name()],
+        #     var_dict[ModalAvailablePotentialEnergy.get_name()],
+        # )
+        # var_dict[TotalKineticEnergy.get_name()] = TotalKineticEnergy(
+        #     var_dict[StreamFunction.get_name()],
+        #     model.h[:1],
+        #     space.dx,
+        #     space.dy,
+        # )
+        # var_dict[TotalAvailablePotentialEnergy.get_name()] = (
+        #     TotalAvailablePotentialEnergy(
+        #         A,
+        #         var_dict[StreamFunction.get_name()],
+        #         model.h[:1],
+        #         physics.f0,
+        #     )
+        # )
+        # var_dict[TotalEnergy.get_name()] = TotalEnergy(
+        #     var_dict[TotalKineticEnergy.get_name()],
+        #     var_dict[TotalAvailablePotentialEnergy.get_name()],
+        # )
