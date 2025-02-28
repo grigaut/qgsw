@@ -132,7 +132,7 @@ class UniformCoefficient(Coefficient[float]):
         Args:
             values (float): Float value.
         """
-        self._core = values * self._core
+        self._core = values * torch.ones_like(self._core)
 
 
 class NonUniformCoefficient(Coefficient[torch.Tensor]):
