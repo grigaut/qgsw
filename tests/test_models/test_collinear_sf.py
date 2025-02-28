@@ -3,6 +3,7 @@
 import pytest
 import torch
 
+from qgsw.fields.variables.coefficients.core import UniformCoefficient
 from qgsw.models.qg.projected.modified.collinear.core import QGCollinearSF
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
@@ -99,5 +100,7 @@ def test_stretching_matrix_shape(
         g_prime,
         beta_plane=BetaPlane(9.375e-5, 0),
     )
-    model.alpha = torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
+    coef = UniformCoefficient(nx=model.space.nx, ny=model.space.ny)
+    coef.update(0)
+    model.alpha = coef.get()
     assert model.A.shape == (1, 1)
