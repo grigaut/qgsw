@@ -160,6 +160,8 @@ class NonUniformCoefficient(Coefficient[torch.Tensor]):
             dtype (torch.dtype, optional): Data type. Defaults to None.
             device (torch.device, optional): Device. Defaults to None.
         """
+        msg = "NonUniformCoefficient is not yet supported."
+        raise NotImplementedError(msg)
         self._shape = (n_ens, self._nl, nx, ny)
         self._dtype = defaults.get_dtype(dtype)
         self._device = defaults.get_device(device)
@@ -207,6 +209,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             dtype (torch.dtype, optional): Data type. Defaults to None.
             device (torch.device, optional): Device. Defaults to None.
         """
+        msg = "NonUniformCoefficient is not yet supported."
+        raise NotImplementedError(msg)
         super().__init__(
             nx=nx,
             ny=ny,
