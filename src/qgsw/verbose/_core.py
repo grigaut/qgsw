@@ -8,7 +8,7 @@ except ImportError:
     from typing_extensions import ParamSpec
 
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 T = TypeVar("T")
@@ -19,7 +19,73 @@ class VerboseDisplayError(Exception):
     """Verbose Related Exception."""
 
 
-class VerboseDisplayer:
+class MSGDisplayer(NamedTuple):
+    msg: str
+    level: int
+    prefix: str
+
+    def __repr__(self) -> str:
+        return f"[MSGDisplayer] -> '{self.build_msg()}'"
+
+    def build_msg(self) -> str:
+        """Build message."""
+        return "".join(
+            ["\t"] * (self.level)
+            + [self.prefix] * (self.level > 0)
+            + [self.msg],
+        ).replace("\n", "")
+
+    def show(self) -> None:
+        """Display message."""
+        print(self.build_msg(), end="\r")  # noqa: T201
+
+    def show_eol(self) -> None:
+        """Display message and ends line."""
+        print(self.build_msg(), end="\n")  # noqa: T201
+
+    def extend(self, msg: str) -> MSGDisplayer:
+        """Extends message.
+
+        Args:
+            msg (str): Message to add.
+
+        Returns:
+            MSGDisplayer: Updated MSGDisplayer.
+        """
+        return MSGDisplayer(
+            msg=self.msg + msg,
+            level=self.level,
+            prefix=self.prefix,
+        )
+
+    def with_prefix(self, prefix: str) -> MSGDisplayer:
+        """Change the prefix.
+
+        Args:
+            prefix (str): Prefix to use.
+
+        Returns:
+            MSGDisplayer: Updated MSGDisplayer.
+        """
+        return MSGDisplayer(msg=self.msg, level=self.level, prefix=prefix)
+
+    def show_after(self, other: MSGDisplayer | None) -> None:
+        """Show the message after another.
+
+        Args:
+            other (MSGDisplayer | None): Previous message.
+        """
+        if other is None:
+            self.show()
+        elif other.level == self.level:
+            other.with_prefix("├── ").show_eol()
+            self.show()
+        else:
+            other.show_eol()
+            self.show()
+
+
+class VerboseManager:
     """Class for any object displaying verbose."""
 
     _instance = None
@@ -42,6 +108,7 @@ class VerboseDisplayer:
         """
         self.level = level
         self.prefix = "└── "
+        self.previous: MSGDisplayer | None = None
 
     @property
     def level(self) -> int:
@@ -107,41 +174,45 @@ class VerboseDisplayer:
             raise VerboseDisplayError(msg)
         return self._keep_within_bounds(level=trigger_level)
 
-    def _indent(self, msg: str, level: int) -> str:
-        """Return indentated message.
-
-        Args:
-            msg (str): Message to indentate.
-            level (int): Level of indentation.
-
-        Returns:
-            str: Indentated message.
-        """
-        indent = "".join(["\t"] * (level) + [self._prefix] * (level > 0))
-        return f"{indent}{msg}"
-
     def display(
         self,
         msg: str,
         trigger_level: int,
-        end: str | None = None,
     ) -> None:
         """Display verbose message.
 
         Args:
             msg (str): Message to display.
             trigger_level (int): Trigger level.
-            end (str | None): End of line text, to pass to `print`.
         """
         trigger = self._check_trigger_level(trigger_level=trigger_level)
+
         if self.level >= trigger:
-            print(self._indent(msg=msg, level=(trigger - 1)), end=end)  # noqa: T201
+            msg_display = MSGDisplayer(
+                msg=msg,
+                level=(trigger - 1),
+                prefix="└── ",
+            )
+            msg_display.show_after(self.previous)
+            self.previous = msg_display
+
+    def extend(
+        self,
+        msg: str,
+    ) -> None:
+        """Display verbose message.
+
+        Args:
+            msg (str): Message to add.
+        """
+        self.previous = self.previous.extend(msg)
+        self.previous.show()
 
     def is_mute(self) -> bool:
         return self.level <= 0
 
 
-VERBOSE = VerboseDisplayer(0)
+VERBOSE = VerboseManager(0)
 
 
 def set_level(level: int) -> None:
@@ -181,15 +252,14 @@ def get_level() -> int:
     return VERBOSE.level
 
 
-def display(msg: str, trigger_level: int, end: str | None = None) -> None:
+def display(msg: str, trigger_level: int) -> None:
     """Display verbose message.
 
     Args:
         msg (str): Message to display.
         trigger_level (int): Trigger level.
-        end (str | None): End of line text, to pass to `print`.
     """
-    return VERBOSE.display(msg=msg, trigger_level=trigger_level, end=end)
+    return VERBOSE.display(msg=msg, trigger_level=trigger_level)
 
 
 def is_mute() -> bool:

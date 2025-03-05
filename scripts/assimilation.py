@@ -210,14 +210,12 @@ with Progress() as progress:
             verbose.display(
                 msg="[Reference Model]: ",
                 trigger_level=1,
-                end="",
             )
             # Save Reference Model
             model_ref.io.save(output_dir.joinpath(f"{prefix_ref}{n}.pt"))
             verbose.display(
                 msg="[     Model     ]: ",
                 trigger_level=1,
-                end="",
             )
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.pt"))
