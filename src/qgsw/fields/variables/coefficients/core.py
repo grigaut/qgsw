@@ -189,7 +189,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
 
     _type = CoefficientName.SMOOOTH_NON_UNIFORM
 
-    sigma = 1
+    sigma = 15
 
     def __init__(
         self,
@@ -209,8 +209,6 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             dtype (torch.dtype, optional): Data type. Defaults to None.
             device (torch.device, optional): Device. Defaults to None.
         """
-        msg = "NonUniformCoefficient is not yet supported."
-        raise NotImplementedError(msg)
         super().__init__(
             nx=nx,
             ny=ny,
@@ -246,6 +244,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
                 dtype=core.dtype,
                 device=core.device,
             ),
+            indexing="ij",
         )
 
         norm = torch.zeros_like(core)
