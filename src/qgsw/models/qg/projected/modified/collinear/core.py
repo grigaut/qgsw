@@ -29,6 +29,7 @@ from qgsw.models.qg.projected.modified.exceptions import (
     UnsetAlphaError,
 )
 from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
+from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
 from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
@@ -254,7 +255,7 @@ class QGCollinearSF(QGAlpha["QGCollinearProjector"]):
         )
 
     def _set_projector(self) -> None:
-        self._P = QGCollinearProjector(
+        self._P = CollinearQGProjector(
             self.A,
             self._H,
             g_prime=self._g_prime,
