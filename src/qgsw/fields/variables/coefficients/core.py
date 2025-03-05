@@ -189,7 +189,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
 
     _type = CoefficientName.SMOOOTH_NON_UNIFORM
 
-    sigma = 15
+    sigma = 1
 
     def __init__(
         self,
