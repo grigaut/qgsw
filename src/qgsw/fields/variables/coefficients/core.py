@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.utils.named_object import NamedObject
@@ -293,9 +293,9 @@ class LSRUniformCoefficient(UniformCoefficient):
             return 0
 
 
-CoefType = (
-    UniformCoefficient
-    | NonUniformCoefficient
-    | SmoothNonUniformCoefficient
-    | LSRUniformCoefficient
-)
+CoefType = Union[
+    UniformCoefficient,
+    NonUniformCoefficient,
+    SmoothNonUniformCoefficient,
+    LSRUniformCoefficient,
+]
