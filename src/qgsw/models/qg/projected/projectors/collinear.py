@@ -271,7 +271,7 @@ class CollinearQGProjector(QGProjector):
             f"[{self.__class__.__name__}.QoG_inv]: "
             "Retrieving pressure using iterative solving "
             f"with at most {self._MAX_ITERATIONS} iterations.",
-            trigger_level=2,
+            trigger_level=3,
         )
 
         for k in range(1, self._MAX_ITERATIONS + 1):
