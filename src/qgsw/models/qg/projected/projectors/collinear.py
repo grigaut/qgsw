@@ -25,8 +25,8 @@ class CollinearQGProjector(QGProjector):
     """QG Projector."""
 
     _MAX_ITERATIONS = 100
-    _ATOL = 1e-10
-    _RTOL = 1e-10
+    _ATOL = 1e-8  # default value for torch.isclose
+    _RTOL = 1e-5  # default value for torch.isclose
 
     @with_shapes(
         A=(1, 1),
@@ -267,6 +267,13 @@ class CollinearQGProjector(QGProjector):
         )
         A_12 = compute_A_12(self.H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
 
+        verbose.display(
+            f"[{self.__class__.__name__}.QoG_inv]: "
+            "Retrieving pressure using iterative solving "
+            f"with at most {self._MAX_ITERATIONS} iterations.",
+            trigger_level=2,
+        )
+
         for k in range(1, self._MAX_ITERATIONS + 1):
             # Since A.shape = (1,1) -> solving in mode space is the same
             # as solving in physical space
@@ -279,6 +286,11 @@ class CollinearQGProjector(QGProjector):
                     * self._points_to_surface(self.alpha)
                 ),
             )
+
+            if torch.isnan(pi1).any():
+                msg = f"Overflow after {k} iterations."
+                raise OverflowError(msg)
+
             pi1_i = self._points_to_surface(pi1)
 
             if torch.isclose(
@@ -288,8 +300,8 @@ class CollinearQGProjector(QGProjector):
                 rtol=self._RTOL,
             ).all():
                 verbose.display(
-                    f"[{self.__class__.__name__}]: "
-                    f"Convergence reached after {k + 1} iterations.",
+                    f"[{self.__class__.__name__}.QoG_inv]: "
+                    f"Convergence reached after {k} iterations.",
                     trigger_level=3,
                 )
                 break
