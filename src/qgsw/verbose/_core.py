@@ -33,15 +33,11 @@ class MSGDisplayer(NamedTuple):
             ["\t"] * (self.level)
             + [self.prefix] * (self.level > 0)
             + [self.msg],
-        ).replace("\n", "")
+        )
 
     def show(self) -> None:
         """Display message."""
-        print(self.build_msg(), end="\r")  # noqa: T201
-
-    def show_eol(self) -> None:
-        """Display message and ends line."""
-        print(self.build_msg(), end="\n")  # noqa: T201
+        print(self.build_msg())  # noqa: T201
 
     def extend(self, msg: str) -> MSGDisplayer:
         """Extends message.
@@ -69,21 +65,6 @@ class MSGDisplayer(NamedTuple):
         """
         return MSGDisplayer(msg=self.msg, level=self.level, prefix=prefix)
 
-    def show_after(self, other: MSGDisplayer | None) -> None:
-        """Show the message after another.
-
-        Args:
-            other (MSGDisplayer | None): Previous message.
-        """
-        if other is None:
-            self.show()
-        elif other.level == self.level:
-            other.with_prefix("├── ").show_eol()
-            self.show()
-        else:
-            other.show_eol()
-            self.show()
-
 
 class VerboseManager:
     """Class for any object displaying verbose."""
@@ -108,7 +89,6 @@ class VerboseManager:
         """
         self.level = level
         self.prefix = "└── "
-        self.previous: MSGDisplayer | None = None
 
     @property
     def level(self) -> int:
@@ -193,20 +173,7 @@ class VerboseManager:
                 level=(trigger - 1),
                 prefix="└── ",
             )
-            msg_display.show_after(self.previous)
-            self.previous = msg_display
-
-    def extend(
-        self,
-        msg: str,
-    ) -> None:
-        """Display verbose message.
-
-        Args:
-            msg (str): Message to add.
-        """
-        self.previous = self.previous.extend(msg)
-        self.previous.show()
+            msg_display.show()
 
     def is_mute(self) -> bool:
         return self.level <= 0
