@@ -105,6 +105,7 @@ def instantiate_coef(
         coef = SmoothNonUniformCoefficient.from_config(
             space_config=space_config,
         )
+        coef.sigma = coef_config.sigma
         coef.update(coef_config.initial, coef_config.locations)
     elif coef_config.type == CoefficientName.LSR_INFERRED_UNIFORM:
         coef = LSRUniformCoefficient.from_config(
