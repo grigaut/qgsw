@@ -55,7 +55,7 @@ class QGProjector:
         self._f0 = f0
         self._space = space
         self._points_to_surface = OptimizableFunction[
-            [torch.Tensor],
+            tuple[torch.Tensor],
             torch.Tensor,
         ](points_to_surfaces)
 

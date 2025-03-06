@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.utils.named_object import NamedObject
@@ -160,8 +160,6 @@ class NonUniformCoefficient(Coefficient[torch.Tensor]):
             dtype (torch.dtype, optional): Data type. Defaults to None.
             device (torch.device, optional): Device. Defaults to None.
         """
-        msg = "NonUniformCoefficient is not yet supported."
-        raise NotImplementedError(msg)
         self._shape = (n_ens, self._nl, nx, ny)
         self._dtype = defaults.get_dtype(dtype)
         self._device = defaults.get_device(device)
@@ -209,8 +207,6 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             dtype (torch.dtype, optional): Data type. Defaults to None.
             device (torch.device, optional): Device. Defaults to None.
         """
-        msg = "NonUniformCoefficient is not yet supported."
-        raise NotImplementedError(msg)
         super().__init__(
             nx=nx,
             ny=ny,
@@ -246,6 +242,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
                 dtype=core.dtype,
                 device=core.device,
             ),
+            indexing="ij",
         )
 
         norm = torch.zeros_like(core)
@@ -296,9 +293,9 @@ class LSRUniformCoefficient(UniformCoefficient):
             return 0
 
 
-CoefType = (
-    UniformCoefficient
-    | NonUniformCoefficient
-    | SmoothNonUniformCoefficient
-    | LSRUniformCoefficient
-)
+CoefType = Union[
+    UniformCoefficient,
+    NonUniformCoefficient,
+    SmoothNonUniformCoefficient,
+    LSRUniformCoefficient,
+]
