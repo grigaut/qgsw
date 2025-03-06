@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Union
 
+from qgsw.exceptions import (
+    UnsetLocationsError,
+    UnsetSigmaError,
+    UnsetValuesError,
+)
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.utils.named_object import NamedObject
 
@@ -187,7 +193,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
 
     _type = CoefficientName.SMOOOTH_NON_UNIFORM
 
-    sigma = 1
+    _sigma = 1
 
     def __init__(
         self,
@@ -215,18 +221,60 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             device=device,
         )
 
-    def update(
-        self,
-        values: Iterable[float],
-        locations: Iterable[tuple[int, int]] | None = None,
-    ) -> None:
-        """Update core value.
+    @property
+    def values(self) -> list[float]:
+        """Values."""
+        try:
+            return self._values
+        except AttributeError as e:
+            raise UnsetValuesError from e
 
-        Args:
-            values (Iterable[float]): Float value.
-            locations (Iterable[tuple[int, int]] | None, optional): Center
-            points indexes. Defaults to None.
-        """
+    @values.setter
+    def values(self, values: Iterable[float]) -> None:
+        with contextlib.suppress(UnsetLocationsError):
+            if len(vals := list(values)) != len(self.locations):
+                msg = "There must be as many values as locations."
+                raise ValueError(msg)
+        self._values = vals
+        with contextlib.suppress(UnsetSigmaError, UnsetLocationsError):
+            self._update()
+
+    @property
+    def locations(self) -> list[tuple[int, int]]:
+        """Locations."""
+        try:
+            return self._locations
+        except AttributeError as e:
+            raise UnsetLocationsError from e
+
+    @locations.setter
+    def locations(self, locations: Iterable[tuple[int, int]]) -> None:
+        with contextlib.suppress(UnsetValuesError):
+            if len(locs := list(locations)) != len(self.values):
+                msg = "There must be as many locations as values."
+                raise ValueError(msg)
+        self._locations = locs
+        with contextlib.suppress(UnsetSigmaError, UnsetValuesError):
+            self._update()
+
+    @property
+    def sigma(self) -> float:
+        """Standard deviation of gaussian kernel."""
+        try:
+            return self._sigma
+        except AttributeError as e:
+            raise UnsetSigmaError from e
+
+    @sigma.setter
+    def sigma(self, sigma: float) -> None:
+        if sigma <= 0:
+            msg = f"Standard deviation must be > 0 thus cannot be {sigma}."
+            raise ValueError(msg)
+        self._sigma = sigma
+        with contextlib.suppress(UnsetLocationsError, UnsetValuesError):
+            self._update()
+
+    def _update(self) -> None:
         core = torch.zeros_like(self._core)
 
         x, y = torch.meshgrid(
@@ -247,7 +295,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
 
         norm = torch.zeros_like(core)
 
-        for alpha, loc in zip(values, locations):
+        for alpha, loc in zip(self.values, self.locations):
             i, j = loc
             exp_factor = torch.exp(
                 -((x - i) ** 2 + (y - j) ** 2) / 2 / self.sigma**2,
@@ -256,6 +304,21 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             core[..., :, :] += alpha * exp_factor
 
         self._core = core / norm
+
+    def update(
+        self,
+        values: Iterable[float],
+        locations: Iterable[tuple[int, int]] | None = None,
+    ) -> None:
+        """Update core value.
+
+        Args:
+            values (Iterable[float]): Float value.
+            locations (Iterable[tuple[int, int]] | None, optional): Center
+            points indexes. Defaults to None.
+        """
+        self.values = values
+        self.locations = locations
 
 
 class LSRUniformCoefficient(UniformCoefficient):
