@@ -53,7 +53,7 @@ class NonUniformCoefConfig(
         return matrix.unsqueeze(0).unsqueeze(0)
 
 
-class SmoothUniformCoefConfig(
+class SmoothNonUniformCoefConfig(
     NamedObjectConfig[CoefficientName],
     BaseModel,
 ):
@@ -83,7 +83,7 @@ CollinearityCoefficientConfig = Union[
 CoefConfig = Union[
     UniformCoefConfig,
     NonUniformCoefConfig,
-    SmoothUniformCoefConfig,
+    SmoothNonUniformCoefConfig,
     LSRUniformCoefConfig,
 ]
 
@@ -92,7 +92,7 @@ CoefConfigVar = TypeVar(
     bound=Union[
         UniformCoefConfig,
         NonUniformCoefConfig,
-        SmoothUniformCoefConfig,
+        SmoothNonUniformCoefConfig,
         LSRUniformCoefConfig,
     ],
 )

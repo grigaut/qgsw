@@ -18,7 +18,7 @@ if TYPE_CHECKING:
         LSRUniformCoefConfig,
         ModelConfig,
         NonUniformCoefConfig,
-        SmoothUniformCoefConfig,
+        SmoothNonUniformCoefConfig,
         UniformCoefConfig,
     )
     from qgsw.configs.space import SpaceConfig
@@ -45,7 +45,7 @@ def instantiate_coef(
 ) -> NonUniformCoefficient: ...
 @overload
 def instantiate_coef(
-    model_config: ModelConfig[SmoothUniformCoefConfig],
+    model_config: ModelConfig[SmoothNonUniformCoefConfig],
     space_config: SpaceConfig,
 ) -> SmoothNonUniformCoefficient: ...
 
@@ -74,7 +74,7 @@ def instantiate_coef(
     | ModelConfig[CoefConfig]
     | ModelConfig[UniformCoefConfig]
     | ModelConfig[NonUniformCoefConfig]
-    | ModelConfig[SmoothUniformCoefConfig]
+    | ModelConfig[SmoothNonUniformCoefConfig]
     | ModelConfig[LSRUniformCoefConfig],
     space_config: SpaceConfig,
 ) -> CoefType:
