@@ -166,7 +166,6 @@ output_dir = config.io.output.directory
 modified = is_modified(config.model.type)
 if modified:
     coef = instantiate_coef(config.model, config.space)
-    coef.update(config.model.collinearity_coef.initial)
     model.alpha = coef.get()
 coef_type = config.model.collinearity_coef.type
 is_lsr = coef_type == CoefficientName.LSR_INFERRED_UNIFORM

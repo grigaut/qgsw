@@ -60,7 +60,7 @@ model = instantiate_model(
 modified = is_modified(config.model.type)
 if modified:
     coef = instantiate_coef(config.model, config.space)
-    model.alpha = coef.update(config.model.collinearity_coef.initial)
+    model.alpha = coef.get()
 
 model.slip_coef = config.physics.slip_coef
 model.bottom_drag_coef = config.physics.bottom_drag_coefficient
