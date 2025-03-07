@@ -48,105 +48,7 @@ class Coefficient(
     _unit = Unit._
 
     _nl = 1
-
-    def __init__(
-        self,
-        *,
-        nx: int,
-        ny: int,
-        n_ens: int = 1,
-        dtype: torch.dtype = None,
-        device: torch.device = None,
-    ) -> None:
-        """Instantiate the coefficient.
-
-        Args:
-            nx (int): Points in the x direction.
-            ny (int): Points in the y direction.
-            n_ens (int, optional): Number of ensemble. Defaults to 1.
-            dtype (torch.dtype, optional): Data type. Defaults to None.
-            device (torch.device, optional): Device. Defaults to None.
-        """
-        self._core = torch.ones(
-            (n_ens, self._nl, nx, ny),
-            **defaults.get(dtype=dtype, device=device),
-        )
-
-    @abstractmethod
-    def update(self, values: Values) -> None:
-        """Update the Coefficient value.
-
-        Args:
-            values (Values): Values to use for update.
-        """
-
-    def get(self) -> torch.Tensor:
-        """Get the coefficient value.
-
-        Returns:
-            torch.Tensor: Coefficient value.
-        """
-        return self._core
-
-    @classmethod
-    def from_config(cls, space_config: SpaceConfig) -> Self:
-        """Instantiate the coefficient from configuration.
-
-        Args:
-            space_config (SpaceConfig): Space configuration.
-
-        Returns:
-            Self: Coefficient
-        """
-        return cls(nx=space_config.nx, ny=space_config.ny)
-
-
-class UniformCoefficient(Coefficient[float]):
-    """Space-uniform coefficient."""
-
-    _type = CoefficientName.UNIFORM
-
-    def __init__(
-        self,
-        *,
-        nx: int,
-        ny: int,
-        n_ens: int = 1,
-        dtype: torch.dtype = None,
-        device: torch.device = None,
-    ) -> None:
-        """Instantiate the coefficient.
-
-        Args:
-            nx (int): Points in the x direction.
-            ny (int): Points in the y direction.
-            n_ens (int, optional): Number of ensemble. Defaults to 1.
-            dtype (torch.dtype, optional): Data type. Defaults to None.
-            device (torch.device, optional): Device. Defaults to None.
-        """
-        super().__init__(
-            nx=nx,
-            ny=ny,
-            n_ens=n_ens,
-            dtype=dtype,
-            device=device,
-        )
-
-    def update(self, values: float) -> None:
-        """Update core value.
-
-        Args:
-            values (float): Float value.
-        """
-        self._core = values * torch.ones_like(self._core)
-
-
-class NonUniformCoefficient(Coefficient[torch.Tensor]):
-    """Non-space-uniform coefficient."""
-
-    _type = CoefficientName.NON_UNIFORM
-
-    sigma = 1
+    _core: torch.Tensor
 
     def __init__(
         self,
@@ -170,30 +72,66 @@ class NonUniformCoefficient(Coefficient[torch.Tensor]):
         self._dtype = defaults.get_dtype(dtype)
         self._device = defaults.get_device(device)
 
-    def update(
-        self,
-        values: torch.Tensor,
-    ) -> None:
-        """Update core value.
+    @property
+    def values(self) -> Values:
+        """Values."""
+        try:
+            return self._values
+        except AttributeError as e:
+            raise UnsetValuesError from e
+
+    @values.setter
+    def values(self, values: Values) -> None:
+        self._values = values
+        self._update()
+
+    @abstractmethod
+    def _update(self) -> None:
+        """Update the Coefficient value."""
+
+    def update(self, values: Values) -> None:
+        """Update values.
 
         Args:
-            values (torch.Tensor): Coefficient value.
+            values (Values): New values to consider.
         """
-        if values.shape != self._shape:
-            msg = f"Invalid shape, it should be {self._shape}-shaped."
-            raise ValueError(msg)
-        if values.dtype != self._dtype:
-            msg = f"Invalid dtype, it should be {self._dtype}."
-            raise ValueError(msg)
-        self._core = values
+        with contextlib.suppress(AttributeError):
+            del self._values
+        self.values = values
+
+    def get(self) -> torch.Tensor:
+        """Get the coefficient value.
+
+        Returns:
+            torch.Tensor: Coefficient value.
+        """
+        try:
+            return self._core
+        except AttributeError as e:
+            msg = (
+                "All parameters have not been properly set."
+                "Thus the coefficient has not been instantiated"
+            )
+            raise AttributeError(msg) from e
+
+    @classmethod
+    def from_config(cls, space_config: SpaceConfig) -> Self:
+        """Instantiate the coefficient from configuration.
+
+        Args:
+            space_config (SpaceConfig): Space configuration.
+
+        Returns:
+            Self: Coefficient
+        """
+        return cls(nx=space_config.nx, ny=space_config.ny)
 
 
-class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
-    """Non-space-uniform coefficient smoothed by gaussians."""
+class UniformCoefficient(Coefficient[float]):
+    """Space-uniform coefficient."""
 
-    _type = CoefficientName.SMOOOTH_NON_UNIFORM
-
-    _sigma = 1
+    _type = CoefficientName.UNIFORM
+    _description = "Space-uniform Collinearity coefficient"
 
     def __init__(
         self,
@@ -220,6 +158,55 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             dtype=dtype,
             device=device,
         )
+
+    def _update(self) -> None:
+        """Update core value.
+
+        Args:
+            values (float): Float value.
+        """
+        self._core = self.values * torch.ones(
+            self._shape,
+            device=self._description,
+            dtype=self._dtype,
+        )
+
+
+class NonUniformCoefficient(Coefficient[torch.Tensor]):
+    """Non-space-uniform coefficient."""
+
+    _type = CoefficientName.NON_UNIFORM
+    _description = "Non-space-uniform Collinearity coefficient"
+
+    def _update(
+        self,
+    ) -> None:
+        """Update core value."""
+        self._core = self._values
+
+    @Coefficient.values.setter
+    def values(self, values: torch.Tensor) -> None:
+        """Setter for values."""
+        if values.shape != self._shape:
+            msg = f"Invalid shape, it should be {self._shape}-shaped."
+            raise ValueError(msg)
+        if values.dtype != self._dtype:
+            msg = f"Invalid dtype, it should be {self._dtype}."
+            raise ValueError(msg)
+        if values.device.type != self._device.type:
+            msg = f"Invalid device type, it should be {self._device.type}."
+            raise ValueError(msg)
+        self._values = values
+        self._update()
+
+
+class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
+    """Non-space-uniform coefficient smoothed by gaussians."""
+
+    _type = CoefficientName.SMOOOTH_NON_UNIFORM
+    _description = "Smoothed-non-space-uniform Collinearity coefficient"
+
+    _sigma = 1
 
     @property
     def values(self) -> list[float]:
@@ -274,8 +261,27 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         with contextlib.suppress(UnsetLocationsError, UnsetValuesError):
             self._update()
 
+    def update(
+        self,
+        values: Iterable[float],
+        locations: Iterable[tuple[int, int]],
+    ) -> None:
+        """Manually update.
+
+        This removes both attributes before setting them to final values.
+
+        Args:
+            values (Iterable[float]): Values.
+            locations (Iterable[tuple[int, int]]): Locations.
+        """
+        with contextlib.suppress(AttributeError):
+            del self._values
+            del self._locations
+        self.values = values
+        self.locations = locations
+
     def _update(self) -> None:
-        core = torch.zeros_like(self._core)
+        core = torch.zeros(self._shape, dtype=self._dtype, device=self._device)
 
         x, y = torch.meshgrid(
             torch.arange(
@@ -304,21 +310,6 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             core[..., :, :] += alpha * exp_factor
 
         self._core = core / norm
-
-    def update(
-        self,
-        values: Iterable[float],
-        locations: Iterable[tuple[int, int]] | None = None,
-    ) -> None:
-        """Update core value.
-
-        Args:
-            values (Iterable[float]): Float value.
-            locations (Iterable[tuple[int, int]] | None, optional): Center
-            points indexes. Defaults to None.
-        """
-        self.values = values
-        self.locations = locations
 
 
 class LSRUniformCoefficient(UniformCoefficient):
