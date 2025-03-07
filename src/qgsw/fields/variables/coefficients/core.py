@@ -167,7 +167,7 @@ class UniformCoefficient(Coefficient[float]):
         """
         self._core = self.values * torch.ones(
             self._shape,
-            device=self._description,
+            device=self._device,
             dtype=self._dtype,
         )
 
