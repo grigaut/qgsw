@@ -22,8 +22,8 @@ T = TypeVar("T", bound=torch.nn.modules.conv._ConvNd)  # noqa: SLF001
 class GaussianFilter(_Filter, ABC, Generic[T]):
     """Gaussian Filter."""
 
-    _windows_width_factor = 4  # nbs of sigma
-    _span_threshold = 0.05
+    _windows_width_factor = 1  # nbs of sigma
+    _span_threshold = 0.5
 
     def __init__(self, sigma: float) -> None:
         """Instantiate the filter.
@@ -66,7 +66,7 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
     @property
     def window_radius(self) -> int:
         """Window radius."""
-        return int(self._windows_width_factor * self._sigma) + 1
+        return self._windows_width_factor * int(self.span) + 1
 
     @abstractmethod
     def _build_convolution(self) -> T:
@@ -91,7 +91,7 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
 
     @classmethod
     def compute_sigma_from_span(cls, span: float, threshold: float) -> float:
-        """Compute the standard deviation givent the span.
+        """Compute the standard deviation given the span.
 
         Args:
             span (float): Desired span (in px).
@@ -105,25 +105,25 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
             dtype=torch.float64,
             device=DEVICE.get(),
         )
-        return (span / torch.sqrt(-8 * torch.log(thres))).item()
+        return (span / torch.sqrt(-2 * torch.log(thres))).item()
 
     @classmethod
     def compute_span_from_sigma(cls, sigma: float, threshold: float) -> float:
-        """Compute the standard deviation givent the span.
+        """Compute the span given the satndard deviation.
 
         Args:
             sigma (float): Standard deviation.
             threshold (float): Threshold to bound the span.
 
         Returns:
-            float: Corresponding standard deviation.
+            float: Corresponding span.
         """
         thres = torch.tensor(
             threshold,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
-        return (sigma * torch.sqrt(-8 * torch.log(thres))).item()
+        return (sigma * torch.sqrt(-2 * torch.log(thres))).item()
 
     @classmethod
     @abstractmethod
@@ -290,13 +290,12 @@ class GaussianFilter2D(
         Returns:
             torch.Tensor: Gaussian kernel (2*windows_radius+1,)-shaped.
         """
-        x = torch.arange(
+        r = torch.arange(
             -window_radius,
             window_radius + 1,
             device=DEVICE.get(),
             dtype=torch.float64,
         )
-        r = x
         kernel_1d = torch.exp(-(r**2 / (2 * sigma**2))).unsqueeze(-1)
         kernel_1d /= (kernel_1d @ kernel_1d.T).sum().sqrt()
         return kernel_1d
