@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.coefficients import LSRSFInferredAlpha
 from qgsw.fields.variables.dynamics import (
     Enstrophy,
     LayerDepthAnomalyDiag,
@@ -142,9 +141,6 @@ class QGVariableSet:
         var_dict[StreamFunction.get_name()] = StreamFunction(
             var_dict[Pressure.get_name()],
             physics.f0,
-        )
-        var_dict[LSRSFInferredAlpha.get_name()] = LSRSFInferredAlpha(
-            var_dict[StreamFunction.get_name()],
         )
 
     @classmethod

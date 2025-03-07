@@ -3,10 +3,8 @@
 import pytest
 import torch
 
+from qgsw.fields.variables.coefficients.core import UniformCoefficient
 from qgsw.models.qg.projected.modified.collinear.core import QGCollinearSF
-from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
-    compute_A_collinear_sf,
-)
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
@@ -102,54 +100,7 @@ def test_stretching_matrix_shape(
         g_prime,
         beta_plane=BetaPlane(9.375e-5, 0),
     )
-    model.alpha = torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
+    coef = UniformCoefficient(nx=model.space.nx, ny=model.space.ny)
+    coef.update(0)
+    model.alpha = coef.get()
     assert model.A.shape == (1, 1)
-
-
-testdata = [
-    pytest.param(
-        0,
-        torch.tensor(
-            [[1 / 200 / 10 + 1 / 200 / 0.05]],
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        ),
-        id="alpha=0",
-    ),
-    pytest.param(
-        1,
-        torch.tensor(
-            [[1 / 200 / 10 + 1 / 200 / 0.05 - 1 / 200 / 0.05]],
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        ),
-        id="alpha=1",
-    ),
-    pytest.param(
-        0.5,
-        torch.tensor(
-            [[1 / 200 / 10 + 1 / 200 / 0.05 - 0.5 / 200 / 0.05]],
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        ),
-        id="alpha=0.5",
-    ),
-]
-
-
-@pytest.mark.parametrize(("coefficient", "reference"), testdata)
-def test_model_stretching_matrix(
-    H: torch.Tensor,  # noqa: N803
-    g_prime: torch.Tensor,
-    coefficient: float,
-    reference: torch.Tensor,
-) -> None:
-    """Test streching matrix computation from QG model."""
-    A = compute_A_collinear_sf(  # noqa: N806
-        H,
-        g_prime,
-        coefficient,
-        torch.float64,
-        DEVICE.get(),
-    )
-    assert torch.isclose(reference, A).all()

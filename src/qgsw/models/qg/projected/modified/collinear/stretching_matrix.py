@@ -3,10 +3,11 @@
 import torch
 
 from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.utils.dim_checks import with_dims
 from qgsw.utils.shape_checks import with_shapes
 
 
-@with_shapes(g_prime=(2,), alpha=(1,))
+@with_shapes(g_prime=(2,))
 def compute_g_tilde(
     g_prime: torch.Tensor,
     alpha: torch.Tensor,
@@ -25,6 +26,51 @@ def compute_g_tilde(
     """
     g1, g2 = g_prime
     return g1 * g2 / ((1 - alpha) * g1 + g2)
+
+
+@with_dims(
+    H=1,
+    g_prime=1,
+)
+def compute_A_11(  # noqa: N802
+    H: torch.Tensor,  # noqa: N803
+    g_prime: torch.Tensor,
+) -> torch.Tensor:
+    """Compute A_12 coefficient of a multilayer A.
+
+    A_11 = 1 / (H_1 g_tilde).
+
+    Args:
+        H (torch.Tensor): Reference heights.
+        g_prime (torch.Tensor): Reduced gravity.
+
+    Returns:
+        torch.Tensor: A_11 = 1 / (H_1 g_tilde)
+    """
+    g_tilde = g_prime[1:2] * g_prime[0:1] / (g_prime[0:1] + g_prime[1:2])
+    return 1 / H[0:1] / g_tilde
+
+
+@with_dims(
+    H=1,
+    g_prime=1,
+)
+def compute_A_12(  # noqa: N802
+    H: torch.Tensor,  # noqa: N803
+    g_prime: torch.Tensor,
+) -> torch.Tensor:
+    """Compute A_12 coefficient of A.
+
+    A_12 = -1 / (H_1 g_2).
+
+    Args:
+        H (torch.Tensor): Reference heights.
+        g_prime (torch.Tensor): Reduced gravity.
+
+    Returns:
+        torch.Tensor: A_12 = -1 / (H_1 g_2)
+    """
+    return -1 / H[0:1] / g_prime[1:2]
 
 
 def compute_A_collinear_sf(  # noqa: N802

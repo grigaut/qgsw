@@ -66,9 +66,10 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
 
 
 T = TypeVar("T", bound=BasePrognosticTuple)
+State = TypeVar("State", bound=StateUVH)
 
 
-class SWCore(ModelUVH[T, StateUVH], Generic[T]):
+class SWCore(ModelUVH[T, State], Generic[T, State]):
     """Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -208,7 +209,7 @@ class SWCore(ModelUVH[T, StateUVH], Generic[T]):
         """Create diagnostic variables and bind them to state.
 
         Args:
-            state (StateUVH): state.
+            state (State): state.
         """
         super()._create_diagnostic_vars(state)
 
@@ -397,7 +398,7 @@ class SWCore(ModelUVH[T, StateUVH], Generic[T]):
         return QGVariableSet.get_variable_set(space, physics, model)
 
 
-class SW(SWCore[UVHT]):
+class SW(SWCore[UVHT, StateUVH]):
     """Implementation of multilayer rotating shallow-water model.
 
     Following https://doi.org/10.1029/2021MS002663 .
@@ -431,7 +432,7 @@ class SW(SWCore[UVHT]):
     """
 
 
-class SWCollinearSublayer(SWCore[UVHTAlpha]):
+class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
     """Shallow water for collinear sublayer models."""
 
     def __init__(

@@ -12,13 +12,15 @@ from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.projected.core import QGCore
-from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
-    compute_A_collinear_sf,
-)
 from qgsw.models.qg.projected.modified.collinear.variable_set import (
     QGCollinearSFVariableSet,
 )
+from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
+from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
 from qgsw.models.qg.projected.projectors.core import QGProjector
+from qgsw.models.qg.stretching_matrix import (
+    compute_A,
+)
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -91,7 +93,7 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
         super()._set_H(h)
 
 
-class QGCollinearSF(QGAlpha[QGProjector]):
+class QGCollinearSF(QGAlpha[CollinearQGProjector]):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _type = ModelName.QG_COLLINEAR_SF
@@ -151,6 +153,8 @@ class QGCollinearSF(QGAlpha[QGProjector]):
             beta_plane=beta_plane,
             optimize=optimize,
         )
+        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
+        self._set_projector()
 
     @property
     def H(self) -> torch.Tensor:  # noqa: N802
@@ -173,8 +177,7 @@ class QGCollinearSF(QGAlpha[QGProjector]):
         """Alpha setter."""
         QGAlpha.alpha.fset(self, alpha)
         self._core.alpha = alpha
-        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
-        self._set_projector()
+        self.P.alpha = alpha
         self._create_diagnostic_vars(self._state)
 
     def _init_core_model(
@@ -226,12 +229,21 @@ class QGCollinearSF(QGAlpha[QGProjector]):
         Returns:
             torch.Tensor: Stretching Operator
         """
-        return compute_A_collinear_sf(
-            H=H,
-            g_prime=g_prime,
-            alpha=self.alpha,
+        return compute_A(
+            H=H[:1],
+            g_prime=compute_g_tilde(g_prime),
             dtype=self.dtype,
             device=self.device.get(),
+        )
+
+    def _set_projector(self) -> None:
+        self._P = CollinearQGProjector(
+            self.A,
+            self._H,
+            g_prime=self._g_prime,
+            space=self.space,
+            f0=self.beta_plane.f0,
+            masks=self.masks,
         )
 
     def step(self) -> None:

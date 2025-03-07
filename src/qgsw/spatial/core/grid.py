@@ -472,3 +472,55 @@ class Grid3D:
             zh_unit=zh_unit,
         )
         return cls(coords)
+
+
+def loc_to_indexes_2d(
+    grid_2d: Grid2D,
+    *,
+    x: float,
+    y: float,
+) -> tuple[int, int]:
+    """Match locations to closest indexes.
+
+    i = argmin((X - x).abs())
+    j = argmin((Y - y).abs())
+
+    Args:
+        grid_2d (Grid2D): Grid.
+        x (float): X value.
+        y (float): Y value.
+
+    Returns:
+        tuple[int, int]: i, j
+    """
+    i: int = torch.argmin((grid_2d.xy.x[:, 0] - x).abs()).item()
+    j: int = torch.argmin((grid_2d.xy.y[0, :] - y).abs()).item()
+    return (i, j)
+
+
+def loc_to_indexes_3d(
+    grid_3d: Grid3D,
+    *,
+    x: float,
+    y: float,
+    h: float,
+) -> tuple[int, int, int]:
+    """Match locations to closest indexes.
+
+    k = argmin((H - h).abs())
+    i = argmin((X - x).abs())
+    j = argmin((Y - y).abs())
+
+    Args:
+        grid_3d (Grid3D): Grid.
+        x (float): X value.
+        y (float): Y value.
+        h (float): H value.
+
+    Returns:
+        tuple[int, int, int]: k, i, j
+    """
+    k: int = torch.argmin((grid_3d.xyh.h[:, 0, 0] - h).abs()).item()
+    i: int = torch.argmin((grid_3d.xyh.x[0, :, 0] - x).abs()).item()
+    j: int = torch.argmin((grid_3d.xyh.y[0, 0, :] - y).abs()).item()
+    return (k, i, j)

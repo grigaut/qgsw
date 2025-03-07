@@ -9,9 +9,8 @@ from rich.progress import Progress
 from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
-from qgsw.fields.variables.coefficients import (
-    create_coefficient,
-)
+from qgsw.fields.variables.coefficients.coef_names import CoefficientName
+from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
 from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models import matching
@@ -134,15 +133,14 @@ else:
         )
         raise ValueError(msg)
 
-model_ref.set_uvh(
-    uvh0.u[:, :nl_ref, ...],
-    uvh0.v[:, :nl_ref, ...],
-    uvh0.h[:, :nl_ref, ...],
+uvh = matching.match_pv(
+    uvh0,
+    nl_ref,
 )
-model.set_uvh(
-    uvh0.u[:, :nl, ...],
-    uvh0.v[:, :nl, ...],
-    uvh0.h[:, :nl, ...],
+model_ref.set_uvh(
+    torch.clone(uvh.u),
+    torch.clone(uvh.v),
+    torch.clone(uvh.h),
 )
 
 dt = model.dt
@@ -165,9 +163,13 @@ prefix = config.model.prefix
 output_dir = config.io.output.directory
 
 # Collinearity Coefficient
-if is_modified(config.model.type):
-    alpha = create_coefficient(config)
-    model.alpha = alpha.compute(model_ref.prognostic)
+modified = is_modified(config.model.type)
+if modified:
+    coef = instantiate_coef(config.model, config.space)
+    model.alpha = coef.get()
+coef_type = config.model.collinearity_coef.type
+is_lsr = coef_type == CoefficientName.LSR_INFERRED_UNIFORM
+
 
 with Progress() as progress:
     simulation = progress.add_task(
@@ -182,11 +184,10 @@ with Progress() as progress:
         progress.advance(simulation)
         if fork:
             prognostic = model_ref.prognostic
-            if config.model.type in [
-                ModelName.QG_COLLINEAR_SF,
-                ModelName.QG_FILTERED,
-            ]:
-                model.alpha = alpha.compute_no_slice(prognostic)
+            if modified and is_lsr:
+                p = model_ref.P.compute_p(prognostic.uvh)[0]
+                coef.update(coef.compute_coefficient(p))
+                model.alpha = coef.get()
             uvh = matching.match_pv(
                 prognostic.uvh,
                 nl,
@@ -208,14 +209,12 @@ with Progress() as progress:
             verbose.display(
                 msg="[Reference Model]: ",
                 trigger_level=1,
-                end="",
             )
             # Save Reference Model
             model_ref.io.save(output_dir.joinpath(f"{prefix_ref}{n}.pt"))
             verbose.display(
                 msg="[     Model     ]: ",
                 trigger_level=1,
-                end="",
             )
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.pt"))

@@ -556,7 +556,7 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
         dtype = defaults.get_dtype(dtype)
         device = defaults.get_device(device)
         return cls.from_uvht(
-            torch.zeros((n_ens,), dtype=dtype, device=device),
+            torch.zeros((n_ens, 1, nx, ny), dtype=dtype, device=device),
             UVHT.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
         )
 
@@ -584,4 +584,7 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
             dtype=dtype,
             device=device,
         )
-        return cls.from_uvht(alpha, UVHT.from_file(file, dtype, device))
+        return cls.from_uvht(
+            alpha,
+            UVHT.from_file(file, dtype=dtype, device=device),
+        )

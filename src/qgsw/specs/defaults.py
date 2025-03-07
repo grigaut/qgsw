@@ -44,13 +44,21 @@ class DefaultSpecs(TypedDict):
     device: torch.device
 
 
-def get() -> DefaultSpecs:
+def get(
+    *,
+    dtype: torch.dtype | None = None,
+    device: torch.device | None = None,
+) -> DefaultSpecs:
     """Get defaults.
+
+    Args:
+        dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+        device (torch.device | None, optional): Device. Defaults to None.
 
     Returns:
         DefaultSpecs: Default specs.
     """
     return DefaultSpecs(
-        dtype=get_dtype(),
-        device=get_device(),
+        dtype=get_dtype(dtype),
+        device=get_device(device),
     )

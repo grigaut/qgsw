@@ -19,9 +19,7 @@ from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.usual.core import QGPSIQ
 from qgsw.models.sw.core import SW
-from qgsw.perturbations.names import PertubationName
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.models import (
@@ -162,7 +160,6 @@ def _instantiate_modified(
     )
     if model_config.type == ModelName.QG_FILTERED:
         model.P.filter.sigma = model_config.sigma
-    model.alpha = _determine_coef0(perturbation.type)
     uvh0 = QGProjector.G(
         p0,
         A=model.A,
@@ -179,30 +176,6 @@ def _instantiate_modified(
         h=torch.clone(uvh0.h[:, :1, ...]),
     )
     return model
-
-
-def _determine_coef0(perturbation_type: str) -> float:
-    """Compute initial coefficient for Modified QG models initialisation.
-
-    Args:
-        perturbation_type (str): Perturbation type.
-
-    Raises:
-        ValueError: If the perturbation type is not recognized.
-
-    Returns:
-        float: Initial coefficient value.
-    """
-    if perturbation_type == PertubationName.BAROCLINIC_VORTEX:
-        return torch.tensor([0], dtype=torch.float64, device=DEVICE.get())
-    if perturbation_type == PertubationName.HALF_BAROTROPIC_VORTEX:
-        return torch.tensor([0.5], dtype=torch.float64, device=DEVICE.get())
-    if perturbation_type == PertubationName.BAROTROPIC_VORTEX:
-        return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
-    if perturbation_type == PertubationName.NONE:
-        return torch.tensor([1], dtype=torch.float64, device=DEVICE.get())
-    msg = f"Unknown perturbation type: {perturbation_type}"
-    raise ValueError(msg)
 
 
 ModelClass = type[

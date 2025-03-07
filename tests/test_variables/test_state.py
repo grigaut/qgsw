@@ -2,6 +2,7 @@
 
 import torch
 
+from qgsw.fields.variables.coefficients.core import UniformCoefficient
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
@@ -151,7 +152,9 @@ def test_state_alpha_updates() -> None:
     state.update_uvh(UVH(state.u.get() + 2, state.v.get(), state.h.get()))
     assert (state.alpha.get() == alpha0.get()).all()
     uvh0 = state.prognostic.uvh
-    state.alpha = torch.tensor([0.4], dtype=torch.float64, device=DEVICE.get())
+    coef = UniformCoefficient(nx=10, ny=10)
+    coef.update(0.4)
+    state.alpha = coef.get()
     assert state.prognostic.uvh == uvh0
 
 
