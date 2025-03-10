@@ -8,7 +8,7 @@ import torch
 
 from qgsw import verbose
 from qgsw.fields.variables.prognostic_tuples import UVH
-from qgsw.filters.high_pass import SpectralGaussianHighPass2D
+from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
@@ -63,7 +63,7 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         self._filter = self.create_filter(self._sigma)
 
     @property
-    def filter(self) -> SpectralGaussianHighPass2D:
+    def filter(self) -> GaussianHighPass2D:
         """Filter."""
         return self._filter
 
@@ -243,7 +243,10 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         return pi1, p_qg_i
 
     @classmethod
-    def create_filter(cls, sigma: float) -> SpectralGaussianHighPass2D:
+    def create_filter(
+        cls,
+        sigma: float,
+    ) -> GaussianHighPass2D:
         """Create filter.
 
         Args:
@@ -252,4 +255,4 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         Returns:
             SpectralGaussianHighPass2D: Filter.
         """
-        return SpectralGaussianHighPass2D(sigma=sigma)
+        return GaussianHighPass2D(sigma=sigma)
