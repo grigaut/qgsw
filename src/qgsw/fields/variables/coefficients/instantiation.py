@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, overload
 
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.fields.variables.coefficients.core import (
-    LSRUniformCoefficient,
     NonUniformCoefficient,
     SmoothNonUniformCoefficient,
     UniformCoefficient,
@@ -15,7 +14,6 @@ from qgsw.fields.variables.coefficients.core import (
 if TYPE_CHECKING:
     from qgsw.configs.models import (
         CoefConfig,
-        LSRUniformCoefConfig,
         ModelConfig,
         NonUniformCoefConfig,
         SmoothNonUniformCoefConfig,
@@ -24,10 +22,7 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
 
 CoefType = (
-    UniformCoefficient
-    | NonUniformCoefficient
-    | SmoothNonUniformCoefficient
-    | LSRUniformCoefficient
+    UniformCoefficient | NonUniformCoefficient | SmoothNonUniformCoefficient
 )
 
 
@@ -52,13 +47,6 @@ def instantiate_coef(
 
 @overload
 def instantiate_coef(
-    model_config: ModelConfig[LSRUniformCoefConfig],
-    space_config: SpaceConfig,
-) -> LSRUniformCoefficient: ...
-
-
-@overload
-def instantiate_coef(
     model_config: ModelConfig[CoefConfig],
     space_config: SpaceConfig,
 ) -> CoefType: ...
@@ -74,8 +62,7 @@ def instantiate_coef(
     | ModelConfig[CoefConfig]
     | ModelConfig[UniformCoefConfig]
     | ModelConfig[NonUniformCoefConfig]
-    | ModelConfig[SmoothNonUniformCoefConfig]
-    | ModelConfig[LSRUniformCoefConfig],
+    | ModelConfig[SmoothNonUniformCoefConfig],
     space_config: SpaceConfig,
 ) -> CoefType:
     """Instantiate the coefficient.
@@ -107,18 +94,12 @@ def instantiate_coef(
         )
         coef.sigma = coef_config.sigma
         coef.update(coef_config.initial, coef_config.centers)
-    elif coef_config.type == CoefficientName.LSR_INFERRED_UNIFORM:
-        coef = LSRUniformCoefficient.from_config(
-            space_config=space_config,
-        )
-        coef.update(coef_config.initial)
     else:
         msg = "Possible coefficient types are: "
         coef_types = [
             UniformCoefficient.get_name(),
             NonUniformCoefficient.get_name(),
             SmoothNonUniformCoefficient.get_name(),
-            LSRUniformCoefficient.get_name(),
         ]
         msg += ", ".join(coef_types)
         raise ValueError(msg)

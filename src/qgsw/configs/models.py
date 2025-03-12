@@ -65,27 +65,15 @@ class SmoothNonUniformCoefConfig(
     sigma: float = 1
 
 
-class LSRUniformCoefConfig(
-    NamedObjectConfig[CoefficientName],
-    BaseModel,
-):
-    """Inferred collinearity coeffciient."""
-
-    type: Literal[CoefficientName.LSR_INFERRED_UNIFORM]
-    initial: float
-
-
 CollinearityCoefficientConfig = Union[
     UniformCoefConfig,
     NonUniformCoefficient,
-    LSRUniformCoefConfig,
 ]
 
 CoefConfig = Union[
     UniformCoefConfig,
     NonUniformCoefConfig,
     SmoothNonUniformCoefConfig,
-    LSRUniformCoefConfig,
 ]
 
 CoefConfigVar = TypeVar(
@@ -94,7 +82,6 @@ CoefConfigVar = TypeVar(
         UniformCoefConfig,
         NonUniformCoefConfig,
         SmoothNonUniformCoefConfig,
-        LSRUniformCoefConfig,
     ],
 )
 

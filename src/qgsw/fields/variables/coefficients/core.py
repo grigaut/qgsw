@@ -30,9 +30,6 @@ import torch
 
 from qgsw.fields.variables.base import Variable
 from qgsw.specs import defaults
-from qgsw.utils.least_squares_regression import (
-    perform_linear_least_squares_regression,
-)
 from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
@@ -541,44 +538,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         return solution.x.tolist()
 
 
-class LSRUniformCoefficient(UniformCoefficient):
-    """Inferred collinearity from the streamfunction.
-
-    Performs linear least squares regression to infer alpha.
-    """
-
-    _type = CoefficientName.LSR_INFERRED_UNIFORM
-    _name = "alpha_lsr_sf"
-    _description = "LSR-Stream function inferred coefficient"
-
-    @classmethod
-    def compute_coefficient(
-        cls,
-        p: torch.Tensor,
-    ) -> float:
-        """Compute collinearity coefficient.
-
-        Args:
-           p (torch.Tensor): Reference pressure (2-layered at least).
-
-        Returns:
-            Self: Coefficient.
-        """
-        p_1 = p[0, 0, ...]  # (nx,ny)-shaped
-        p_2 = p[0, 1, ...]  # (nx,ny)-shaped
-
-        x = p_1.flatten(-2, -1).unsqueeze(-1)  # (nx*ny,1)-shaped
-        y = p_2.flatten(-2, -1)  # (nx*ny)-shaped
-
-        try:
-            return perform_linear_least_squares_regression(x, y).item()
-        except torch.linalg.LinAlgError:
-            return 0
-
-
 CoefType = Union[
     UniformCoefficient,
     NonUniformCoefficient,
     SmoothNonUniformCoefficient,
-    LSRUniformCoefficient,
 ]
