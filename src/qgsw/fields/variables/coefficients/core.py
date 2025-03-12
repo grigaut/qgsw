@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Union
 import numpy as np
 from scipy import optimize
 
+from qgsw import verbose
 from qgsw.exceptions import (
     InappropriateShapeError,
     UnmatchingShapesError,
@@ -190,10 +191,16 @@ class UniformCoefficient(Coefficient[float]):
             nx and ny.
         """
         super().with_optimal_values(p, p_ref)
-        self.values = self.compute_optimal_values(
+        optimal = self.compute_optimal_values(
             p,
             p_ref,
         )
+
+        verbose.display(
+            msg=f"Optimal coefficient inferred: {round(optimal, 2)}",
+            trigger_level=2,
+        )
+        self.values = optimal
 
     @classmethod
     def compute_optimal_values(
@@ -235,6 +242,7 @@ class UniformCoefficient(Coefficient[float]):
             p_ref.flatten().cpu().numpy(),
             # To set bounds -> bounds=(-1, 1)
         )
+
         return solution.x.item()
 
 
@@ -396,7 +404,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
                 del self._centers
             self.centers = centers
         try:
-            self.values = self.compute_optimal_values(
+            optimal = self.compute_optimal_values(
                 p,
                 p_ref,
                 self.sigma,
@@ -409,6 +417,15 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
                 f" = {self.sigma}."
             )
             raise np.linalg.LinAlgError(msg) from e
+
+        verbose.display(
+            msg=(
+                "Optimal coefficient inferred"
+                f": {[round(r, 2) for r in optimal]}"
+            ),
+            trigger_level=2,
+        )
+        self.values = optimal
 
     def update(
         self,
