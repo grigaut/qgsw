@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+from copy import copy
 from typing import TYPE_CHECKING, Union
 
+import numpy as np
+from scipy import optimize
+
 from qgsw.exceptions import (
+    InappropriateShapeError,
     UnsetCentersError,
     UnsetSigmaError,
     UnsetValuesError,
@@ -17,7 +22,6 @@ try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
-
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable
 from typing import Generic, TypeVar
@@ -33,6 +37,7 @@ from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
+    from qgsw.filters.base import _Filter
 
 Values = TypeVar("Values")
 
@@ -69,6 +74,8 @@ class Coefficient(
             device (torch.device, optional): Device. Defaults to None.
         """
         self._shape = (n_ens, self._nl, nx, ny)
+        self._nx = nx
+        self._ny = ny
         self._dtype = defaults.get_dtype(dtype)
         self._device = defaults.get_device(device)
 
@@ -261,6 +268,56 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         with contextlib.suppress(UnsetCentersError, UnsetValuesError):
             self._update()
 
+    def with_optimal_values(
+        self,
+        p: torch.Tensor,
+        filt: _Filter,
+        centers: Iterable[tuple[int, int]] | None = None,
+    ) -> None:
+        """Set optimal values for `values`.
+
+        Optimal values are inferred using Least Square Regression.
+
+        Args:
+            p (torch.Tensor): Reference pressure.
+
+            filt (_Filter): Filter to use to filter p[0,0].
+            centers (Iterable[tuple[int, int]] | None, optional): Values
+            center locations. If None, the actual centers will be reused
+            (if already set). Defaults to None.
+
+        Raises:
+            InappropriateShapeError: If the pressure shape does not match with
+            nx and ny.
+            np.linalg.LinAlgError: If the least square regression does not
+            converge.
+        """
+        if p.shape[-2:] != self._shape[-2:]:
+            msg = (
+                f"Pressure's xy shape must be ({self._nx}, {self._ny}),"
+                f" not {p.shape[-2:]}"
+            )
+            raise InappropriateShapeError(msg)
+        if centers is not None:
+            with contextlib.suppress(AttributeError):
+                del self._values
+                del self._centers
+            self.centers = centers
+        try:
+            self.values = self.compute_optimal_values(
+                p,
+                self.sigma,
+                filt,
+                self.centers,
+            )
+        except np.linalg.LinAlgError as e:
+            msg = (
+                "Convergence issue might be solved by increasing the value "
+                f"of sigma.\n Currently, {self.__class__.__name__}.sigma"
+                f" = {self.sigma}."
+            )
+            raise np.linalg.LinAlgError(msg) from e
+
     def update(
         self,
         values: Iterable[float],
@@ -281,35 +338,119 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         self.centers = centers
 
     def _update(self) -> None:
-        core = torch.zeros(self._shape, dtype=self._dtype, device=self._device)
+        """Update the core."""
+        supports = self.compute_supports(
+            self.sigma,
+            self._nx,
+            self._ny,
+            self.centers,
+            dtype=self._dtype,
+            device=self._device,
+        )
 
-        x, y = torch.meshgrid(
-            torch.arange(
-                0,
-                core.shape[-2],
-                dtype=core.dtype,
-                device=core.device,
-            ),
-            torch.arange(
-                0,
-                core.shape[-1],
-                dtype=core.dtype,
-                device=core.device,
-            ),
+        core = supports @ torch.tensor(
+            self.values,
+            dtype=self._dtype,
+            device=self._device,
+        )
+        self._core = (
+            core.reshape((self._nx, self._ny)).unsqueeze(0).unsqueeze(0)
+        )
+
+    @classmethod
+    def compute_supports(
+        cls,
+        sigma: float,
+        nx: int,
+        ny: int,
+        centers: Iterable[tuple[int, int]],
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> torch.Tensor:
+        """Compute gaussian support for the coefficient.
+
+        Args:
+            sigma (float): Standard deviation for gaussian smoothing.
+            nx (int): Number of points along x.
+            ny (int): Number of points along y.
+            centers (Iterable[tuple[int, int]]): Values center locations.
+            dtype (torch.dtype): Data type.
+            device (torch.device): Data device.
+
+        Returns:
+            torch.Tensor: Gaussian supports.
+        """
+        specs = defaults.get(dtype=dtype, device=device)
+        X, Y = torch.meshgrid(  # noqa: N806
+            torch.arange(nx, **specs),
+            torch.arange(ny, **specs),
             indexing="ij",
         )
 
-        norm = torch.zeros_like(core)
+        supports: list[torch.Tensor] = []
 
-        for alpha, loc in zip(self.values, self.locations):
-            i, j = loc
-            exp_factor = torch.exp(
-                -((x - i) ** 2 + (y - j) ** 2) / 2 / self.sigma**2,
-            )
-            norm[..., :, :] += exp_factor
-            core[..., :, :] += alpha * exp_factor
+        norm = torch.zeros((nx, ny), **specs)
 
-        self._core = core / norm
+        for x0, y0 in copy(centers):
+            kernel = torch.exp(-((X - x0) ** 2 + (Y - y0) ** 2) / 2 / sigma**2)
+            norm += kernel
+            supports.append(kernel)
+
+        return torch.concatenate(
+            [(s / norm).reshape((-1, 1)) for s in supports],
+            dim=-1,
+        )
+
+    @classmethod
+    def compute_optimal_values(
+        cls,
+        p: torch.Tensor,
+        sigma: float,
+        filt: _Filter,
+        centers: Iterable[tuple[int, int]],
+    ) -> Iterable[float]:
+        """Compute optimal values.
+
+        Optimal values are inferred using Least Square Regression.
+
+        Args:
+            p (torch.Tensor): Pressure.
+            sigma (float): Standard deviation for gaussian smoothing.
+            filt (_Filter): Filter to apply to p[0,0].
+            centers (Iterable[tuple[int, int]]): Values centers locations.
+
+        Raises:
+            InappropriateShapeError: If p is not at least 2-layered.
+
+        Returns:
+            Iterable[float]: Optimal values.
+        """
+        if p.shape[1] < 2:  # noqa: PLR2004
+            msg = "Pressure should be at least 2-layered."
+            raise InappropriateShapeError(msg)
+
+        nx, ny = p.shape[-2:]
+
+        p1_filt = filt(p[0, 0])
+
+        supports = cls.compute_supports(
+            sigma=sigma,
+            nx=nx,
+            ny=ny,
+            centers=centers,
+            dtype=p.dtype,
+            device=p.device.type,
+        )
+
+        weighted_p1_filt = supports * (p1_filt.reshape((-1, 1)))
+
+        solution = optimize.lsq_linear(
+            weighted_p1_filt.cpu().numpy(),
+            p[0, 1].flatten().cpu().numpy(),
+            bounds=(-1, 1),
+        )
+        return solution.x.tolist()
 
 
 class LSRUniformCoefficient(UniformCoefficient):
