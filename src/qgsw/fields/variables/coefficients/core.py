@@ -76,8 +76,7 @@ class Coefficient(
         self._shape = (n_ens, self._nl, nx, ny)
         self._nx = nx
         self._ny = ny
-        self._dtype = defaults.get_dtype(dtype)
-        self._device = defaults.get_device(device)
+        self._specs = defaults.get(dtype=dtype, device=device)
 
     @property
     def values(self) -> Values:
@@ -91,6 +90,13 @@ class Coefficient(
     def values(self, values: Values) -> None:
         self._values = values
         self._update()
+
+    @abstractmethod
+    def with_optimal_values(
+        self,
+        p: torch.Tensor,
+    ) -> None:
+        """Sets optimal values to the coefficient."""
 
     @abstractmethod
     def _update(self) -> None:
@@ -117,7 +123,7 @@ class Coefficient(
         except AttributeError as e:
             msg = (
                 "All parameters have not been properly set."
-                "Thus the coefficient has not been instantiated"
+                "Thus the coefficient has not been instantiated."
             )
             raise AttributeError(msg) from e
 
@@ -133,38 +139,17 @@ class Coefficient(
         """
         return cls(nx=space_config.nx, ny=space_config.ny)
 
+    @classmethod
+    @abstractmethod
+    def compute_optimal_values(cls, p: torch.Tensor) -> Values:
+        """Compute the optimal values given pressure."""
+
 
 class UniformCoefficient(Coefficient[float]):
     """Space-uniform coefficient."""
 
     _type = CoefficientName.UNIFORM
     _description = "Space-uniform Collinearity coefficient"
-
-    def __init__(
-        self,
-        *,
-        nx: int,
-        ny: int,
-        n_ens: int = 1,
-        dtype: torch.dtype = None,
-        device: torch.device = None,
-    ) -> None:
-        """Instantiate the coefficient.
-
-        Args:
-            nx (int): Points in the x direction.
-            ny (int): Points in the y direction.
-            n_ens (int, optional): Number of ensemble. Defaults to 1.
-            dtype (torch.dtype, optional): Data type. Defaults to None.
-            device (torch.device, optional): Device. Defaults to None.
-        """
-        super().__init__(
-            nx=nx,
-            ny=ny,
-            n_ens=n_ens,
-            dtype=dtype,
-            device=device,
-        )
 
     def _update(self) -> None:
         """Update core value.
@@ -174,9 +159,64 @@ class UniformCoefficient(Coefficient[float]):
         """
         self._core = self.values * torch.ones(
             self._shape,
-            device=self._device,
-            dtype=self._dtype,
+            **self._specs,
         )
+
+    def with_optimal_values(
+        self,
+        p: torch.Tensor,
+    ) -> None:
+        """Set optimal values for `values`.
+
+        Optimal values are inferred using Least Square Regression.
+
+        Args:
+            p (torch.Tensor): Pressure (at least 2-layered).
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Raises:
+            InappropriateShapeError: If the pressure shape does not match with
+            nx and ny.
+        """
+        if p.shape[-2:] != self._shape[-2:]:
+            msg = (
+                f"Pressure's xy shape must be ({self._nx}, {self._ny}),"
+                f" not {p.shape[-2:]}"
+            )
+            raise InappropriateShapeError(msg)
+        self.values = self.compute_optimal_values(
+            p,
+        )
+
+    @classmethod
+    def compute_optimal_values(
+        cls,
+        p: torch.Tensor,
+    ) -> float:
+        """Compute optimal values.
+
+        Optimal values are inferred using Least Square Regression.
+
+        Args:
+            p (torch.Tensor): Pressure (at least 2-layered).
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Raises:
+            InappropriateShapeError: If p is not at least 2-layered.
+
+        Returns:
+            float: Optimal values.
+        """
+        if p.shape[1] < 2:  # noqa: PLR2004
+            msg = "Pressure should be at least 2-layered."
+            raise InappropriateShapeError(msg)
+
+        solution = optimize.lsq_linear(
+            p[0, 0].flatten().reshape((-1, 1)).cpu().numpy(),
+            p[0, 1].flatten().cpu().numpy(),
+            # To set bounds -> bounds=(-1, 1)
+        )
+        return solution.x.item()
 
 
 class NonUniformCoefficient(Coefficient[torch.Tensor]):
@@ -197,14 +237,62 @@ class NonUniformCoefficient(Coefficient[torch.Tensor]):
         if values.shape != self._shape:
             msg = f"Invalid shape, it should be {self._shape}-shaped."
             raise ValueError(msg)
-        if values.dtype != self._dtype:
-            msg = f"Invalid dtype, it should be {self._dtype}."
+        if values.dtype != (dtype := self._specs["dtype"]):
+            msg = f"Invalid dtype, it should be {dtype}."
             raise ValueError(msg)
-        if values.device.type != self._device.type:
-            msg = f"Invalid device type, it should be {self._device.type}."
+        if values.device.type != (device := self._specs["device"].type):
+            msg = f"Invalid device type, it should be {device}."
             raise ValueError(msg)
         self._values = values
         self._update()
+
+    def with_optimal_values(
+        self,
+        p: torch.Tensor,
+    ) -> None:
+        """Set optimal values for `values`.
+
+        Optimal values are inferred using Least Square Regression.
+
+        Args:
+            p (torch.Tensor): Pressure (at least 2-layered).
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Raises:
+            InappropriateShapeError: If the pressure shape does not match with
+            nx and ny.
+        """
+        if p.shape[-2:] != self._shape[-2:]:
+            msg = (
+                f"Pressure's xy shape must be ({self._nx}, {self._ny}),"
+                f" not {p.shape[-2:]}"
+            )
+            raise InappropriateShapeError(msg)
+        self.values = self.compute_optimal_values(
+            p,
+        )
+
+    @classmethod
+    def compute_optimal_values(
+        cls,
+        p: torch.Tensor,
+    ) -> float:
+        """Compute optimal values.
+
+        Optimal values are inferred using Least Square Regression.
+
+        Args:
+            p (torch.Tensor): Pressure (at least 2-layered).
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Raises:
+            InappropriateShapeError: If p is not at least 2-layered.
+
+        Returns:
+            float: Optimal values.
+        """
+        msg = "NonUniformCoefficient does not support optimal value."
+        raise NotImplementedError(msg)
 
 
 class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
@@ -279,8 +367,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Reference pressure.
-
+            p (torch.Tensor): Pressure (at least 2-layered).
+                └── (n_ens, nl, nx, ny)-shaped
             filt (_Filter): Filter to use to filter p[0,0].
             centers (Iterable[tuple[int, int]] | None, optional): Values
             center locations. If None, the actual centers will be reused
@@ -344,14 +432,12 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             self._nx,
             self._ny,
             self.centers,
-            dtype=self._dtype,
-            device=self._device,
+            **self._specs,
         )
 
         core = supports @ torch.tensor(
             self.values,
-            dtype=self._dtype,
-            device=self._device,
+            **self._specs,
         )
         self._core = (
             core.reshape((self._nx, self._ny)).unsqueeze(0).unsqueeze(0)
@@ -379,7 +465,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             device (torch.device): Data device.
 
         Returns:
-            torch.Tensor: Gaussian supports.
+            torch.Tensor: Gaussian supports
+                └── (nx*ny, n)-shaped (n is the number of centers)
         """
         specs = defaults.get(dtype=dtype, device=device)
         X, Y = torch.meshgrid(  # noqa: N806
@@ -415,7 +502,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Pressure.
+            p (torch.Tensor): Pressure (at least 2-layered).
+                └── (n_ens, nl, nx, ny)-shaped
             sigma (float): Standard deviation for gaussian smoothing.
             filt (_Filter): Filter to apply to p[0,0].
             centers (Iterable[tuple[int, int]]): Values centers locations.
