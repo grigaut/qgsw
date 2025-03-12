@@ -11,6 +11,7 @@ from scipy import optimize
 
 from qgsw.exceptions import (
     InappropriateShapeError,
+    UnmatchingShapesError,
     UnsetCentersError,
     UnsetSigmaError,
     UnsetValuesError,
@@ -34,7 +35,6 @@ from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
-    from qgsw.filters.base import _Filter
 
 Values = TypeVar("Values")
 
@@ -92,8 +92,15 @@ class Coefficient(
     def with_optimal_values(
         self,
         p: torch.Tensor,
+        p_ref: torch.Tensor,
     ) -> None:
         """Sets optimal values to the coefficient."""
+        if p.shape != self._shape[-2:]:
+            msg = f"p shape must be {self._shape[-2:]}, not {p.shape}"
+            raise InappropriateShapeError(msg)
+        if p_ref.shape != self._shape[-2:]:
+            msg = f"p_ref shape must be {self._shape[-2:]}, not {p_ref.shape}"
+            raise InappropriateShapeError(msg)
 
     @abstractmethod
     def _update(self) -> None:
@@ -138,7 +145,11 @@ class Coefficient(
 
     @classmethod
     @abstractmethod
-    def compute_optimal_values(cls, p: torch.Tensor) -> Values:
+    def compute_optimal_values(
+        cls,
+        p: torch.Tensor,
+        p_ref: torch.Tensor,
+    ) -> Values:
         """Compute the optimal values given pressure."""
 
 
@@ -162,55 +173,66 @@ class UniformCoefficient(Coefficient[float]):
     def with_optimal_values(
         self,
         p: torch.Tensor,
+        p_ref: torch.Tensor,
     ) -> None:
         """Set optimal values for `values`.
 
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Pressure (at least 2-layered).
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx, ny)-shaped
+            p_ref (torch.Tensor): Reference pressure to approximate.
                 └── (n_ens, nl, nx, ny)-shaped
 
         Raises:
             InappropriateShapeError: If the pressure shape does not match with
             nx and ny.
         """
-        if p.shape[-2:] != self._shape[-2:]:
-            msg = (
-                f"Pressure's xy shape must be ({self._nx}, {self._ny}),"
-                f" not {p.shape[-2:]}"
-            )
-            raise InappropriateShapeError(msg)
+        super().with_optimal_values(p, p_ref)
         self.values = self.compute_optimal_values(
             p,
+            p_ref,
         )
 
     @classmethod
     def compute_optimal_values(
         cls,
         p: torch.Tensor,
+        p_ref: torch.Tensor,
     ) -> float:
         """Compute optimal values.
 
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Pressure (at least 2-layered).
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx, ny)-shaped
+            p_ref (torch.Tensor): Reference pressure to approximate.
                 └── (n_ens, nl, nx, ny)-shaped
 
         Raises:
-            InappropriateShapeError: If p is not at least 2-layered.
+            UnmatchingShapesError: If p and p_ref shapes don't match.
 
         Returns:
             float: Optimal values.
         """
-        if p.shape[1] < 2:  # noqa: PLR2004
-            msg = "Pressure should be at least 2-layered."
-            raise InappropriateShapeError(msg)
+        if p.shape != p_ref.shape:
+            msg = (
+                f"p ({p.shape}) and p_ref ({p_ref.shape})"
+                " must have the same shape."
+            )
+            raise UnmatchingShapesError(msg)
+        if len(p.shape) != len(p_ref.shape):
+            msg = (
+                f"p ({p.shape}) and p_ref ({p_ref.shape})"
+                " must have the same dimension."
+            )
+            raise UnmatchingShapesError(msg)
 
         solution = optimize.lsq_linear(
-            p[0, 0].flatten().reshape((-1, 1)).cpu().numpy(),
-            p[0, 1].flatten().cpu().numpy(),
+            p.flatten().reshape((-1, 1)).cpu().numpy(),
+            p_ref.flatten().cpu().numpy(),
             # To set bounds -> bounds=(-1, 1)
         )
         return solution.x.item()
@@ -246,47 +268,36 @@ class NonUniformCoefficient(Coefficient[torch.Tensor]):
     def with_optimal_values(
         self,
         p: torch.Tensor,
+        p_ref: torch.Tensor,
     ) -> None:
         """Set optimal values for `values`.
 
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Pressure (at least 2-layered).
+            p (torch.Tensor): Pressure.
                 └── (n_ens, nl, nx, ny)-shaped
-
-        Raises:
-            InappropriateShapeError: If the pressure shape does not match with
-            nx and ny.
+            p_ref (torch.Tensor): Reference pressure to approximate.
+                └── (n_ens, nl, nx, ny)-shaped
         """
-        if p.shape[-2:] != self._shape[-2:]:
-            msg = (
-                f"Pressure's xy shape must be ({self._nx}, {self._ny}),"
-                f" not {p.shape[-2:]}"
-            )
-            raise InappropriateShapeError(msg)
-        self.values = self.compute_optimal_values(
-            p,
-        )
+        msg = "NonUniformCoefficient does not support optimal value."
+        raise NotImplementedError(msg)
 
     @classmethod
     def compute_optimal_values(
         cls,
         p: torch.Tensor,
+        p_ref: torch.Tensor,
     ) -> float:
         """Compute optimal values.
 
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Pressure (at least 2-layered).
+            p (torch.Tensor): Pressure.
                 └── (n_ens, nl, nx, ny)-shaped
-
-        Raises:
-            InappropriateShapeError: If p is not at least 2-layered.
-
-        Returns:
-            float: Optimal values.
+            p_ref (torch.Tensor): Reference pressure to approximate.
+                └── (n_ens, nl, nx, ny)-shaped
         """
         msg = "NonUniformCoefficient does not support optimal value."
         raise NotImplementedError(msg)
@@ -356,7 +367,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
     def with_optimal_values(
         self,
         p: torch.Tensor,
-        filt: _Filter,
+        p_ref: torch.Tensor,
         centers: Iterable[tuple[int, int]] | None = None,
     ) -> None:
         """Set optimal values for `values`.
@@ -364,9 +375,10 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Pressure (at least 2-layered).
+            p (torch.Tensor): Pressure.
                 └── (n_ens, nl, nx, ny)-shaped
-            filt (_Filter): Filter to use to filter p[0,0].
+            p_ref (torch.Tensor): Reference pressure to approximate.
+                └── (n_ens, nl, nx, ny)-shaped
             centers (Iterable[tuple[int, int]] | None, optional): Values
             center locations. If None, the actual centers will be reused
             (if already set). Defaults to None.
@@ -377,12 +389,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             np.linalg.LinAlgError: If the least square regression does not
             converge.
         """
-        if p.shape[-2:] != self._shape[-2:]:
-            msg = (
-                f"Pressure's xy shape must be ({self._nx}, {self._ny}),"
-                f" not {p.shape[-2:]}"
-            )
-            raise InappropriateShapeError(msg)
+        super().with_optimal_values(p, p_ref)
         if centers is not None:
             with contextlib.suppress(AttributeError):
                 del self._values
@@ -391,8 +398,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         try:
             self.values = self.compute_optimal_values(
                 p,
+                p_ref,
                 self.sigma,
-                filt,
                 self.centers,
             )
         except np.linalg.LinAlgError as e:
@@ -490,8 +497,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
     def compute_optimal_values(
         cls,
         p: torch.Tensor,
+        p_ref: torch.Tensor,
         sigma: float,
-        filt: _Filter,
         centers: Iterable[tuple[int, int]],
     ) -> Iterable[float]:
         """Compute optimal values.
@@ -499,25 +506,34 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
         Optimal values are inferred using Least Square Regression.
 
         Args:
-            p (torch.Tensor): Pressure (at least 2-layered).
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx, ny)-shaped
+            p_ref (torch.Tensor): Reference pressure to approximate.
                 └── (n_ens, nl, nx, ny)-shaped
             sigma (float): Standard deviation for gaussian smoothing.
             filt (_Filter): Filter to apply to p[0,0].
             centers (Iterable[tuple[int, int]]): Values centers locations.
 
         Raises:
-            InappropriateShapeError: If p is not at least 2-layered.
+            UnmatchingShapesError: If p and p_ref shapes don't match.
 
         Returns:
             Iterable[float]: Optimal values.
         """
-        if p.shape[1] < 2:  # noqa: PLR2004
-            msg = "Pressure should be at least 2-layered."
-            raise InappropriateShapeError(msg)
+        if p.shape != p_ref.shape:
+            msg = (
+                f"p ({p.shape}) and p_ref ({p_ref.shape})"
+                " must have the same shape."
+            )
+            raise UnmatchingShapesError(msg)
+        if len(p.shape) != len(p_ref.shape):
+            msg = (
+                f"p ({p.shape}) and p_ref ({p_ref.shape})"
+                " must have the same dimension."
+            )
+            raise UnmatchingShapesError(msg)
 
-        nx, ny = p.shape[-2:]
-
-        p1_filt = filt(p[0, 0])
+        nx, ny = p.shape
 
         supports = cls.compute_supports(
             sigma=sigma,
@@ -528,11 +544,11 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             device=p.device.type,
         )
 
-        weighted_p1_filt = supports * (p1_filt.reshape((-1, 1)))
+        weighted_p = supports * (p.reshape((-1, 1)))
 
         solution = optimize.lsq_linear(
-            weighted_p1_filt.cpu().numpy(),
-            p[0, 1].flatten().cpu().numpy(),
+            weighted_p.cpu().numpy(),
+            p_ref.flatten().cpu().numpy(),
             bounds=(-1, 1),
         )
         return solution.x.tolist()

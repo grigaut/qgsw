@@ -15,3 +15,7 @@ class UnsetCentersError(Exception):
 
 class InappropriateShapeError(Exception):
     """When a tensor has an inappropriate shape."""
+
+
+class UnmatchingShapesError(Exception):
+    """When a tensor has an inappropriate shape."""
