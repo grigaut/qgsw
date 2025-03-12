@@ -17,6 +17,7 @@ from qgsw.exceptions import (
     UnsetSigmaError,
     UnsetValuesError,
 )
+from qgsw.fields.scope import Scope
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.utils.named_object import NamedObject
 
@@ -49,6 +50,7 @@ class Coefficient(
     """Coefficient base class."""
 
     _unit = Unit._
+    _scopt = Scope.POINT_WISE
 
     _nl = 1
     _core: torch.Tensor
