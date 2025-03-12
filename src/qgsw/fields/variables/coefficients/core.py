@@ -240,7 +240,7 @@ class UniformCoefficient(Coefficient[float]):
         solution = optimize.lsq_linear(
             p.flatten().reshape((-1, 1)).cpu().numpy(),
             p_ref.flatten().cpu().numpy(),
-            # To set bounds -> bounds=(-1, 1)
+            bounds=(-1, 1),
         )
 
         return solution.x.item()
