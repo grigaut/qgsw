@@ -11,3 +11,7 @@ class UnsetValuesError(Exception):
 
 class UnsetLocationsError(Exception):
     """When the property locations is not yet set."""
+
+
+class InappropriateShapeError(Exception):
+    """When a tensor has an inappropriate shape."""

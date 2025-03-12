@@ -6,7 +6,7 @@ import contextlib
 from typing import TYPE_CHECKING, Union
 
 from qgsw.exceptions import (
-    UnsetLocationsError,
+    UnsetCentersError,
     UnsetSigmaError,
     UnsetValuesError,
 )
@@ -218,29 +218,29 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
 
     @values.setter
     def values(self, values: Iterable[float]) -> None:
-        with contextlib.suppress(UnsetLocationsError):
-            if len(vals := list(values)) != len(self.locations):
-                msg = "There must be as many values as locations."
+        with contextlib.suppress(UnsetCentersError):
+            if len(vs := list(values)) != len(self.centers):
+                msg = "There must be as many values as centers."
                 raise ValueError(msg)
-        self._values = vals
-        with contextlib.suppress(UnsetSigmaError, UnsetLocationsError):
+        self._values = list(vs)
+        with contextlib.suppress(UnsetSigmaError, UnsetCentersError):
             self._update()
 
     @property
-    def locations(self) -> list[tuple[int, int]]:
-        """Locations."""
+    def centers(self) -> list[tuple[int, int]]:
+        """Values centers."""
         try:
-            return self._locations
+            return self._centers
         except AttributeError as e:
-            raise UnsetLocationsError from e
+            raise UnsetCentersError from e
 
-    @locations.setter
-    def locations(self, locations: Iterable[tuple[int, int]]) -> None:
+    @centers.setter
+    def centers(self, centers: Iterable[tuple[int, int]]) -> None:
         with contextlib.suppress(UnsetValuesError):
-            if len(locs := list(locations)) != len(self.values):
-                msg = "There must be as many locations as values."
+            if len(cs := list(centers)) != len(self.values):
+                msg = "There must be as many centers as values."
                 raise ValueError(msg)
-        self._locations = locs
+        self._centers = list(cs)
         with contextlib.suppress(UnsetSigmaError, UnsetValuesError):
             self._update()
 
@@ -258,13 +258,13 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             msg = f"Standard deviation must be > 0 thus cannot be {sigma}."
             raise ValueError(msg)
         self._sigma = sigma
-        with contextlib.suppress(UnsetLocationsError, UnsetValuesError):
+        with contextlib.suppress(UnsetCentersError, UnsetValuesError):
             self._update()
 
     def update(
         self,
         values: Iterable[float],
-        locations: Iterable[tuple[int, int]],
+        centers: Iterable[tuple[int, int]],
     ) -> None:
         """Manually update.
 
@@ -272,13 +272,13 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
 
         Args:
             values (Iterable[float]): Values.
-            locations (Iterable[tuple[int, int]]): Locations.
+            centers (Iterable[tuple[int, int]]): Values center locations.
         """
         with contextlib.suppress(AttributeError):
             del self._values
-            del self._locations
+            del self._centers
         self.values = values
-        self.locations = locations
+        self.centers = centers
 
     def _update(self) -> None:
         core = torch.zeros(self._shape, dtype=self._dtype, device=self._device)

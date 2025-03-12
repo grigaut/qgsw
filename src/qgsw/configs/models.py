@@ -61,7 +61,7 @@ class SmoothNonUniformCoefConfig(
 
     type: Literal[CoefficientName.SMOOOTH_NON_UNIFORM]
     initial: list[float]
-    locations: list[tuple[int, int]]
+    centers: list[tuple[int, int]]
     sigma: float = 1
 
 

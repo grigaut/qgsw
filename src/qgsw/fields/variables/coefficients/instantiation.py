@@ -106,7 +106,7 @@ def instantiate_coef(
             space_config=space_config,
         )
         coef.sigma = coef_config.sigma
-        coef.update(coef_config.initial, coef_config.locations)
+        coef.update(coef_config.initial, coef_config.centers)
     elif coef_config.type == CoefficientName.LSR_INFERRED_UNIFORM:
         coef = LSRUniformCoefficient.from_config(
             space_config=space_config,
