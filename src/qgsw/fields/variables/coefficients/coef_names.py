@@ -9,4 +9,3 @@ class CoefficientName(Name):
     UNIFORM = "uniform"
     NON_UNIFORM = "non-uniform"
     SMOOOTH_NON_UNIFORM = "smooth-non-uniform"
-    LSR_INFERRED_UNIFORM = "lsr-uniform"

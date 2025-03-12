@@ -29,6 +29,7 @@ class UniformCoefConfig(
 
     type: Literal[CoefficientName.UNIFORM]
     initial: float
+    use_optimal: bool = False
 
 
 class NonUniformCoefConfig(
@@ -39,6 +40,7 @@ class NonUniformCoefConfig(
 
     type: Literal[CoefficientName.NON_UNIFORM]
     initial: list[list[float]]
+    use_optimal: bool = False
 
     @cached_property
     def matrix(self) -> torch.Tensor:
@@ -61,31 +63,20 @@ class SmoothNonUniformCoefConfig(
 
     type: Literal[CoefficientName.SMOOOTH_NON_UNIFORM]
     initial: list[float]
-    locations: list[tuple[int, int]]
+    centers: list[tuple[int, int]]
     sigma: float = 1
-
-
-class LSRUniformCoefConfig(
-    NamedObjectConfig[CoefficientName],
-    BaseModel,
-):
-    """Inferred collinearity coeffciient."""
-
-    type: Literal[CoefficientName.LSR_INFERRED_UNIFORM]
-    initial: float
+    use_optimal: bool = False
 
 
 CollinearityCoefficientConfig = Union[
     UniformCoefConfig,
     NonUniformCoefficient,
-    LSRUniformCoefConfig,
 ]
 
 CoefConfig = Union[
     UniformCoefConfig,
     NonUniformCoefConfig,
     SmoothNonUniformCoefConfig,
-    LSRUniformCoefConfig,
 ]
 
 CoefConfigVar = TypeVar(
@@ -94,7 +85,6 @@ CoefConfigVar = TypeVar(
         UniformCoefConfig,
         NonUniformCoefConfig,
         SmoothNonUniformCoefConfig,
-        LSRUniformCoefConfig,
     ],
 )
 
