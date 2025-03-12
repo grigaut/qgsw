@@ -9,7 +9,6 @@ from rich.progress import Progress
 from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
-from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
 from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
@@ -167,8 +166,6 @@ modified = is_modified(config.model.type)
 if modified:
     coef = instantiate_coef(config.model, config.space)
     model.alpha = coef.get()
-coef_type = config.model.collinearity_coef.type
-is_lsr = coef_type == CoefficientName.LSR_INFERRED_UNIFORM
 
 
 with Progress() as progress:
@@ -184,9 +181,13 @@ with Progress() as progress:
         progress.advance(simulation)
         if fork:
             prognostic = model_ref.prognostic
-            if modified and is_lsr:
-                p = model_ref.P.compute_p(prognostic.uvh)[0]
-                coef.update(coef.compute_coefficient(p))
+            if modified and config.model.collinearity_coef.use_optimal:
+                pressure = model_ref.P.compute_p(prognostic.uvh)[1]
+                if model.get_type() == ModelName.QG_FILTERED:
+                    p = model.P.filter(pressure[0, 0])
+                else:
+                    p = pressure[0, 0]
+                coef.with_optimal_values(p, pressure[0, 1])
                 model.alpha = coef.get()
             uvh = matching.match_pv(
                 prognostic.uvh,

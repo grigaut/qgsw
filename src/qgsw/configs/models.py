@@ -29,6 +29,7 @@ class UniformCoefConfig(
 
     type: Literal[CoefficientName.UNIFORM]
     initial: float
+    use_optimal: bool = False
 
 
 class NonUniformCoefConfig(
@@ -39,6 +40,7 @@ class NonUniformCoefConfig(
 
     type: Literal[CoefficientName.NON_UNIFORM]
     initial: list[list[float]]
+    use_optimal: bool = False
 
     @cached_property
     def matrix(self) -> torch.Tensor:
@@ -63,6 +65,7 @@ class SmoothNonUniformCoefConfig(
     initial: list[float]
     centers: list[tuple[int, int]]
     sigma: float = 1
+    use_optimal: bool = False
 
 
 CollinearityCoefficientConfig = Union[
