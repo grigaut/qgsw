@@ -236,6 +236,27 @@ class QGCollinearSF(QGAlpha[CollinearQGProjector]):
             device=self.device.get(),
         )
 
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        uvh = self.P.G(
+            p,
+            self.A,
+            self._H,
+            self._g_prime,
+            self._space.dx,
+            self._space.dy,
+            self._space.ds,
+            self.beta_plane.f0,
+            self.alpha,
+            self.points_to_surfaces,
+        )
+        self.set_uvh(*uvh)
+
     def _set_projector(self) -> None:
         self._P = CollinearQGProjector(
             self.A,
@@ -245,10 +266,6 @@ class QGCollinearSF(QGAlpha[CollinearQGProjector]):
             f0=self.beta_plane.f0,
             masks=self.masks,
         )
-
-    def step(self) -> None:
-        """Performs one step time-integration with RK3-SSP scheme."""
-        return super().step()
 
     @classmethod
     def get_variable_set(
