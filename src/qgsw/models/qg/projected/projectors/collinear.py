@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class CollinearQGProjector(QGProjector):
     """QG Projector."""
 
-    _MAX_ITERATIONS = 100
+    _MAX_ITERATIONS = 1000
     _ATOL = 1e-8  # default value for torch.isclose
     _RTOL = 1e-5  # default value for torch.isclose
 
