@@ -12,7 +12,6 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
 from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
-from qgsw.models import matching
 from qgsw.models.instantiation import instantiate_model
 from qgsw.models.names import ModelName
 from qgsw.models.qg.projected.modified.utils import is_modified
@@ -132,14 +131,10 @@ else:
         )
         raise ValueError(msg)
 
-uvh = matching.match_pv(
-    uvh0,
-    nl_ref,
-)
 model_ref.set_uvh(
-    torch.clone(uvh.u),
-    torch.clone(uvh.v),
-    torch.clone(uvh.h),
+    torch.clone(uvh0.u),
+    torch.clone(uvh0.v),
+    torch.clone(uvh0.h),
 )
 
 dt = model.dt
@@ -189,14 +184,8 @@ with Progress() as progress:
                     p = pressure[0, 0]
                 coef.with_optimal_values(p, pressure[0, 1])
                 model.alpha = coef.get()
-            uvh = matching.match_pv(
-                prognostic.uvh,
-                nl,
-            )
-            model.set_uvh(
-                torch.clone(uvh.u),
-                torch.clone(uvh.v),
-                torch.clone(uvh.h),
+            model.set_p(
+                model_ref.P.compute_p(prognostic)[0][:, :nl],
             )
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
