@@ -1,4 +1,5 @@
-# ruff : noqa
+# ruff: noqa: PGH004
+# ruff: noqa
 import os
 import sys
 from pathlib import Path

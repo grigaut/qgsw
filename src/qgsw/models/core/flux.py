@@ -1,3 +1,4 @@
+# ruff: noqa: PGH004
 # ruff: noqa
 """Velocity-sign biased flux computations.
 Louis Thiry, 2023

@@ -1,3 +1,4 @@
+# ruff: noqa: PGH004
 # ruff: noqa
 """Comparison between QG and SW solutions in vortex shear instability.
 

@@ -1,3 +1,4 @@
+# ruff: noqa: PGH004
 # ruff: noqa
 """
 Spectral 2D Helmholtz equation solver on rectangular and non-rectangular domain.

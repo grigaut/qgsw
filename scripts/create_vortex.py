@@ -1,5 +1,5 @@
 """Create a Baroclinic Vortex."""
-
+# ruff: noqa: PGH004
 # ruff: noqa
 
 import torch
