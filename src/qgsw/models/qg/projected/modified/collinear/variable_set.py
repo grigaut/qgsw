@@ -7,13 +7,20 @@ from typing import TYPE_CHECKING
 from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.dynamics import (
     CollinearityCoefficientDiag,
-    PhysicalSurfaceHeightAnomaly,
     PhysicalVorticity,
     PotentialVorticity,
-    PressureTilde,
+    QGPressure,
     Vorticity,
 )
+from qgsw.masks import Masks
+from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
+from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
 from qgsw.models.qg.projected.variable_set import QGVariableSet
+from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
+from qgsw.specs import defaults
+from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
@@ -42,18 +49,38 @@ class QGCollinearSFVariableSet(QGVariableSet):
         cls,
         var_dict: dict[str, DiagnosticVariable],
         model: ModelConfig,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
     ) -> None:
         """Add pressure.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             model (ModelConfig): Model Configuration.
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
         """
-        super().add_pressure(var_dict, model)
+        super().add_pressure(var_dict, model, space, physics)
 
-        var_dict[PressureTilde.get_name()] = PressureTilde(
-            model.g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
-            var_dict[PhysicalSurfaceHeightAnomaly.get_name()],
+        specs = defaults.get()
+        space_2d = SpaceDiscretization2D.from_config(space)
+        P = CollinearQGProjector(  # noqa: N806
+            A=compute_A(
+                H=model.h[:1],
+                g_prime=compute_g_tilde(model.g_prime),
+                **specs,
+            ),
+            H=model.h.unsqueeze(-1).unsqueeze(-1),
+            g_prime=model.g_prime.unsqueeze(-1).unsqueeze(-1),
+            space=space_2d.add_h(
+                Coordinates1D(points=model.h[:1], unit=Unit.M),
+            ),
+            f0=physics.f0,
+            masks=Masks.empty(space.nx, space.ny, specs["device"]),
+        )
+
+        var_dict[QGPressure.get_name()] = QGPressure(
+            P,
         )
 
     @classmethod
@@ -67,7 +94,7 @@ class QGCollinearSFVariableSet(QGVariableSet):
         """Add vorticity.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             space (SpaceConfig): Space configuration.
             model (ModelConfig): Model Configuration.
             physics (PhysicsConfig): Physics Confdiguration.
@@ -94,7 +121,7 @@ class QGCollinearSFVariableSet(QGVariableSet):
         """Add energy.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             space (SpaceConfig): Space configuration.
             model (ModelConfig): Model Configuration.
             physics (PhysicsConfig): Physics Configuration.

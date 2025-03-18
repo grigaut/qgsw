@@ -25,6 +25,7 @@ try:
 except ImportError:
     from typing_extensions import Self
 
+import contextlib
 from typing import TYPE_CHECKING
 
 import torch
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
     )
     from qgsw.fields.variables.state import StateUVH
     from qgsw.masks import Masks
+    from qgsw.models.qg.projected.projectors.core import QGProjector
 
 
 class PhysicalZonalVelocity(DiagnosticVariable):
@@ -469,6 +471,50 @@ class PhysicalVorticity(DiagnosticVariable):
         # Bind the vorticity variable
         self._vorticity = self._vorticity.bind(state)
         return super().bind(state)
+
+
+class QGPressure(DiagnosticVariable):
+    """QGPressure.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
+
+    _unit = Unit.M2S_2
+    _name = "p"
+    _description = "Pressure per unit of mass"
+    _scope = Scope.POINT_WISE
+
+    def __init__(
+        self,
+        P: QGProjector,  # noqa: N803
+    ) -> None:
+        """Instantiate the pressure variable.
+
+        Args:
+            P (QGprojector): Projector to use to retrieve pressure.
+
+        """
+        self._P = P
+
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Pressure.
+                └── (n_ens, nl, nx, ny)-shaped
+        """
+        with contextlib.suppress(AttributeError):
+            self._P.alpha = prognostic.alpha
+        return self._P.compute_p(prognostic)[1]
 
 
 class Pressure(DiagnosticVariable):

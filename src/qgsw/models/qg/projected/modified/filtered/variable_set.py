@@ -8,16 +8,27 @@ from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
-    Pressure,
+    QGPressure,
     SurfaceHeightAnomaly,
 )
+from qgsw.masks import Masks
 from qgsw.models.qg.projected.modified.filtered.pv import (
     compute_g_tilde,
 )
+from qgsw.models.qg.projected.projectors.filtered import (
+    CollinearFilteredQGProjector,
+)
 from qgsw.models.qg.projected.variable_set import QGVariableSet
+from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
+from qgsw.specs import defaults
+from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
 
 
@@ -29,24 +40,40 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
         cls,
         var_dict: dict[str, DiagnosticVariable],
         model: ModelConfig,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
     ) -> None:
         """Add pressure.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             model (ModelConfig): Model Configuration.
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
         """
+        specs = defaults.get()
         var_dict[SurfaceHeightAnomaly.get_name()] = SurfaceHeightAnomaly()
         eta_phys_name = PhysicalSurfaceHeightAnomaly.get_name()
         var_dict[eta_phys_name] = PhysicalSurfaceHeightAnomaly(
             var_dict[PhysicalLayerDepthAnomaly.get_name()],
         )
-        var_dict[Pressure.get_name()] = Pressure(
-            compute_g_tilde(
-                model.g_prime,
-            )
-            .unsqueeze(0)
-            .unsqueeze(-1)
-            .unsqueeze(-1),
-            var_dict[eta_phys_name],
+        g_tilde = compute_g_tilde(model.g_prime)
+        space_2d = SpaceDiscretization2D.from_config(space)
+        P = CollinearFilteredQGProjector(  # noqa: N806
+            A=compute_A(
+                model.h[:1],
+                g_tilde,
+                **specs,
+            ),
+            H=model.h.unsqueeze(-1).unsqueeze(-1),
+            g_prime=model.g_prime.unsqueeze(-1).unsqueeze(-1),
+            space=space_2d.add_h(
+                Coordinates1D(points=model.h[:1], unit=Unit.M),
+            ),
+            f0=physics.f0,
+            masks=Masks.empty(space.nx, space.ny, specs["device"]),
+        )
+        P.filter.sigma = model.sigma
+        var_dict[QGPressure.get_name()] = QGPressure(
+            P,
         )

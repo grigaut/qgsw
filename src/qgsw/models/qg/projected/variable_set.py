@@ -18,7 +18,7 @@ from qgsw.fields.variables.dynamics import (
     PhysicalVorticity,
     PhysicalZonalVelocity,
     PotentialVorticity,
-    Pressure,
+    QGPressure,
     StreamFunction,
     SurfaceHeightAnomaly,
     TimeDiag,
@@ -35,8 +35,13 @@ from qgsw.fields.variables.energetics import (
     TotalEnergy,
     TotalKineticEnergy,
 )
+from qgsw.masks import Masks
+from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
-from qgsw.specs import DEVICE
+from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
+from qgsw.specs import DEVICE, defaults
+from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
@@ -96,7 +101,7 @@ class QGVariableSet:
         """Add fluxes.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             space (SpaceConfig): Space configuration.
         """
         var_dict[ZonalVelocityFlux.get_name()] = ZonalVelocityFlux(space.dx)
@@ -109,21 +114,39 @@ class QGVariableSet:
         cls,
         var_dict: dict[str, DiagnosticVariable],
         model: ModelConfig,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
     ) -> None:
         """Add pressure.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             model (ModelConfig): Model Configuration.
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
         """
+        specs = defaults.get()
         var_dict[SurfaceHeightAnomaly.get_name()] = SurfaceHeightAnomaly()
         eta_phys_name = PhysicalSurfaceHeightAnomaly.get_name()
         var_dict[eta_phys_name] = PhysicalSurfaceHeightAnomaly(
             var_dict[PhysicalLayerDepthAnomaly.get_name()],
         )
-        var_dict[Pressure.get_name()] = Pressure(
-            model.g_prime.unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
-            var_dict[eta_phys_name],
+        space_2d = SpaceDiscretization2D.from_config(space)
+
+        var_dict[QGPressure.get_name()] = QGPressure(
+            QGProjector(
+                A=compute_A(
+                    model.h,
+                    model.g_prime,
+                    **specs,
+                ),
+                H=model.h.unsqueeze(-1).unsqueeze(-1),
+                space=space_2d.add_h(
+                    Coordinates1D(points=model.h, unit=Unit.M),
+                ),
+                f0=physics.f0,
+                masks=Masks.empty(space.nx, space.ny, specs["device"]),
+            ),
         )
 
     @classmethod
@@ -135,11 +158,11 @@ class QGVariableSet:
         """Add streamfunction.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             physics (PhysicsConfig): Physics Confdiguration.
         """
         var_dict[StreamFunction.get_name()] = StreamFunction(
-            var_dict[Pressure.get_name()],
+            var_dict[QGPressure.get_name()],
             physics.f0,
         )
 
@@ -154,7 +177,7 @@ class QGVariableSet:
         """Add vorticity.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             space (SpaceConfig): Space configuration.
             model (ModelConfig): Model Configuration.
             physics (PhysicsConfig): Physics Confdiguration.
@@ -175,7 +198,7 @@ class QGVariableSet:
         """Add enstrophy.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
         """
         var_dict[Enstrophy.get_name()] = Enstrophy(
             var_dict[PotentialVorticity.get_name()],
@@ -195,7 +218,7 @@ class QGVariableSet:
         """Add energy.
 
         Args:
-            var_dict (dict[str, DiagnosticVariable]): _description_
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             space (SpaceConfig): Space configuration.
             model (ModelConfig): Model Configuration.
             physics (PhysicsConfig): Physics Configuration.
@@ -265,7 +288,7 @@ class QGVariableSet:
         cls.add_prognostics(var_dict)
         cls.add_physical(var_dict, space)
         cls.add_fluxes(var_dict, space)
-        cls.add_pressure(var_dict, model)
+        cls.add_pressure(var_dict, model, space, physics)
         cls.add_streamfunction(var_dict, physics)
         cls.add_vorticity(var_dict, space, model, physics)
         cls.add_enstrophy(var_dict)

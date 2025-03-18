@@ -4,6 +4,7 @@ Comparison between QG and SW solutions in vortex shear instability.
 
 """
 
+# ruff: noqa: PGH004
 # ruff: noqa
 import numpy as np
 import sys

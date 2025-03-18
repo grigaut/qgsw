@@ -1,3 +1,4 @@
+# ruff: noqa: PGH004
 # ruff: noqa
 """Finite difference operators in pytorch,
 Louis Thiry, 6 march 2023."""

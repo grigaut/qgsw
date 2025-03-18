@@ -1,3 +1,4 @@
+# ruff: noqa: PGH004
 # ruff: noqa
 """
 Pytorch implementation of multigrid solver for 2D generalized Helmoltz equation
