@@ -8,12 +8,17 @@ from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
     PhysicalSurfaceHeightAnomaly,
+    PhysicalVorticity,
     QGPressure,
+    StreamFunction,
     SurfaceHeightAnomaly,
 )
 from qgsw.masks import Masks
 from qgsw.models.qg.projected.modified.filtered.pv import (
     compute_g_tilde,
+)
+from qgsw.models.qg.projected.modified.filtered.variables import (
+    ColFiltStreamFunctionFromVorticity,
 )
 from qgsw.models.qg.projected.projectors.filtered import (
     CollinearFilteredQGProjector,
@@ -76,4 +81,35 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
         P.filter.sigma = model.sigma
         var_dict[QGPressure.get_name()] = QGPressure(
             P,
+        )
+
+    @classmethod
+    def add_streamfunction(
+        cls,
+        var_dict: dict[str, DiagnosticVariable],
+        physics: PhysicsConfig,
+        space: SpaceConfig,
+        model: ModelConfig,
+    ) -> None:
+        """Add streamfunction.
+
+        Args:
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
+            physics (PhysicsConfig): Physics Configuration.
+            space (PhysicsConfig): Space Configuration.
+            model (ModelConfig): Model Configuration.
+        """
+        var_dict[StreamFunction.get_name()] = StreamFunction(
+            var_dict[QGPressure.get_name()],
+            physics.f0,
+        )
+        var_dict[ColFiltStreamFunctionFromVorticity.get_name()] = (
+            ColFiltStreamFunctionFromVorticity(
+                var_dict[PhysicalVorticity.get_name()],
+                space.nx,
+                space.ny,
+                space.dx,
+                space.dy,
+                filt=CollinearFilteredQGProjector.create_filter(model.sigma),
+            )
         )

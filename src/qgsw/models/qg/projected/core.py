@@ -17,7 +17,10 @@ from qgsw.models.core import schemes
 from qgsw.models.exceptions import UnsetTimestepError
 from qgsw.models.names import ModelName
 from qgsw.models.qg.projected.projectors.core import QGProjector
-from qgsw.models.qg.projected.variable_set import QGVariableSet
+from qgsw.models.qg.projected.variable_set import (
+    QGVariableSet,
+    RefQGVariableSet,
+)
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
@@ -373,6 +376,8 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
         Returns:
             dict[str, DiagnosticVariable]: Variables dictionnary.
         """
+        if model.h.shape[0] == 1 and model.type == ModelName.QUASI_GEOSTROPHIC:
+            return RefQGVariableSet.get_variable_set(space, physics, model)
         return QGVariableSet.get_variable_set(space, physics, model)
 
 
