@@ -4,15 +4,15 @@ import torch
 from torch._tensor import Tensor
 
 from qgsw.fields.variables.dynamics import (
-    StreamFunctionFromVorticity,
+    Psi2,
 )
 from qgsw.fields.variables.prognostic_tuples import (
     UVHTAlpha,
 )
 
 
-class RefStreamFunctionFromVorticity(StreamFunctionFromVorticity):
-    """Stream function from vorticity for collinear models."""
+class RefPsi2(Psi2):
+    """Stream function from vorticity in second layer for 1-layer model."""
 
     def _compute(self, prognostic: UVHTAlpha) -> Tensor:
         """Compute the variable value.
@@ -27,9 +27,8 @@ class RefStreamFunctionFromVorticity(StreamFunctionFromVorticity):
                 └── h: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            torch.Tensor: Stream function.
-                └── (n_ens, nl, nx, ny)-shaped
+            torch.Tensor: Stream function in second layer.
+                └── (n_ens, 1, nx, ny)-shaped
         """
-        psi1 = super()._compute(prognostic)
-        psi2 = torch.zeros_like(psi1)
-        return torch.cat([psi1, psi2], dim=1)
+        psi1 = self._psi_vort.compute_no_slice(prognostic)[:, :1]
+        return torch.zeros_like(psi1)

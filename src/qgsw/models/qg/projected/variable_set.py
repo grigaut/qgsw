@@ -18,6 +18,7 @@ from qgsw.fields.variables.dynamics import (
     PhysicalVorticity,
     PhysicalZonalVelocity,
     PotentialVorticity,
+    Psi2,
     QGPressure,
     StreamFunction,
     StreamFunctionFromVorticity,
@@ -39,7 +40,7 @@ from qgsw.fields.variables.energetics import (
 from qgsw.masks import Masks
 from qgsw.models.names import ModelName
 from qgsw.models.qg.projected.modified.variables import (
-    RefStreamFunctionFromVorticity,
+    RefPsi2,
 )
 from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
@@ -182,6 +183,9 @@ class QGVariableSet:
                 space.dx,
                 space.dy,
             )
+        )
+        var_dict[Psi2.get_name()] = Psi2(
+            var_dict[StreamFunctionFromVorticity.get_name()],
         )
 
     @classmethod
@@ -338,14 +342,17 @@ class RefQGVariableSet(QGVariableSet):
             var_dict[QGPressure.get_name()],
             physics.f0,
         )
-        var_dict[RefStreamFunctionFromVorticity.get_name()] = (
-            RefStreamFunctionFromVorticity(
+        var_dict[StreamFunctionFromVorticity.get_name()] = (
+            StreamFunctionFromVorticity(
                 var_dict[PhysicalVorticity.get_name()],
                 space.nx,
                 space.ny,
                 space.dx,
                 space.dy,
             )
+        )
+        var_dict[RefPsi2.get_name()] = RefPsi2(
+            var_dict[StreamFunctionFromVorticity.get_name()],
         )
 
     @classmethod

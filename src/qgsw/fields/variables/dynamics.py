@@ -840,6 +840,63 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
         return super().bind(state)
 
 
+class Psi2(DiagnosticVariable):
+    """Stream function variable in second layer.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
+
+    _unit = Unit.M2S_1
+    _name = "psi2"
+    _description = "Stream function in second layer"
+    _scope = Scope.POINT_WISE
+
+    def __init__(
+        self,
+        psi_vort: StreamFunctionFromVorticity,
+    ) -> None:
+        """Instantiate the variable.
+
+        Args:
+            psi_vort (StreamFunctionFromVorticity): Stream Function.
+        """
+        self._psi_vort = psi_vort
+
+        self._require_alpha |= psi_vort.require_alpha
+        self._require_time |= psi_vort.require_time
+
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Stream function in second layer.
+                └── (n_ens, 1, nx, ny)-shaped
+        """
+        return self._psi_vort.compute_no_slice(prognostic)[:, 1:2]
+
+    def bind(self, state: StateUVH) -> BoundDiagnosticVariable[Self]:
+        """Bind the variable to a given state.
+
+        Args:
+            state (StateUVH): StateUVH to bind the variable to.
+
+        Returns:
+            BoundDiagnosticVariable: Bound variable.
+        """
+        # Bind the vorticity variable
+        self._psi_vort = self._psi_vort.bind(state)
+        return super().bind(state)
+
+
 class Enstrophy(DiagnosticVariable):
     """Layer-wise enstrophy.
 

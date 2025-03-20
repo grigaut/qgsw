@@ -11,11 +11,12 @@ from qgsw.fields.variables.dynamics import (
     PotentialVorticity,
     QGPressure,
     StreamFunction,
+    StreamFunctionFromVorticity,
     Vorticity,
 )
 from qgsw.masks import Masks
 from qgsw.models.qg.projected.modified.collinear.variables import (
-    ColStreamFunctionFromVorticity,
+    CollinearPsi2,
 )
 from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
 from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
@@ -134,14 +135,17 @@ class QGCollinearSFVariableSet(QGVariableSet):
             var_dict[QGPressure.get_name()],
             physics.f0,
         )
-        var_dict[ColStreamFunctionFromVorticity.get_name()] = (
-            ColStreamFunctionFromVorticity(
+        var_dict[StreamFunctionFromVorticity.get_name()] = (
+            StreamFunctionFromVorticity(
                 var_dict[PhysicalVorticity.get_name()],
                 space.nx,
                 space.ny,
                 space.dx,
                 space.dy,
             )
+        )
+        var_dict[CollinearPsi2.get_name()] = CollinearPsi2(
+            var_dict[StreamFunctionFromVorticity.get_name()],
         )
 
     @classmethod
