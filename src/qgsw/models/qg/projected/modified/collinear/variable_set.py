@@ -10,9 +10,14 @@ from qgsw.fields.variables.dynamics import (
     PhysicalVorticity,
     PotentialVorticity,
     QGPressure,
+    StreamFunction,
+    StreamFunctionFromVorticity,
     Vorticity,
 )
 from qgsw.masks import Masks
+from qgsw.models.qg.projected.modified.collinear.variables import (
+    CollinearPsi2,
+)
 from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
 from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
 from qgsw.models.qg.projected.variable_set import QGVariableSet
@@ -108,6 +113,39 @@ class QGCollinearSFVariableSet(QGVariableSet):
             model.h[:1].unsqueeze(0).unsqueeze(-1).unsqueeze(-1),
             space.ds,
             physics.f0,
+        )
+
+    @classmethod
+    def add_streamfunction(
+        cls,
+        var_dict: dict[str, DiagnosticVariable],
+        physics: PhysicsConfig,
+        space: SpaceConfig,
+        model: ModelConfig,  # noqa: ARG003
+    ) -> None:
+        """Add streamfunction.
+
+        Args:
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
+            physics (PhysicsConfig): Physics Configuration.
+            space (PhysicsConfig): Space Configuration.
+            model (ModelConfig): Model Configuration, for compatibility only.
+        """
+        var_dict[StreamFunction.get_name()] = StreamFunction(
+            var_dict[QGPressure.get_name()],
+            physics.f0,
+        )
+        var_dict[StreamFunctionFromVorticity.get_name()] = (
+            StreamFunctionFromVorticity(
+                var_dict[PhysicalVorticity.get_name()],
+                space.nx,
+                space.ny,
+                space.dx,
+                space.dy,
+            )
+        )
+        var_dict[CollinearPsi2.get_name()] = CollinearPsi2(
+            var_dict[StreamFunctionFromVorticity.get_name()],
         )
 
     @classmethod

@@ -18,8 +18,10 @@ from qgsw.fields.variables.dynamics import (
     PhysicalVorticity,
     PhysicalZonalVelocity,
     PotentialVorticity,
+    Psi2,
     QGPressure,
     StreamFunction,
+    StreamFunctionFromVorticity,
     SurfaceHeightAnomaly,
     TimeDiag,
     TotalEnstrophy,
@@ -36,6 +38,10 @@ from qgsw.fields.variables.energetics import (
     TotalKineticEnergy,
 )
 from qgsw.masks import Masks
+from qgsw.models.names import ModelName
+from qgsw.models.qg.projected.modified.variables import (
+    RefPsi2,
+)
 from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.spatial.core.coordinates import Coordinates1D
@@ -154,16 +160,32 @@ class QGVariableSet:
         cls,
         var_dict: dict[str, DiagnosticVariable],
         physics: PhysicsConfig,
+        space: SpaceConfig,
+        model: ModelConfig,  # noqa: ARG003
     ) -> None:
         """Add streamfunction.
 
         Args:
             var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
-            physics (PhysicsConfig): Physics Confdiguration.
+            physics (PhysicsConfig): Physics Configuration.
+            space (PhysicsConfig): Space Configuration.
+            model (ModelConfig): Model Configuration, for compatibility only.
         """
         var_dict[StreamFunction.get_name()] = StreamFunction(
             var_dict[QGPressure.get_name()],
             physics.f0,
+        )
+        var_dict[StreamFunctionFromVorticity.get_name()] = (
+            StreamFunctionFromVorticity(
+                var_dict[PhysicalVorticity.get_name()],
+                space.nx,
+                space.ny,
+                space.dx,
+                space.dy,
+            )
+        )
+        var_dict[Psi2.get_name()] = Psi2(
+            var_dict[StreamFunctionFromVorticity.get_name()],
         )
 
     @classmethod
@@ -180,7 +202,7 @@ class QGVariableSet:
             var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
             space (SpaceConfig): Space configuration.
             model (ModelConfig): Model Configuration.
-            physics (PhysicsConfig): Physics Confdiguration.
+            physics (PhysicsConfig): Physics Configuration.
         """
         var_dict[Vorticity.get_name()] = Vorticity()
         var_dict[PhysicalVorticity.get_name()] = PhysicalVorticity(
@@ -289,8 +311,77 @@ class QGVariableSet:
         cls.add_physical(var_dict, space)
         cls.add_fluxes(var_dict, space)
         cls.add_pressure(var_dict, model, space, physics)
-        cls.add_streamfunction(var_dict, physics)
         cls.add_vorticity(var_dict, space, model, physics)
+        cls.add_streamfunction(var_dict, physics, space, model)
+        cls.add_enstrophy(var_dict)
+        cls.add_energy(var_dict, space, model, physics)
+
+        return var_dict
+
+
+class RefQGVariableSet(QGVariableSet):
+    """Reference QG Variable set for one-mayer models."""
+
+    @classmethod
+    def add_streamfunction(
+        cls,
+        var_dict: dict[str, DiagnosticVariable],
+        physics: PhysicsConfig,
+        space: SpaceConfig,
+        model: ModelConfig,  # noqa: ARG003
+    ) -> None:
+        """Add streamfunction.
+
+        Args:
+            var_dict (dict[str, DiagnosticVariable]): Variables dictionary.
+            physics (PhysicsConfig): Physics Configuration.
+            space (PhysicsConfig): Space Configuration.
+            model (ModelConfig): Model Configuration, for compatibility only.
+        """
+        var_dict[StreamFunction.get_name()] = StreamFunction(
+            var_dict[QGPressure.get_name()],
+            physics.f0,
+        )
+        var_dict[StreamFunctionFromVorticity.get_name()] = (
+            StreamFunctionFromVorticity(
+                var_dict[PhysicalVorticity.get_name()],
+                space.nx,
+                space.ny,
+                space.dx,
+                space.dy,
+            )
+        )
+        var_dict[RefPsi2.get_name()] = RefPsi2(
+            var_dict[StreamFunctionFromVorticity.get_name()],
+        )
+
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        if model.h.shape[0] != 1 or model.type != ModelName.QUASI_GEOSTROPHIC:
+            msg = "Such variable is only suited for one-layer QG models."
+            raise ValueError(msg)
+        var_dict = {}
+        cls.add_prognostics(var_dict)
+        cls.add_physical(var_dict, space)
+        cls.add_fluxes(var_dict, space)
+        cls.add_pressure(var_dict, model, space, physics)
+        cls.add_vorticity(var_dict, space, model, physics)
+        cls.add_streamfunction(var_dict, physics, space, model)
         cls.add_enstrophy(var_dict)
         cls.add_energy(var_dict, space, model, physics)
 
