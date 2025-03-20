@@ -13,7 +13,7 @@ from qgsw.filters.base import _Filter
 
 
 class CollinearFilteredPsi2(Psi2):
-    """Stream function from vorticity for collinear models."""
+    """Stream function in second layer for collinear filtered model."""
 
     def __init__(
         self,
