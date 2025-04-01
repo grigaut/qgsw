@@ -213,7 +213,7 @@ class ModelParamChecker:
 
         (n_ens,)-shaped.
         """
-        return self.g_prime[:, 0, 0, 0]
+        return self.g_prime[0, 0, 0]
 
     @property
     def taux(self) -> torch.Tensor | float:
