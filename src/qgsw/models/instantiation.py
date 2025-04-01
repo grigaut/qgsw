@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import torch
 
@@ -178,8 +178,13 @@ def _instantiate_modified(
     return model
 
 
-ModelClass = type[
-    SW | QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ | QGSanityCheck
+ModelClass = Union[
+    SW,
+    QG,
+    QGCollinearFilteredSF,
+    QGCollinearSF,
+    QGPSIQ,
+    QGSanityCheck,
 ]
 
 
