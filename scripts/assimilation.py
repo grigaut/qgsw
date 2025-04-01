@@ -10,7 +10,6 @@ from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
-from qgsw.fields.variables.dynamics import Pressure
 from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
@@ -178,18 +177,8 @@ with Progress() as progress:
         if fork:
             prognostic = model_ref.prognostic
             if modified and config.model.collinearity_coef.use_optimal:
-                if model_ref.get_type() in [
-                    ModelName.SHALLOW_WATER,
-                    ModelName.SW_FILTER_EXACT,
-                    ModelName.SW_FILTER_EXACT,
-                ]:
-                    pressure = model_ref.get_variable_set(
-                        config.space,
-                        config.physics,
-                        config.simulation.reference,
-                    )[Pressure.get_name()].compute(prognostic)
-                else:
-                    pressure = model_ref.P.compute_p(prognostic.uvh)[1]
+                # WARNING: this does not work for SW models
+                pressure = model_ref.P.compute_p(prognostic.uvh)[1]
                 if model.get_type() == ModelName.QG_FILTERED:
                     p = model.P.filter(pressure[0, 0])
                 else:
