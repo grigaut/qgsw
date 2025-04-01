@@ -155,7 +155,7 @@ class PSIQ(BasePrognosticPSIQ, _PSIQ):
         """
         dtype = defaults.get_dtype(dtype)
         device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        data: dict[str, torch.Tensor] = torch.load(file)
         psi_name = PrognosticStreamFunction.get_name()
         psi = data[psi_name].to(dtype=dtype, device=device)
         q_name = PrognosticPotentialVorticity.get_name()
@@ -254,7 +254,7 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
         """
         dtype = defaults.get_dtype(dtype)
         device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        data: dict[str, torch.Tensor] = torch.load(file)
         t = data[Time.get_name()].to(dtype=dtype, device=device)
         return cls.from_psiq(
             t,
@@ -358,7 +358,7 @@ class UVH(BasePrognosticUVH, _UVH):
         """
         dtype = defaults.get_dtype(dtype)
         device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        data: dict[str, torch.Tensor] = torch.load(file)
         u = data[ZonalVelocity.get_name()].to(dtype=dtype, device=device)
         v = data[MeridionalVelocity.get_name()].to(dtype=dtype, device=device)
         h = data[LayerDepthAnomaly.get_name()].to(dtype=dtype, device=device)
@@ -456,7 +456,7 @@ class UVHT(BasePrognosticUVH, _UVHT):
         """
         dtype = defaults.get_dtype(dtype)
         device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        data: dict[str, torch.Tensor] = torch.load(file)
         t = data[Time.get_name()].to(dtype=dtype, device=device)
         return cls.from_uvh(t, UVH.from_file(file, dtype=dtype, device=device))
 
@@ -579,7 +579,7 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
         """
         dtype = defaults.get_dtype(dtype)
         device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file, weights_only=True)
+        data: dict[str, torch.Tensor] = torch.load(file)
         alpha = data[CollinearityCoefficient.get_name()].to(
             dtype=dtype,
             device=device,

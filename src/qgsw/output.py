@@ -88,7 +88,6 @@ class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
         """
         data: dict[str, torch.Tensor] = torch.load(
             self.path,
-            weights_only=True,
         )
         t = data[Time.get_name()]
         u = data[ZonalVelocityDiag.get_name()]
@@ -113,7 +112,6 @@ class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
         """
         data: dict[str, torch.Tensor] = torch.load(
             self.path,
-            weights_only=True,
         )
         t = data[Time.get_name()]
         u = data[ZonalVelocityDiag.get_name()]
