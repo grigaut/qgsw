@@ -12,5 +12,5 @@ class ModelName(Name):
     QG_COLLINEAR_SF = "QGCollinearSF"
     QG_FILTERED = "QGCollinearFilteredSF"
     QG_SANITY_CHECK = "QGSanityCheck"
-    SW_FILTER_SPECTRAL = "SWFilterBaroptropicSpectral"
-    SW_FILTER_EXACT = "SWFilterBaroptropicExact"
+    SW_FILTER_SPECTRAL = "SWFilterBarotropicSpectral"
+    SW_FILTER_EXACT = "SWFilterBarotropicExact"
