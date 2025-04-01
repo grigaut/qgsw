@@ -507,7 +507,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             norm += kernel
             supports.append(kernel)
 
-        return torch.concatenate(
+        return torch.cat(
             [(s / norm).reshape((-1, 1)) for s in supports],
             dim=-1,
         )
