@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, Union, overload
 
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.fields.variables.coefficients.core import (
@@ -21,9 +21,11 @@ if TYPE_CHECKING:
     )
     from qgsw.configs.space import SpaceConfig
 
-CoefType = (
-    UniformCoefficient | NonUniformCoefficient | SmoothNonUniformCoefficient
-)
+CoefType = Union[
+    UniformCoefficient,
+    NonUniformCoefficient,
+    SmoothNonUniformCoefficient,
+]
 
 
 @overload
