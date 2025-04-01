@@ -19,15 +19,15 @@ from qgsw.models.qg.projected.modified.utils import is_modified
 from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.usual.core import QGPSIQ
 from qgsw.models.sw.core import SW
+from qgsw.models.sw.filtering import (
+    SWFilterBarotropicExact,
+    SWFilterBarotropicSpectral,
+)
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
     from qgsw.configs.models import (
         ModelConfig,
-    )
-    from qgsw.models.sw.filtering import (
-        SWFilterBarotropicExact,
-        SWFilterBarotropicSpectral,
     )
     from qgsw.perturbations.core import Perturbation
     from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -91,7 +91,15 @@ def _instantiate_model(
     perturbation: Perturbation,
     beta_plane: BetaPlane,
     Ro: float,  # noqa: N803
-) -> QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ | SW:
+) -> (
+    QG
+    | QGCollinearFilteredSF
+    | QGCollinearSF
+    | QGPSIQ
+    | SW
+    | SWFilterBarotropicExact
+    | SWFilterBarotropicSpectral
+):
     """Instantiate SW model from Configuration.
 
     Args:
@@ -102,7 +110,7 @@ def _instantiate_model(
         Ro (float): Rossby Number.
 
     Returns:
-        QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ | SW: Model.
+        QG | QGCollinearFilteredSF | QGCollinearSF | QGPSIQ | SW  : Model.
     """
     model_class = get_model_class(model_config)
     model = model_class(
@@ -179,16 +187,18 @@ def _instantiate_modified(
 
 
 ModelClass = Union[
-    SW,
-    QG,
-    QGCollinearFilteredSF,
-    QGCollinearSF,
-    QGPSIQ,
-    QGSanityCheck,
+    type[SW],
+    type[SWFilterBarotropicExact],
+    type[SWFilterBarotropicSpectral],
+    type[QG],
+    type[QGCollinearFilteredSF],
+    type[QGCollinearSF],
+    type[QGPSIQ],
+    type[QGSanityCheck],
 ]
 
 
-def get_model_class(
+def get_model_class(  # noqa: PLR0911
     model_config: ModelConfig,
 ) -> ModelClass:
     """Get the model class.
@@ -216,5 +226,9 @@ def get_model_class(
         return QGCollinearFilteredSF
     if model_type == ModelName.QG_SANITY_CHECK:
         return QGSanityCheck
+    if model_type == ModelName.SW_FILTER_EXACT:
+        return SWFilterBarotropicExact
+    if model_type == ModelName.SW_FILTER_SPECTRAL:
+        return SWFilterBarotropicSpectral
     msg = f"Unrecognized model type: {model_config.type}"
     raise ValueError(msg)
