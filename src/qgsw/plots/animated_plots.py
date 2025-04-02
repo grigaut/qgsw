@@ -21,6 +21,8 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
     """Animated Plot base class."""
 
     _slider_prefix: str = "Frame: "
+    frame_duration = 300
+    transition_duration = 500
 
     def __init__(
         self,
@@ -142,12 +144,12 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
                 None,
                 {
                     "frame": {
-                        "duration": 300,
+                        "duration": self.frame_duration,
                         "redraw": True,
                     },
                     "fromcurrent": True,
                     "transition": {
-                        "duration": 500,
+                        "duration": self.transition_duration,
                         "easing": "quadratic-in-out",
                     },
                 },
@@ -228,7 +230,7 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
             go.layout.slider.Transition: Slider Transition.
         """
         return go.layout.slider.Transition(
-            duration=300,
+            duration=self.transition_duration,
             easing="cubic-in-out",
         )
 

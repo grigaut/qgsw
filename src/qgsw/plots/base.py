@@ -98,8 +98,7 @@ class BasePlot(ABC, Generic[T]):
 
     def show(self) -> None:
         """Show the Figure."""
-        self._set_figure()
-        self.figure.show()
+        self.retrieve_figure().show()
 
     def retrieve_figure(self) -> go.Figure:
         """Retrieve the figure.
