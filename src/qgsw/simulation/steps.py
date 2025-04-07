@@ -25,6 +25,17 @@ class Steps:
         self._t_end = t_end
         self._n_tot = ceil(t_end / dt)
 
+    def __repr__(self) -> str:
+        """String representation for steps.
+
+        Returns:
+            str: String representation.
+        """
+        return (
+            f"Perform {self._n_tot} steps of {self._dt} s"
+            f" for a total of {self._t_end} s."
+        )
+
     @property
     def n_tot(self) -> int:
         """Simulation's total number of steps."""
