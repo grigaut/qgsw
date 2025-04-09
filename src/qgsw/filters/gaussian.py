@@ -68,6 +68,10 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
         """Window radius."""
         return self._windows_width_factor * int(self.span) + 1
 
+    def __repr__(self) -> str:
+        """String representation for gaussian filters."""
+        return f"Gaussian filter\n\t└── sigma = {self.sigma}"
+
     @abstractmethod
     def _build_convolution(self) -> T:
         """Build the convolution.
@@ -163,6 +167,10 @@ class GaussianFilter(_Filter, ABC, Generic[T]):
 class GaussianFilter1D(GaussianFilter[torch.nn.Conv1d]):
     """1D Gaussian Filter."""
 
+    def __repr__(self) -> str:
+        """String representation for 1D gaussian filters."""
+        return "1D " + super().__repr__()
+
     def _build_convolution(self) -> torch.nn.Conv1d:
         return torch.nn.Conv1d(
             in_channels=1,
@@ -223,6 +231,10 @@ class GaussianFilter2D(
     GaussianFilter[tuple[torch.nn.Conv2d, torch.nn.Conv2d]],
 ):
     """2D Gaussian Filter."""
+
+    def __repr__(self) -> str:
+        """String representation for 2D gaussian filters."""
+        return "2D " + super().__repr__()
 
     def _build_convolution(self) -> tuple[torch.nn.Conv2d, torch.nn.Conv2d]:
         conv1 = torch.nn.Conv2d(
