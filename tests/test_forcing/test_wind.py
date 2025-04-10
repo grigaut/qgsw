@@ -35,8 +35,8 @@ def test_cosine_wind_forcing() -> None:
     rho = 1000
     mag = 0.08  # Wind stress magnitude (Pa m-1 kg s-2)
     tau0 = mag / rho
-    y_ugrid = 0.5 * (y[:, 1:] + y[:, :-1])
-    taux = tau0 * torch.cos(2 * torch.pi * (y_ugrid - ly / 2) / ly)[1:-1, :]
+    y_ugrid = 0.5 * (y[1:, :] + y[:-1, :])
+    taux = tau0 * torch.cos(2 * torch.pi * (y_ugrid - ly / 2) / ly)
 
     space = SpaceDiscretization2D.from_tensors(
         x=torch.linspace(
