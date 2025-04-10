@@ -24,15 +24,31 @@ class Psi2(DiagnosticVariable):
 
         Args:
             prognostic (BasePrognosticUVH): Prognostic variables
-            (t, α,) u,v and h.
-                ├── (t: (n_ens,)-shaped)
-                ├── (α: (n_ens,)-shaped)
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
+            psi and q.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                ├── q: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Stream function in second layer.
-                └── (n_ens, 1, nx, ny)-shaped
+                └── (n_ens, 1, nx+1, ny+1)-shaped
         """
         return prognostic.psi[:, 1:2, :, :]
+
+
+class Psi21L(Psi2):
+    """PSi2 for one layer models."""
+
+    def _compute(self, prognostic: BasePrognosticPSIQ) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            psi and q.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                ├── q: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Stream function in second layer.
+                └── (n_ens, 1, nx+1, ny+1)-shaped
+        """
+        return torch.zeros_like(prognostic.psi[:, :1])
