@@ -40,7 +40,7 @@ from qgsw.fields.variables.energetics import (
 from qgsw.masks import Masks
 from qgsw.models.names import ModelName
 from qgsw.models.qg.projected.modified.variables import (
-    RefPsi2,
+    Psi21L,
 )
 from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import compute_A
@@ -351,7 +351,7 @@ class RefQGVariableSet(QGVariableSet):
                 space.dy,
             )
         )
-        var_dict[RefPsi2.get_name()] = RefPsi2(
+        var_dict[Psi21L.get_name()] = Psi21L(
             var_dict[StreamFunctionFromVorticity.get_name()],
         )
 
