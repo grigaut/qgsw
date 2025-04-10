@@ -36,11 +36,11 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
+from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
 )
-from qgsw.models.qg.usual.variable_sets import QGPSIQVariableSet
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 

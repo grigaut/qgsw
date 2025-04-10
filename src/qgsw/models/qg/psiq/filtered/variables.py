@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.models.qg.usual.variables import Psi2
+from qgsw.models.qg.psiq.variables import Psi2
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.prognostic_tuples import PSIQTAlpha

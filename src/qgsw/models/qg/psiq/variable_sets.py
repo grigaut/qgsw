@@ -10,7 +10,7 @@ from qgsw.fields.variables.dynamics import (
     ProgStreamFunctionDiag,
     TimeDiag,
 )
-from qgsw.models.qg.usual.variables import Psi2
+from qgsw.models.qg.psiq.variables import Psi2
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig

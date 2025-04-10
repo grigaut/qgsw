@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Union
 import torch
 
 from qgsw.models.names import ModelName
-from qgsw.models.qg.usual.core import QGPSIQ
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.uvh.core import QG
 from qgsw.models.qg.uvh.modified.collinear.core import (
     QGCollinearSF,
