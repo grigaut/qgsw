@@ -6,7 +6,6 @@ import contextlib
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
-import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.exceptions import UnsetStencilError
@@ -436,10 +435,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             )
             return
         curl_tau = (
-            torch.diff(points_to_surfaces(F.pad(tauy, (1, 1, 1, 1))), dim=-2)
-            / self._space.dx
-            - torch.diff(points_to_surfaces(F.pad(taux, (1, 1, 1, 1))), dim=-1)
-            / self._space.dy
+            torch.diff(tauy, dim=-2) / self._space.dx
+            - torch.diff(taux, dim=-1) / self._space.dy
         )
         self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
 

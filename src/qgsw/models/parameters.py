@@ -14,6 +14,7 @@ from qgsw.exceptions import (
 from qgsw.masks import Masks
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
+from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
 
@@ -292,13 +293,13 @@ class ModelParamChecker:
         if (not isinstance(taux, float)) and (not is_tensorx):
             msg = "taux must be a float or a Tensor"
             raise InvalidModelParameterError(msg)
-        if is_tensorx and (taux.shape != (self.space.nx - 1, self.space.ny)):
+        if is_tensorx and (taux.shape != (self.space.nx, self.space.ny + 1)):
             msg = (
                 "Tau_x Tensor must be "
-                f"{(self.space.nx - 1, self.space.ny)}-shaped."
+                f"{(self.space.nx, self.space.ny + 1)}-shaped."
             )
             raise InvalidModelParameterError(msg)
-        self._taux = taux
+        self._taux = points_to_surfaces(taux)
 
     def _set_tauy(self, tauy: torch.Tensor | float) -> None:
         """Set tauy value.
@@ -314,10 +315,10 @@ class ModelParamChecker:
         if (not isinstance(tauy, float)) and (not is_tensory):
             msg = "tauy must be a float or a Tensor"
             raise InvalidModelParameterError(msg)
-        if is_tensory and (tauy.shape != (self.space.nx, self.space.ny - 1)):
+        if is_tensory and (tauy.shape != (self.space.nx + 1, self.space.ny)):
             msg = (
                 "Tau_y Tensor must be "
-                f"{(self.space.nx, self.space.ny - 1)}-shaped."
+                f"{(self.space.nx + 1, self.space.ny)}-shaped."
             )
             raise InvalidModelParameterError(msg)
-        self._tauy = tauy
+        self._tauy = points_to_surfaces(tauy)

@@ -40,7 +40,9 @@ class _WindForcing(NamedObject[WindForcingName], metaclass=ABCMeta):
         """Generate Wind Stress constraints over the space.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: tau_x, tau_y
+            tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y.
+                ├── τ_x: (n_ens, nl, nx, ny+1)-shaped
+                └── τ_y: (n_ens, nl, nx+1, ny)-shaped
         """
 
     @classmethod
@@ -74,6 +76,8 @@ class CosineZonalWindForcing(_WindForcing):
 
         Returns:
             tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y.
+                ├── τ_x: (n_ens, nl, nx, ny+1)-shaped
+                └── τ_y: (n_ens, nl, nx+1, ny)-shaped
         """
         return self._compute_taux(), self._compute_tauy()
 
@@ -82,21 +86,23 @@ class CosineZonalWindForcing(_WindForcing):
 
         Returns:
             torch.Tensor: Tau_x
+                └── τ_x: (n_ens, nl, nx, ny+1)-shaped
         """
         ly = self._space.omega.ly
         y_ugrid = 0.5 * (
-            self._space.omega.xy.y[:, 1:] + self._space.omega.xy.y[:, :-1]
+            self._space.omega.xy.y[1:, :] + self._space.omega.xy.y[:-1, :]
         )
         wind_profile = torch.cos(2 * torch.pi * (y_ugrid - ly / 2) / ly)
-        return self._tau0 * wind_profile[1:-1, :]
+        return self._tau0 * wind_profile
 
     def _compute_tauy(self) -> torch.Tensor:
         """No meridional wind.
 
         Returns:
             torch.Tensor: Tau_y
+                └── τ_y: (n_ens, nl, nx+1, ny)-shaped
         """
-        return torch.zeros_like(self._space.omega.xy.x[1:, 1:-1])
+        return torch.zeros_like(self._space.omega.xy.x[:, 1:])
 
     @classmethod
     def from_config(
@@ -333,22 +339,26 @@ class NoWindForcing(_WindForcing):
 
         Returns:
             torch.Tensor: Tau_x
+                └── τ_x: (n_ens, nl, nx, ny+1)-shaped
         """
-        return torch.zeros_like(self._space.omega.xy.x[1:-1, 1:])
+        return torch.zeros_like(self._space.omega.xy.x[1:, :])
 
     def _compute_tauy(self) -> torch.Tensor:
         """No meridional wind.
 
         Returns:
             torch.Tensor: Tau_y
+                └── τ_y: (n_ens, nl, nx+1, ny)-shaped
         """
-        return torch.zeros_like(self._space.omega.xy.x[1:, 1:-1])
+        return torch.zeros_like(self._space.omega.xy.x[:, 1:])
 
     def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute no wind forcing -> return 0.0s.
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y.
+            tuple[torch.Tensor, torch.Tensor]:Tau x, Tau y.
+                ├── τ_x: (n_ens, nl, nx, ny+1)-shaped
+                └── τ_y: (n_ens, nl, nx+1, ny)-shaped
         """
         return self._compute_taux(), self._compute_tauy()
 
