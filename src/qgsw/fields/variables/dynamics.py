@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     )
     from qgsw.fields.variables.state import StateUVH
     from qgsw.masks import Masks
-    from qgsw.models.qg.projected.projectors.core import QGProjector
+    from qgsw.models.qg.uvh.projectors.core import QGProjector
 
 
 class PhysicalZonalVelocity(DiagnosticVariable):

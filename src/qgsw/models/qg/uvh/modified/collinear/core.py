@@ -11,16 +11,16 @@ from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.projected.core import QGCore
-from qgsw.models.qg.projected.modified.collinear.variable_set import (
-    QGCollinearSFVariableSet,
-)
-from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
-from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
-from qgsw.models.qg.projected.projectors.core import QGProjector
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
+from qgsw.models.qg.uvh.core import QGCore
+from qgsw.models.qg.uvh.modified.collinear.variable_set import (
+    QGCollinearSFVariableSet,
+)
+from qgsw.models.qg.uvh.modified.filtered.pv import compute_g_tilde
+from qgsw.models.qg.uvh.projectors.collinear import CollinearQGProjector
+from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,

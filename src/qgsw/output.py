@@ -23,7 +23,7 @@ from qgsw.fields.variables.prognostic_tuples import (
     UVHTAlpha,
 )
 from qgsw.models.names import ModelName
-from qgsw.models.qg.projected.modified.utils import is_modified
+from qgsw.models.qg.uvh.modified.utils import is_modified
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
 from qgsw.utils.sorting import sort_files

@@ -7,17 +7,17 @@ from typing import TYPE_CHECKING, Union
 import torch
 
 from qgsw.models.names import ModelName
-from qgsw.models.qg.projected.core import QG
-from qgsw.models.qg.projected.modified.collinear.core import (
+from qgsw.models.qg.usual.core import QGPSIQ
+from qgsw.models.qg.uvh.core import QG
+from qgsw.models.qg.uvh.modified.collinear.core import (
     QGCollinearSF,
 )
-from qgsw.models.qg.projected.modified.filtered.core import (
+from qgsw.models.qg.uvh.modified.filtered.core import (
     QGCollinearFilteredSF,
 )
-from qgsw.models.qg.projected.modified.sanity_check.core import QGSanityCheck
-from qgsw.models.qg.projected.modified.utils import is_modified
-from qgsw.models.qg.projected.projectors.core import QGProjector
-from qgsw.models.qg.usual.core import QGPSIQ
+from qgsw.models.qg.uvh.modified.sanity_check.core import QGSanityCheck
+from qgsw.models.qg.uvh.modified.utils import is_modified
+from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sw.core import SW
 from qgsw.models.sw.filtering import (
     SWFilterBarotropicExact,

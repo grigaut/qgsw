@@ -3,11 +3,11 @@
 import pytest
 import torch
 
-from qgsw.models.qg.projected.core import QG
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
 )
+from qgsw.models.qg.uvh.core import QG
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE

@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING
 from qgsw import verbose
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.projected.modified.collinear.core import QGAlpha
-from qgsw.models.qg.projected.modified.filtered.pv import (
+from qgsw.models.qg.uvh.modified.collinear.core import QGAlpha
+from qgsw.models.qg.uvh.modified.filtered.pv import (
     compute_g_tilde,
 )
-from qgsw.models.qg.projected.modified.filtered.variable_set import (
+from qgsw.models.qg.uvh.modified.filtered.variable_set import (
     QGCollinearFilteredSFVariableSet,
 )
-from qgsw.models.qg.projected.projectors.filtered import (
+from qgsw.models.qg.uvh.projectors.filtered import (
     CollinearFilteredQGProjector,
 )
 from qgsw.spatial.core.discretization import (

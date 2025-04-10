@@ -12,7 +12,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
-from qgsw.models.qg.projected.modified.utils import is_modified
+from qgsw.models.qg.uvh.modified.utils import is_modified
 from qgsw.perturbations.core import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary

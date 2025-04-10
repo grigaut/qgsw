@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from qgsw.fields.variables.coefficients.core import UniformCoefficient
-from qgsw.models.qg.projected.modified.collinear.core import QGCollinearSF
+from qgsw.models.qg.uvh.modified.collinear.core import QGCollinearSF
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
