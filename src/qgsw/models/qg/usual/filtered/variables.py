@@ -40,17 +40,16 @@ class CollinearFilteredPsi2(Psi2):
         """Compute the variable value.
 
         Args:
-            prognostic (UVHTAlpha): Prognostic variables
-            t, α, u,v and h.
-                ├── t: (n_ens,)-shaped
-                ├── α: (n_ens, 1, nx, ny)-shaped
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
+            prognostic (BasePrognosticUVH): Prognostic variables t, α,
+            psi and q.
+                ├── t: (n_ens)-shaped
+                ├── α: (n_ens, 1, nx+1, ny+1)-shaped
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └── q: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Stream function in second layer.
-                └── (n_ens, 1, nx, ny)-shaped
+                └── (n_ens, 1, nx+1, ny+1)-shaped
         """
         psi1 = prognostic.psi[:, :1]
         if self._offset_psi1 is None:

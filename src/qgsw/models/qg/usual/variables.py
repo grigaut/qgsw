@@ -26,7 +26,7 @@ class Psi2(DiagnosticVariable):
             prognostic (BasePrognosticUVH): Prognostic variables
             psi and q.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                ├── q: (n_ens, nl, nx, ny)-shaped
+                └── q: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Stream function in second layer.
@@ -45,7 +45,7 @@ class Psi21L(Psi2):
             prognostic (BasePrognosticUVH): Prognostic variables
             psi and q.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                ├── q: (n_ens, nl, nx, ny)-shaped
+                └── q: (n_ens, nl, nx, ny)-shaped
 
         Returns:
             torch.Tensor: Stream function in second layer.

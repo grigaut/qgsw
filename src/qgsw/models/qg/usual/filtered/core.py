@@ -61,7 +61,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 
     @property
     def alpha(self) -> torch.Tensor:
-        """Collinearity coeffcient."""
+        """Collinearity coefficient."""
         return self._state.alpha.get()
 
     @alpha.setter
