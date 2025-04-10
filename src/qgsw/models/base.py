@@ -10,6 +10,10 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.exceptions import (
+    IncoherentWithMaskError,
+    UnsetTimestepError,
+)
 from qgsw.fields.variables.prognostic_tuples import (
     PSIQ,
     UVH,
@@ -21,10 +25,6 @@ from qgsw.fields.variables.state import BaseState, BaseStateUVH, StateUVH
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
-from qgsw.models.exceptions import (
-    IncoherentWithMaskError,
-    UnsetTimestepError,
-)
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
