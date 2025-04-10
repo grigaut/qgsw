@@ -25,6 +25,7 @@ from qgsw.fields.variables.prognostic_tuples import (
     PSIQT,
     UVH,
     UVHT,
+    PSIQTAlpha,
     UVHTAlpha,
 )
 
@@ -324,6 +325,123 @@ class StatePSIQ(BaseStatePSIQ[PSIQT]):
             Self: StateUVH.
         """
         return cls(PSIQ(psi, q))
+
+
+class StatePSIQAlpha(BaseStatePSIQ[PSIQTAlpha]):
+    """State: wrapper for PSIQTAlpha state variables.
+
+    This wrapper links psiq variables to diagnostic variables.
+    Diagnostic variables can be bound to the state so that they are updated
+    only when the state has changed.
+    """
+
+    def __init__(self, prognostic: PSIQTAlpha) -> None:
+        """Instantiate StatePSIQAlpha.
+
+        Args:
+            prognostic (PSIQTAlpha): Core prognostic variables.
+        """
+        super().__init__(prognostic)
+        self._alpha = CollinearityCoefficient(prognostic.alpha)
+        self._prog_vars[CollinearityCoefficient.get_name()] = self._alpha
+
+    @property
+    def alpha(self) -> CollinearityCoefficient:
+        """Collinearity coefficient."""
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self.update_alpha(alpha)
+
+    def _update_prognostic_vars(self, prognostic: PSIQTAlpha) -> None:
+        """Update the prognostic variables.
+
+        Args:
+            prognostic (PSIQTAlpha): Prognostic tuple for psi and q.
+        """
+        self._t.update(prognostic.t)
+        self._psi.update(prognostic.psi)
+        self._q.update(prognostic.q)
+        self._alpha.update(prognostic.alpha)
+
+    def update_alpha(self, alpha: torch.Tensor) -> None:
+        """Update only the value of alpha.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+        """
+        for var in filter(lambda v: v.require_alpha, self.diag_vars.values()):
+            var.outdated()
+        prognostic = PSIQTAlpha.from_psiq(
+            self.t.get(),
+            alpha,
+            self.prognostic.psiq,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    def update_psiq(self, psiq: PSIQ) -> None:
+        """Update psi and q only.
+
+        Args:
+            psiq (PSIQ): Prognostic psi and q.
+        """
+        self.prognostic = PSIQTAlpha.from_psiq(
+            self.t.get(),
+            self.alpha.get(),
+            psiq,
+        )
+
+    @classmethod
+    def steady(
+        cls,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> Self:
+        """Instantiate a steady state with zero-filled prognostic variables.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
+
+        Returns:
+            Self: StatePSIQTAlpha.
+        """
+        return cls(
+            PSIQTAlpha.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
+        )
+
+    @classmethod
+    def from_tensors(
+        cls,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        h: torch.Tensor,
+        alpha: torch.Tensor,
+    ) -> Self:
+        """Instantiate the state from tensors.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meridional velocity.
+            h (torch.Tensor): Surface height anomaly.
+            alpha (torch.Tensor): Collinearity coefficient.
+
+        Returns:
+            Self: StatePSIQTAlpha.
+        """
+        return cls(PSIQTAlpha(u, v, h, alpha))
 
 
 class StateUVH(BaseStateUVH[UVHT]):
