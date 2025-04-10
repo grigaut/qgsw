@@ -34,7 +34,7 @@ from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
-from qgsw.models.qg.uvh.variable_set import QGVariableSet
+from qgsw.models.sw.variable_set import SWVariableSet
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -395,7 +395,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         Returns:
             dict[str, DiagnosticVariable]: Variables dictionnary.
         """
-        return QGVariableSet.get_variable_set(space, physics, model)
+        return SWVariableSet.get_variable_set(space, physics, model)
 
 
 class SW(SWCore[UVHT, StateUVH]):
