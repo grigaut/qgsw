@@ -1,1 +1,0 @@
-"""Usual QG Model formulation."""

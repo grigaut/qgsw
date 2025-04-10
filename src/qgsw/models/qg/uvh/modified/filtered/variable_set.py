@@ -15,17 +15,17 @@ from qgsw.fields.variables.dynamics import (
     SurfaceHeightAnomaly,
 )
 from qgsw.masks import Masks
-from qgsw.models.qg.projected.modified.filtered.pv import (
+from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.uvh.modified.filtered.pv import (
     compute_g_tilde,
 )
-from qgsw.models.qg.projected.modified.filtered.variables import (
+from qgsw.models.qg.uvh.modified.filtered.variables import (
     CollinearFilteredPsi2,
 )
-from qgsw.models.qg.projected.projectors.filtered import (
+from qgsw.models.qg.uvh.projectors.filtered import (
     CollinearFilteredQGProjector,
 )
-from qgsw.models.qg.projected.variable_set import QGVariableSet
-from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.uvh.variable_set import QGVariableSet
 from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import defaults

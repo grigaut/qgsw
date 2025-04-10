@@ -12,7 +12,7 @@ except ImportError:
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw.spatial.exceptions import CoordinatesInstanciationError
+from qgsw.exceptions import CoordinatesInstanciationError
 
 if TYPE_CHECKING:
     from qgsw.utils.units._units import Unit

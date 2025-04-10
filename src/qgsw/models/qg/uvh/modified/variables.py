@@ -11,7 +11,7 @@ from qgsw.fields.variables.prognostic_tuples import (
 )
 
 
-class RefPsi2(Psi2):
+class Psi21L(Psi2):
     """Stream function from vorticity in second layer for 1-layer model."""
 
     def _compute(self, prognostic: UVHTAlpha) -> Tensor:

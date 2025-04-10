@@ -89,6 +89,15 @@ class _PSIQT(NamedTuple):
     t: torch.Tensor
 
 
+class _PSIQTAlpha(NamedTuple):
+    """Stream function, potential vorticity and time."""
+
+    psi: torch.Tensor
+    q: torch.Tensor
+    t: torch.Tensor
+    alpha: torch.Tensor
+
+
 class PSIQ(BasePrognosticPSIQ, _PSIQ):
     """Stream function and potential vorticity."""
 
@@ -259,6 +268,142 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
         return cls.from_psiq(
             t,
             PSIQ.from_file(file, dtype=dtype, device=device),
+        )
+
+
+class PSIQTAlpha(BasePrognosticPSIQ, _PSIQTAlpha):
+    """Time, alpha, stream function and potential vorticity."""
+
+    @property
+    def psiq(self) -> PSIQ:
+        """PSIQ."""
+        return PSIQ(self.psi, self.q)
+
+    @property
+    def psiqt(self) -> PSIQT:
+        """PSIQT."""
+        return PSIQT(self.psi, self.q, self.t)
+
+    def __mul__(self, other: float) -> PSIQTAlpha:
+        """Left multiplication."""
+        return PSIQTAlpha.from_psiqt(
+            self.alpha,
+            PSIQT.from_psiq(self.t, self.psiq.__mul__(other)),
+        )
+
+    def __add__(self, other: PSIQTAlpha) -> PSIQTAlpha:
+        """Addition."""
+        return PSIQTAlpha.from_psiqt(
+            self.alpha,
+            PSIQT.from_psiq(self.t, self.psiq.__add__(other)),
+        )
+
+    def increment_time(self, dt: float) -> PSIQTAlpha:
+        """Increment time.
+
+        Args:
+            dt (float): Timestep.
+
+        Returns:
+            PSIQTAlpha: PSIQTAlpha.
+        """
+        return PSIQTAlpha.from_psiqt(self.alpha, self.psiqt.increment_time(dt))
+
+    @classmethod
+    def from_psiq(
+        cls,
+        t: torch.Tensor,
+        alpha: torch.Tensor,
+        psiq: PSIQ,
+    ) -> Self:
+        """Instantiate from PSIQ.
+
+        Args:
+            t (torch.Tensor): Time.
+            alpha (torch.Tensor): Alpha.
+            psiq (PSIQ): PSIQ.
+
+        Returns:
+            Self: PSIQTAlpha
+        """
+        return cls(t=t, psi=psiq.psi, q=psiq.q, alpha=alpha)
+
+    @classmethod
+    def from_psiqt(cls, alpha: torch.Tensor, psiqt: PSIQT) -> Self:
+        """Instantiate from PSIQT.
+
+        Args:
+            alpha (torch.Tensor): Alpha.
+            psiqt (PSIQT): PSIQT.
+
+        Returns:
+            Self: PSIQTAlpha
+        """
+        return cls(t=psiqt.t, psi=psiqt.psi, q=psiqt.q, alpha=alpha)
+
+    @classmethod
+    def steady(
+        cls,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> Self:
+        """Instantiate a PSIQTAlpha with zero-filled prognostic variables.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
+
+        Returns:
+            Self: PSIQTAlpha.
+        """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
+        return cls.from_psiqt(
+            torch.zeros(
+                (n_ens, 1, nx + 1, ny + 1),
+                dtype=dtype,
+                device=device,
+            ),
+            PSIQT.steady(n_ens, nl, nx, ny, dtype=dtype, device=device),
+        )
+
+    @classmethod
+    def from_file(
+        cls,
+        file: Path,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> Self:
+        """Instantiate PSIQTAlpha from a file.
+
+        Args:
+            file (Path): File to read.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
+
+        Returns:
+            Self: PSIQTAlpha.
+        """
+        dtype = defaults.get_dtype(dtype)
+        device = defaults.get_device(device)
+        data: dict[str, torch.Tensor] = torch.load(file)
+        alpha = data[CollinearityCoefficient.get_name()].to(
+            dtype=dtype,
+            device=device,
+        )
+        return cls.from_psiqt(
+            alpha,
+            PSIQT.from_file(file, dtype=dtype, device=device),
         )
 
 

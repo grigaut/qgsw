@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw import verbose
+from qgsw.exceptions import InvalidSavingFileError
 from qgsw.fields.variables.prognostic import Time
-from qgsw.models.exceptions import InvalidSavingFileError
 
 if TYPE_CHECKING:
     from pathlib import Path

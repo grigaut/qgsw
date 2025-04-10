@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw import verbose
-from qgsw.masks import Masks
-from qgsw.models.exceptions import (
+from qgsw.exceptions import (
     InvalidModelParameterError,
     UnsetTimestepError,
 )
+from qgsw.masks import Masks
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.specs import DEVICE

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
+from qgsw.exceptions import UnsetTimestepError
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
     UVHT,
@@ -14,15 +15,14 @@ from qgsw.fields.variables.prognostic_tuples import (
 from qgsw.fields.variables.state import StateUVH
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import schemes
-from qgsw.models.exceptions import UnsetTimestepError
 from qgsw.models.names import ModelName
-from qgsw.models.qg.projected.projectors.core import QGProjector
-from qgsw.models.qg.projected.variable_set import (
-    QGVariableSet,
-    RefQGVariableSet,
-)
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
+)
+from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.models.qg.uvh.variable_set import (
+    QGVariableSet,
+    RefQGVariableSet,
 )
 from qgsw.models.sw.core import SW
 from qgsw.spatial.core.discretization import SpaceDiscretization2D

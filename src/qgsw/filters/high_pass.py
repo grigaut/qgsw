@@ -20,6 +20,10 @@ class GaussianHighPass1D(GaussianFilter1D):
         id_[self.window_radius] = 1
         return id_ - self._kernel
 
+    def __repr__(self) -> str:
+        """String representation for 1D gaussian filters."""
+        return "High pass " + super().__repr__()
+
     def __call__(self, to_filter: Tensor) -> Tensor:
         """Perform filtering.
 
@@ -34,6 +38,10 @@ class GaussianHighPass1D(GaussianFilter1D):
 
 class SpectralGaussianHighPass1D(SpectralGaussianFilter1D):
     """1D Spectral Gaussian High-Pass filter."""
+
+    def __repr__(self) -> str:
+        """String representation for 1D gaussian filters."""
+        return "High pass " + super().__repr__()
 
     @classmethod
     def compute_kernel(
@@ -70,6 +78,10 @@ class SpectralGaussianHighPass1D(SpectralGaussianFilter1D):
 class GaussianHighPass2D(GaussianFilter2D):
     """2D Gaussian High-Pass filter."""
 
+    def __repr__(self) -> str:
+        """String representation for 1D gaussian filters."""
+        return "High pass " + super().__repr__()
+
     @property
     def kernel(self) -> torch.Tensor:
         """Convolution kernel."""
@@ -91,6 +103,10 @@ class GaussianHighPass2D(GaussianFilter2D):
 
 class SpectralGaussianHighPass2D(SpectralGaussianFilter2D):
     """2D Spectral Gaussian High-Pass filter."""
+
+    def __repr__(self) -> str:
+        """String representation for 1D gaussian filters."""
+        return "High pass " + super().__repr__()
 
     @classmethod
     def compute_kernel(

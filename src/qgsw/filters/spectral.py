@@ -17,6 +17,10 @@ class SpectralGaussianFilter(_SpectralFilter):
         """
         self.sigma = sigma
 
+    def __repr__(self) -> str:
+        """String representation for gaussian filters."""
+        return f"Spectral Gaussian filter\n\t└── sigma = {self.sigma}"
+
     @property
     def sigma(self) -> float:
         """Standard deviation."""
@@ -29,6 +33,10 @@ class SpectralGaussianFilter(_SpectralFilter):
 
 class SpectralGaussianFilter1D(SpectralGaussianFilter):
     """1D Spectral Gaussian Filter."""
+
+    def __repr__(self) -> str:
+        """String representation for gaussian filters."""
+        return "1D " + super().__repr__()
 
     @classmethod
     def compute_kernel(
@@ -108,6 +116,10 @@ class SpectralGaussianFilter1D(SpectralGaussianFilter):
 
 class SpectralGaussianFilter2D(SpectralGaussianFilter):
     """2D Spectral Gaussain Filter."""
+
+    def __repr__(self) -> str:
+        """String representation for gaussian filters."""
+        return "2D " + super().__repr__()
 
     @classmethod
     def compute_kernel(

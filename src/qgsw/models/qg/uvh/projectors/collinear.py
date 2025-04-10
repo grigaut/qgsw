@@ -1,4 +1,4 @@
-"""Collinear Filtered Projector."""
+"""Projector for Collinear models."""
 
 from __future__ import annotations
 
@@ -8,25 +8,25 @@ import torch
 
 from qgsw import verbose
 from qgsw.fields.variables.prognostic_tuples import UVH
-from qgsw.filters.high_pass import GaussianHighPass2D
-from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
+from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
-from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
+from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.utils.shape_checks import with_shapes
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qgsw.filters.base import _Filter
     from qgsw.masks import Masks
     from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
-class CollinearFilteredQGProjector(CollinearQGProjector):
+class CollinearQGProjector(QGProjector):
     """QG Projector."""
 
-    _sigma = 1
+    _MAX_ITERATIONS = 1000
+    _ATOL = 1e-8  # default value for torch.isclose
+    _RTOL = 1e-5  # default value for torch.isclose
 
     @with_shapes(
         A=(1, 1),
@@ -55,17 +55,40 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         super().__init__(
             A=A,
             H=H,
-            g_prime=g_prime,
             space=space,
             f0=f0,
             masks=masks,
         )
-        self._filter = self.create_filter(self._sigma)
+        self._g_prime = g_prime
 
     @property
-    def filter(self) -> GaussianHighPass2D:
-        """Filter."""
-        return self._filter
+    def alpha(self) -> torch.Tensor:
+        """Alpha."""
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self._alpha = alpha
+
+    @QGProjector.A.setter
+    @with_shapes(A=(1, 1))
+    def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803
+        """Set the stretching matrix."""
+        # A.shape = (1,1) -> Cm2L = [[1]], lambd = A_11,  Cl2M = [[1]]
+        QGProjector.A.fset(self, A)
+
+    def _set_helmholtz_solver(self, lambd: torch.Tensor, f0: float) -> None:
+        """Set the Helmholtz Solver.
+
+        Args:
+            lambd (torch.Tensor): Matrix A's eigenvalues.
+                └── (1, 1, 1, 1)-shaped.
+            f0 (float): f0.
+        """
+        if len(self._masks.psi_irrbound_xids) > 0:
+            # Handle Non rectangular geometry
+            raise NotImplementedError
+        super()._set_helmholtz_solver(lambd, f0)
 
     @classmethod
     @with_shapes(
@@ -84,7 +107,6 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         ds: float,
         f0: float,
         alpha: torch.Tensor,
-        filt: _Filter,
         points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
         p_i: torch.Tensor | None = None,
     ) -> UVH:
@@ -105,7 +127,6 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
             f0 (float): f0.
             alpha (torch.Tensor): Collinearity coeffciient.
                 └── (nx, ny)-shaped.
-            filt (_Filter): Filter.
             points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface function.
             p_i (torch.Tensor | None, optional): Interpolated pressure.
@@ -125,13 +146,9 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         v = torch.diff(p, dim=-2) / dx / f0 * dy
         # h = diag(H)Ap
         A_12 = compute_A_12(H[:, 0, 0], g_prime[:, 0, 0])  # noqa: N806
-        p_i_filt = filt(p_i[0, 0]).unsqueeze(0).unsqueeze(0)
         h = (
             H[0, 0, 0]
-            * (
-                torch.einsum("lm,...mxy->...lxy", A, p_i)
-                + A_12 * alpha * p_i_filt
-            )
+            * (torch.einsum("lm,...mxy->...lxy", A, p_i) + A_12 * alpha * p_i)
             * ds
         )
 
@@ -163,7 +180,67 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
             ds=self._space.ds,
             f0=self._f0,
             alpha=self.alpha,
-            filt=self.filter,
+            points_to_surfaces=self._points_to_surface,
+        )
+
+    @classmethod
+    @with_shapes(
+        H=(2, 1, 1),
+    )
+    def Q(  # noqa: N802
+        cls,
+        uvh: UVH,
+        H: torch.Tensor,  # noqa: N803
+        f0: float,
+        ds: float,
+        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+    ) -> torch.Tensor:
+        """PV linear operator.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+            H (torch.Tensor): Layers reference thickness.
+                └── (nl, 1, 1)-shaped.
+            f0 (float): f0.
+            ds (float): ds.
+            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            to surface interpolation function.
+
+        Returns:
+            torch.Tensor: Physical Potential Vorticity * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
+        """
+        # Compute ω = ∂_x v - ∂_y u
+        omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
+            uvh.u[..., 1:-1, :],
+            dim=-1,
+        )
+        # Compute ω-f_0*h/H
+        return (omega - f0 * points_to_surfaces(uvh.h) / H[0, 0, 0]) * (
+            f0 / ds
+        )
+
+    def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
+        """PV linear operator.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Physical Pressure * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
+        """
+        return self.Q(
+            uvh=uvh,
+            f0=self._f0,
+            H=self.H,
+            ds=self._space.ds,
             points_to_surfaces=self._points_to_surface,
         )
 
@@ -200,13 +277,12 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         for k in range(1, self._MAX_ITERATIONS + 1):
             # Since A.shape = (1,1) -> solving in mode space is the same
             # as solving in physical space
-            pi_i_filt = self.filter(pi_i[0, 0]).unsqueeze(0).unsqueeze(0)
             pi1 = self._compute_p_modes(
                 elliptic_rhs
                 + (
                     self._f0**2
                     * A_12
-                    * self._points_to_surface(pi_i_filt)
+                    * self._points_to_surface(pi_i)
                     * self._points_to_surface(self.alpha)
                 ),
             )
@@ -225,7 +301,7 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
             ).all():
                 verbose.display(
                     f"[{self.__class__.__name__}.QoG_inv]: "
-                    f"Convergence reached after {k + 1} iterations.",
+                    f"Convergence reached after {k} iterations.",
                     trigger_level=3,
                 )
                 break
@@ -241,18 +317,3 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
 
         p_qg_i = self._points_to_surface(pi1)
         return pi1, p_qg_i
-
-    @classmethod
-    def create_filter(
-        cls,
-        sigma: float,
-    ) -> GaussianHighPass2D:
-        """Create filter.
-
-        Args:
-            sigma (float): Filter standard deviation.
-
-        Returns:
-            SpectralGaussianHighPass2D: Filter.
-        """
-        return GaussianHighPass2D(sigma=sigma)

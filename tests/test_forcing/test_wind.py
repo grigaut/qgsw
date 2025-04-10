@@ -64,4 +64,4 @@ def test_cosine_wind_forcing() -> None:
     taux_, tauy_ = wf.compute()
 
     assert torch.isclose(taux, taux_).all()
-    assert tauy_ == 0
+    assert (tauy_ == 0).all()

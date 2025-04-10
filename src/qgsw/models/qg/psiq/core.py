@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
-from qgsw.fields.variables.prognostic_tuples import PSIQ, PSIQT
-from qgsw.fields.variables.state import StatePSIQ
+from qgsw.exceptions import UnsetStencilError
+from qgsw.fields.variables.prognostic_tuples import (
+    PSIQ,
+    PSIQT,
+    BasePrognosticPSIQ,
+)
+from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
 from qgsw.masks import Masks
 from qgsw.models.base import _Model
 from qgsw.models.core import schemes
@@ -31,12 +36,11 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
+from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
 )
-from qgsw.models.qg.usual.exceptions import UnsetStencilError
-from qgsw.models.qg.usual.variable_sets import QGPSIQVariableSet
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE
 
@@ -48,11 +52,13 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
+T = TypeVar("T", bound=BasePrognosticPSIQ)
+State = TypeVar("State", bound=BaseStatePSIQ)
 
-class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
+
+class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
     """Finite volume multi-layer QG solver."""
 
-    _type = ModelName.QUASI_GEOSTROPHIC_USUAL
     _flux_stencil = 5
 
     dtype = torch.float64
@@ -430,10 +436,12 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
             )
             return
         curl_tau = (
-            torch.diff(F.pad(tauy, (0, 1, 0, 0))) / self._space.dx
-            - torch.diff(F.pad(taux, (0, 0, 0, 1))) / self._space.dy
+            torch.diff(points_to_surfaces(F.pad(tauy, (1, 1, 1, 1))), dim=-2)
+            / self._space.dx
+            - torch.diff(points_to_surfaces(F.pad(taux, (1, 1, 1, 1))), dim=-1)
+            / self._space.dy
         )
-        self._curl_tau = curl_tau / self.H[0]
+        self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
 
     def advection_rhs(self, prognostic: PSIQ) -> torch.Tensor:
         """Right hand side advection.
@@ -566,3 +574,9 @@ class QGPSIQ(_Model[PSIQT, StatePSIQ, PSIQ]):
             dict[str, DiagnosticVariable]: Variables dictionnary.
         """
         return QGPSIQVariableSet.get_variable_set(space, physics, model)
+
+
+class QGPSIQ(QGPSIQCore[PSIQT, StatePSIQ]):
+    """Usual Quasi Geostrophic Model (psi / pv formulation)."""
+
+    _type = ModelName.QUASI_GEOSTROPHIC_USUAL

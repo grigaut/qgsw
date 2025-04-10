@@ -16,6 +16,7 @@ except ImportError:
 import torch
 import torch.nn.functional as F  # noqa: N812
 
+from qgsw.exceptions import UnitError
 from qgsw.models.core import helmholtz
 from qgsw.perturbations.base import (
     BaroclinicPerturbation,
@@ -26,7 +27,6 @@ from qgsw.perturbations.base import (
 from qgsw.spatial.core.grid import Grid2D, Grid3D
 from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
-from qgsw.utils.units.exceptions import UnitError
 
 if TYPE_CHECKING:
     from qgsw.configs.perturbation import PerturbationConfig

@@ -14,7 +14,7 @@ from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
 from qgsw.models.names import ModelName
-from qgsw.models.qg.projected.modified.utils import is_modified
+from qgsw.models.qg.uvh.modified.utils import is_modified
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps

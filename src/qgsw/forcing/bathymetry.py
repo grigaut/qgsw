@@ -18,9 +18,9 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.data.loaders import BathyLoader
+from qgsw.exceptions import UnitError
 from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
-from qgsw.utils.units.exceptions import UnitError
 
 if TYPE_CHECKING:
     from qgsw.configs.bathymetry import BathyConfig

@@ -16,7 +16,7 @@ from pydantic import (
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
 from qgsw.fields.variables.coefficients.core import NonUniformCoefficient
 from qgsw.models.names import ModelName
-from qgsw.models.qg.projected.modified.utils import is_modified
+from qgsw.models.qg.uvh.modified.utils import is_modified
 from qgsw.specs import DEVICE, defaults
 from qgsw.utils.named_object import NamedObjectConfig
 

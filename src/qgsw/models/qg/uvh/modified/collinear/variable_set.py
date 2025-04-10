@@ -15,13 +15,13 @@ from qgsw.fields.variables.dynamics import (
     Vorticity,
 )
 from qgsw.masks import Masks
-from qgsw.models.qg.projected.modified.collinear.variables import (
+from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.uvh.modified.collinear.variables import (
     CollinearPsi2,
 )
-from qgsw.models.qg.projected.modified.filtered.pv import compute_g_tilde
-from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
-from qgsw.models.qg.projected.variable_set import QGVariableSet
-from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.uvh.modified.filtered.pv import compute_g_tilde
+from qgsw.models.qg.uvh.projectors.collinear import CollinearQGProjector
+from qgsw.models.qg.uvh.variable_set import QGVariableSet
 from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import defaults

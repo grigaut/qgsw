@@ -36,11 +36,11 @@ class _WindForcing(NamedObject[WindForcingName], metaclass=ABCMeta):
     """Wind Forcing Representation."""
 
     @abstractmethod
-    def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
+    def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate Wind Stress constraints over the space.
 
         Returns:
-            tuple[float | torch.Tensor, float | torch.Tensor]: tau_x, tau_y
+            tuple[torch.Tensor, torch.Tensor]: tau_x, tau_y
         """
 
     @classmethod
@@ -69,19 +69,19 @@ class CosineZonalWindForcing(_WindForcing):
         self._space = space_2d
         self._tau0 = magnitude / rho
 
-    def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
+    def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute tau x and tau y based on wind data.
 
         Returns:
-            tuple[float | torch.Tensor, float | torch.Tensor]: Tau x, Tau y.
+            tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y.
         """
         return self._compute_taux(), self._compute_tauy()
 
-    def _compute_taux(self) -> float | torch.Tensor:
+    def _compute_taux(self) -> torch.Tensor:
         """Zonal Wind.
 
         Returns:
-            float | torch.Tensor: Tau_x
+            torch.Tensor: Tau_x
         """
         ly = self._space.omega.ly
         y_ugrid = 0.5 * (
@@ -90,13 +90,13 @@ class CosineZonalWindForcing(_WindForcing):
         wind_profile = torch.cos(2 * torch.pi * (y_ugrid - ly / 2) / ly)
         return self._tau0 * wind_profile[1:-1, :]
 
-    def _compute_tauy(self) -> float | torch.Tensor:
+    def _compute_tauy(self) -> torch.Tensor:
         """No meridional wind.
 
         Returns:
-            float | torch.Tensor: Tau_y
+            torch.Tensor: Tau_y
         """
-        return 0.0
+        return torch.zeros_like(self._space.omega.xy.x[1:, 1:-1])
 
     @classmethod
     def from_config(
@@ -153,14 +153,14 @@ class DataWindForcing(_WindForcing):
         self._loader = loader
         self._data_type = data_type
 
-    def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
+    def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute tau x and tau y based on wind data.
 
         Raises:
             KeyError: If the data type is not recognized.
 
         Returns:
-            tuple[float | torch.Tensor, float | torch.Tensor]: Tau x, Tau y.
+            tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y.
         """
         if self._data_type == "speed":
             return self._transform_speed_data(*self._loader.retrieve())
@@ -324,23 +324,40 @@ class NoWindForcing(_WindForcing):
 
     _type = WindForcingName.NONE
 
-    def __init__(self) -> None:
+    def __init__(self, space_2d: SpaceDiscretization2D) -> None:
         """Instantiate the NoWindForcing."""
+        self._space = space_2d
 
-    def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
+    def _compute_taux(self) -> torch.Tensor:
+        """No meridional wind.
+
+        Returns:
+            torch.Tensor: Tau_x
+        """
+        return torch.zeros_like(self._space.omega.xy.x[1:-1, 1:])
+
+    def _compute_tauy(self) -> torch.Tensor:
+        """No meridional wind.
+
+        Returns:
+            torch.Tensor: Tau_y
+        """
+        return torch.zeros_like(self._space.omega.xy.x[1:, 1:-1])
+
+    def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute no wind forcing -> return 0.0s.
 
         Returns:
-            tuple[float | torch.Tensor, float | torch.Tensor]: Tau x, Tau y.
+            tuple[torch.Tensor, torch.Tensor]: Tau x, Tau y.
         """
-        return 0.0, 0.0
+        return self._compute_taux(), self._compute_tauy()
 
     @classmethod
     def from_config(
         cls,
         windstress_config: WindStressConfig,  # noqa: ARG003
         physics_config: PhysicsConfig,  # noqa: ARG003
-        space_2d: SpaceDiscretization3D,  # noqa: ARG003
+        space_2d: SpaceDiscretization3D,
     ) -> Self:
         """Instantiate DataWindForcing from configuration.
 
@@ -352,7 +369,7 @@ class NoWindForcing(_WindForcing):
         Returns:
             Self: NoWindForcing.
         """
-        return cls()
+        return cls(space_2d)
 
 
 class WindForcing:
@@ -366,11 +383,11 @@ class WindForcing:
         """
         self._forcing = forcing
 
-    def compute(self) -> tuple[float | torch.Tensor, float | torch.Tensor]:
+    def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute Wind Forcing.
 
         Returns:
-            tuple[float | torch.Tensor, float | torch.Tensor]: tau x, tau y
+            tuple[torch.Tensor, torch.Tensor]: tau x, tau y
         """
         return self._forcing.compute()
 
