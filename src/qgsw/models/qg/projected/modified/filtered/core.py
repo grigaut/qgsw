@@ -105,12 +105,21 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredQGProjector]):
         self._P.alpha = alpha
         self._create_diagnostic_vars(self._state)
 
-    def set_p(self, p: torch.Tensor) -> None:
+    def set_p(
+        self,
+        p: torch.Tensor,
+        offset_p0: torch.Tensor | None = None,
+        offset_p1: torch.Tensor | None = None,
+    ) -> None:
         """Set the initial pressure.
 
         Args:
             p (torch.Tensor): Pressure.
                 └── (n_ens, nl, nx+1, ny+1)-shaped
+            offset_p0 (torch.Tensor): Offset for the pressure in top layer.
+                └── (1, 1, nx, ny)-shaped
+            offset_p1 (torch.Tensor): Offset for the pressure in bottom layer.
+                └── (1, 1, nx, ny)-shaped
         """
         uvh = self.P.G(
             p,
@@ -124,6 +133,8 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredQGProjector]):
             self.alpha,
             self.P.filter,
             self.points_to_surfaces,
+            offset_p0=offset_p0 if offset_p0 is not None else self.P.offset_p0,
+            offset_p1=offset_p1 if offset_p0 is not None else self.P.offset_p1,
         )
         self.set_uvh(*uvh)
 

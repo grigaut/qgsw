@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 import torch
@@ -13,6 +15,7 @@ from qgsw.models.qg.projected.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
 from qgsw.models.qg.projected.projectors.collinear import CollinearQGProjector
+from qgsw.specs import defaults
 from qgsw.utils.shape_checks import with_shapes
 
 if TYPE_CHECKING:
@@ -67,6 +70,58 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         """Filter."""
         return self._filter
 
+    @cached_property
+    def offset_p0_default(self) -> torch.Tensor:
+        """Default offset for the pressure."""
+        return torch.zeros(
+            (1, 1, self._space.nx, self._space.ny),
+            **defaults.get(),
+        )
+
+    @property
+    def offset_p0(self) -> torch.Tensor:
+        """Offset for the pressure."""
+        try:
+            return self._offset_p0
+        except AttributeError:
+            return self.offset_p0_default
+
+    @offset_p0.setter
+    def offset_p0(self, value: torch.Tensor) -> None:
+        """Set the offset for the pressure."""
+        warnings.warn(
+            f"Setting a value to {self.__class__.__name__}.offset_p0"
+            " is very likely yo cause overflow.",
+            stacklevel=1,
+        )
+        self._offset_p0 = value
+
+    @cached_property
+    def offset_p1_default(self) -> torch.Tensor:
+        """Default offset for the pressure."""
+        return torch.zeros(
+            (1, 1, self._space.nx, self._space.ny),
+            **defaults.get(),
+        )
+
+    @property
+    def offset_p1(self) -> torch.Tensor:
+        """Offset for the pressure."""
+        try:
+            return self._offset_p1
+        except AttributeError:
+            return self.offset_p1_default
+
+    @offset_p1.setter
+    def offset_p1(self, value: torch.Tensor) -> None:
+        """Set the offset for the pressure."""
+        warnings.warn(
+            f"Setting a value to {self.__class__.__name__}.offset_p1"
+            " is very likely yo cause overflow.",
+            stacklevel=1,
+        )
+        self._offset_p1 = value
+
     @classmethod
     @with_shapes(
         H=(2, 1, 1),
@@ -86,6 +141,8 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         alpha: torch.Tensor,
         filt: _Filter,
         points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        offset_p0: torch.Tensor,
+        offset_p1: torch.Tensor,
         p_i: torch.Tensor | None = None,
     ) -> UVH:
         """Geostrophic operator.
@@ -107,7 +164,11 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
                 └── (nx, ny)-shaped.
             filt (_Filter): Filter.
             points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
-            to surface function.
+                to surface function.
+            offset_p0 (torch.Tensor): Offset for the pressure in top layer.
+                └── (1, 1, nx, ny)-shaped
+            offset_p1 (torch.Tensor): Offset for the pressure in bottom layer.
+                └── (1, 1, nx, ny)-shaped
             p_i (torch.Tensor | None, optional): Interpolated pressure.
             Defaults to None.
                 └── (n_ens, nl, nx, ny)-shaped
@@ -125,12 +186,12 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         v = torch.diff(p, dim=-2) / dx / f0 * dy
         # h = diag(H)Ap
         A_12 = compute_A_12(H[:, 0, 0], g_prime[:, 0, 0])  # noqa: N806
-        p_i_filt = filt(p_i[0, 0]).unsqueeze(0).unsqueeze(0)
+        p_i_filt = filt(p_i[0, 0] - offset_p0[0, 0]).unsqueeze(0).unsqueeze(0)
         h = (
             H[0, 0, 0]
             * (
                 torch.einsum("lm,...mxy->...lxy", A, p_i)
-                + A_12 * alpha * p_i_filt
+                + A_12 * (alpha * p_i_filt + offset_p1)
             )
             * ds
         )
@@ -165,6 +226,8 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
             alpha=self.alpha,
             filt=self.filter,
             points_to_surfaces=self._points_to_surface,
+            offset_p0=self.offset_p0_default,
+            offset_p1=self.offset_p1_default,
         )
 
     def QoG_inv(  # noqa: N802
@@ -200,14 +263,21 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         for k in range(1, self._MAX_ITERATIONS + 1):
             # Since A.shape = (1,1) -> solving in mode space is the same
             # as solving in physical space
-            pi_i_filt = self.filter(pi_i[0, 0]).unsqueeze(0).unsqueeze(0)
+            pi_i_filt = (
+                self.filter(pi_i[0, 0] - self.offset_p0[0, 0])
+                .unsqueeze(0)
+                .unsqueeze(0)
+            )
             pi1 = self._compute_p_modes(
                 elliptic_rhs
                 + (
                     self._f0**2
                     * A_12
-                    * self._points_to_surface(pi_i_filt)
-                    * self._points_to_surface(self.alpha)
+                    * (
+                        self._points_to_surface(pi_i_filt)
+                        * self._points_to_surface(self.alpha)
+                        + self._points_to_surface(self.offset_p1)
+                    )
                 ),
             )
 
