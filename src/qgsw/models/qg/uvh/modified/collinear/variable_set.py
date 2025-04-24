@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.dynamics import (
     CollinearityCoefficientDiag,
+    PhysicalMeridionalVelocityFromPsi2,
     PhysicalVorticity,
+    PhysicalZonalVelocityFromPsi2,
     PotentialVorticity,
     QGPressure,
     StreamFunction,
@@ -146,6 +148,18 @@ class QGCollinearSFVariableSet(QGVariableSet):
         )
         var_dict[CollinearPsi2.get_name()] = CollinearPsi2(
             var_dict[StreamFunctionFromVorticity.get_name()],
+        )
+        var_dict[PhysicalZonalVelocityFromPsi2.get_name()] = (
+            PhysicalZonalVelocityFromPsi2(
+                var_dict[CollinearPsi2.get_name()],
+                space.dy,
+            )
+        )
+        var_dict[PhysicalMeridionalVelocityFromPsi2.get_name()] = (
+            PhysicalMeridionalVelocityFromPsi2(
+                var_dict[CollinearPsi2.get_name()],
+                space.dx,
+            )
         )
 
     @classmethod

@@ -14,9 +14,11 @@ from qgsw.fields.variables.dynamics import (
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
+    PhysicalMeridionalVelocity2,
     PhysicalSurfaceHeightAnomaly,
     PhysicalVorticity,
     PhysicalZonalVelocity,
+    PhysicalZonalVelocity2,
     PotentialVorticity,
     Psi2,
     QGPressure,
@@ -95,6 +97,14 @@ class QGVariableSet:
         var_dict[PhysicalLayerDepthAnomaly.get_name()] = (
             PhysicalLayerDepthAnomaly(
                 space.ds,
+            )
+        )
+        var_dict[PhysicalZonalVelocity2.get_name()] = PhysicalZonalVelocity2(
+            var_dict[PhysicalZonalVelocity.get_name()],
+        )
+        var_dict[PhysicalMeridionalVelocity2.get_name()] = (
+            PhysicalMeridionalVelocity2(
+                var_dict[PhysicalMeridionalVelocity.get_name()],
             )
         )
 

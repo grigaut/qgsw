@@ -8,7 +8,12 @@ from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.dynamics import (
     LayerDepthAnomalyDiag,
     MeridionalVelocityDiag,
+    PhysicalLayerDepthAnomaly,
+    PhysicalMeridionalVelocity,
+    PhysicalMeridionalVelocity2,
     PhysicalVorticity,
+    PhysicalZonalVelocity,
+    PhysicalZonalVelocity2,
     Psi2,
     StreamFunctionFromVorticity,
     TimeDiag,
@@ -53,6 +58,25 @@ class SWVariableSet:
             var_dict (dict[str, DiagnosticVariable]): Variables dict.
             space (SpaceConfig): Space configuration. configuration.
         """
+        var_dict[PhysicalZonalVelocity.get_name()] = PhysicalZonalVelocity(
+            space.dx,
+        )
+        var_dict[PhysicalMeridionalVelocity.get_name()] = (
+            PhysicalMeridionalVelocity(space.dx)
+        )
+        var_dict[PhysicalLayerDepthAnomaly.get_name()] = (
+            PhysicalLayerDepthAnomaly(
+                space.ds,
+            )
+        )
+        var_dict[PhysicalZonalVelocity2.get_name()] = PhysicalZonalVelocity2(
+            var_dict[PhysicalZonalVelocity.get_name()],
+        )
+        var_dict[PhysicalMeridionalVelocity2.get_name()] = (
+            PhysicalMeridionalVelocity2(
+                var_dict[PhysicalMeridionalVelocity.get_name()],
+            )
+        )
 
     @classmethod
     def add_fluxes(
