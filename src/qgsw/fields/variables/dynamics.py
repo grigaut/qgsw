@@ -985,6 +985,166 @@ class TotalEnstrophy(Enstrophy):
         )
 
 
+class PhysicalZonalVelocity2(DiagnosticVariable):
+    """Physical zonal Velocity in second layer.
+
+    └── (n_ens, 1, nx, ny-1)-shaped
+    """
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.M1S_1
+    _name = "u_phys2"
+    _description = "Physical zonal velocity in second layer"
+
+    def __init__(self, u_phys: PhysicalZonalVelocity) -> None:
+        """Instantiate the variable.
+
+        Args:
+            u_phys (PhysicalZonalVelocity): Physical zonal velocity.
+        """
+        self._u_phys = u_phys
+
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Physical zonal velocity in second layer..
+                └── (n_ens, 1, nx, ny-1)-shaped
+        """
+        u_phys = self._u_phys.compute_no_slice(prognostic)
+        return points_to_surfaces(u_phys)[:, 1:2]
+
+
+class PhysicalMeridionalVelocity2(DiagnosticVariable):
+    """Physical meridional Velocity in second layer.
+
+    └── (n_ens, 1, nx-1, ny)-shaped
+    """
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.M1S_1
+    _name = "v_phys2"
+    _description = "Physical meridional velocity in second layer"
+
+    def __init__(self, v_phys: PhysicalMeridionalVelocity) -> None:
+        """Instantiate the variable.
+
+        Args:
+            v_phys (PhysicalMeridionalVelocity): Physical meridional velocity.
+        """
+        self._v_phys = v_phys
+
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Physical zonal velocity in second layer..
+                └── (n_ens, 1, nx-1, ny)-shaped
+        """
+        v_phys = self._v_phys.compute_no_slice(prognostic)
+        return points_to_surfaces(v_phys)[:, 1:2]
+
+
+class PhysicalZonalVelocityFromPsi2(DiagnosticVariable):
+    """Physical zonal Velocity in second layer.
+
+    └── (n_ens, 1, nx, ny-1)-shaped
+    """
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.M2S_1
+    _name = "u_phys2"
+    _description = "Physical zonal velocity in bottom layer"
+
+    def __init__(self, psi2: Psi2, dy: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            psi2 (Psi2): Vorticity in second layer.
+            dy (float): Step in the Y direction.
+        """
+        self._psi2 = psi2
+        self._dy = dy
+
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Physical zonal velocity in second layer..
+                └── (n_ens, 1, nx, ny-1)-shaped
+        """
+        psi2 = self._psi2.compute_no_slice(prognostic)
+        return -torch.diff(psi2, dim=-1) / self._dy
+
+
+class PhysicalMeridionalVelocityFromPsi2(DiagnosticVariable):
+    """Physical meridional Velocity in second layer.
+
+    └── (n_ens, 1, nx-1, ny)-shaped
+    """
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.M2S_1
+    _name = "v_phys2"
+    _description = "Physical meriodional velocity in bottom layer"
+
+    def __init__(self, psi2: Psi2, dx: float) -> None:
+        """Instantiate the variable.
+
+        Args:
+            psi2 (Psi2): Vorticity in second layer.
+            dx (float): Step in the X direction.
+        """
+        self._psi2 = psi2
+        self._dx = dx
+
+    def _compute(self, prognostic: BasePrognosticUVH) -> torch.Tensor:
+        """Compute the variable value.
+
+        Args:
+            prognostic (BasePrognosticUVH): Prognostic variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Physical zonal velocity in second layer..
+                └── (n_ens, 1, nx-1, ny)-shaped
+        """
+        psi2 = self._psi2.compute_no_slice(prognostic)
+        return torch.diff(psi2, dim=-2) / self._dx
+
+
 class ZonalVelocityDiag(DiagnosticVariable):
     """Diagnostic zonal velocity.
 
