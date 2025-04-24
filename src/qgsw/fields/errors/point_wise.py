@@ -68,15 +68,9 @@ class RMSE(PointWiseError):  # noqa: N818
         """
         value = self._var.compute(prognostic)
         value_ref = self._var_ref.compute(prognostic_ref)
-        norm = torch.max(
-            torch.square(value_ref).flatten(-2, -1),
-            dim=-1,
-            keepdim=True,
-        ).values.unsqueeze(-1)
         point_wise = torch.square(value - value_ref)
-        sum_errs = torch.sum(point_wise / norm, dim=(-1, -2))
-        _, _, nx, ny = point_wise.shape
-        return torch.sqrt(sum_errs / (nx * ny))
+        mean_err = torch.mean(point_wise, dim=(-1, -2))
+        return torch.sqrt(mean_err)
 
     def compute_ensemble_wise(
         self,
@@ -96,11 +90,6 @@ class RMSE(PointWiseError):  # noqa: N818
         """
         value = self._var.compute(prognostic)
         value_ref = self._var_ref.compute(prognostic_ref)
-        norm = torch.mean(
-            torch.square(value_ref).flatten(-3, -1),
-            dim=-1,
-        )
         point_wise = torch.square(value - value_ref)
-        sum_errs = torch.sum(point_wise / norm, dim=(-1, -2, -3))
-        _, nl, nx, ny = point_wise.shape
-        return torch.sqrt(sum_errs / (nl * nx * ny))
+        mean_err = torch.mean(point_wise, dim=(-1, -2, -3))
+        return torch.sqrt(mean_err)
