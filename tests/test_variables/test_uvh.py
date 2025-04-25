@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 import torch
 
-from qgsw.fields.variables.prognostic_tuples import UVH, UVHT, UVHTAlpha
+from qgsw.exceptions import ParallelSlicingError
+from qgsw.fields.variables.prognostic_tuples import (
+    UVH,
+    UVHT,
+    BasePrognosticUVH,
+    UVHTAlpha,
+)
 from qgsw.specs import DEVICE
 
 
@@ -175,3 +181,37 @@ def test_operations_uvht_alpha(
     assert ((uvht_alpha - 3 * uvht_alpha).h == h0 - 3 * h0).all()
     assert ((uvht_alpha - 3 * uvht_alpha).alpha == alpha0).all()
     assert ((uvht_alpha - 3 * uvht_alpha).t == t0).all()
+
+
+testdata = [
+    pytest.param("uvh", id="uvh"),
+    pytest.param("uvht", id="uvht"),
+    pytest.param("uvht_alpha", id="uvhtalpha"),
+]
+
+
+@pytest.mark.parametrize(("prognostic"), testdata)
+def test_slicing_uvh(
+    prognostic: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    """Test slicing on BasePrognosticUVH."""
+    base_uvh: BasePrognosticUVH = request.getfixturevalue(prognostic)
+    u, v, h = base_uvh.uvh.parallel_slice[:1, 0]
+    u_ = base_uvh.uvh.u[:1, 0]
+    v_ = base_uvh.uvh.v[:1, 0]
+    h_ = base_uvh.uvh.h[:1, 0]
+    torch.testing.assert_close(u, u_)
+    torch.testing.assert_close(v, v_)
+    torch.testing.assert_close(h, h_)
+
+
+@pytest.mark.parametrize(("prognostic"), testdata)
+def test_slicing_depth_uvh(
+    prognostic: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    """Test slicing depth error on BasePrognosticUVH."""
+    base_uvh: BasePrognosticUVH = request.getfixturevalue(prognostic)
+    with pytest.raises(ParallelSlicingError):
+        base_uvh.uvh.parallel_slice[:1, 0, 0:1]
