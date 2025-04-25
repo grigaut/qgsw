@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 
+from qgsw.exceptions import ParallelSlicingError
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
@@ -72,7 +73,8 @@ class ParallelSlice(Generic[P]):
             key (tuple[int  |  slice, ...]): Slicing tuple.
 
         Raises:
-            ValueError: If the key depth is greater than self._slice_depth
+            ParallelSlicingError: If the key depth is greater than
+            self._slice_depth
         """
         if self._slice_depth is None:
             return
@@ -82,7 +84,7 @@ class ParallelSlice(Generic[P]):
             f"Slicing can only be done on the first {self._slice_depth}"
             " dimension(s)."
         )
-        raise ValueError(msg)
+        raise ParallelSlicingError(msg)
 
     def __getitem__(self, key: int | slice | tuple[int | slice, ...]) -> P:
         """__getitem__ magic method for parallel slicing.
