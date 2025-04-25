@@ -1,118 +1,194 @@
 """Match models variables."""
 
-import torch
+from __future__ import annotations
 
-from qgsw.fields.variables.prognostic_tuples import UVH
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
+
+from qgsw import verbose
+from qgsw.exceptions import InvalidLayerNumberError
+from qgsw.fields.variables.prognostic_tuples import BasePrognosticUVH
+from qgsw.fields.variables.state import BaseStateUVH
+from qgsw.models.base import _Model
+from qgsw.models.names import ModelCategory, ModelName
+from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.uvh.core import QGCore
+from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.models.sw.core import SWCore
 from qgsw.specs import defaults
-from qgsw.utils.dim_checks import with_dims
+
+ModelRef = TypeVar("ModelRef", bound=_Model)
+Model = TypeVar("Model", bound=_Model)
+ModelSW = SWCore[BasePrognosticUVH, BaseStateUVH]
+ModelQG = QGCore[BasePrognosticUVH, BaseStateUVH, QGProjector]
 
 
-@with_dims(
-    g_prime_nl=1,
-    g_prime=1,
-)
-def match_psi(
-    uvh_nl: UVH,
-    g_prime_nl: torch.Tensor,
-    g_prime: torch.Tensor,
-    *,
-    dtype: torch.dtype = None,
-    device: torch.device = None,
-) -> UVH:
-    """Compute prognostic vars to match stream function between models.
+class ModelSync:
+    """Model synchronizing tool."""
 
-    The reference streamfunction is supposed to have nl levels and the output
-    is expected to have n layers (nl >= n).
+    __slots__ = ("_core",)
 
-    Ensure that the streamfunction of both models are the same.
-    ψ_nl = M_nl @ h_nl / f_0 with M_nl: (nl, nl)-shaped
-    ψ    = M    @ h    / f_0 with M   : (n , n )-shaped
-    --> u = u_nl[:n]                (Omitting non-layer dimensions)
-    --> v = v_nl[:n]                (Omitting non-layer dimensions)
-    --> h = M⁻¹ @ ( M_nl @ h)[:n]   (Omitting non-layer dimensions)
+    def __init__(
+        self,
+        model_ref: _Model,
+        model: _Model,
+    ) -> None:
+        """Instantiate the model synchronizer.
 
-    Args:
-        uvh_nl (UVH): UVH from the reference model.
-            ├── u: (n_ens, nl, nx+1, ny)-shaped
-            ├── v: (n_ens, nl, nx, ny+1)-shaped
-            └── h: (n_ens, nl, nx, ny)-shaped
-        g_prime_nl (torch.Tensor): Reduced gravity for the reference model.
-            └── (nl,)-shaped
-        g_prime (torch.Tensor): Reduced gravity for the model
-        to compute UVH for.
-            └── (n,)-shaped
-        dtype (torch.dtype, optional): Dtype. Defaults to None.
-        device (torch.device, optional): Device. Defaults to None.
+        Args:
+            model_ref (_Model): Reference model.
+            model (_Model): Model to synchronize.
 
-    Returns:
-        UVH: Corresponding UVH.
-            ├── u: (n_ens, n, nx+1, ny)-shaped
-            ├── v: (n_ens, n, nx, ny+1)-shaped
-            └── h: (n_ens, n, nx, ny)-shaped
-    """
-    nl = g_prime_nl.shape[0]
-    n = g_prime.shape[0]
-    if nl < n:
-        msg = f"n should be lower than nl (n: {n} !<= nl: {nl})"
-        raise ValueError(msg)
-    dtype = defaults.get_dtype(dtype)
-    device = defaults.get_device(device)
-    u_nl, v_nl, h_nl = uvh_nl
-    u = u_nl[:, :n, ...]
-    v = v_nl[:, :n, ...]
+        Raises:
+            ValueError: If the reference model is a QGPSIQ model.
+            ValueError: If the model is a QGPSIQ model.
+            ValueError: If model categories don't support synchronization.
+        """
+        category_ref = model_ref.get_category()
+        category = model.get_category()
+        sw = ModelCategory.SHALLOW_WATER
+        qg = ModelCategory.QUASI_GEOSTROPHIC
+        if model_ref.get_type() == ModelName.QUASI_GEOSTROPHIC_USUAL:
+            msg = "Synchronization with QGPSIG is not yet possible."
+            raise ValueError(msg)
+        if model.get_type() == ModelName.QUASI_GEOSTROPHIC_USUAL:
+            msg = "Synchronization with QGPSIG is not yet possible."
+            raise ValueError(msg)
+        if category_ref == sw and category == sw:
+            self._core = SWSWSync(model_ref, model)
+        elif category_ref == qg and category == qg:
+            self._core = QGQGSync(model_ref, model)
+        elif category_ref == qg and category == sw:
+            self._core = QGSWSync(model_ref, model)
+        elif category_ref == sw and category == qg:
+            self._core = SWQGSync(model_ref, model)
+        else:
+            msg = (
+                f"Synchronization is not possible between {category_ref}"
+                f" and {category} categories."
+            )
+            raise ValueError(msg)
 
-    ones_nl = torch.ones((nl, nl), dtype=dtype, device=device)
-    B_nl = ones_nl.tril() * g_prime_nl.unsqueeze(0)  # noqa: N806
-    M_nl = B_nl @ ones_nl.triu()  # noqa: N806
+    def __repr__(self) -> str:
+        """String representation of ModelSync."""
+        return self._core.__repr__()
 
-    ones = torch.ones((n, n), dtype=dtype, device=device)
-    B = ones.tril() * g_prime.unsqueeze(0)  # noqa: N806
-    M = B @ ones.triu()  # noqa: N806
-
-    # Compute pressure: p = (M_nl @ h_nl)[:n]
-    p = torch.einsum("lp,...pxy->...lxy", M_nl, h_nl)[:, :n, ...]
-
-    # Solve h = M⁻¹ @ ( M_nl @ h)[:n]
-    h = torch.einsum(
-        "lp,...pxy->...lxy",
-        torch.linalg.inv(M),
-        p,
-    )
-    return UVH(u, v, h)
+    def __call__(self) -> None:
+        """Perform synchronization."""
+        self._core()
 
 
-def match_pv(uvh_nl: UVH, n: int) -> UVH:
-    """Compute prognostic vars to match potential vorticity between models.
+class BaseModelSync(ABC, Generic[ModelRef, Model]):
+    """BAse class for model synchronizing."""
 
-    The reference potential vorticity is supposed to have nl levels and the
-    output is expected to have n layers (nl >= n).
+    __slots__ = ("_model", "_model_ref", "_nl")
 
-    Ensure that the potential vorticity of both models are the same.
-    q_nl = ∂_x v_nl - ∂_y u_nl - f_0 h_nl / H
-    q    = ∂_x v    - ∂_y u    - f_0 h    / H
-    --> u = u_nl[:n]                (Omitting non-layer dimensions)
-    --> v = v_nl[:n]                (Omitting non-layer dimensions)
-    --> h = h_nl[:n]                (Omitting non-layer dimensions)
+    def __init__(
+        self,
+        model_ref: ModelRef,
+        model: ModelRef,
+    ) -> None:
+        """Instantiate the BaseModelSync.
 
-    Args:
-        uvh_nl (UVH): UVH from the reference model.
-            ├── u: (n_ens, nl, nx+1, ny)-shaped
-            ├── v: (n_ens, nl, nx, ny+1)-shaped
-            └── h: (n_ens, nl, nx, ny)-shaped
-        n (int): Output desired shape.
+        Args:
+            model_ref (ModelRef): Reference model.
+            model (ModelRef): Model.
+        """
+        self._raise_if_incompatible_nl(model_ref, model)
+        self._model_ref = model_ref
+        self._model = model
+        self._nl = self._model.space.nl
 
-    Returns:
-        UVH: Corresponding UVH.
-            ├── u: (n_ens, n, nx+1, ny)-shaped
-            ├── v: (n_ens, n, nx, ny+1)-shaped
-            └── h: (n_ens, n, nx, ny)-shaped
-    """
-    nl = uvh_nl.u.shape[1]
-    if nl < n:
-        msg = f"n should be lower than nl (n: {n} !<= nl: {nl})"
-        raise ValueError(msg)
-    return UVH(
-        uvh_nl.u[:, :n],
-        uvh_nl.v[:, :n],
-        uvh_nl.h[:, :n],
-    )
+    def __repr__(self) -> str:
+        """String representation of model synchronizer."""
+        repr_parts = [
+            "Model synchronizer:",
+            f"\t├── Reference: {self._model_ref.__class__.__name__}",
+            f"\t└── To sync: {self._model.__class__.__name__}",
+        ]
+        return "/n".join(repr_parts)
+
+    def _raise_if_incompatible_nl(
+        self,
+        model_ref: ModelRef,
+        model: Model,
+    ) -> None:
+        nl_ref = model_ref.space.nl
+        nl = model.space.nl
+        if nl_ref >= nl:
+            return
+        msg = (
+            f"Reference model number of layers ({nl_ref}) must be"
+            f" greater than model's number of layers ({nl})"
+        )
+        raise InvalidLayerNumberError(msg)
+
+    @abstractmethod
+    def __call__(self) -> None:
+        """Perform synchronization."""
+        verbose.display("Synchronizing models.", trigger_level=2)
+
+
+class SWSWSync(BaseModelSync[ModelSW, ModelSW]):
+    """Model synchronizer SW->SW."""
+
+    def __call__(self) -> None:
+        """Perform synchronization."""
+        super().__call__()
+        uvh = self._model_ref.prognostic.uvh
+        self._model.set_uvh(uvh.parallel_slice[:, : self._nl])
+
+
+class QGQGSync(BaseModelSync[ModelQG, ModelQG]):
+    """Model synchronizer QG->QG."""
+
+    def __call__(self) -> None:
+        """Perform synchronization."""
+        super().__call__()
+        uvh = self._model_ref.prognostic.uvh
+        p = self._model_ref.P.compute_p(uvh)[0]
+        self._model.set_p(p[:, : self._nl])
+
+
+class SWQGSync(BaseModelSync[ModelSW, ModelQG]):
+    """Model synchronizer SW->QG."""
+
+    def __init__(self, model_ref: ModelSW, model: ModelQG) -> None:
+        """Instantiate the BaseModelSync.
+
+        Args:
+            model_ref (ModelRef): Reference model.
+            model (ModelRef): Model.
+        """
+        super().__init__(model_ref, model)
+        self._set_P()
+
+    def _set_P(self) -> None:  # noqa: N802
+        """Create the projector."""
+        h = self._model_ref.H
+        g_prime = self._model_ref.g_prime
+        self._P = QGProjector(
+            compute_A(h, g_prime, **defaults.get()),
+            h,
+            self._model_ref.space,
+            self._model_ref.beta_plane.f0,
+            self._model_ref.masks,
+        )
+
+    def __call__(self) -> None:
+        """Perform synchronization."""
+        super().__call__()
+        uvh = self._model_ref.prognostic.uvh
+        p_qg = self._P.compute_p(uvh)[0]
+        self._model.set_p(p_qg[:, : self._nl])
+
+
+class QGSWSync(BaseModelSync[ModelQG, ModelSW]):
+    """Model synchronizer QG->SW."""
+
+    def __call__(self) -> None:
+        """Perform synchronization."""
+        super().__call__()
+        nl = self._model.space.nl
+        uvh = self._model_ref.prognostic.uvh
+        self._model.set_uvh(uvh.parallel_slice[:, :nl])
