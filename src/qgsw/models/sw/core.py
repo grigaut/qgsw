@@ -23,10 +23,10 @@ from qgsw.fields.variables.energetics import KineticEnergy
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
     UVHT,
-    BasePrognosticTuple,
+    BasePrognosticUVH,
     UVHTAlpha,
 )
-from qgsw.fields.variables.state import StateUVH, StateUVHAlpha
+from qgsw.fields.variables.state import BaseStateUVH, StateUVH, StateUVHAlpha
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
@@ -65,8 +65,8 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return torch.cat([-torch.diff(x, dim=dim), x.narrow(dim, -1, 1)], dim=dim)
 
 
-T = TypeVar("T", bound=BasePrognosticTuple)
-State = TypeVar("State", bound=StateUVH)
+T = TypeVar("T", bound=BasePrognosticUVH)
+State = TypeVar("State", bound=BaseStateUVH)
 
 
 class SWCore(ModelUVH[T, State], Generic[T, State]):
@@ -205,7 +205,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         dv[..., -1, :, :] += -coef * prognostic.v[..., -1, :, 1:-1]
         return du, dv
 
-    def _create_diagnostic_vars(self, state: StateUVH) -> None:
+    def _create_diagnostic_vars(self, state: State) -> None:
         """Create diagnostic variables and bind them to state.
 
         Args:
