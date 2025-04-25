@@ -168,7 +168,7 @@ class SWQGSync(BaseModelSync[ModelSW, ModelQG]):
         h = self._model_ref.H
         g_prime = self._model_ref.g_prime
         self._P = QGProjector(
-            compute_A(h, g_prime, **defaults.get()),
+            compute_A(h[:, 0, 0], g_prime[:, 0, 0], **defaults.get()),
             h,
             self._model_ref.space,
             self._model_ref.beta_plane.f0,
