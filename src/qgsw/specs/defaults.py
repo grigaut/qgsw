@@ -37,7 +37,7 @@ def get_device(device: torch.device | None = None) -> torch.device:
     return device
 
 
-class DefaultSpecs(TypedDict):
+class TensorSpecs(TypedDict):
     """Defaults specs."""
 
     dtype: torch.dtype
@@ -48,7 +48,7 @@ def get(
     *,
     dtype: torch.dtype | None = None,
     device: torch.device | None = None,
-) -> DefaultSpecs:
+) -> TensorSpecs:
     """Get defaults.
 
     Args:
@@ -56,9 +56,29 @@ def get(
         device (torch.device | None, optional): Device. Defaults to None.
 
     Returns:
-        DefaultSpecs: Default specs.
+        TensorSpecs: Default specs.
     """
-    return DefaultSpecs(
+    return TensorSpecs(
         dtype=get_dtype(dtype),
         device=get_device(device),
+    )
+
+
+def get_save_specs(
+    *,
+    dtype: torch.dtype | None = None,
+    device: torch.device | None = None,
+) -> TensorSpecs:
+    """Get defaults.
+
+    Args:
+        dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+        device (torch.device | None, optional): Device. Defaults to None.
+
+    Returns:
+        TensorSpecs: Default specs.
+    """
+    return TensorSpecs(
+        dtype=dtype or torch.float32,
+        device=device or torch.device("cpu"),
     )

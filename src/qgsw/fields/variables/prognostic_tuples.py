@@ -15,6 +15,7 @@ from qgsw.fields.variables.prognostic import (
     ZonalVelocity,
 )
 from qgsw.specs import defaults
+from qgsw.utils import tensorio
 
 try:
     from typing import Self
@@ -217,13 +218,15 @@ class PSIQ(BasePrognosticPSIQ, _PSIQ):
         Returns:
             Self: PSIQ.
         """
-        dtype = defaults.get_dtype(dtype)
-        device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file)
+        data: dict[str, torch.Tensor] = tensorio.load(
+            file,
+            dtype=dtype,
+            device=device,
+        )
         psi_name = PrognosticStreamFunction.get_name()
-        psi = data[psi_name].to(dtype=dtype, device=device)
+        psi = data[psi_name]
         q_name = PrognosticPotentialVorticity.get_name()
-        q = data[q_name].to(dtype=dtype, device=device)
+        q = data[q_name]
         return cls(psi=psi, q=q)
 
 
@@ -316,10 +319,8 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
         Returns:
             Self: PSIQT.
         """
-        dtype = defaults.get_dtype(dtype)
-        device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file)
-        t = data[Time.get_name()].to(dtype=dtype, device=device)
+        data = tensorio.load(file, dtype=dtype, device=device)
+        t = data[Time.get_name()]
         return cls.from_psiq(
             t,
             PSIQ.from_file(file, dtype=dtype, device=device),
@@ -449,13 +450,8 @@ class PSIQTAlpha(BasePrognosticPSIQ, _PSIQTAlpha):
         Returns:
             Self: PSIQTAlpha.
         """
-        dtype = defaults.get_dtype(dtype)
-        device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file)
-        alpha = data[CollinearityCoefficient.get_name()].to(
-            dtype=dtype,
-            device=device,
-        )
+        data = tensorio.load(file, dtype=dtype, device=device)
+        alpha = data[CollinearityCoefficient.get_name()]
         return cls.from_psiqt(
             alpha,
             PSIQT.from_file(file, dtype=dtype, device=device),
@@ -561,12 +557,10 @@ class UVH(BasePrognosticUVH, _UVH):
         Returns:
             Self: UVH.
         """
-        dtype = defaults.get_dtype(dtype)
-        device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file)
-        u = data[ZonalVelocity.get_name()].to(dtype=dtype, device=device)
-        v = data[MeridionalVelocity.get_name()].to(dtype=dtype, device=device)
-        h = data[LayerDepthAnomaly.get_name()].to(dtype=dtype, device=device)
+        data = tensorio.load(file, dtype=dtype, device=device)
+        u = data[ZonalVelocity.get_name()]
+        v = data[MeridionalVelocity.get_name()]
+        h = data[LayerDepthAnomaly.get_name()]
         return cls(u=u, v=v, h=h)
 
 
@@ -659,10 +653,12 @@ class UVHT(BasePrognosticUVH, _UVHT):
         Returns:
             Self: UVHT.
         """
-        dtype = defaults.get_dtype(dtype)
-        device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file)
-        t = data[Time.get_name()].to(dtype=dtype, device=device)
+        data: dict[str, torch.Tensor] = tensorio.load(
+            file,
+            dtype=dtype,
+            device=device,
+        )
+        t = data[Time.get_name()]
         return cls.from_uvh(t, UVH.from_file(file, dtype=dtype, device=device))
 
 
@@ -782,9 +778,11 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
         Returns:
             Self: UVHTAlpha.
         """
-        dtype = defaults.get_dtype(dtype)
-        device = defaults.get_device(device)
-        data: dict[str, torch.Tensor] = torch.load(file)
+        data: dict[str, torch.Tensor] = tensorio.load(
+            file,
+            dtype=dtype,
+            device=device,
+        )
         alpha = data[CollinearityCoefficient.get_name()].to(
             dtype=dtype,
             device=device,

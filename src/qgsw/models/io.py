@@ -63,7 +63,9 @@ class IO:
             output_file (Path): File to save value in (.pt).
         """
         self._raise_if_invalid_savefile(output_file=output_file)
-        to_save = {var.name: var.get() for var in self._prog}
+        to_save = {
+            var.name: var.get().to(torch.float32).cpu() for var in self._prog
+        }
         torch.save(to_save, f=output_file)
 
         verbose.display(
