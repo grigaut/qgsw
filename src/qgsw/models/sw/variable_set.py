@@ -199,6 +199,7 @@ class SWVariableSet:
         """
         var_dict = {}
         cls.add_prognostics(var_dict)
+        cls.add_physical(var_dict, space)
         cls.add_vorticity(var_dict, space)
         cls.add_streamfunction(var_dict, space)
 

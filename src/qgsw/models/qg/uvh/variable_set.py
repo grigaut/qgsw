@@ -22,6 +22,8 @@ from qgsw.fields.variables.dynamics import (
     PotentialVorticity,
     Psi2,
     QGPressure,
+    RefPhysicalMeridionalVelocity2,
+    RefPhysicalZonalVelocity2,
     StreamFunction,
     StreamFunctionFromVorticity,
     SurfaceHeightAnomaly,
@@ -331,6 +333,40 @@ class QGVariableSet:
 
 class RefQGVariableSet(QGVariableSet):
     """Reference QG Variable set for one-mayer models."""
+
+    @classmethod
+    def add_physical(
+        cls,
+        var_dict: dict[str, DiagnosticVariable],
+        space: SpaceConfig,
+    ) -> None:
+        """Add physical variables.
+
+        Args:
+            var_dict (dict[str, DiagnosticVariable]): Variables dict.
+            space (SpaceConfig): Space configuration. configuration.
+        """
+        var_dict[PhysicalZonalVelocity.get_name()] = PhysicalZonalVelocity(
+            space.dx,
+        )
+        var_dict[PhysicalMeridionalVelocity.get_name()] = (
+            PhysicalMeridionalVelocity(space.dy)
+        )
+        var_dict[PhysicalLayerDepthAnomaly.get_name()] = (
+            PhysicalLayerDepthAnomaly(
+                space.ds,
+            )
+        )
+        var_dict[RefPhysicalZonalVelocity2.get_name()] = (
+            RefPhysicalZonalVelocity2(
+                var_dict[PhysicalZonalVelocity.get_name()],
+            )
+        )
+        var_dict[RefPhysicalMeridionalVelocity2.get_name()] = (
+            RefPhysicalMeridionalVelocity2(
+                var_dict[PhysicalMeridionalVelocity.get_name()],
+            )
+        )
 
     @classmethod
     def add_streamfunction(
