@@ -26,6 +26,7 @@ from qgsw.models.names import ModelName
 from qgsw.models.qg.uvh.modified.utils import is_modified
 from qgsw.run_summary import RunSummary
 from qgsw.specs import DEVICE
+from qgsw.utils import tensorio
 from qgsw.utils.sorting import sort_files
 
 if TYPE_CHECKING:
@@ -86,19 +87,16 @@ class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
         Returns:
             UVh: Data.
         """
-        data: dict[str, torch.Tensor] = torch.load(
+        data: dict[str, torch.Tensor] = tensorio.load(
             self.path,
+            dtype=self.dtype,
+            device=self.device,
         )
         t = data[Time.get_name()]
         u = data[ZonalVelocityDiag.get_name()]
         v = data[MeridionalVelocityDiag.get_name()]
         h = data[LayerDepthAnomalyDiag.get_name()]
-        return UVHT(
-            u.to(dtype=self.dtype, device=self.device),
-            v.to(dtype=self.dtype, device=self.device),
-            h.to(dtype=self.dtype, device=self.device),
-            t.to(dtype=self.dtype, device=self.device),
-        )
+        return UVHT(u, v, h, t)
 
 
 class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
@@ -110,21 +108,17 @@ class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
         Returns:
             UVh: Data.
         """
-        data: dict[str, torch.Tensor] = torch.load(
+        data: dict[str, torch.Tensor] = tensorio.load(
             self.path,
+            dtype=self.dtype,
+            device=self.device,
         )
         t = data[Time.get_name()]
         u = data[ZonalVelocityDiag.get_name()]
         v = data[MeridionalVelocityDiag.get_name()]
         h = data[LayerDepthAnomalyDiag.get_name()]
         alpha = data[CollinearityCoefficient.get_name()]
-        return UVHTAlpha(
-            u.to(dtype=self.dtype, device=self.device),
-            v.to(dtype=self.dtype, device=self.device),
-            h.to(dtype=self.dtype, device=self.device),
-            t.to(dtype=self.dtype, device=self.device),
-            alpha.to(dtype=self.dtype, device=self.device),
-        )
+        return UVHTAlpha(u, v, h, t, alpha)
 
 
 class RunOutput:
