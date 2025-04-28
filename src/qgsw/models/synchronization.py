@@ -11,11 +11,9 @@ from qgsw.fields.variables.prognostic_tuples import BasePrognosticUVH
 from qgsw.fields.variables.state import BaseStateUVH
 from qgsw.models.base import _Model
 from qgsw.models.names import ModelCategory, ModelName
-from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.core import QGCore
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCore
-from qgsw.specs import defaults
 
 ModelRef = TypeVar("ModelRef", bound=_Model)
 Model = TypeVar("Model", bound=_Model)
@@ -161,25 +159,12 @@ class SWQGSync(BaseModelSync[ModelSW, ModelQG]):
             model (ModelRef): Model.
         """
         super().__init__(model_ref, model)
-        self._set_P()
-
-    def _set_P(self) -> None:  # noqa: N802
-        """Create the projector."""
-        h = self._model_ref.H
-        g_prime = self._model_ref.g_prime
-        self._P = QGProjector(
-            compute_A(h[:, 0, 0], g_prime[:, 0, 0], **defaults.get()),
-            h,
-            self._model_ref.space,
-            self._model_ref.beta_plane.f0,
-            self._model_ref.masks,
-        )
 
     def __call__(self) -> None:
         """Perform synchronization."""
         super().__call__()
         uvh = self._model_ref.prognostic.uvh
-        p_qg = self._P.compute_p(uvh)[0]
+        p_qg = self._model_ref.P.compute_p(uvh)[0]
         self._model.set_p(p_qg[:, : self._nl])
 
 

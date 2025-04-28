@@ -134,6 +134,15 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
             optimize=optimize,
         )
 
+    @property
+    def P(self) -> QGProjector:  # noqa: N802
+        """Quasi-Geostrophic projector."""
+        try:
+            return self._P
+        except AttributeError:
+            self._set_projector()
+            return self.P
+
     def _compute_coriolis(self, omega_grid_2d: Grid2D) -> None:
         """Set Coriolis related grids.
 
@@ -227,6 +236,21 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         omega.bind(state)
         p.bind(state)
         k_energy.bind(state)
+
+    def _set_projector(self) -> None:
+        """Set the projector."""
+        self._P = QGProjector(
+            compute_A(
+                self.H[:, 0, 0],
+                self.g_prime[:, 0, 0],
+                dtype=self.dtype,
+                device=self.device.get(),
+            ),
+            self.H,
+            space=self.space,
+            f0=self.beta_plane.f0,
+            masks=self.masks,
+        )
 
     def update(self, prognostic: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
