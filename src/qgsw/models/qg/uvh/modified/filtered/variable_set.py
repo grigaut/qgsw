@@ -7,8 +7,12 @@ from typing import TYPE_CHECKING
 from qgsw.fields.variables.base import DiagnosticVariable
 from qgsw.fields.variables.dynamics import (
     PhysicalLayerDepthAnomaly,
+    PhysicalMeridionalVelocity,
+    PhysicalMeridionalVelocityFromPsi2,
     PhysicalSurfaceHeightAnomaly,
     PhysicalVorticity,
+    PhysicalZonalVelocity,
+    PhysicalZonalVelocityFromPsi2,
     QGPressure,
     StreamFunction,
     StreamFunctionFromVorticity,
@@ -40,6 +44,30 @@ if TYPE_CHECKING:
 
 class QGCollinearFilteredSFVariableSet(QGVariableSet):
     """Variable set for QGCOllinearFilteredSF."""
+
+    @classmethod
+    def add_physical(
+        cls,
+        var_dict: dict[str, DiagnosticVariable],
+        space: SpaceConfig,
+    ) -> None:
+        """Add physical variables.
+
+        Args:
+            var_dict (dict[str, DiagnosticVariable]): Variables dict.
+            space (SpaceConfig): Space configuration. configuration.
+        """
+        var_dict[PhysicalZonalVelocity.get_name()] = PhysicalZonalVelocity(
+            space.dx,
+        )
+        var_dict[PhysicalMeridionalVelocity.get_name()] = (
+            PhysicalMeridionalVelocity(space.dy)
+        )
+        var_dict[PhysicalLayerDepthAnomaly.get_name()] = (
+            PhysicalLayerDepthAnomaly(
+                space.ds,
+            )
+        )
 
     @classmethod
     def add_pressure(
@@ -116,4 +144,16 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
         var_dict[CollinearFilteredPsi2.get_name()] = CollinearFilteredPsi2(
             var_dict[StreamFunctionFromVorticity.get_name()],
             filt=CollinearFilteredQGProjector.create_filter(model.sigma),
+        )
+        var_dict[PhysicalZonalVelocityFromPsi2.get_name()] = (
+            PhysicalZonalVelocityFromPsi2(
+                var_dict[CollinearFilteredPsi2.get_name()],
+                space.dy,
+            )
+        )
+        var_dict[PhysicalMeridionalVelocityFromPsi2.get_name()] = (
+            PhysicalMeridionalVelocityFromPsi2(
+                var_dict[CollinearFilteredPsi2.get_name()],
+                space.dx,
+            )
         )

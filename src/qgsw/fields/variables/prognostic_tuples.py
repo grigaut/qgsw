@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 
+from qgsw.exceptions import ParallelSlicingError
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
@@ -21,7 +22,7 @@ except ImportError:
     from typing_extensions import Self
 
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 import torch
 
@@ -47,6 +48,55 @@ class BasePrognosticTuple:
     def __sub__(self, other: Self) -> Self:
         """Substraction."""
         return self.__add__(-1 * other)
+
+
+P = TypeVar("P", bound=BasePrognosticTuple)
+
+
+class ParallelSlice(Generic[P]):
+    """Parallele slicing for prognostic tuples."""
+
+    def __init__(self, prognostic: P, slice_depth: int | None = None) -> None:
+        """Instantiate the parallel slice.
+
+        Args:
+            prognostic (P): Prognostic tuple.
+            slice_depth (int | None, optional): Slice depth. Defaults to None.
+        """
+        self._prognostic = prognostic
+        self._slice_depth = slice_depth
+
+    def _raise_if_invalid_depth(self, key: tuple[int | slice, ...]) -> None:
+        """Raise an error if the key depth is greater than self._slice_depth.
+
+        Args:
+            key (tuple[int  |  slice, ...]): Slicing tuple.
+
+        Raises:
+            ParallelSlicingError: If the key depth is greater than
+            self._slice_depth
+        """
+        if self._slice_depth is None:
+            return
+        if len(key) <= self._slice_depth:
+            return
+        msg = (
+            f"Slicing can only be done on the first {self._slice_depth}"
+            " dimension(s)."
+        )
+        raise ParallelSlicingError(msg)
+
+    def __getitem__(self, key: int | slice | tuple[int | slice, ...]) -> P:
+        """__getitem__ magic method for parallel slicing.
+
+        Args:
+            key (int | slice | tuple[int  |  slice, ...]): Key.
+
+        Returns:
+            P: Sliced prognostic tuple.
+        """
+        self._raise_if_invalid_depth(key)
+        return self._prognostic.__class__(*[v[key] for v in self._prognostic])
 
 
 class BasePrognosticPSIQ(BasePrognosticTuple, metaclass=ABCMeta):
@@ -105,6 +155,11 @@ class PSIQ(BasePrognosticPSIQ, _PSIQ):
     def psiq(self) -> PSIQ:
         """PSIQ."""
         return self
+
+    @property
+    def parallel_slice(self) -> ParallelSlice[PSIQ]:
+        """Parallel slicing object."""
+        return ParallelSlice(self, slice_depth=2)
 
     @classmethod
     def steady(
@@ -441,6 +496,11 @@ class UVH(BasePrognosticUVH, _UVH):
     def uvh(self) -> UVH:
         """UVH."""
         return self
+
+    @property
+    def parallel_slice(self) -> ParallelSlice[UVH]:
+        """Parallel slicing object."""
+        return ParallelSlice(self, slice_depth=2)
 
     @classmethod
     def steady(

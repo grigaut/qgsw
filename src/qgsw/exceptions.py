@@ -59,3 +59,7 @@ class InappropriateShapeError(Exception):
 
 class UnmatchingShapesError(Exception):
     """When a tensor has an inappropriate shape."""
+
+
+class ParallelSlicingError(Exception):
+    """When parallel slicing arguments are invalid."""

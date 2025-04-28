@@ -23,10 +23,10 @@ from qgsw.fields.variables.energetics import KineticEnergy
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
     UVHT,
-    BasePrognosticTuple,
+    BasePrognosticUVH,
     UVHTAlpha,
 )
-from qgsw.fields.variables.state import StateUVH, StateUVHAlpha
+from qgsw.fields.variables.state import BaseStateUVH, StateUVH, StateUVHAlpha
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
@@ -34,7 +34,7 @@ from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
-from qgsw.models.qg.uvh.variable_set import QGVariableSet
+from qgsw.models.sw.variable_set import SWVariableSet
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -65,8 +65,8 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return torch.cat([-torch.diff(x, dim=dim), x.narrow(dim, -1, 1)], dim=dim)
 
 
-T = TypeVar("T", bound=BasePrognosticTuple)
-State = TypeVar("State", bound=StateUVH)
+T = TypeVar("T", bound=BasePrognosticUVH)
+State = TypeVar("State", bound=BaseStateUVH)
 
 
 class SWCore(ModelUVH[T, State], Generic[T, State]):
@@ -133,6 +133,15 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
             beta_plane=beta_plane,
             optimize=optimize,
         )
+
+    @property
+    def P(self) -> QGProjector:  # noqa: N802
+        """Quasi-Geostrophic projector."""
+        try:
+            return self._P
+        except AttributeError:
+            self._set_projector()
+            return self.P
 
     def _compute_coriolis(self, omega_grid_2d: Grid2D) -> None:
         """Set Coriolis related grids.
@@ -205,7 +214,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         dv[..., -1, :, :] += -coef * prognostic.v[..., -1, :, 1:-1]
         return du, dv
 
-    def _create_diagnostic_vars(self, state: StateUVH) -> None:
+    def _create_diagnostic_vars(self, state: State) -> None:
         """Create diagnostic variables and bind them to state.
 
         Args:
@@ -227,6 +236,21 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         omega.bind(state)
         p.bind(state)
         k_energy.bind(state)
+
+    def _set_projector(self) -> None:
+        """Set the projector."""
+        self._P = QGProjector(
+            compute_A(
+                self.H[:, 0, 0],
+                self.g_prime[:, 0, 0],
+                dtype=self.dtype,
+                device=self.device.get(),
+            ),
+            self.H,
+            space=self.space,
+            f0=self.beta_plane.f0,
+            masks=self.masks,
+        )
 
     def update(self, prognostic: UVH) -> UVH:
         """Performs one step time-integration with RK3-SSP scheme.
@@ -395,7 +419,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         Returns:
             dict[str, DiagnosticVariable]: Variables dictionnary.
         """
-        return QGVariableSet.get_variable_set(space, physics, model)
+        return SWVariableSet.get_variable_set(space, physics, model)
 
 
 class SW(SWCore[UVHT, StateUVH]):

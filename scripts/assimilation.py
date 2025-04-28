@@ -15,6 +15,7 @@ from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
 from qgsw.models.names import ModelName
 from qgsw.models.qg.uvh.modified.utils import is_modified
+from qgsw.models.synchronization import ModelSync
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
@@ -95,6 +96,7 @@ else:
     model.dt = config.simulation.dt
 model.set_wind_forcing(taux, tauy)
 
+model_sync = ModelSync(model_ref, model)
 
 verbose.display("\n[Reference Model]", trigger_level=1)
 verbose.display(msg=model_ref.__repr__(), trigger_level=1)
@@ -141,6 +143,7 @@ dt = model.dt
 t_end = config.simulation.duration
 
 steps = Steps(t_end=t_end, dt=dt)
+verbose.display(steps.__repr__(), trigger_level=1)
 
 ns = steps.simulation_steps()
 forks = steps.steps_from_interval(interval=config.simulation.fork_interval)
@@ -177,7 +180,6 @@ with Progress() as progress:
         if fork:
             prognostic = model_ref.prognostic
             if modified and config.model.collinearity_coef.use_optimal:
-                # WARNING: this does not work for SW models
                 pressure = model_ref.P.compute_p(prognostic.uvh)[1]
                 if model.get_type() == ModelName.QG_FILTERED:
                     p = model.P.filter(pressure[0, 0])
@@ -185,9 +187,7 @@ with Progress() as progress:
                     p = pressure[0, 0]
                 coef.with_optimal_values(p, pressure[0, 1])
                 model.alpha = coef.get()
-            model.set_p(
-                model_ref.P.compute_p(prognostic)[0][:, :nl],
-            )
+            model_sync()
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
                 trigger_level=1,

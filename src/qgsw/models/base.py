@@ -26,7 +26,7 @@ from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.io import IO
-from qgsw.models.names import ModelName
+from qgsw.models.names import ModelCategory, ModelName, get_category
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core import grid_conversion as convert
@@ -251,6 +251,15 @@ class _Model(
         Returns:
             dict[str, DiagnosticVariable]: Variables dictionnary.
         """
+
+    @classmethod
+    def get_category(cls) -> ModelCategory:
+        """Get the model category.
+
+        Returns:
+            ModelCategory: Model category.
+        """
+        return get_category(cls.get_type())
 
 
 State_uvh = TypeVar("State_uvh", bound=BaseStateUVH)
