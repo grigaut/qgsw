@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import overload
+from typing import TYPE_CHECKING, overload
 
 import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.fields.variables.prognostic_tuples import UVH, UVHT, UVHTAlpha
-from qgsw.specs import defaults
+
+if TYPE_CHECKING:
+    from qgsw.masks import Masks
 
 
 class Upscaler:
@@ -18,7 +20,7 @@ class Upscaler:
     _mode = "bicubic"
     _align_corners = False
 
-    def _upscale_uvh(self, uvh: UVH, delta: int) -> UVH:
+    def _upscale_uvh(self, uvh: UVH, delta: int, masks: Masks) -> UVH:
         """Upscale uvh data.
 
         Args:
@@ -29,6 +31,7 @@ class Upscaler:
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             delta (int): Upscaling factor.
+            masks: Masks: Masks for u, v and h.
 
         Returns:
             UVH: (t, α,) u,v and h.
@@ -38,18 +41,38 @@ class Upscaler:
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        _, _, h = uvh
-        h_up: torch.Tensor = F.interpolate(
-            h,
-            scale_factor=delta,
-            mode=self._mode,
-            align_corners=self._align_corners,
+        u, v, h = uvh
+        _, nl, nx, ny = h.shape
+        u_up: torch.Tensor = (
+            F.interpolate(
+                u,
+                size=(delta * nx + 1, delta * ny),
+                mode=self._mode,
+                align_corners=self._align_corners,
+            )
+            * masks.u
         )
-        n_ens, nl, nx, ny = h_up.shape
-        uvh_up = UVH.steady(n_ens, nl, nx, ny, **defaults.get())
+        v_up: torch.Tensor = (
+            F.interpolate(
+                v,
+                size=(delta * nx, delta * ny + 1),
+                mode=self._mode,
+                align_corners=self._align_corners,
+            )
+            * masks.v
+        )
+        h_up: torch.Tensor = (
+            F.interpolate(
+                h,
+                size=(delta * nx, delta * ny),
+                mode=self._mode,
+                align_corners=self._align_corners,
+            )
+            * masks.h
+        )
         return UVH(
-            u=uvh_up.u,
-            v=uvh_up.v,
+            u=u_up,
+            v=v_up,
             h=h_up,
         )
 
@@ -57,6 +80,7 @@ class Upscaler:
         self,
         uvht: UVHT,
         delta: int,
+        masks: Masks,
     ) -> UVHT:
         """Upscale uvht data.
 
@@ -67,6 +91,7 @@ class Upscaler:
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             delta (int): Upscaling factor.
+            masks: Masks: Masks for u, v and h.
 
         Returns:
             UVHTAlpha: t, α, u,v and h.
@@ -77,13 +102,14 @@ class Upscaler:
         """
         return UVHT.from_uvh(
             uvht.t,
-            self._upscale_uvh(uvht.uvh, delta),
+            self._upscale_uvh(uvht.uvh, delta, masks),
         )
 
     def _upscale_uvht_alpha(
         self,
         uvht_alpha: UVHTAlpha,
         delta: int,
+        masks: Masks,
     ) -> UVHTAlpha:
         """Upscale uvht_alpha data.
 
@@ -95,6 +121,7 @@ class Upscaler:
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             delta (int): Upscaling factor.
+            masks: Masks: Masks for u, v and h.
 
         Returns:
             UVHTAlpha: t, α, u,v and h.
@@ -114,20 +141,26 @@ class Upscaler:
         return UVHTAlpha.from_uvh(
             uvht_alpha.t,
             alpha_up,
-            self._upscale_uvh(uvht_alpha.uvh, delta),
+            self._upscale_uvh(uvht_alpha.uvh, delta, masks),
         )
 
     @overload
-    def __call__(self, prognostic: UVH, delta: int) -> UVH: ...
+    def __call__(self, prognostic: UVH, delta: int, masks: Masks) -> UVH: ...
     @overload
-    def __call__(self, prognostic: UVHT, delta: int) -> UVHT: ...
+    def __call__(self, prognostic: UVHT, delta: int, masks: Masks) -> UVHT: ...
     @overload
-    def __call__(self, prognostic: UVHTAlpha, delta: int) -> UVHTAlpha: ...
+    def __call__(
+        self,
+        prognostic: UVHTAlpha,
+        delta: int,
+        masks: Masks,
+    ) -> UVHTAlpha: ...
 
     def __call__(
         self,
         prognostic: UVH | UVHT | UVHTAlpha,
         delta: int,
+        masks: Masks,
     ) -> UVH | UVHT | UVHTAlpha:
         """Upscale prognostic data.
 
@@ -139,6 +172,7 @@ class Upscaler:
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             delta (int): Upscaling factor.
+            masks: Masks: Masks for u, v and h.
 
         Returns:
             UVH | UVHT | UVHTAlpha: (t, α,) u,v and h.
@@ -149,10 +183,10 @@ class Upscaler:
                 └── h: (n_ens, nl, δ*nx, δ*ny)-shaped
         """
         if isinstance(prognostic, UVH):
-            return self._upscale_uvh(prognostic, delta)
+            return self._upscale_uvh(prognostic, delta, masks)
         if isinstance(prognostic, UVHT):
-            return self._upscale_uvht(prognostic, delta)
+            return self._upscale_uvht(prognostic, delta, masks)
         if isinstance(prognostic, UVHTAlpha):
-            return self._upscale_uvht_alpha(prognostic, delta)
+            return self._upscale_uvht_alpha(prognostic, delta, masks)
         msg = "Unsupported prognostic type."
         raise TypeError(msg)
