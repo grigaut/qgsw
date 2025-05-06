@@ -363,6 +363,15 @@ class ModelUVH(
         """
         return self._state.h.get()
 
+    @property
+    def courant_number(self) -> float:
+        """Courant number: v*dt/dx."""
+        return (
+            torch.sqrt(torch.sum(self.H) * self.g_prime[0])
+            * self.dt
+            / torch.min(self.space.dx, self.space.dy)
+        )
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StateUVH.steady(
