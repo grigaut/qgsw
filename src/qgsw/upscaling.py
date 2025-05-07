@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from qgsw.masks import Masks
 
 
-class Upscaler:
+class UpscalerLegacy:
     """Data upscaling class."""
 
     __slots__ = ()
