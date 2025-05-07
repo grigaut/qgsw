@@ -75,7 +75,7 @@ class BaseSWFilterBarotropic(ABC, SW):
         self,
         dt_uvh: UVH,
     ) -> UVH:
-        """Filter barotropic waves.
+        """Filter barotropic waves by computing damping term.
 
         Args:
             dt_uvh (torch.Tensor): Derivative of prognostic variables
@@ -179,7 +179,7 @@ class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
                 + torch.diff(v_bar_star, dim=-1) / self.space.dy
             )
         )
-        w_surf_imp = self.helm_solver.solve(rhs)
+        w_surf_imp = self.helm_solver.solve(rhs)  # ∂_t η
         filt_u = (
             F.pad(
                 -self.g * self.tau * torch.diff(w_surf_imp, dim=-2),

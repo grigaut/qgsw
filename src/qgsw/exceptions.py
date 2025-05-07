@@ -63,3 +63,7 @@ class UnmatchingShapesError(Exception):
 
 class ParallelSlicingError(Exception):
     """When parallel slicing arguments are invalid."""
+
+
+class UnspecifiedConditionCategoryError(Exception):
+    """When condition category is not specified."""

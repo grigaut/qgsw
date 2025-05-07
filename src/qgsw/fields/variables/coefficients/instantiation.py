@@ -40,6 +40,8 @@ def instantiate_coef(
     model_config: ModelConfig[NonUniformCoefConfig],
     space_config: SpaceConfig,
 ) -> NonUniformCoefficient: ...
+
+
 @overload
 def instantiate_coef(
     model_config: ModelConfig[SmoothNonUniformCoefConfig],

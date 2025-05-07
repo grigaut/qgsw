@@ -520,6 +520,23 @@ class SpaceDiscretization2D:
             v_grid=v_3d,
         )
 
+    def to_shape(self, nx: int, ny: int) -> SpaceDiscretization2D:
+        """Recreate a new Space discretization 2D.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            SpaceDiscretization2D: 2D space discretization with new shape.
+        """
+        return SpaceDiscretization2D(
+            omega_grid=self.omega.to_shape(nx + 1, ny + 1),
+            h_grid=self.h.to_shape(nx, ny),
+            u_grid=self.u.to_shape(nx + 1, ny),
+            v_grid=self.v.to_shape(nx, ny + 1),
+        )
+
     @classmethod
     def from_config(cls, grid_config: SpaceConfig) -> Self:
         """Construct the SpaceDiscretization2D given a SpaceConfig object.
@@ -1047,6 +1064,24 @@ class SpaceDiscretization3D:
             h_grid=self._h.remove_z_h(),
             u_grid=self._u.remove_z_h(),
             v_grid=self._v.remove_z_h(),
+        )
+
+    def to_shape(self, nx: int, ny: int, nl: int) -> SpaceDiscretization3D:
+        """Recreate a new Space discretization 3D.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+            nl (int): New nl.
+
+        Returns:
+            SpaceDiscretization3D: 3D space discretization with new shape.
+        """
+        return SpaceDiscretization3D(
+            omega_grid=self.omega.to_shape(nx + 1, ny + 1, nl),
+            h_grid=self.h.to_shape(nx, ny, nl),
+            u_grid=self.u.to_shape(nx + 1, ny, nl),
+            v_grid=self.v.to_shape(nx, ny + 1, nl),
         )
 
     @classmethod

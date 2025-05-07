@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
+
 import torch
 
 from qgsw.exceptions import UnsetAError
@@ -60,6 +65,11 @@ class QGProjector:
         ](points_to_surfaces)
 
         self.A = A
+
+    @property
+    def space(self) -> SpaceDiscretization3D:
+        """Space discretization."""
+        return self._space
 
     @property
     def A(self) -> torch.Tensor:  # noqa: N802
@@ -374,3 +384,21 @@ class QGProjector:
             tuple[torch.Tensor, torch.Tensor]: Pressure, Pressure interpolated.
         """
         return self.QoG_inv(self._Q(uvh))
+
+    def to_shape(self, nx: int, ny: int) -> Self:
+        """Recreate a QGProjector with another shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            Self: QGProjector.
+        """
+        return QGProjector(
+            A=self.A,
+            H=self.H,
+            space=self.space.to_shape(nx, ny, self.space.nl),
+            f0=self._f0,
+            masks=self.masks,
+        )
