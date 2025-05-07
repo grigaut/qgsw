@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
+    from qgsw.models.qg.uvh.projectors.core import QGProjector
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
@@ -362,6 +363,11 @@ class ModelUVH(
         └── (n_ens, nl, nx,ny)-shaped.
         """
         return self._state.h.get()
+
+    @property
+    @abstractmethod
+    def P(self) -> QGProjector:  # noqa: N802
+        """QG Projector."""
 
     @property
     def courant_number(self) -> float:
