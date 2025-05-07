@@ -12,7 +12,13 @@ from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.models.synchronization.rescaling import interpolate_physical_variable
 from qgsw.utils.shape_checks import with_shapes
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -317,3 +323,25 @@ class CollinearQGProjector(QGProjector):
 
         p_qg_i = self._points_to_surface(pi1)
         return pi1, p_qg_i
+
+    def to_shape(self, nx: int, ny: int) -> Self:
+        """Recreate a QGProjector with another shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            Self: QGProjector.
+        """
+        proj = CollinearQGProjector(
+            A=self.A,
+            H=self.H,
+            g_prime=self._g_prime,
+            space=self.space.to_shape(nx, ny, self.space.nl),
+            f0=self._f0,
+            masks=self.masks,
+        )
+        alpha = self.alpha
+        proj.alpha = interpolate_physical_variable(alpha, (nx, ny))
+        return proj

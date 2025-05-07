@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
+
 import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING
@@ -15,6 +20,7 @@ from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
 from qgsw.models.qg.uvh.projectors.collinear import CollinearQGProjector
+from qgsw.models.synchronization.rescaling import interpolate_physical_variable
 from qgsw.specs import defaults
 from qgsw.utils.shape_checks import with_shapes
 
@@ -311,6 +317,29 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
 
         p_qg_i = self._points_to_surface(pi1)
         return pi1, p_qg_i
+
+    def to_shape(self, nx: int, ny: int) -> Self:
+        """Recreate a QGProjector with another shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            Self: QGProjector.
+        """
+        proj = CollinearFilteredQGProjector(
+            A=self.A,
+            H=self.H,
+            g_prime=self._g_prime,
+            space=self.space.to_shape(nx, ny, self.space.nl),
+            f0=self._f0,
+            masks=self.masks,
+        )
+        alpha = self.alpha
+        proj.alpha = interpolate_physical_variable(alpha, (nx, ny))
+        proj.filter = self.filter
+        return proj
 
     @classmethod
     def create_filter(
