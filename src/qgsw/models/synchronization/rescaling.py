@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, overload
 import torch
 import torch.nn.functional as F  # noqa: N812
 
+from qgsw import verbose
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
     UVHT,
@@ -201,6 +202,14 @@ class Rescaler:
         u, v, h = self._to_physical(uvh, dx_in, dy_in)
         _, _, nx_in, ny_in = h.shape
         self._raise_if_incompatible_shapes(nxin=nx_in, nyin=ny_in)
+
+        verbose.display(
+            msg=(
+                f"Rescaling from nx={nx_in}, ny={ny_in} to "
+                f"nx={self._nx}, ny={self._ny}."
+            ),
+            trigger_level=2,
+        )
 
         # INTERPOLATION ------------------------------------------------------
         ## Physical zonal velocity

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from qgsw import verbose
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
 )
@@ -23,7 +24,11 @@ if TYPE_CHECKING:
 
 
 class InitialCondition:
-    """Initial condition."""
+    """Initial condition.
+
+    Perform rescaling using Rescaling if input data shape does not match output
+    model shapes.
+    """
 
     __slots__ = ("_input_cat", "_model", "_nl", "_rescaler")
 
@@ -116,6 +121,18 @@ class InitialCondition:
         dx: float,
         dy: float,
     ) -> tuple[UVH, QGProjector]:
+        """Rescale UVH.
+
+        Args:
+            uvh (UVH): Input UVH.
+            P (QGProjector): Projects (if output is QG).
+            dx (float): Infinitesimal distance in the X direction.
+            dy (float): Infinitesimal distance in the Y direction.
+
+        Returns:
+            tuple[UVH, QGProjector]: Interpolated UVH, QG projector whose
+                shapes matches new UVH shape
+        """
         _, _, nx, ny = uvh.h.shape
         nx_model, ny_model = self._model.space.nx, self._model.space.ny
         require_scaling = nx != nx_model or ny != ny_model
@@ -188,12 +205,22 @@ class InitialCondition:
             dx (float): Input infinitesimal distance in the X direction.
             dy (float): Input infinitesimal distance in the Y direction.
         """
+        verbose.display(
+            msg=f"Setting initial condition for '{self._model.name}' model.",
+            trigger_level=2,
+        )
         uvh_i, proj_i = self._rescale(uvh, P, dx, dy)
         if self._model.get_category() == ModelCategory.QUASI_GEOSTROPHIC:
+            # SW -> QG
             p_qg = proj_i.compute_p(uvh_i)[0]
             self._model.set_p(p_qg[:, : self._nl])
-            return
-        self._model.set_uvh(*uvh_i.parallel_slice[:, : self._nl])
+        else:
+            # SW -> SW
+            self._model.set_uvh(*uvh_i.parallel_slice[:, : self._nl])
+        verbose.display(
+            msg="Initial condition set.",
+            trigger_level=2,
+        )
 
     def set_initial_condition_from_qg(
         self,
@@ -213,15 +240,25 @@ class InitialCondition:
             dx (float): Input infinitesimal distance in the X direction.
             dy (float): Input infinitesimal distance in the Y direction.
         """
+        verbose.display(
+            msg=f"Setting initial condition for '{self._model.name}' model.",
+            trigger_level=2,
+        )
         uvh_i, proj_i = self._rescale(uvh, P, dx, dy)
         if self._model.get_category() == ModelCategory.SHALLOW_WATER:
+            # QG -> SW
             self._model.set_uvh(*uvh_i.parallel_slice[:, : self._nl])
-            return
-        if self._model.space.nl == uvh_i.h.shape[-3]:
+        elif self._model.space.nl == uvh_i.h.shape[-3]:
+            # QG -> QG with same number of layers
             self._model.set_uvh(*uvh_i)
-            return
-        p_qg = proj_i.compute_p(uvh_i)[0]
-        self._model.set_p(p_qg[:, : self._nl])
+        else:
+            # QG -> QG
+            p_qg = proj_i.compute_p(uvh_i)[0]
+            self._model.set_p(p_qg[:, : self._nl])
+        verbose.display(
+            msg="Initial condition set.",
+            trigger_level=2,
+        )
 
     def set_initial_condition_from_file(
         self,
@@ -276,6 +313,13 @@ class InitialCondition:
             dtype (torch.dtype | None, optional): Dtype. Defaults to None.
             device (torch.device | None, optional): Device. Defaults to None.
         """
+        verbose.display(
+            msg=(
+                f"Setting steady initial condition for '{self._model.name}' "
+                "model."
+            ),
+            trigger_level=2,
+        )
         specs = defaults.get(dtype=dtype, device=device)
         n_ens = 1
         nl = self._model.space.nl
@@ -289,3 +333,7 @@ class InitialCondition:
             **specs,
         )
         self._model.set_uvh(*uvh)
+        verbose.display(
+            msg="Initial condition set.",
+            trigger_level=2,
+        )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from qgsw import verbose
 from qgsw.models.synchronization.initial_conditions import InitialCondition
 
 if TYPE_CHECKING:
@@ -20,7 +21,11 @@ if TYPE_CHECKING:
 
 
 class Synchronizer:
-    """Model synchronizer."""
+    """Model synchronizer.
+
+    Synchronizes model by using the 'input' model as initial condition
+    for the 'output' model.
+    """
 
     __slots__ = (
         "_m_in",
@@ -50,12 +55,23 @@ class Synchronizer:
 
     def __call__(self) -> None:
         """Rescale if necessary and Synchronize models."""
+        verbose.display(
+            msg="Synchronizing model states...",
+            trigger_level=1,
+        )
         self._syncout.set_initial_condition(
             self._m_in.prognostic.uvh,
             self._m_in.P,
             self._m_in.space.dx,
             self._m_in.space.dy,
             self._m_in.get_category(),
+        )
+        verbose.display(
+            msg=(
+                f"'{self._m_out.name}' model state now "
+                f"matches '{self._m_in.name}' state."
+            ),
+            trigger_level=1,
         )
 
     def sync_to_uvh(
@@ -67,7 +83,7 @@ class Synchronizer:
         dy: float,
         initial_condition_cat: str | ModelCategory,
     ) -> None:
-        """Syncrhonize both models to a given uvh.
+        """Synchronize both models to a given uvh.
 
         Args:
             uvh (UVH): uvh to use as reference: u,v and h.
