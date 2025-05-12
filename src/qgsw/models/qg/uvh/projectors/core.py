@@ -13,6 +13,7 @@ import torch
 
 from qgsw.exceptions import UnsetAError
 from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.masks import Masks
 from qgsw.models.core.helmholtz import (
     compute_capacitance_matrices,
     compute_laplace_dstI,
@@ -21,16 +22,19 @@ from qgsw.models.core.helmholtz import (
 )
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.qg.stretching_matrix import (
+    compute_A,
     compute_layers_to_mode_decomposition,
 )
+from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.specs import DEVICE
+from qgsw.specs import DEVICE, defaults
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qgsw.masks import Masks
-    from qgsw.spatial.core.discretization import SpaceDiscretization3D
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
 
 
 class QGProjector:
@@ -401,4 +405,39 @@ class QGProjector:
             space=self.space.to_shape(nx, ny, self.space.nl),
             f0=self._f0,
             masks=self.masks,
+        )
+
+    @classmethod
+    def from_config(
+        cls,
+        space_config: SpaceConfig,
+        model_config: ModelConfig,
+        physics_config: PhysicsConfig,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> Self:
+        """Builds Projector frm configuration.
+
+        Args:
+            space_config (SpaceConfig): Space configuration.
+            model_config (ModelConfig): Model configuration.
+            physics_config (PhysicsConfig): _description_
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+
+        Returns:
+            Self: QGProjector.
+        """
+        specs = defaults.get(dtype=dtype, device=device)
+        return cls(
+            compute_A(model_config.h, model_config.g_prime, **specs),
+            model_config.h.unsqueeze(-1).unsqueeze(-1),
+            SpaceDiscretization3D.from_config(space_config, model_config),
+            physics_config.f0,
+            masks=Masks.empty(
+                space_config.nx,
+                space_config.ny,
+                device=specs["device"],
+            ),
         )
