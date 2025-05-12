@@ -116,6 +116,15 @@ class _Model(
         )
         self._compute_coriolis(self._space.omega.remove_z_h())
 
+    @property
+    def courant_number(self) -> float:
+        """Courant number: v*dt/dx."""
+        return (
+            torch.sqrt(torch.sum(self.H) * self.g_prime[0])
+            * self.dt
+            / torch.min(self.space.dx, self.space.dy)
+        ).item()
+
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
 
@@ -126,6 +135,7 @@ class _Model(
             f"Model: {self.__class__}",
             f"├── Data type: {self.dtype}",
             f"├── Device: {self.device}",
+            f"├── Courant number: {self.courant_number}",
             (
                 f"├── Beta plane: f0 = {self.beta_plane.f0} "
                 f"- β = {self.beta_plane.beta}"
@@ -400,15 +410,6 @@ class ModelUVH(
     @abstractmethod
     def P(self) -> QGProjector:  # noqa: N802
         """QG Projector."""
-
-    @property
-    def courant_number(self) -> float:
-        """Courant number: v*dt/dx."""
-        return (
-            torch.sqrt(torch.sum(self.H) * self.g_prime[0])
-            * self.dt
-            / torch.min(self.space.dx, self.space.dy)
-        )
 
     def _set_state(self) -> None:
         """Set the state."""

@@ -171,6 +171,7 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
             f"Model: {self.__class__}",
             f"├── Data type: {self.dtype}",
             f"├── Device: {self.device}",
+            f"├── Courant number: {self.courant_number}",
             (
                 f"├── Beta plane: f0 = {self.beta_plane.f0} "
                 f"- β = {self.beta_plane.beta}"
