@@ -1,25 +1,33 @@
 """Initial conditions."""
 
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
-from qgsw.exceptions import UnspecifiedConditionCategoryError
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
 )
-from qgsw.models.base import ModelUVH
-from qgsw.models.names import ModelCategory
+from qgsw.models.names import ModelCategory, get_category
 from qgsw.models.qg.uvh.projectors.core import QGProjector
-from qgsw.spatial.core.discretization import SpaceDiscretization3D
+from qgsw.models.synchronization.rescaling import Rescaler
+from qgsw.specs import defaults
+
+if TYPE_CHECKING:
+    import torch
+
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.models.base import ModelUVH
 
 
 class InitialCondition:
     """Initial condition."""
 
-    __slots__ = ("_P", "_input_cat", "_model", "_nl")
+    __slots__ = ("_input_cat", "_model", "_nl", "_rescaler")
 
-    def __init__(self, qg_proj_in: QGProjector, model_out: ModelUVH) -> None:
+    def __init__(self, model_out: ModelUVH) -> None:
         """Instantiate the initial condition.
 
         Args:
@@ -28,29 +36,115 @@ class InitialCondition:
                 which computed uvh.
             model_out (ModelUVH): Model to set the initial condition for.
         """
-        self._raise_if_incompatible_spaces(qg_proj_in.space, model_out.space)
-        self._P = qg_proj_in
         self._model = model_out
+        self._rescaler = Rescaler.for_model(self._model)
         self._nl = model_out.space.nl
 
-    @property
-    def input_condition_category(self) -> ModelCategory:
-        """Input condition model category."""
-        try:
-            return self._input_cat
-        except AttributeError as e:
-            msg = "Input condition category not set."
-            raise UnspecifiedConditionCategoryError(msg) from e
+    def _raise_if_incompatible_shapes(
+        self,
+        *,
+        nxin: int,
+        nyin: int,
+        nxout: int,
+        nyout: int,
+    ) -> None:
+        """Raise an error if the model have incompatible shapes.
 
-    @input_condition_category.setter
-    def input_condition_category(self, category: ModelCategory) -> None:
-        try:
-            self._input_cat = ModelCategory(category)
-        except ValueError as e:
-            msg = f"Unrecognized model category: {category}."
-            raise ValueError(msg) from e
+        Args:
+            nxin (int): Input nx.
+            nyin (int): Input ny.
+            nxout (int): Output nx.
+            nyout (int): Output ny.
 
-    def set_initial_condition(self, uvh: UVH) -> None:
+        Raises:
+            ValueError: If nxout (or, resp. nxin) does not divide nxin
+                (or, resp. nxout).
+            ValueError: If nyout (or, resp. nyin) does not divide nyin
+                (or, resp. nyout).
+            ValueError: If nxout / nxin != nyout / nyin
+        """
+        if (nxin % nxout != 0) and (nxout % nxin != 0):
+            msg = (
+                "nxin (or, resp. nxout) must divisable"
+                " by nxout (or, resp. nxin)."
+            )
+            raise ValueError(msg)
+        if (nyin % nyout != 0) and (nyout % nyin != 0):
+            msg = (
+                "nyin (or, resp. nyout) must divisable"
+                " by nyout (or, resp. nyin)."
+            )
+            raise ValueError(msg)
+        if nxout / nxin != nyout / nyin:
+            msg = (
+                "There should be the same ratio between"
+                " nxout / nxin and nyout / nyin"
+            )
+            raise ValueError(msg)
+
+    def _raise_if_different_steps(
+        self,
+        *,
+        dxin: int,
+        dyin: int,
+        dxout: int,
+        dyout: int,
+    ) -> None:
+        """Raise an error if the model have incompatible shapes.
+
+        Args:
+            dxin (int): Input dx.
+            dyin (int): Input dy.
+            dxout (int): Output dx.
+            dyout (int): Output dy.
+
+        Raises:
+            ValueError: If dxout does equal dxin.
+            ValueError: If dyout does equal dyin.
+        """
+        if dxin != dxout:
+            msg = "dxin must equal dxout for same-sized uvh/models."
+            raise ValueError(msg)
+        if dyin != dyout:
+            msg = "dyin must equal dyout for same-sized uvh/models."
+            raise ValueError(msg)
+
+    def _rescale(
+        self,
+        uvh: UVH,
+        P: QGProjector,  # noqa: N803
+        dx: float,
+        dy: float,
+    ) -> tuple[UVH, QGProjector]:
+        _, _, nx, ny = uvh.h.shape
+        nx_model, ny_model = self._model.space.nx, self._model.space.ny
+        require_scaling = nx != nx_model or ny != ny_model
+        if not require_scaling:
+            self._raise_if_different_steps(
+                dxin=dx,
+                dyin=dy,
+                dxout=self._model.space.dx,
+                dyout=self._model.space.dy,
+            )
+            return uvh, P
+        self._raise_if_incompatible_shapes(
+            nxin=nx,
+            nyin=ny,
+            nxout=nx_model,
+            nyout=ny_model,
+        )
+        uvh_i = self._rescaler(uvh, dx, dy)
+        qg_proj_in = P.to_shape(nx_model, ny_model)
+        return uvh_i, qg_proj_in
+
+    def set_initial_condition(
+        self,
+        uvh: UVH,
+        P: QGProjector,  # noqa: N803
+        dx: float,
+        dy: float,
+        input_category: str | ModelCategory = ModelCategory.SHALLOW_WATER,
+    ) -> None:
         """Set the initial condition.
 
         Can only be used if input_condition_category has been set.
@@ -60,73 +154,29 @@ class InitialCondition:
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
+            P (QGProjector): QGProjector associated with input uvh.
+            dx (float): Input infinitesimal distance in the X direction.
+            dy (float): Input infinitesimal distance in the Y direction.
+            input_category (str | ModelCategory, optional): Input model
+                category. Defaults to ModelCategory.SHALLOW_WTAER
 
         Raises:
             ValueError: If the model category is not recognized.
         """
-        if self._input_cat == ModelCategory.QUASI_GEOSTROPHIC:
-            return self.set_initial_condition_from_qg(uvh)
-        if self._input_cat == ModelCategory.SHALLOW_WATER:
-            return self.set_initial_condition_from_sw(uvh)
-        msg = f"Unrecognized model category: {self._input_cat}."
+        if input_category == ModelCategory.QUASI_GEOSTROPHIC:
+            return self.set_initial_condition_from_qg(uvh, P, dx, dy)
+        if input_category == ModelCategory.SHALLOW_WATER:
+            return self.set_initial_condition_from_sw(uvh, P, dx, dy)
+        msg = f"Unrecognized model category: {input_category}."
         raise ValueError(msg)
 
-    def _raise_if_incompatible_spaces(
+    def set_initial_condition_from_sw(
         self,
-        P_space: SpaceDiscretization3D,  # noqa: N803
-        model_space: SpaceDiscretization3D,
-    ) -> None:
-        """Raise an error if model and projector dimension don't match.
-
-        Args:
-            P_space (SpaceDiscretization3D): QG Projector space.
-            model_space (SpaceDiscretization3D): Model space.
-
-        Raises:
-            ValueError: If model and projector horizontal shape don't match.
-        """
-        match_nx = P_space.nx == model_space.nx
-        match_ny = P_space.ny == model_space.ny
-
-        if not (match_nx and match_ny):
-            msg = (
-                f"Projector horizontal shape ({P_space.nx}, {P_space.ny}) "
-                "must be equal to model horizontal shape nx "
-                f"({model_space.nx}, {model_space.ny})"
-            )
-            raise ValueError(msg)
-
-    def _raise_if_incompatible_uvh_and_qg_proj_in(
-        self,
-        P_space: SpaceDiscretization3D,  # noqa: N803
         uvh: UVH,
+        P: QGProjector,  # noqa: N803
+        dx: float,
+        dy: float,
     ) -> None:
-        """Raise an error if uvh and projector dimension don't match.
-
-        Args:
-            P_space (SpaceDiscretization3D): QG Projector space.
-            uvh (UVH): uvh to use as reference: u,v and h.
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
-
-        Raises:
-            ValueError: If nx, ny or nl don't match.
-        """
-        _, nl, nx, ny = uvh.h.shape
-
-        match_nx = P_space.nx == nx
-        match_ny = P_space.ny == ny
-        match_nl = P_space.nl == nl
-
-        if not (match_nx and match_ny and match_nl):
-            msg = (
-                f"Projector shape ({P_space.nl}, {P_space.nx}, {P_space.ny}) "
-                f"must be equal to uvh shape nx ({nl}, {nx}, {ny})"
-            )
-            raise ValueError(msg)
-
-    def set_initial_condition_from_sw(self, uvh: UVH) -> None:
         """Set initial condition from SW uvh.
 
         Args:
@@ -134,15 +184,24 @@ class InitialCondition:
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
+            P (QGProjector): QGProjector associated with input uvh.
+            dx (float): Input infinitesimal distance in the X direction.
+            dy (float): Input infinitesimal distance in the Y direction.
         """
-        self._raise_if_incompatible_uvh_and_qg_proj_in(self._P.space, uvh)
+        uvh_i, proj_i = self._rescale(uvh, P, dx, dy)
         if self._model.get_category() == ModelCategory.QUASI_GEOSTROPHIC:
-            p_qg = self._P.compute_p(uvh)[0]
+            p_qg = proj_i.compute_p(uvh_i)[0]
             self._model.set_p(p_qg[:, : self._nl])
             return
-        self._model.set_uvh(*uvh.parallel_slice[:, : self._nl])
+        self._model.set_uvh(*uvh_i.parallel_slice[:, : self._nl])
 
-    def set_initial_condition_from_qg(self, uvh: UVH) -> None:
+    def set_initial_condition_from_qg(
+        self,
+        uvh: UVH,
+        P: QGProjector,  # noqa: N803
+        dx: float,
+        dy: float,
+    ) -> None:
         """Set initial condition from QG uvh.
 
         Args:
@@ -150,34 +209,57 @@ class InitialCondition:
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
+            P (QGProjector): QGProjector associated with input uvh.
+            dx (float): Input infinitesimal distance in the X direction.
+            dy (float): Input infinitesimal distance in the Y direction.
         """
-        self._raise_if_incompatible_uvh_and_qg_proj_in(self._P.space, uvh)
+        uvh_i, proj_i = self._rescale(uvh, P, dx, dy)
         if self._model.get_category() == ModelCategory.SHALLOW_WATER:
-            self._model.set_uvh(*uvh.parallel_slice[:, : self._nl])
+            self._model.set_uvh(*uvh_i.parallel_slice[:, : self._nl])
             return
-        if self._model.space.nl == uvh.h.shape[-3]:
-            self._model.set_uvh(*uvh)
+        if self._model.space.nl == uvh_i.h.shape[-3]:
+            self._model.set_uvh(*uvh_i)
             return
-        p_qg = self._P.compute_p(uvh)[0]
+        p_qg = proj_i.compute_p(uvh_i)[0]
         self._model.set_p(p_qg[:, : self._nl])
 
-    @classmethod
-    def from_models(
-        cls,
-        model_in: ModelUVH,
-        model_out: ModelUVH,
-    ) -> Self:
-        """Set initial condition from in and out models.
+    def set_initial_condition_from_file(
+        self,
+        file: str | Path,
+        *,
+        space_config: SpaceConfig,
+        model_config: ModelConfig,
+        physics_config: PhysicsConfig,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> None:
+        """Set initial condition from file.
 
         Args:
-            model_in (ModelUVH): Model from which reference uvh comes.
-            model_out (ModelUVH): Model to update uvh of.
-
-        Returns:
-            Self: Initial condition.
+            file (str | Path): File to use as UVH input.
+            space_config (SpaceConfig): Space configuration
+                associated with input.
+            model_config (ModelConfig): Model configuration
+                associated with input.
+            physics_config (PhysicsConfig): Physics configuration
+                associated with input.
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
         """
-        qg_proj_in = model_in.P.to_shape(
-            nx=model_out.space.nx,
-            ny=model_out.space.ny,
+        specs = defaults.get(dtype=dtype, device=device)
+        file = Path(file)
+        self.set_initial_condition(
+            UVH.from_file(
+                Path(file),
+                **specs,
+            ),
+            P=QGProjector.from_config(
+                space_config,
+                model_config,
+                physics_config,
+                **specs,
+            ),
+            dx=space_config.dx,
+            dy=space_config.dy,
+            input_category=get_category(model_config.type),
         )
-        return cls(qg_proj_in, model_out)
