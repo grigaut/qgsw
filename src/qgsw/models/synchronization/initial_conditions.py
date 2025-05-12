@@ -227,9 +227,9 @@ class InitialCondition:
         self,
         file: str | Path,
         *,
-        space_config: SpaceConfig,
-        model_config: ModelConfig,
-        physics_config: PhysicsConfig,
+        space_config: SpaceConfig = None,
+        model_config: ModelConfig = None,
+        physics_config: PhysicsConfig = None,
         dtype: torch.dtype | None = None,
         device: torch.device | None = None,
     ) -> None:
