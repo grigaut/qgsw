@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar, Union
 
@@ -52,11 +53,24 @@ PrognosticUVH = TypeVar("PrognosticUVH", bound=BasePrognosticUVH)
 PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePrognosticPSIQ)
 
 
+class ModelCounter(type):
+    """Metaclass to make instance counter not share count with descendants."""
+
+    def __init__(cls, name: str, bases: tuple[type, ...], attrs: dict) -> None:
+        """Model Counter metaclass."""
+        super().__init__(name, bases, attrs)
+        cls._instance_count = itertools.count(1)
+
+
+class ABCCounter(ModelCounter, ABCMeta):
+    """Multiple inheritance for counter."""
+
+
 class _Model(
     ModelParamChecker,
     Generic[Prognostic, State, AdvectedPrognostic],
     NamedObject[ModelName],
-    metaclass=ABCMeta,
+    metaclass=ABCCounter,
 ):
     """Base class for models."""
 
@@ -87,6 +101,8 @@ class _Model(
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self.__instance_nb = next(self._instance_count)
+        self.__name = f"{self.__class__.__name__}-{self.__instance_nb}"
         verbose.display(
             msg=f"Creating {self.__class__.__name__} model...",
             trigger_level=1,
@@ -129,7 +145,23 @@ class _Model(
 
     def __repr__(self) -> str:
         """String representation of the model."""
-        return "\n[Model]\n" + "\n".join(self.get_repr_parts())
+        return f"\n[Model] -> `{self.name}`\n" + "\n".join(
+            self.get_repr_parts(),
+        )
+
+    @property
+    def name(self) -> str:
+        """Object name."""
+        try:
+            return self._name
+        except AttributeError:
+            return self.__name
+
+    @name.setter
+    def name(self, name: str) -> None:
+        if name is None:
+            return
+        self._name = name
 
     @property
     def io(self) -> IO:

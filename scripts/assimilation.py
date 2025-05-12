@@ -99,9 +99,9 @@ model.set_wind_forcing(taux, tauy)
 
 model_sync = Synchronizer(model_ref, model)
 
-verbose.display("\n[Reference Model]", trigger_level=1)
+verbose.display(f"\n[Reference Model: {model_ref.name}]", trigger_level=1)
 verbose.display(msg=model_ref.__repr__(), trigger_level=1)
-verbose.display("\n[Model]", trigger_level=1)
+verbose.display(f"\n[Model: {model_ref.name}]", trigger_level=1)
 verbose.display(msg=model.__repr__(), trigger_level=1)
 
 nl_ref = model_ref.space.nl
@@ -172,16 +172,8 @@ with Progress() as progress:
                 msg=f"[n={n:05d}/{steps.n_tot:05d}]",
                 trigger_level=1,
             )
-            verbose.display(
-                msg="[Reference Model]: ",
-                trigger_level=1,
-            )
             # Save Reference Model
             model_ref.io.save(output_dir.joinpath(f"{prefix_ref}{n}.pt"))
-            verbose.display(
-                msg="[     Model     ]: ",
-                trigger_level=1,
-            )
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.pt"))
             summary.register_step(n)
