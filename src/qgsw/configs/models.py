@@ -97,7 +97,7 @@ class ModelConfig(
     """Model configuration."""
 
     prefix: str
-    name: str | None = None
+    name: Union[str, None] = None
     layers: list[PositiveFloat]
     reduced_gravity: list[PositiveFloat]
     collinearity_coef: Union[CoefConfigVar, None] = Field(
