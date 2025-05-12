@@ -196,6 +196,18 @@ class Grid2D:
         """
         return Grid3D(self.coordinates.add_h(h=h))
 
+    def to_shape(self, nx: int, ny: int) -> Grid2D:
+        """Recreate a new 2D Grid.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            Grid2D: New 2D Grid.
+        """
+        return Grid2D(coordinates=self._coords.to_shape(nx, ny))
+
     @classmethod
     def from_tensors(
         cls,
@@ -430,6 +442,19 @@ class Grid3D:
             Grid2D: 2D Grid for only X and Y.
         """
         return Grid2D(coordinates=self._coords.remove_z_h())
+
+    def to_shape(self, nx: int, ny: int, nl: int) -> Grid3D:
+        """Recreate a new 3D Grid.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+            nl (int): New nl
+
+        Returns:
+            Grid3D: New 3D Grid.
+        """
+        return Grid3D(coordinates=self._coords.to_shape(nx, ny, nl))
 
     @classmethod
     def from_tensors(

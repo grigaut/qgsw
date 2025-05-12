@@ -19,7 +19,10 @@ type = "assimilation"
 duration = 31_536_000       # seconds
 dt = 3600                   # seconds
 fork_interval = 1_728_000   # seconds
-startup_file = "output/g5k/double_gyre_qg_long/results_step_876000.pt"
+[simulation.startup]
+file ="output/g5k/double_gyre_qg_long/results_step_876000.pt"
+config ="output/g5k/double_gyre_qg_long/_config.toml"
+
 [simulation.reference]
 type = "QG"
 prefix = "reference_step_"

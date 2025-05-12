@@ -65,6 +65,26 @@ class Coordinates1D:
             msg = "Only unidimensional tensors are accepted as coordinates."
             raise CoordinatesInstanciationError(msg)
 
+    def to_shape(self, n: int) -> Coordinates1D:
+        """Reacreate a new 1D Coordinates.
+
+        Args:
+            n (int): New n.
+
+        Returns:
+            Coordinates1D: 1D Coordinates.
+        """
+        return Coordinates1D(
+            points=torch.linspace(
+                start=self.points[0],
+                end=self.points[-1],
+                steps=n,
+                dtype=self.points.dtype,
+                device=self.points.device,
+            ),
+            unit=self.unit,
+        )
+
 
 class Coordinates2D:
     """2D Coordinates."""
@@ -136,6 +156,22 @@ class Coordinates2D:
             Coordinates3D: 3D Coordinates.
         """
         return Coordinates3D(x=self.x, y=self.y, h=h)
+
+    def to_shape(self, nx: int, ny: int) -> Coordinates2D:
+        """Recreate 2D Coordinates with new shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+            nl (int): New nl.
+
+        Returns:
+            Coordinates2D: New 2D Coordinates.
+        """
+        return Coordinates2D(
+            x=self.x.to_shape(nx),
+            y=self.y.to_shape(ny),
+        )
 
     @classmethod
     def from_tensors(
@@ -294,6 +330,23 @@ class Coordinates3D:
             Coordinates2D: X,Y Coordinates.
         """
         return self._2d
+
+    def to_shape(self, nx: int, ny: int, nl: int) -> Coordinates3D:
+        """Recreate 3D Coordinates with new shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+            nl (int): New nl.
+
+        Returns:
+            Coordinates3D: New 3D Coordinates.
+        """
+        return Coordinates3D(
+            x=self.x.to_shape(nx),
+            y=self.y.to_shape(ny),
+            h=self.h.to_shape(nl),
+        )
 
     @classmethod
     def from_tensors(

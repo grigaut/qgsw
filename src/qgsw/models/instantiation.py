@@ -119,6 +119,7 @@ def _instantiate_model(
         g_prime=model_config.g_prime,
         beta_plane=beta_plane,
     )
+    model.name = model_config.name
     if model.get_type() == ModelName.QG_SANITY_CHECK:
         omega_grid = model.baseline.space.omega
     else:
@@ -161,6 +162,7 @@ def _instantiate_modified(
         g_prime=model_config.g_prime,
         beta_plane=beta_plane,
     )
+    model.name = model_config.name
     p0 = perturbation.compute_initial_pressure(
         model.space.omega,
         model.beta_plane.f0,

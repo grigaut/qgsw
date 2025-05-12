@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Generic, TypeVar, Union
 
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
+    from qgsw.models.qg.uvh.projectors.core import QGProjector
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
@@ -51,11 +53,24 @@ PrognosticUVH = TypeVar("PrognosticUVH", bound=BasePrognosticUVH)
 PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePrognosticPSIQ)
 
 
+class ModelCounter(type):
+    """Metaclass to make instance counter not share count with descendants."""
+
+    def __init__(cls, name: str, bases: tuple[type, ...], attrs: dict) -> None:
+        """Model Counter metaclass."""
+        super().__init__(name, bases, attrs)
+        cls._instance_count = itertools.count(1)
+
+
+class ABCCounter(ModelCounter, ABCMeta):
+    """Multiple inheritance for counter."""
+
+
 class _Model(
     ModelParamChecker,
     Generic[Prognostic, State, AdvectedPrognostic],
     NamedObject[ModelName],
-    metaclass=ABCMeta,
+    metaclass=ABCCounter,
 ):
     """Base class for models."""
 
@@ -86,6 +101,8 @@ class _Model(
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self.__instance_nb = next(self._instance_count)
+        self.__name = f"{self.__class__.__name__}-{self.__instance_nb}"
         verbose.display(
             msg=f"Creating {self.__class__.__name__} model...",
             trigger_level=1,
@@ -99,6 +116,15 @@ class _Model(
         )
         self._compute_coriolis(self._space.omega.remove_z_h())
 
+    @property
+    def courant_number(self) -> float:
+        """Courant number: v*dt/dx."""
+        return (
+            torch.sqrt(torch.sum(self.H) * self.g_prime[0])
+            * self.dt
+            / torch.min(self.space.dx, self.space.dy)
+        ).item()
+
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
 
@@ -109,6 +135,7 @@ class _Model(
             f"Model: {self.__class__}",
             f"├── Data type: {self.dtype}",
             f"├── Device: {self.device}",
+            f"├── Courant number: {self.courant_number}",
             (
                 f"├── Beta plane: f0 = {self.beta_plane.f0} "
                 f"- β = {self.beta_plane.beta}"
@@ -128,7 +155,23 @@ class _Model(
 
     def __repr__(self) -> str:
         """String representation of the model."""
-        return "\n[Model]\n" + "\n".join(self.get_repr_parts())
+        return f"\n[Model] -> `{self.name}`\n" + "\n".join(
+            self.get_repr_parts(),
+        )
+
+    @property
+    def name(self) -> str:
+        """Object name."""
+        try:
+            return self._name
+        except AttributeError:
+            return self.__name
+
+    @name.setter
+    def name(self, name: str) -> None:
+        if name is None:
+            return
+        self._name = name
 
     @property
     def io(self) -> IO:
@@ -362,6 +405,11 @@ class ModelUVH(
         └── (n_ens, nl, nx,ny)-shaped.
         """
         return self._state.h.get()
+
+    @property
+    @abstractmethod
+    def P(self) -> QGProjector:  # noqa: N802
+        """QG Projector."""
 
     def _set_state(self) -> None:
         """Set the state."""

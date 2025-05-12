@@ -11,38 +11,43 @@ directory = "tmp"
 rho = 1000
 slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
-beta = 0                # coriolis gradient (m^-1 s^-1)
-bottom_drag_coefficient = 0
+beta = 1.754e-11
+bottom_drag_coefficient = 3.60577e-8
 
 [simulation]
 type = "simple-run"
 duration = 2_389_333.3   # seconds
 dt = 26                 # in seconds
+[simulation.startup]
 
 [model]
 type = "QG"
 prefix = "results_step_"
 layers = [
-    200,
-    800
+    400,
+    1100,
+    2600,
 ]
 reduced_gravity = [
-    10.0,
-    5e-2
+    9.81,
+    0.025,
+    0.0125
 ]
 
 [space]
-nx = 192
-ny = 192
+nx = 128
+ny = 256
 unit = "m"
-x_min = -500_000
-x_max = 500_000
-y_min = -500_000
-y_max = 500_000
+x_min = 0
+x_max = 2560000
+y_min = 0
+y_max = 5120000
 
 [windstress]
-type = "none"
+type = "cosine"
+magnitude = 0.08
+drag_coefficient = 0.0013
 
 [perturbation]
-type = "vortex-baroclinic"
+type = "none"
 perturbation_magnitude = 1e-3

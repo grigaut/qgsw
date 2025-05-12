@@ -51,5 +51,5 @@ def get_category(model_name: ModelName) -> ModelCategory:  # noqa: PLR0911
         return ModelCategory.QUASI_GEOSTROPHIC
     if model_name == ModelName.QG_SANITY_CHECK:
         return ModelCategory.QUASI_GEOSTROPHIC
-    msg = f"Unrecognized model name: {model_name}."
+    msg = f"Unrecognized model category: {model_name}."
     raise ValueError(msg)

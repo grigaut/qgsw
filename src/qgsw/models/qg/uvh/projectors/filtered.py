@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.uvh.modified.filtered.pv import compute_g_tilde
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
+
 import warnings
 from functools import cached_property
 from typing import TYPE_CHECKING
@@ -11,19 +19,23 @@ import torch
 from qgsw import verbose
 from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.filters.high_pass import GaussianHighPass2D
+from qgsw.masks import Masks
 from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
 from qgsw.models.qg.uvh.projectors.collinear import CollinearQGProjector
+from qgsw.models.synchronization.rescaling import interpolate_physical_variable
+from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs import defaults
 from qgsw.utils.shape_checks import with_shapes
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from qgsw.configs.models import ModelConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.space import SpaceConfig
     from qgsw.filters.base import _Filter
-    from qgsw.masks import Masks
-    from qgsw.spatial.core.discretization import SpaceDiscretization3D
 
 
 class CollinearFilteredQGProjector(CollinearQGProjector):
@@ -312,6 +324,29 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
         p_qg_i = self._points_to_surface(pi1)
         return pi1, p_qg_i
 
+    def to_shape(self, nx: int, ny: int) -> Self:
+        """Recreate a QGProjector with another shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            Self: QGProjector.
+        """
+        proj = CollinearFilteredQGProjector(
+            A=self.A,
+            H=self.H,
+            g_prime=self._g_prime,
+            space=self.space.to_shape(nx, ny, self.space.nl),
+            f0=self._f0,
+            masks=self.masks,
+        )
+        alpha = self.alpha
+        proj.alpha = interpolate_physical_variable(alpha, (nx, ny))
+        proj.filter = self.filter
+        return proj
+
     @classmethod
     def create_filter(
         cls,
@@ -326,3 +361,42 @@ class CollinearFilteredQGProjector(CollinearQGProjector):
             SpectralGaussianHighPass2D: Filter.
         """
         return GaussianHighPass2D(sigma=sigma)
+
+    @classmethod
+    def from_config(
+        cls,
+        space_config: SpaceConfig,
+        model_config: ModelConfig,
+        physics_config: PhysicsConfig,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> Self:
+        """Builds Projector frm configuration.
+
+        Args:
+            space_config (SpaceConfig): Space configuration.
+            model_config (ModelConfig): Model configuration.
+            physics_config (PhysicsConfig): _description_
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+
+        Returns:
+            Self: CollinearFilteredQGProjector.
+        """
+        specs = defaults.get(dtype=dtype, device=device)
+        g_tilde = compute_g_tilde(model_config.g_prime)
+        P = cls(  # noqa: N806
+            compute_A(model_config.h[:1], g_tilde, **specs),
+            model_config.h.unsqueeze(-1).unsqueeze(-1),
+            model_config.g_prime.unsqueeze(-1).unsqueeze(-1),
+            SpaceDiscretization3D.from_config(space_config, model_config),
+            physics_config.f0,
+            masks=Masks.empty(
+                space_config.nx,
+                space_config.ny,
+                device=specs["device"],
+            ),
+        )
+        P.filter.sigma = model_config.sigma
+        return P
