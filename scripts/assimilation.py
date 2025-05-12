@@ -10,19 +10,19 @@ from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
-from qgsw.fields.variables.prognostic_tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
 from qgsw.models.names import ModelName
 from qgsw.models.qg.uvh.modified.utils import is_modified
-from qgsw.models.synchronization import ModelSync
+from qgsw.models.synchronization.initial_conditions import InitialCondition
+from qgsw.models.synchronization.sync import Synchronizer
 from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
 )
-from qgsw.specs import DEVICE
+from qgsw.specs import defaults
 from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
@@ -30,6 +30,7 @@ torch.backends.cudnn.deterministic = True
 args = ScriptArgs.from_cli()
 
 verbose.set_level(args.verbose)
+specs = defaults.get()
 
 ROOT_PATH = Path(__file__).parent.parent
 config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
@@ -96,7 +97,7 @@ else:
     model.dt = config.simulation.dt
 model.set_wind_forcing(taux, tauy)
 
-model_sync = ModelSync(model_ref, model)
+model_sync = Synchronizer(model_ref, model)
 
 verbose.display("\n[Reference Model]", trigger_level=1)
 verbose.display(msg=model_ref.__repr__(), trigger_level=1)
@@ -111,33 +112,20 @@ if model.get_type() == ModelName.QG_SANITY_CHECK:
 nx = model.space.nx
 ny = model.space.ny
 
-dtype = torch.float64
-device = DEVICE.get()
-
-if (startup_file := config.simulation.startup_file) is None:
-    uvh0 = UVH.steady(
-        n_ens=1,
-        nl=nl_ref,
-        nx=config.space.nx,
-        ny=config.space.ny,
-        dtype=torch.float64,
-        device=DEVICE.get(),
-    )
+# Initial condition ----------------------------------------------------------
+ic = InitialCondition(model_ref)
+if (startup := config.simulation.startup) is None:
+    ic.set_steady(**specs)
 else:
-    uvh0 = UVH.from_file(startup_file, dtype=dtype, device=device)
-    horizontal_shape = uvh0.h.shape[-2:]
-    if horizontal_shape != (nx, ny):
-        msg = (
-            f"Horizontal shape {horizontal_shape} from {startup_file}"
-            f" should be ({nx},{ny})."
-        )
-        raise ValueError(msg)
-
-model_ref.set_uvh(
-    torch.clone(uvh0.u),
-    torch.clone(uvh0.v),
-    torch.clone(uvh0.h),
-)
+    ic_conf = Configuration.from_toml(config.simulation.startup.config)
+    ic.set_initial_condition_from_file(
+        file=startup.file,
+        space_config=ic_conf.space,
+        model_config=ic_conf.model,
+        physics_config=ic_conf.physics,
+        **specs,
+    )
+# ----------------------------------------------------------------------------
 
 dt = model.dt
 t_end = config.simulation.duration
@@ -146,7 +134,7 @@ steps = Steps(t_end=t_end, dt=dt)
 verbose.display(steps.__repr__(), trigger_level=1)
 
 ns = steps.simulation_steps()
-forks = steps.steps_from_interval(interval=config.simulation.fork_interval)
+syncs = steps.steps_from_interval(interval=config.simulation.fork_interval)
 saves = config.io.output.get_saving_steps(steps)
 
 summary.register_outputs(model.io)
@@ -171,27 +159,14 @@ with Progress() as progress:
         rf"\[n=00000/{steps.n_tot:05d}]",
         total=steps.n_tot,
     )
-    for n, fork, save in zip(ns, forks, saves):
+    for n, sync, save in zip(ns, syncs, saves):
         progress.update(
             simulation,
             description=rf"\[n={n:05d}/{steps.n_tot:05d}]",
         )
         progress.advance(simulation)
-        if fork:
-            prognostic = model_ref.prognostic
-            if modified and config.model.collinearity_coef.use_optimal:
-                pressure = model_ref.P.compute_p(prognostic.uvh)[1]
-                if model.get_type() == ModelName.QG_FILTERED:
-                    p = model.P.filter(pressure[0, 0])
-                else:
-                    p = pressure[0, 0]
-                coef.with_optimal_values(p, pressure[0, 1])
-                model.alpha = coef.get()
+        if sync:
             model_sync()
-            verbose.display(
-                msg=f"[n={n:05d}/{steps.n_tot:05d}] - Forked",
-                trigger_level=1,
-            )
         if save:
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}]",

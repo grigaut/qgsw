@@ -13,16 +13,19 @@ from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.instantiation import instantiate_model
 from qgsw.models.qg.uvh.modified.utils import is_modified
+from qgsw.models.synchronization.initial_conditions import InitialCondition
 from qgsw.perturbations.core import Perturbation
 from qgsw.physics import compute_burger
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
+from qgsw.specs import defaults
 from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 
 args = ScriptArgs.from_cli()
+specs = defaults.get()
 
 verbose.set_level(args.verbose)
 
@@ -74,6 +77,21 @@ if np.isnan(config.simulation.dt):
 else:
     model.dt = config.simulation.dt
 model.set_wind_forcing(taux, tauy)
+
+# Initial condition ----------------------------------------------------------
+ic = InitialCondition(model)
+if (startup := config.simulation.startup) is None:
+    ic.set_steady(**specs)
+else:
+    ic_conf = Configuration.from_toml(config.simulation.startup.config)
+    ic.set_initial_condition_from_file(
+        file=startup.file,
+        space_config=ic_conf.space,
+        model_config=ic_conf.model,
+        physics_config=ic_conf.physics,
+        **specs,
+    )
+    # ------------------------------------------------------------------------
 
 ## Compute Burger Number
 Bu = compute_burger(
