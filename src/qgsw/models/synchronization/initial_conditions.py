@@ -263,3 +263,29 @@ class InitialCondition:
             dy=space_config.dy,
             input_category=get_category(model_config.type),
         )
+
+    def set_steady(
+        self,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> None:
+        """Set steady uvh.
+
+        Args:
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+        """
+        specs = defaults.get(dtype=dtype, device=device)
+        n_ens = 1
+        nl = self._model.space.nl
+        nx = self._model.space.nx
+        ny = self._model.space.ny
+        uvh = UVH.steady(
+            n_ens=n_ens,
+            nl=nl,
+            nx=nx,
+            ny=ny,
+            **specs,
+        )
+        self._model.set_uvh(*uvh)
