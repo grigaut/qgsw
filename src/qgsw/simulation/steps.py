@@ -24,7 +24,7 @@ class Steps:
         Raises:
             ValueError: If the timestep is greater than the simulation time.
         """
-        if dt > (t_end - t_start):
+        if (t_end != t_start) and (dt > (t_end - t_start)):
             msg = "Timestep must be lower than t_start - t_end."
             raise ValueError(msg)
         self._dt = dt
