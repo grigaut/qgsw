@@ -6,6 +6,8 @@ import pytest
 
 from qgsw.specs import DEVICE
 
+pytest_plugins = ["tests.fixtures"]
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Pytest arg parser."""

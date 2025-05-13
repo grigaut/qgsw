@@ -11,26 +11,6 @@ from qgsw.models.qg.uvh.core import QG
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
-
-
-@pytest.fixture
-def space_2d() -> SpaceDiscretization2D:
-    """X,Y and H."""
-    lx = 2560.0e3
-    nx = 128
-    ly = 5120.0e3
-    ny = 256
-
-    X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device=DEVICE.get())  # noqa: N806
-    Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device=DEVICE.get())  # noqa:N806
-    return SpaceDiscretization2D.from_tensors(
-        x=X,
-        y=Y,
-        x_unit=Unit.M,
-        y_unit=Unit.M,
-    )
-
 
 testdata = [
     pytest.param(

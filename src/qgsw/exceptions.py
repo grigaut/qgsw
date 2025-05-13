@@ -67,3 +67,7 @@ class ParallelSlicingError(Exception):
 
 class UnspecifiedConditionCategoryError(Exception):
     """When condition category is not specified."""
+
+
+class RescalingShapeMismatchError(Exception):
+    """When rescaling shapes mismatch."""

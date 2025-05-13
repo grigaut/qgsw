@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.exceptions import RescalingShapeMismatchError
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
     UVHT,
@@ -86,6 +87,11 @@ class Rescaler:
         )
         self._P = qg_proj
 
+    @property
+    def output_hshape(self) -> tuple[int, int]:
+        """Output horizontal shape."""
+        return (self._nx, self._ny)
+
     def _raise_if_incompatible_shapes(
         self,
         *,
@@ -99,30 +105,30 @@ class Rescaler:
             nyin (int): Input ny.
 
         Raises:
-            ValueError: If nx (or, resp. nxin) does not divide nxin
-                (or, resp. nx).
-            ValueError: If ny (or, resp. nyin) does not divide nyin
-                (or, resp. ny).
-            ValueError: If nx / nxin != ny / nyin
+            RescalingShapeMismatchError: If nx (or, resp. nxin)
+                does not divide nxin (or, resp. nx).
+            RescalingShapeMismatchError: If ny (or, resp. nyin)
+                does not divide nyin (or, resp. ny).
+            RescalingShapeMismatchError: If nx / nxin != ny / nyin
         """
         if (nxin % self._nx != 0) and (self._nx % nxin != 0):
             msg = (
                 "nxin (or, resp. self._nx) must divisable"
                 " by self._nx (or, resp. nxin)."
             )
-            raise ValueError(msg)
+            raise RescalingShapeMismatchError(msg)
         if (nyin % self._ny != 0) and (self._ny % nyin != 0):
             msg = (
                 "nyin (or, resp. self._ny) must divisable"
                 " by self._ny (or, resp. nyin)."
             )
-            raise ValueError(msg)
+            raise RescalingShapeMismatchError(msg)
         if self._nx / nxin != self._ny / nyin:
             msg = (
                 "There should be the same ratio between"
                 " self._nx / nxin and self._ny / nyin"
             )
-            raise ValueError(msg)
+            raise RescalingShapeMismatchError(msg)
 
     def _to_physical(self, uvh: UVH, dx: float, dy: float) -> UVH:
         """Convert physical uvh to covariant.
