@@ -5,7 +5,7 @@ save = true
 type = "interval"           # "interval"
 # quantity = 100
 interval_duration = 86_400  # seconds
-directory = "assimilation"
+directory = "tmp"
 
 [physics]
 rho = 1000
@@ -25,12 +25,14 @@ file ="output/g5k/double_gyre_qg_long/results_step_876000.pt"
 config ="output/g5k/double_gyre_qg_long/_config.toml"
 
 [simulation.reference]
+type = "model"
+[simulation.reference.model]
 type = "QG"
 prefix = "reference_step_"
 layers = [
     400,
     1100,
-    2600,
+    2600
 ]
 reduced_gravity = [
     9.81,
@@ -42,10 +44,10 @@ reduced_gravity = [
 type = "QG"
 prefix = "results_step_"
 layers = [
-    4100
+    400,
 ]
 reduced_gravity = [
-    9.81
+    9.81,
 ]
 
 [space]
