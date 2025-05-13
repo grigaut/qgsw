@@ -113,7 +113,7 @@ dt = model.dt
 t_end = config.simulation.duration
 
 
-steps = Steps(t_end=t_end, dt=dt)
+steps = Steps(t_start=0, t_end=t_end, dt=dt)
 ns = steps.simulation_steps()
 saves = config.io.output.get_saving_steps(steps)
 logs = steps.steps_from_total(100)

@@ -130,7 +130,7 @@ else:
 dt = model.dt
 t_end = config.simulation.duration
 
-steps = Steps(t_end=t_end, dt=dt)
+steps = Steps(t_start=0, t_end=t_end, dt=dt)
 verbose.display(steps.__repr__(), trigger_level=1)
 
 ns = steps.simulation_steps()
