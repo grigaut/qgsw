@@ -45,7 +45,7 @@ if config.io.output.save:
 wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 taux, tauy = wind.compute()
 ## Rossby
-Ro = 0.1
+Ro = config.physics.Ro
 
 # Model Set-up
 ## Vortex
@@ -59,7 +59,7 @@ model_ref = instantiate_model(
     config.physics.beta_plane,
     space_2d,
     perturbation,
-    Ro=0.1,
+    Ro=config.physics.Ro,
 )
 
 model_ref.slip_coef = config.physics.slip_coef

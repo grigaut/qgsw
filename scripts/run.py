@@ -41,7 +41,7 @@ if config.io.output.save:
 wind = WindForcing.from_config(config.windstress, config.space, config.physics)
 taux, tauy = wind.compute()
 ## Rossby
-Ro = 0.1
+Ro = config.physics.Ro
 
 # Model Set-up
 ## Vortex
