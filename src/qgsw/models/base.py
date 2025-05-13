@@ -160,6 +160,11 @@ class _Model(
         )
 
     @property
+    def time(self) -> torch.Tensor:
+        """Model time."""
+        return self._state.t.get()
+
+    @property
     def name(self) -> str:
         """Object name."""
         try:
