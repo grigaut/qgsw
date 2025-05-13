@@ -175,7 +175,7 @@ class InitialCondition:
             dx (float): Input infinitesimal distance in the X direction.
             dy (float): Input infinitesimal distance in the Y direction.
             input_category (str | ModelCategory, optional): Input model
-                category. Defaults to ModelCategory.SHALLOW_WTAER
+                category. Defaults to ModelCategory.SHALLOW_WATER
 
         Raises:
             ValueError: If the model category is not recognized.
