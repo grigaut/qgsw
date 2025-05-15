@@ -57,7 +57,7 @@ class Reference(ABC):
         """Load the data.
 
         Returns:
-            BaseUVH: Stored prognostic variables.
+            BaseUVH: Stored physical variables.
         """
 
     @classmethod

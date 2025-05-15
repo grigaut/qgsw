@@ -1,4 +1,7 @@
-"""Physical variables."""
+"""Physical variables.
+
+This file regroups variables which are computed from the physical variables.
+"""
 
 from __future__ import annotations
 
@@ -68,7 +71,7 @@ class SurfaceHeightAnomaly(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -112,7 +115,7 @@ class Vorticity(DiagnosticVariable):
         """Compute the variable.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -164,7 +167,7 @@ class Pressure(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -298,7 +301,7 @@ class PotentialVorticity(DiagnosticVariable):
         """Compute the value of the variable.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -351,7 +354,7 @@ class StreamFunction(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -429,7 +432,7 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -489,7 +492,7 @@ class Psi2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -542,7 +545,7 @@ class Enstrophy(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -587,7 +590,7 @@ class TotalEnstrophy(Enstrophy):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -620,7 +623,7 @@ class ZonalVelocity2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -650,7 +653,7 @@ class MeridionalVelocity2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -680,7 +683,7 @@ class RefZonalVelocity2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -710,7 +713,7 @@ class RefMeridionalVelocity2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -750,7 +753,7 @@ class ZonalVelocityFromPsi2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -791,7 +794,7 @@ class MeridionalVelocityFromPsi2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -822,7 +825,7 @@ class TimeDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -882,7 +885,7 @@ class ProgStreamFunctionDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t,) psi and q.
                 ├── (t: (n_ens,)-shaped)
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
@@ -910,7 +913,7 @@ class ProgPotentialVorticityDiag(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t,) psi and q.
                 ├── (t: (n_ens,)-shaped)
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
@@ -938,7 +941,7 @@ class ZonalVelocity(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -968,7 +971,7 @@ class MeridionalVelocity(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -998,7 +1001,7 @@ class LayerDepthAnomaly(DiagnosticVariable):
         """Compute the variable.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -1078,7 +1081,7 @@ class ModalKineticEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -1169,7 +1172,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -1240,7 +1243,7 @@ class ModalEnergy(DiagnosticVariable):
         """Compute total modal energy.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -1318,7 +1321,7 @@ class TotalKineticEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -1404,7 +1407,7 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
         """Compute variable value.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -1480,7 +1483,7 @@ class TotalEnergy(DiagnosticVariable):
         """Compute total modal energy.
 
         Args:
-            vars_tuple (BaseUVH): Prognostic variables
+            vars_tuple (BaseUVH): Physical variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)

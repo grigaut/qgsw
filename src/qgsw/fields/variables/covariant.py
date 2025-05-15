@@ -129,11 +129,11 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
         """
         self._ds = ds
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the variable.
 
         Args:
-            prognostic (BaseUVH): Covariant variables
+            vars_tuple (BaseUVH): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -145,7 +145,7 @@ class PhysicalLayerDepthAnomaly(DiagnosticVariable):
             torch.Tensor: Physical layer depth anomaly.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        return prognostic.h / self._ds
+        return vars_tuple.h / self._ds
 
 
 class ZonalVelocityFlux(DiagnosticVariable):
@@ -167,11 +167,11 @@ class ZonalVelocityFlux(DiagnosticVariable):
         """
         self._dx = dx
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BaseUVH): Covariant variables
+            vars_tuple (BaseUVH): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -183,7 +183,7 @@ class ZonalVelocityFlux(DiagnosticVariable):
             BaseUVH: Value
                 └── (n_ens, nl, nx+1, ny)-shaped
         """
-        return prognostic.u / self._dx**2
+        return vars_tuple.u / self._dx**2
 
 
 class MeridionalVelocityFlux(DiagnosticVariable):
@@ -205,11 +205,11 @@ class MeridionalVelocityFlux(DiagnosticVariable):
         """
         self._dy = dy
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BaseUVH): Covariant variables
+            vars_tuple (BaseUVH): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -221,7 +221,7 @@ class MeridionalVelocityFlux(DiagnosticVariable):
             BaseUVH: Value
                 └── (n_ens, nl, nx, ny+1)-shaped
         """
-        return prognostic.v / self._dy**2
+        return vars_tuple.v / self._dy**2
 
 
 class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
@@ -246,11 +246,11 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
         self._require_alpha |= h_phys.require_alpha
         self._require_time |= h_phys.require_time
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BaseUVH): Covariant variables
+            vars_tuple (BaseUVH): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -263,7 +263,7 @@ class PhysicalSurfaceHeightAnomaly(DiagnosticVariable):
                 └── (n_ens, nl, nx, ny)-shaped
         """
         return reverse_cumsum(
-            self._h_phys.compute_no_slice(prognostic),
+            self._h_phys.compute_no_slice(vars_tuple),
             dim=-3,
         )
 
@@ -312,18 +312,18 @@ class MaskedVorticity(DiagnosticVariable):
         self._w_vertical_bound = masks.w_vertical_bound
         self._w_horizontal_bound = masks.w_horizontal_bound
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BaseUVH): Covariant variables
+            vars_tuple (BaseUVH): Covariant variables
 
         Returns:
             torch.Tensor: Vorticity
                 └── (n_ens, nl, nx+1, ny+1)-shaped
         """
-        u = prognostic.u
-        v = prognostic.v
+        u = vars_tuple.u
+        v = vars_tuple.v
         u_ = F.pad(u, (1, 1, 0, 0))
         v_ = F.pad(v, (0, 0, 1, 1))
         dx_v = torch.diff(v_, dim=-2)
@@ -361,11 +361,11 @@ class QGPressure(DiagnosticVariable):
         """
         self._P = P
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BaseUVH): Covariant variables
+            vars_tuple (BaseUVH): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -379,8 +379,8 @@ class QGPressure(DiagnosticVariable):
         """
         raise NotImplementedError
         with contextlib.suppress(AttributeError):
-            self._P.alpha = prognostic.alpha
-        return self._P.compute_p(prognostic)[1]
+            self._P.alpha = vars_tuple.alpha
+        return self._P.compute_p(vars_tuple)[1]
 
 
 class Pressure(DiagnosticVariable):
@@ -413,11 +413,11 @@ class Pressure(DiagnosticVariable):
         self._require_alpha |= eta_phys.require_alpha
         self._require_time |= eta_phys.require_time
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (BaseUVH): Covariant variables
+            vars_tuple (BaseUVH): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -430,7 +430,7 @@ class Pressure(DiagnosticVariable):
                 └── (n_ens, nl, nx, ny)-shaped
         """
         return torch.cumsum(
-            self._g_prime * self._eta.compute_no_slice(prognostic),
+            self._g_prime * self._eta.compute_no_slice(vars_tuple),
             dim=-3,
         )
 
@@ -494,11 +494,11 @@ class PressureTilde(Pressure):
         """
         return self._g1 * self._g2 / (self._g2 + (1 - alpha) * self._g1)
 
-    def _compute(self, prognostic: UVHTAlpha) -> torch.Tensor:
+    def _compute(self, vars_tuple: UVHTAlpha) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            prognostic (UVHTAlpha): Covariant variables
+            vars_tuple (UVHTAlpha): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -510,8 +510,8 @@ class PressureTilde(Pressure):
             torch.Tensor: Pressure
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        g_tilde = self._compute_g_tilde(prognostic.alpha)
-        return g_tilde * self._eta.compute_no_slice(prognostic)
+        g_tilde = self._compute_g_tilde(vars_tuple.alpha)
+        return g_tilde * self._eta.compute_no_slice(vars_tuple)
 
 
 class KineticEnergy(DiagnosticVariable):
@@ -547,11 +547,11 @@ class KineticEnergy(DiagnosticVariable):
         self._require_alpha |= U.require_alpha | V.require_alpha
         self._require_time |= U.require_time | V.require_time
 
-    def _compute(self, prognostic: BaseUVH) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the kinetic energy.
 
         Args:
-            prognostic (BasePrognosticTuple): Covariant variables
+            vars_tuple (Basevars_tupleTuple): Covariant variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -563,10 +563,10 @@ class KineticEnergy(DiagnosticVariable):
             torch.Tensor: Kinetic energy.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        u = prognostic.u
-        v = prognostic.v
-        U = self._U.compute_no_slice(prognostic)  # noqa: N806
-        V = self._V.compute_no_slice(prognostic)  # noqa: N806
+        u = vars_tuple.u
+        v = vars_tuple.v
+        U = self._U.compute_no_slice(vars_tuple)  # noqa: N806
+        V = self._V.compute_no_slice(vars_tuple)  # noqa: N806
         return self._comp_ke(u, U, v, V) * self._h_mask
 
     def bind(

@@ -89,7 +89,7 @@ class ModelReference(NamedObject[ReferenceName], Reference):
         """Load the data.
 
         Returns:
-            BaseUVH: Model's prognostic variables.
+            BaseUVH: Model's physical variables.
         """
         return self._core.physical
 
@@ -179,7 +179,7 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
         """Load the data.
 
         Returns:
-            BaseUVH: Stored prognostic variables.
+            BaseUVH: Stored physical variables.
         """
         verbose.display(
             msg=f"Loading reference data from {self._data.path}",

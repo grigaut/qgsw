@@ -73,17 +73,13 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
         """Synchronize both models to a given uvh.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             qg_proj (QGProjector): QG Projector to set initial for model_in.
                 This projector is the one associated with the model
                 which computed uvh.
-            dx (float): Infinitesimal distance in the X direction,
-                associated with the model which computed uvh.
-            dy (float): Infinitesimal distance in the y direction,
-                associated with the model which computed uvh.
             initial_condition_cat (str | ModelCategory): Category of the
                 initial condition, hence the category of the model
                 which computed uvh.
@@ -137,9 +133,9 @@ class Synchronizer(_Synchronizer[Reference]):
     def __call__(self) -> None:
         """Rescale if necessary and synchronize model to ref."""
         self._ref.at_time(self._model.time.item())
-        prognostic = self._ref.load()
+        physical = self._ref.load()
         self._ic.set_initial_condition(
-            prognostic.uvh,
+            physical.uvh,
             self._ref.retrieve_P(),
             self._ref.retrieve_category(),
         )

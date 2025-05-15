@@ -140,12 +140,12 @@ class Rescaler:
         """Enforce mass conservation.
 
         Args:
-            h_in (torch.Tensor): Input h.
-            h_out (torch.Tensor): Output h.
+            h_in (torch.Tensor): Input (physical) h.
+            h_out (torch.Tensor): Interpolated input (physical) h.
             hmask (torch.Tensor): H mask.
 
         Returns:
-            torch.Tensor: Output h with conserved mass.
+            torch.Tensor: Interpolated (physical) h with conserved mass.
         """
         for k in range(h_in.shape[-3]):
             h_out[0, k] += h_in[0, k].mean() - h_out[0, k].mean()
@@ -155,15 +155,13 @@ class Rescaler:
         """Rescale uvh.
 
         Args:
-            uvh (UVH): Input uvh: u,v and h.
+            uvh (UVH): Input (physical) uvh: u,v and h.
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
-            dx_in (float): Input dx.
-            dy_in (float): Input dy.
 
         Returns:
-            UVH: Output uvh: u,v and h.
+            UVH: Output (physical) uvh: u,v and h.
                 ├── u: (n_ens, nl, nx_out+1, ny_out)-shaped
                 ├── v: (n_ens, nl, nx_out, ny_out+1)-shaped
                 └── h: (n_ens, nl, nx_out, ny_out)-shaped
@@ -218,16 +216,14 @@ class Rescaler:
         """Rescale UVHT.
 
         Args:
-            uvht (UVHT): Input uvht: t,u,v and h.
+            uvht (UVHT): Input (physical) uvht: t,u,v and h.
                 ├── t: (n_ens, )-shaped
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
-            dx_in (float): Input dx.
-            dy_in (float): Input dy.
 
         Returns:
-            UVHT: Output uvht: t,u,v and h.
+            UVHT: Output (physical) uvht: t,u,v and h.
                 ├── t: (n_ens, )-shaped
                 ├── u: (n_ens, nl, nx_out+1, ny_out)-shaped
                 ├── v: (n_ens, nl, nx_out, ny_out+1)-shaped
@@ -245,17 +241,15 @@ class Rescaler:
         """Rescale UVHTAlpha.
 
         Args:
-            uvht_alpha (UVHTAlpha): Input uvhtα: t,α,u,v and h.
+            uvht_alpha (UVHTAlpha): Input (physical) uvhtα: t,α,u,v and h.
                 ├── t: (n_ens, )-shaped
                 ├── α: (n_ens, 1, nx_in, ny_in)-shaped
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
-            dx_in (float): Input dx.
-            dy_in (float): Input dy.
 
         Returns:
-            UVHTAlpha: Output uvhtα: t,α,u,v and h.
+            UVHTAlpha: Output (physical) uvhtα: t,α,u,v and h.
                 ├── t: (n_ens, )-shaped
                 ├── α: (n_ens, 1, nx_out, ny_out)-shaped
                 ├── u: (n_ens, nl, nx_out+1, ny_out)-shaped
@@ -292,20 +286,18 @@ class Rescaler:
         """Perform rescaling.
 
         Args:
-            prognostic (UVH | UVHT | UVHTAlpha): (t,α,)u,v and h.
+            prognostic (UVH | UVHT | UVHTAlpha): (physical) (t,α,)u,v and h.
                 ├── (t: (n_ens, )-shaped)
                 ├── (α: (n_ens, 1, nx_in, ny_in)-shaped)
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
-            dx_in (float): Input dx.
-            dy_in (float): Input dy.
 
         Raises:
             TypeError: If prognostic is neither UVH, UVHT or UVHTAlpha
 
         Returns:
-            UVH | UVHT | UVHTAlpha: (t,α,)u,v and h.
+            UVH | UVHT | UVHTAlpha: (physical) (t,α,)u,v and h.
                 ├── (t: (n_ens, )-shaped)
                 ├── (α: (n_ens, 1, nx_out, ny_out)-shaped)
                 ├── u: (n_ens, nl, nx_out+1, ny_out)-shaped
@@ -340,9 +332,7 @@ class Rescaler:
         is_qg = model.get_category() == ModelCategory.QUASI_GEOSTROPHIC
         qg_proj = model.P if is_qg else None
         return self(
-            model.prognostic,
-            model.space.dx,
-            model.space.dy,
+            model.physical,
             model.masks,
             qg_proj,
         )

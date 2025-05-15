@@ -123,14 +123,12 @@ class InitialCondition:
         """Rescale UVH.
 
         Args:
-            uvh (UVH): Input UVH.
+            uvh (UVH): Input (physical) UVH.
             P (QGProjector): Projects (if output is QG).
-            dx (float): Infinitesimal distance in the X direction.
-            dy (float): Infinitesimal distance in the Y direction.
 
         Returns:
-            tuple[UVH, QGProjector]: Interpolated UVH, QG projector whose
-                shapes matches new UVH shape
+            tuple[UVH, QGProjector]: Interpolated (physical) UVH, QG projector
+                whose shapes matches new UVH shape
         """
         _, _, nx, ny = uvh.h.shape
         nx_model, ny_model = self._model.space.nx, self._model.space.ny
@@ -158,13 +156,11 @@ class InitialCondition:
         Can only be used if input_condition_category has been set.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             P (QGProjector): QGProjector associated with input uvh.
-            dx (float): Input infinitesimal distance in the X direction.
-            dy (float): Input infinitesimal distance in the Y direction.
             input_category (str | ModelCategory, optional): Input model
                 category. Defaults to ModelCategory.SHALLOW_WATER
 
@@ -186,13 +182,11 @@ class InitialCondition:
         """Set initial condition from SW uvh.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             P (QGProjector): QGProjector associated with input uvh.
-            dx (float): Input infinitesimal distance in the X direction.
-            dy (float): Input infinitesimal distance in the Y direction.
         """
         verbose.display(
             msg=f"Setting initial condition for '{self._model.name}' model.",
@@ -224,7 +218,7 @@ class InitialCondition:
         """Set initial condition from QG uvh.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
@@ -268,7 +262,7 @@ class InitialCondition:
         """Set initial condition from file.
 
         Args:
-            file (str | Path): File to use as UVH input.
+            file (str | Path): File to use as (physical) UVH input.
             space_config (SpaceConfig): Space configuration
                 associated with input.
             model_config (ModelConfig): Model configuration
@@ -300,7 +294,7 @@ class InitialCondition:
         dtype: torch.dtype | None = None,
         device: torch.device | None = None,
     ) -> None:
-        """Set steady uvh.
+        """Set steady (physical) uvh.
 
         Args:
             dtype (torch.dtype | None, optional): Dtype. Defaults to None.
