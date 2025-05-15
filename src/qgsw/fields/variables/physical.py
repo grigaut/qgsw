@@ -5,6 +5,8 @@ This file regroups variables which are computed from the physical variables.
 
 from __future__ import annotations
 
+import contextlib
+
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.covariant import (
     PhysicalLayerDepthAnomaly,
@@ -26,6 +28,7 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.specs import DEVICE
+from qgsw.utils.covphys import to_cov
 from qgsw.utils.units._units import Unit
 
 try:
@@ -54,6 +57,7 @@ if TYPE_CHECKING:
         UVHTAlpha,
     )
     from qgsw.fields.variables.state import StateUVH
+    from qgsw.models.qg.uvh.projectors.core import QGProjector
 
 
 class SurfaceHeightAnomaly(DiagnosticVariable):
@@ -131,6 +135,56 @@ class Vorticity(DiagnosticVariable):
             torch.diff(vars_tuple.v[..., 1:-1], dim=-2) / self._dx
             - torch.diff(vars_tuple.u[..., 1:-1, :], dim=-1) / self._dy
         )
+
+
+class QGPressure(DiagnosticVariable):
+    """QGPressure.
+
+    └── (n_ens, nl, nx, ny)-shaped
+    """
+
+    _unit = Unit.M2S_2
+    _name = "p"
+    _description = "Pressure per unit of mass"
+    _scope = Scope.POINT_WISE
+
+    def __init__(
+        self,
+        P: QGProjector,  # noqa: N803
+        dx: float,
+        dy: float,
+    ) -> None:
+        """Instantiate the pressure variable.
+
+        Args:
+            P (QGprojector): Projector to use to retrieve pressure.
+            dx (float): Infinitesimal distance in the X direction.
+            dy (float): Infinitesimal distance in the Y direction.
+
+        """
+        self._P = P
+        self._dx = dx
+        self._dy = dy
+
+    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
+        """Compute the value of the variable.
+
+        Args:
+            vars_tuple (BaseUVH): Covariant variables
+            (t, α,) u,v and h.
+                ├── (t: (n_ens,)-shaped)
+                ├── (α: (n_ens,)-shaped)
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Pressure.
+                └── (n_ens, nl, nx, ny)-shaped
+        """
+        with contextlib.suppress(AttributeError):
+            self._P.alpha = vars_tuple.alpha
+        return self._P.compute_p(to_cov(vars_tuple, self._dx, self._dy))[1]
 
 
 class Pressure(DiagnosticVariable):

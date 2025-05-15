@@ -18,6 +18,7 @@ from qgsw.fields.variables.physical import (
     PotentialVorticity,
     Pressure,
     Psi2,
+    QGPressure,
     RefMeridionalVelocity2,
     RefZonalVelocity2,
     StreamFunction,
@@ -38,6 +39,7 @@ from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.modified.variables import (
     Psi21L,
 )
+from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
@@ -72,6 +74,8 @@ class QGVariableSet:
     def add_pressure(
         cls,
         var_dict: dict[str, DiagnosticVariable],
+        physics: PhysicsConfig,
+        space: SpaceConfig,
         model: ModelConfig,
     ) -> None:
         """Add pressure.
@@ -83,9 +87,10 @@ class QGVariableSet:
             physics (PhysicsConfig): Physics configuration.
         """
         var_dict[SurfaceHeightAnomaly.get_name()] = SurfaceHeightAnomaly()
-        var_dict[Pressure.get_name()] = Pressure(
-            model.g_prime,
-            var_dict[SurfaceHeightAnomaly.get_name()],
+        var_dict[QGPressure.get_name()] = QGPressure(
+            QGProjector.from_config(space, model, physics),
+            space.dx,
+            space.dy,
         )
 
     @classmethod
@@ -241,7 +246,7 @@ class QGVariableSet:
         """
         var_dict = {}
         cls.add_physical(var_dict)
-        cls.add_pressure(var_dict, model)
+        cls.add_pressure(var_dict, physics, space, model)
         cls.add_vorticity(var_dict, space, model, physics)
         cls.add_streamfunction(var_dict, physics, space, model)
         cls.add_enstrophy(var_dict)
@@ -292,7 +297,7 @@ class RefQGVariableSet(QGVariableSet):
             model (ModelConfig): Model Configuration, for compatibility only.
         """
         var_dict[StreamFunction.get_name()] = StreamFunction(
-            var_dict[Pressure.get_name()],
+            var_dict[QGPressure.get_name()],
             physics.f0,
         )
         var_dict[StreamFunctionFromVorticity.get_name()] = (
@@ -330,7 +335,7 @@ class RefQGVariableSet(QGVariableSet):
             raise ValueError(msg)
         var_dict = {}
         cls.add_physical(var_dict)
-        cls.add_pressure(var_dict, model)
+        cls.add_pressure(var_dict, physics, space, model)
         cls.add_vorticity(var_dict, space, model, physics)
         cls.add_streamfunction(var_dict, physics, space, model)
         cls.add_enstrophy(var_dict)

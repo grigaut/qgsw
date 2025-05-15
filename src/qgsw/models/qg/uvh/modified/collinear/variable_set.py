@@ -5,12 +5,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.covariant import QGPressure
 from qgsw.fields.variables.physical import (
     CollinearityCoefficientDiag,
     LayerDepthAnomaly,
     MeridionalVelocity,
     MeridionalVelocityFromPsi2,
+    QGPressure,
     StreamFunction,
     StreamFunctionFromVorticity,
     SurfaceHeightAnomaly,
@@ -72,7 +72,7 @@ class QGCollinearSFVariableSet(QGVariableSet):
         """
         var_dict[SurfaceHeightAnomaly.get_name()] = SurfaceHeightAnomaly()
         P = CollinearQGProjector.from_config(space, model, physics)  # noqa: N806
-        var_dict[QGPressure.get_name()] = QGPressure(P)
+        var_dict[QGPressure.get_name()] = QGPressure(P, space.dx, space.dy)
 
     @classmethod
     def add_streamfunction(

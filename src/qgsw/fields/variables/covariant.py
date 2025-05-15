@@ -11,7 +11,6 @@ try:
 except ImportError:
     from typing_extensions import Self
 
-import contextlib
 from typing import TYPE_CHECKING
 
 import torch
@@ -31,7 +30,6 @@ if TYPE_CHECKING:
     )
     from qgsw.fields.variables.state import StateUVH
     from qgsw.masks import Masks
-    from qgsw.models.qg.uvh.projectors.core import QGProjector
 
 
 class PhysicalZonalVelocity(DiagnosticVariable):
@@ -336,51 +334,6 @@ class MaskedVorticity(DiagnosticVariable):
             + self._w_vertical_bound * alpha * dx_v
             - self._w_horizontal_bound * alpha * dy_u
         )
-
-
-class QGPressure(DiagnosticVariable):
-    """QGPressure.
-
-    └── (n_ens, nl, nx, ny)-shaped
-    """
-
-    _unit = Unit.M2S_2
-    _name = "p"
-    _description = "Pressure per unit of mass"
-    _scope = Scope.POINT_WISE
-
-    def __init__(
-        self,
-        P: QGProjector,  # noqa: N803
-    ) -> None:
-        """Instantiate the pressure variable.
-
-        Args:
-            P (QGprojector): Projector to use to retrieve pressure.
-
-        """
-        self._P = P
-
-    def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
-        """Compute the value of the variable.
-
-        Args:
-            vars_tuple (BaseUVH): Covariant variables
-            (t, α,) u,v and h.
-                ├── (t: (n_ens,)-shaped)
-                ├── (α: (n_ens,)-shaped)
-                ├── u: (n_ens, nl, nx+1, ny)-shaped
-                ├── v: (n_ens, nl, nx, ny+1)-shaped
-                └── h: (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            torch.Tensor: Pressure.
-                └── (n_ens, nl, nx, ny)-shaped
-        """
-        raise NotImplementedError
-        with contextlib.suppress(AttributeError):
-            self._P.alpha = vars_tuple.alpha
-        return self._P.compute_p(vars_tuple)[1]
 
 
 class Pressure(DiagnosticVariable):
