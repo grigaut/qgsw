@@ -9,7 +9,7 @@ from qgsw.exceptions import ParallelSlicingError
 from qgsw.fields.variables.prognostic_tuples import (
     UVH,
     UVHT,
-    BasePrognosticUVH,
+    BaseUVH,
     UVHTAlpha,
 )
 from qgsw.specs import DEVICE
@@ -195,8 +195,8 @@ def test_slicing_uvh(
     prognostic: str,
     request: pytest.FixtureRequest,
 ) -> None:
-    """Test slicing on BasePrognosticUVH."""
-    base_uvh: BasePrognosticUVH = request.getfixturevalue(prognostic)
+    """Test slicing on BaseUVH."""
+    base_uvh: BaseUVH = request.getfixturevalue(prognostic)
     u, v, h = base_uvh.uvh.parallel_slice[:1, 0]
     u_ = base_uvh.uvh.u[:1, 0]
     v_ = base_uvh.uvh.v[:1, 0]
@@ -211,7 +211,7 @@ def test_slicing_depth_uvh(
     prognostic: str,
     request: pytest.FixtureRequest,
 ) -> None:
-    """Test slicing depth error on BasePrognosticUVH."""
-    base_uvh: BasePrognosticUVH = request.getfixturevalue(prognostic)
+    """Test slicing depth error on BaseUVH."""
+    base_uvh: BaseUVH = request.getfixturevalue(prognostic)
     with pytest.raises(ParallelSlicingError):
         base_uvh.uvh.parallel_slice[:1, 0, 0:1]

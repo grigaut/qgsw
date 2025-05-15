@@ -3,14 +3,14 @@
 import pytest
 import torch
 
-from qgsw.fields.variables.dynamics import (
+from qgsw.fields.variables.covariant import (
     MeridionalVelocityFlux,
-    PhysicalLayerDepthAnomaly,
-    PhysicalMeridionalVelocity,
-    PhysicalSurfaceHeightAnomaly,
-    PhysicalZonalVelocity,
-    Pressure,
     ZonalVelocityFlux,
+)
+from qgsw.fields.variables.physical import (
+    LayerDepthAnomaly,
+    Pressure,
+    SurfaceHeightAnomaly,
 )
 from qgsw.fields.variables.prognostic_tuples import UVHT
 from qgsw.fields.variables.state import StateUVH
@@ -51,10 +51,8 @@ def state() -> StateUVH:
 
 def test_slicing(state: StateUVH) -> None:
     """Test slicing with variables."""
-    dx = 2
-    dy = 3
     # Variables
-    h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
+    h_phys = LayerDepthAnomaly()
 
     h_phys.slices = [slice(0, 1), slice(0, 1), ...]
     h = h_phys.compute(state.prognostic)
@@ -68,11 +66,8 @@ def test_slicing(state: StateUVH) -> None:
 
 def test_slicing_bound(state: StateUVH) -> None:
     """Test slicing with bounded variables."""
-    dx = 2
-    dy = 3
     # Variables
-    h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
-    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
+    eta_phys = SurfaceHeightAnomaly()
     p = Pressure(
         g_prime=torch.tensor(
             [[[[10]], [[0.05]]]],
@@ -92,24 +87,6 @@ def test_slicing_bound(state: StateUVH) -> None:
     assert p_no_slice.shape == (1, 2, 10, 10)
 
     assert (p_no_slice.__getitem__(p_bound.slices) == p_value).shape
-
-
-def test_physical_prognostic_variables(state: StateUVH) -> None:
-    """Test the physical prognostic variables."""
-    dx = 2
-    dy = 3
-    # Variables
-    u_phys = PhysicalZonalVelocity(dx=dx)
-    v_phys = PhysicalMeridionalVelocity(dy=dy)
-    h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
-    # Compute physical variables
-    u_phys = u_phys.compute(state.prognostic)
-    v_phys = v_phys.compute(state.prognostic)
-    h_phys = h_phys.compute(state.prognostic)
-    # Assert values equality
-    assert (u_phys == state.prognostic.u / dx).all()
-    assert (v_phys == state.prognostic.v / dy).all()
-    assert (h_phys == state.prognostic.h / (dx * dy)).all()
 
 
 def test_velocity_flux(state: StateUVH) -> None:

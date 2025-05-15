@@ -5,23 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.dynamics import (
-    PhysicalLayerDepthAnomaly,
-    PhysicalMeridionalVelocity,
-    PhysicalMeridionalVelocityFromPsi2,
-    PhysicalSurfaceHeightAnomaly,
-    PhysicalVorticity,
-    PhysicalZonalVelocity,
-    PhysicalZonalVelocityFromPsi2,
-    QGPressure,
+from qgsw.fields.variables.covariant import QGPressure
+from qgsw.fields.variables.physical import (
+    CollinearityCoefficientDiag,
+    LayerDepthAnomaly,
+    MeridionalVelocity,
+    MeridionalVelocityFromPsi2,
     StreamFunction,
     StreamFunctionFromVorticity,
     SurfaceHeightAnomaly,
-)
-from qgsw.masks import Masks
-from qgsw.models.qg.stretching_matrix import compute_A
-from qgsw.models.qg.uvh.modified.filtered.pv import (
-    compute_g_tilde,
+    TimeDiag,
+    Vorticity,
+    ZonalVelocity,
+    ZonalVelocityFromPsi2,
 )
 from qgsw.models.qg.uvh.modified.filtered.variables import (
     CollinearFilteredPsi2,
@@ -30,10 +26,6 @@ from qgsw.models.qg.uvh.projectors.filtered import (
     CollinearFilteredQGProjector,
 )
 from qgsw.models.qg.uvh.variable_set import QGVariableSet
-from qgsw.spatial.core.coordinates import Coordinates1D
-from qgsw.spatial.core.discretization import SpaceDiscretization2D
-from qgsw.specs import defaults
-from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
@@ -49,7 +41,6 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
     def add_physical(
         cls,
         var_dict: dict[str, DiagnosticVariable],
-        space: SpaceConfig,
     ) -> None:
         """Add physical variables.
 
@@ -57,16 +48,12 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
             var_dict (dict[str, DiagnosticVariable]): Variables dict.
             space (SpaceConfig): Space configuration. configuration.
         """
-        var_dict[PhysicalZonalVelocity.get_name()] = PhysicalZonalVelocity(
-            space.dx,
-        )
-        var_dict[PhysicalMeridionalVelocity.get_name()] = (
-            PhysicalMeridionalVelocity(space.dy)
-        )
-        var_dict[PhysicalLayerDepthAnomaly.get_name()] = (
-            PhysicalLayerDepthAnomaly(
-                space.ds,
-            )
+        var_dict[TimeDiag.get_name()] = TimeDiag()
+        var_dict[ZonalVelocity.get_name()] = ZonalVelocity()
+        var_dict[MeridionalVelocity.get_name()] = MeridionalVelocity()
+        var_dict[LayerDepthAnomaly.get_name()] = LayerDepthAnomaly()
+        var_dict[CollinearityCoefficientDiag.get_name()] = (
+            CollinearityCoefficientDiag()
         )
 
     @classmethod
@@ -85,32 +72,9 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
             space (SpaceConfig): Space configuration.
             physics (PhysicsConfig): Physics configuration.
         """
-        specs = defaults.get()
         var_dict[SurfaceHeightAnomaly.get_name()] = SurfaceHeightAnomaly()
-        eta_phys_name = PhysicalSurfaceHeightAnomaly.get_name()
-        var_dict[eta_phys_name] = PhysicalSurfaceHeightAnomaly(
-            var_dict[PhysicalLayerDepthAnomaly.get_name()],
-        )
-        g_tilde = compute_g_tilde(model.g_prime)
-        space_2d = SpaceDiscretization2D.from_config(space)
-        P = CollinearFilteredQGProjector(  # noqa: N806
-            A=compute_A(
-                model.h[:1],
-                g_tilde,
-                **specs,
-            ),
-            H=model.h.unsqueeze(-1).unsqueeze(-1),
-            g_prime=model.g_prime.unsqueeze(-1).unsqueeze(-1),
-            space=space_2d.add_h(
-                Coordinates1D(points=model.h[:1], unit=Unit.M),
-            ),
-            f0=physics.f0,
-            masks=Masks.empty(space.nx, space.ny, specs["device"]),
-        )
-        P.filter.sigma = model.sigma
-        var_dict[QGPressure.get_name()] = QGPressure(
-            P,
-        )
+        P = CollinearFilteredQGProjector.from_config(space, model, physics)  # noqa: N806
+        var_dict[QGPressure.get_name()] = QGPressure(P)
 
     @classmethod
     def add_streamfunction(
@@ -134,7 +98,7 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
         )
         var_dict[StreamFunctionFromVorticity.get_name()] = (
             StreamFunctionFromVorticity(
-                var_dict[PhysicalVorticity.get_name()],
+                var_dict[Vorticity.get_name()],
                 space.nx,
                 space.ny,
                 space.dx,
@@ -145,14 +109,12 @@ class QGCollinearFilteredSFVariableSet(QGVariableSet):
             var_dict[StreamFunctionFromVorticity.get_name()],
             filt=CollinearFilteredQGProjector.create_filter(model.sigma),
         )
-        var_dict[PhysicalZonalVelocityFromPsi2.get_name()] = (
-            PhysicalZonalVelocityFromPsi2(
-                var_dict[CollinearFilteredPsi2.get_name()],
-                space.dy,
-            )
+        var_dict[ZonalVelocityFromPsi2.get_name()] = ZonalVelocityFromPsi2(
+            var_dict[CollinearFilteredPsi2.get_name()],
+            space.dy,
         )
-        var_dict[PhysicalMeridionalVelocityFromPsi2.get_name()] = (
-            PhysicalMeridionalVelocityFromPsi2(
+        var_dict[MeridionalVelocityFromPsi2.get_name()] = (
+            MeridionalVelocityFromPsi2(
                 var_dict[CollinearFilteredPsi2.get_name()],
                 space.dx,
             )

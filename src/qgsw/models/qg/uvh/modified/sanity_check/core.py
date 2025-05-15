@@ -153,6 +153,13 @@ class QGSanityCheck(
         self._baseline.set_uvh(u, v, h)
         return super().set_uvh(u[:, :1], v[:, :1], h[:, :1])
 
+    def _set_io(self, state: StateUVHAlpha) -> None:
+        self._io = IO(
+            state.t,
+            state.alpha,
+            *state.physical,
+        )
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StateUVHAlpha.steady(
@@ -162,13 +169,6 @@ class QGSanityCheck(
             ny=self.space.ny,
             dtype=self.dtype,
             device=self.device.get(),
-        )
-        self._io = IO(
-            t=self._state.t,
-            u=self._state.u,
-            v=self._state.v,
-            h=self._state.h,
-            alpha=self._state.alpha,
         )
 
     def _set_projector(self) -> None:

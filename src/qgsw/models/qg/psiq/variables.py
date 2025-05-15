@@ -23,7 +23,7 @@ class Psi2(DiagnosticVariable):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticUVH): Prognostic variables
+            prognostic (BaseUVH): Prognostic variables
             psi and q.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
                 └── q: (n_ens, nl, nx, ny)-shaped
@@ -42,7 +42,7 @@ class Psi21L(Psi2):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticUVH): Prognostic variables
+            prognostic (BaseUVH): Prognostic variables
             psi and q.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
                 └── q: (n_ens, nl, nx, ny)-shaped

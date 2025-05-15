@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.dynamics import (
+from qgsw.fields.variables.physical import (
     ProgPotentialVorticityDiag,
     ProgStreamFunctionDiag,
     TimeDiag,

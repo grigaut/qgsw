@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 
+from typing_extensions import Self
+
 from qgsw.exceptions import ParallelSlicingError
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
@@ -23,7 +25,7 @@ except ImportError:
     from typing_extensions import Self
 
 
-from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Generic, NamedTuple, Self, TypeVar
 
 import torch
 
@@ -112,7 +114,7 @@ class BasePrognosticPSIQ(BasePrognosticTuple, metaclass=ABCMeta):
         """PSIQ."""
 
 
-class BasePrognosticUVH(BasePrognosticTuple, metaclass=ABCMeta):
+class BaseUVH(BasePrognosticTuple, metaclass=ABCMeta):
     """Base Prognostic tuple for UVH tuple."""
 
     u: torch.Tensor
@@ -123,6 +125,19 @@ class BasePrognosticUVH(BasePrognosticTuple, metaclass=ABCMeta):
     @abstractmethod
     def uvh(self) -> UVH:
         """UVH."""
+
+    @abstractmethod
+    def with_uvh(self, uvh: UVH) -> Self:
+        """Update the tuple by specifying new UVH.
+
+        Usefult to switch from covariant to physical and reverse.
+
+        Args:
+            uvh (UVH): UVH.
+
+        Returns:
+            Self: New tuple.
+        """
 
 
 class _PSIQ(NamedTuple):
@@ -485,7 +500,7 @@ class _UVHTAlpha(NamedTuple):
     alpha: torch.Tensor
 
 
-class UVH(BasePrognosticUVH, _UVH):
+class UVH(BaseUVH, _UVH):
     """Zonal velocity, meridional velocity and layer thickness."""
 
     @property
@@ -497,6 +512,19 @@ class UVH(BasePrognosticUVH, _UVH):
     def parallel_slice(self) -> ParallelSlice[UVH]:
         """Parallel slicing object."""
         return ParallelSlice(self, slice_depth=2)
+
+    def with_uvh(self, uvh: UVH) -> UVH:
+        """Update the tuple by specifying new UVH.
+
+        Usefult to switch from covariant to physical and reverse.
+
+        Args:
+            uvh (UVH): UVH.
+
+        Returns:
+            UVH: New tuple.
+        """
+        return uvh
 
     @classmethod
     def steady(
@@ -564,7 +592,7 @@ class UVH(BasePrognosticUVH, _UVH):
         return cls(u=u, v=v, h=h)
 
 
-class UVHT(BasePrognosticUVH, _UVHT):
+class UVHT(BaseUVH, _UVHT):
     """Time, Zonal velocity, meridional velocity and layer thickness."""
 
     @property
@@ -590,6 +618,19 @@ class UVHT(BasePrognosticUVH, _UVHT):
             UVHT: UVHT
         """
         return UVHT.from_uvh(self.t + dt, self.uvh)
+
+    def with_uvh(self, uvh: UVH) -> UVHT:
+        """Update the tuple by specifying new UVH.
+
+        Usefult to switch from covariant to physical and reverse.
+
+        Args:
+            uvh (UVH): UVH.
+
+        Returns:
+            UVHT: New tuple.
+        """
+        return UVHT.from_uvh(self.t, uvh)
 
     @classmethod
     def from_uvh(cls, t: torch.Tensor, uvh: UVH) -> Self:
@@ -662,7 +703,7 @@ class UVHT(BasePrognosticUVH, _UVHT):
         return cls.from_uvh(t, UVH.from_file(file, dtype=dtype, device=device))
 
 
-class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
+class UVHTAlpha(BaseUVH, _UVHTAlpha):
     """Time, alpha, Zonal velocity,meridional velocity and layer thickness."""
 
     @property
@@ -701,6 +742,19 @@ class UVHTAlpha(BasePrognosticUVH, _UVHTAlpha):
             UVHTAlpha: UVHTAlpha.
         """
         return UVHTAlpha.from_uvht(self.alpha, self.uvht.increment_time(dt))
+
+    def with_uvh(self, uvh: UVH) -> UVHT:
+        """Update the tuple by specifying new UVH.
+
+        Usefult to switch from covariant to physical and reverse.
+
+        Args:
+            uvh (UVH): UVH.
+
+        Returns:
+            UVHT: New tuple.
+        """
+        return UVHTAlpha.from_uvh(self.t, self.alpha, uvh)
 
     @classmethod
     def from_uvh(cls, t: torch.Tensor, alpha: torch.Tensor, uvh: UVH) -> Self:

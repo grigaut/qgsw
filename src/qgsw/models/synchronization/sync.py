@@ -53,8 +53,6 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
         self._ic.set_initial_condition(
             self._ref.prognostic.uvh,
             self._ref.P,
-            self._ref.space.dx,
-            self._ref.space.dy,
             self._ref.get_category(),
         )
         verbose.display(
@@ -70,8 +68,6 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
         uvh: UVH,
         qg_proj: QGProjector,
         *,
-        dx: float,
-        dy: float,
         initial_condition_cat: str | ModelCategory,
     ) -> None:
         """Synchronize both models to a given uvh.
@@ -96,8 +92,6 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
         syncin.set_initial_condition(
             uvh,
             qg_proj,
-            dx,
-            dy,
             initial_condition_cat,
         )
         self()
@@ -144,11 +138,8 @@ class Synchronizer(_Synchronizer[Reference]):
         """Rescale if necessary and synchronize model to ref."""
         self._ref.at_time(self._model.time.item())
         prognostic = self._ref.load()
-        dx, dy = self._ref.retrieve_dxdy()
         self._ic.set_initial_condition(
             prognostic.uvh,
             self._ref.retrieve_P(),
-            dx,
-            dy,
             self._ref.retrieve_category(),
         )

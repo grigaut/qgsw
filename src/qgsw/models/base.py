@@ -15,12 +15,17 @@ from qgsw.exceptions import (
     IncoherentWithMaskError,
     UnsetTimestepError,
 )
+from qgsw.fields.variables.covariant import (
+    PhysicalLayerDepthAnomaly,
+    PhysicalMeridionalVelocity,
+    PhysicalZonalVelocity,
+)
 from qgsw.fields.variables.prognostic_tuples import (
     PSIQ,
     UVH,
     BasePrognosticPSIQ,
     BasePrognosticTuple,
-    BasePrognosticUVH,
+    BaseUVH,
 )
 from qgsw.fields.variables.state import BaseState, BaseStateUVH, StateUVH
 from qgsw.models.core import finite_diff, flux
@@ -49,7 +54,7 @@ if TYPE_CHECKING:
 Prognostic = TypeVar("Prognostic", bound=BasePrognosticTuple)
 AdvectedPrognostic = TypeVar("AdvectedPrognostic", bound=Union[UVH, PSIQ])
 State = TypeVar("State", bound=BaseState)
-PrognosticUVH = TypeVar("PrognosticUVH", bound=BasePrognosticUVH)
+PrognosticUVH = TypeVar("PrognosticUVH", bound=BaseUVH)
 PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePrognosticPSIQ)
 
 
@@ -388,6 +393,12 @@ class ModelUVH(
         self._set_fluxes(optimize)
 
     @property
+    def physical(self) -> PrognosticUVH:
+        """Physical UVH."""
+        u, v, h = self._state.physical
+        return self.prognostic.with_uvh(UVH(u.get(), v.get(), h.get()))
+
+    @property
     def u(self) -> torch.Tensor:
         """StateUVH Variable u: Zonal Speed.
 
@@ -416,6 +427,27 @@ class ModelUVH(
     def P(self) -> QGProjector:  # noqa: N802
         """QG Projector."""
 
+    def _set_io(self, state: State_uvh) -> None:
+        self._io = IO(
+            state.t,
+            *state.physical,
+        )
+
+    def _create_physical_variables(self, state: State_uvh) -> None:
+        u_phys = PhysicalZonalVelocity(self.space.dx)
+        v_phys = PhysicalMeridionalVelocity(self.space.dy)
+        h_phys = PhysicalLayerDepthAnomaly(self.space.ds)
+
+        u_phys.bind(state)
+        v_phys.bind(state)
+        h_phys.bind(state)
+
+        self._set_io(state)
+
+    def _create_diagnostic_vars(self, state: State_uvh) -> None:
+        super()._create_diagnostic_vars(state)
+        self._create_physical_variables(state)
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StateUVH.steady(
@@ -425,12 +457,6 @@ class ModelUVH(
             ny=self.space.ny,
             dtype=self.dtype,
             device=self.device.get(),
-        )
-        self._io = IO(
-            t=self._state.t,
-            u=self._state.u,
-            v=self._state.v,
-            h=self._state.h,
         )
 
     def _set_fluxes(self, optimize: bool) -> None:  # noqa: FBT001

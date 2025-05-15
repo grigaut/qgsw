@@ -286,6 +286,9 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             OptimizableFunction(div_flux) if self._optim else div_flux
         )
 
+    def _set_io(self, state: StatePSIQ) -> None:
+        self._io = IO(state.t, state.psi, state.q)
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StatePSIQ.steady(
@@ -296,11 +299,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             dtype=self.dtype,
             device=self.device.get(),
         )
-        self._io = IO(
-            t=self._state.t,
-            psi=self._state.psi,
-            q=self._state.q,
-        )
+        self._set_io(self._state)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
 

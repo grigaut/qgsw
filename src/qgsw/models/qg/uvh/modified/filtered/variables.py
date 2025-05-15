@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.dynamics import (
+from qgsw.fields.variables.physical import (
     Psi2,
     StreamFunctionFromVorticity,
 )

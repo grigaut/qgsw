@@ -49,7 +49,7 @@ testdata = [
 def test_rescaling(rescaler: Rescaler, nxin: int, nyin: int) -> None:
     """Test rescaling shapes validity."""
     uvh = uvh_nxny(nxin, nyin)
-    uvh_i = rescaler(uvh, 1, 1)
+    uvh_i = rescaler(uvh)
     assert uvh_i.h.shape[-2:] == rescaler.output_hshape
 
 
@@ -68,7 +68,7 @@ def test_rescaling_shape_mismatch(
     """Test rescaling error when input shapes are not matching."""
     uvh = uvh_nxny(nxin, nyin)
     with pytest.raises(RescalingShapeMismatchError):
-        rescaler(uvh, 1, 1)
+        rescaler(uvh)
 
 
 testdata = [
@@ -108,7 +108,7 @@ def test_masks(
     model: ModelUVH = request.getfixturevalue(model_fixture)
     rescaler = Rescaler.for_model(model)
     uvh = uvh_nxny(nxin, nyin)
-    uvh_i = rescaler(uvh, 1, 1)
+    uvh_i = rescaler(uvh)
     assert (uvh_i.u * model.masks.u == uvh_i.u).all()
     assert (uvh_i.v * model.masks.v == uvh_i.v).all()
     assert (uvh_i.h * model.masks.h == uvh_i.h).all()

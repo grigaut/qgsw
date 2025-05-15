@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 import torch
 
-from qgsw.fields.variables.dynamics import (
-    LayerDepthAnomalyDiag,
-    MeridionalVelocityDiag,
-    ZonalVelocityDiag,
+from qgsw.fields.variables.physical import (
+    LayerDepthAnomaly,
+    MeridionalVelocity,
+    ZonalVelocity,
 )
 from qgsw.fields.variables.prognostic import CollinearityCoefficient, Time
 from qgsw.fields.variables.prognostic_tuples import (
@@ -93,9 +93,9 @@ class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
             device=self.device,
         )
         t = data[Time.get_name()]
-        u = data[ZonalVelocityDiag.get_name()]
-        v = data[MeridionalVelocityDiag.get_name()]
-        h = data[LayerDepthAnomalyDiag.get_name()]
+        u = data[ZonalVelocity.get_name()]
+        v = data[MeridionalVelocity.get_name()]
+        h = data[LayerDepthAnomaly.get_name()]
         return UVHT(u, v, h, t)
 
 
@@ -114,9 +114,9 @@ class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
             device=self.device,
         )
         t = data[Time.get_name()]
-        u = data[ZonalVelocityDiag.get_name()]
-        v = data[MeridionalVelocityDiag.get_name()]
-        h = data[LayerDepthAnomalyDiag.get_name()]
+        u = data[ZonalVelocity.get_name()]
+        v = data[MeridionalVelocity.get_name()]
+        h = data[LayerDepthAnomaly.get_name()]
         alpha = data[CollinearityCoefficient.get_name()]
         return UVHTAlpha(u, v, h, t, alpha)
 
