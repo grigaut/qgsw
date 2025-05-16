@@ -25,7 +25,7 @@ except ImportError:
     from typing_extensions import Self
 
 
-from typing import TYPE_CHECKING, Generic, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 import torch
 
