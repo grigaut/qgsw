@@ -71,3 +71,7 @@ class UnspecifiedConditionCategoryError(Exception):
 
 class RescalingShapeMismatchError(Exception):
     """When rescaling shapes mismatch."""
+
+
+class StateBindingError(Exception):
+    """When error occurs with state binding."""
