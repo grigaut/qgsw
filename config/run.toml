@@ -13,6 +13,7 @@ slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11
 bottom_drag_coefficient = 3.60577e-8
+Ro = 0.1
 
 [simulation]
 type = "simple-run"

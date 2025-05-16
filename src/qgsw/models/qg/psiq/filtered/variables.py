@@ -9,7 +9,7 @@ import torch
 from qgsw.models.qg.psiq.variables import Psi2
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.prognostic_tuples import PSIQTAlpha
+    from qgsw.fields.variables.tuples import PSIQTAlpha
     from qgsw.filters.base import _Filter
 
 
@@ -40,7 +40,7 @@ class CollinearFilteredPsi2(Psi2):
         """Compute the variable value.
 
         Args:
-            prognostic (BasePrognosticUVH): Prognostic variables t, α,
+            prognostic (BaseUVH): Prognostic variables t, α,
             psi and q.
                 ├── t: (n_ens)-shaped
                 ├── α: (n_ens, 1, nx+1, ny+1)-shaped

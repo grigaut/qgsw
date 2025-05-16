@@ -29,7 +29,7 @@ class MeridionalVelocity(PrognosticVariable):
     _scope = Scope.POINT_WISE
     _unit = Unit.M2S_1
     _name = "v"
-    _description = "Covariant meriodional velocity"
+    _description = "Covariant meridional velocity"
 
 
 class LayerDepthAnomaly(PrognosticVariable):

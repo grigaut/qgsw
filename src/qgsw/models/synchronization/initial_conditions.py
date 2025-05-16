@@ -6,13 +6,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from qgsw import verbose
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     UVH,
 )
 from qgsw.models.names import ModelCategory, get_category
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.synchronization.rescaling import Rescaler
 from qgsw.specs import defaults
+from qgsw.utils import covphys
 
 if TYPE_CHECKING:
     import torch
@@ -118,31 +119,21 @@ class InitialCondition:
         self,
         uvh: UVH,
         P: QGProjector,  # noqa: N803
-        dx: float,
-        dy: float,
     ) -> tuple[UVH, QGProjector]:
         """Rescale UVH.
 
         Args:
-            uvh (UVH): Input UVH.
+            uvh (UVH): Input (physical) UVH.
             P (QGProjector): Projects (if output is QG).
-            dx (float): Infinitesimal distance in the X direction.
-            dy (float): Infinitesimal distance in the Y direction.
 
         Returns:
-            tuple[UVH, QGProjector]: Interpolated UVH, QG projector whose
-                shapes matches new UVH shape
+            tuple[UVH, QGProjector]: Interpolated (physical) UVH, QG projector
+                whose shapes matches new UVH shape
         """
         _, _, nx, ny = uvh.h.shape
         nx_model, ny_model = self._model.space.nx, self._model.space.ny
         require_scaling = nx != nx_model or ny != ny_model
         if not require_scaling:
-            self._raise_if_different_steps(
-                dxin=dx,
-                dyin=dy,
-                dxout=self._model.space.dx,
-                dyout=self._model.space.dy,
-            )
             return uvh, P
         self._raise_if_incompatible_shapes(
             nxin=nx,
@@ -150,7 +141,7 @@ class InitialCondition:
             nxout=nx_model,
             nyout=ny_model,
         )
-        uvh_i = self._rescaler(uvh, dx, dy)
+        uvh_i = self._rescaler(uvh)
         qg_proj_in = P.to_shape(nx_model, ny_model)
         return uvh_i, qg_proj_in
 
@@ -158,8 +149,6 @@ class InitialCondition:
         self,
         uvh: UVH,
         P: QGProjector,  # noqa: N803
-        dx: float,
-        dy: float,
         input_category: str | ModelCategory = ModelCategory.SHALLOW_WATER,
     ) -> None:
         """Set the initial condition.
@@ -167,23 +156,21 @@ class InitialCondition:
         Can only be used if input_condition_category has been set.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             P (QGProjector): QGProjector associated with input uvh.
-            dx (float): Input infinitesimal distance in the X direction.
-            dy (float): Input infinitesimal distance in the Y direction.
             input_category (str | ModelCategory, optional): Input model
-                category. Defaults to ModelCategory.SHALLOW_WTAER
+                category. Defaults to ModelCategory.SHALLOW_WATER
 
         Raises:
             ValueError: If the model category is not recognized.
         """
         if input_category == ModelCategory.QUASI_GEOSTROPHIC:
-            return self.set_initial_condition_from_qg(uvh, P, dx, dy)
+            return self.set_initial_condition_from_qg(uvh, P)
         if input_category == ModelCategory.SHALLOW_WATER:
-            return self.set_initial_condition_from_sw(uvh, P, dx, dy)
+            return self.set_initial_condition_from_sw(uvh, P)
         msg = f"Unrecognized model category: {input_category}."
         raise ValueError(msg)
 
@@ -191,32 +178,33 @@ class InitialCondition:
         self,
         uvh: UVH,
         P: QGProjector,  # noqa: N803
-        dx: float,
-        dy: float,
     ) -> None:
         """Set initial condition from SW uvh.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             P (QGProjector): QGProjector associated with input uvh.
-            dx (float): Input infinitesimal distance in the X direction.
-            dy (float): Input infinitesimal distance in the Y direction.
         """
         verbose.display(
             msg=f"Setting initial condition for '{self._model.name}' model.",
             trigger_level=2,
         )
-        uvh_i, proj_i = self._rescale(uvh, P, dx, dy)
+        uvh_i, proj_i = self._rescale(uvh, P)
         if self._model.get_category() == ModelCategory.QUASI_GEOSTROPHIC:
             # SW -> QG
-            p_qg = proj_i.compute_p(uvh_i)[0]
+            uvh_cov = covphys.to_cov(
+                uvh_i,
+                self._model.space.dx,
+                self._model.space.dy,
+            )
+            p_qg = proj_i.compute_p(uvh_cov)[0]
             self._model.set_p(p_qg[:, : self._nl])
         else:
             # SW -> SW
-            self._model.set_uvh(*uvh_i.parallel_slice[:, : self._nl])
+            self._model.set_physical_uvh(*uvh_i.parallel_slice[:, : self._nl])
         verbose.display(
             msg="Initial condition set.",
             trigger_level=2,
@@ -226,34 +214,35 @@ class InitialCondition:
         self,
         uvh: UVH,
         P: QGProjector,  # noqa: N803
-        dx: float,
-        dy: float,
     ) -> None:
         """Set initial condition from QG uvh.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             P (QGProjector): QGProjector associated with input uvh.
-            dx (float): Input infinitesimal distance in the X direction.
-            dy (float): Input infinitesimal distance in the Y direction.
         """
         verbose.display(
             msg=f"Setting initial condition for '{self._model.name}' model.",
             trigger_level=2,
         )
-        uvh_i, proj_i = self._rescale(uvh, P, dx, dy)
+        uvh_i, proj_i = self._rescale(uvh, P)
         if self._model.get_category() == ModelCategory.SHALLOW_WATER:
             # QG -> SW
-            self._model.set_uvh(*uvh_i.parallel_slice[:, : self._nl])
+            self._model.set_physical_uvh(*uvh_i.parallel_slice[:, : self._nl])
         elif self._model.space.nl == uvh_i.h.shape[-3]:
             # QG -> QG with same number of layers
-            self._model.set_uvh(*uvh_i)
+            self._model.set_physical_uvh(*uvh_i)
         else:
             # QG -> QG
-            p_qg = proj_i.compute_p(uvh_i)[0]
+            uvh_cov = covphys.to_cov(
+                uvh_i,
+                self._model.space.dx,
+                self._model.space.dy,
+            )
+            p_qg = proj_i.compute_p(uvh_cov)[0]
             self._model.set_p(p_qg[:, : self._nl])
         verbose.display(
             msg="Initial condition set.",
@@ -273,7 +262,7 @@ class InitialCondition:
         """Set initial condition from file.
 
         Args:
-            file (str | Path): File to use as UVH input.
+            file (str | Path): File to use as (physical) UVH input.
             space_config (SpaceConfig): Space configuration
                 associated with input.
             model_config (ModelConfig): Model configuration
@@ -296,8 +285,6 @@ class InitialCondition:
                 physics_config,
                 **specs,
             ),
-            dx=space_config.dx,
-            dy=space_config.dy,
             input_category=get_category(model_config.type),
         )
 
@@ -307,7 +294,7 @@ class InitialCondition:
         dtype: torch.dtype | None = None,
         device: torch.device | None = None,
     ) -> None:
-        """Set steady uvh.
+        """Set steady (physical) uvh.
 
         Args:
             dtype (torch.dtype | None, optional): Dtype. Defaults to None.
@@ -332,7 +319,7 @@ class InitialCondition:
             ny=ny,
             **specs,
         )
-        self._model.set_uvh(*uvh)
+        self._model.set_physical_uvh(*uvh)
         verbose.display(
             msg="Initial condition set.",
             trigger_level=2,

@@ -21,6 +21,7 @@ class PhysicsConfig(BaseModel):
     f0: float
     beta: float
     bottom_drag_coefficient: float = Field(ge=0, le=1)
+    Ro: PositiveFloat = 0.1
 
     @cached_property
     def beta_plane(self) -> BetaPlane:

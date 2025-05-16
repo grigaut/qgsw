@@ -9,12 +9,12 @@ import torch
 
 from qgsw import verbose
 from qgsw.exceptions import UnsetStencilError
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
+from qgsw.fields.variables.tuples import (
     PSIQ,
     PSIQT,
-    BasePrognosticPSIQ,
+    BasePSIQ,
 )
-from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
 from qgsw.masks import Masks
 from qgsw.models.base import _Model
 from qgsw.models.core import schemes
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
-T = TypeVar("T", bound=BasePrognosticPSIQ)
+T = TypeVar("T", bound=BasePSIQ)
 State = TypeVar("State", bound=BaseStatePSIQ)
 
 
@@ -286,6 +286,9 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             OptimizableFunction(div_flux) if self._optim else div_flux
         )
 
+    def _set_io(self, state: StatePSIQ) -> None:
+        self._io = IO(state.t, state.psi, state.q)
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StatePSIQ.steady(
@@ -296,11 +299,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             dtype=self.dtype,
             device=self.device.get(),
         )
-        self._io = IO(
-            t=self._state.t,
-            psi=self._state.psi,
-            q=self._state.q,
-        )
+        self._set_io(self._state)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
 
