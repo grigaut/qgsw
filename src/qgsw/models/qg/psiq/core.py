@@ -9,12 +9,12 @@ import torch
 
 from qgsw import verbose
 from qgsw.exceptions import UnsetStencilError
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
+from qgsw.fields.variables.tuples import (
     PSIQ,
     PSIQT,
-    BasePrognosticPSIQ,
+    BasePSIQ,
 )
-from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
 from qgsw.masks import Masks
 from qgsw.models.base import _Model
 from qgsw.models.core import schemes
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
-T = TypeVar("T", bound=BasePrognosticPSIQ)
+T = TypeVar("T", bound=BasePSIQ)
 State = TypeVar("State", bound=BaseStatePSIQ)
 
 

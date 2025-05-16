@@ -4,7 +4,7 @@ import torch
 
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.base import DiagnosticVariable
-from qgsw.fields.variables.prognostic_tuples import BasePrognosticPSIQ
+from qgsw.fields.variables.tuples import BasePSIQ
 from qgsw.utils.units._units import Unit
 
 
@@ -19,7 +19,7 @@ class Psi2(DiagnosticVariable):
     _description = "Stream function in second layer"
     _scope = Scope.POINT_WISE
 
-    def _compute(self, prognostic: BasePrognosticPSIQ) -> torch.Tensor:
+    def _compute(self, prognostic: BasePSIQ) -> torch.Tensor:
         """Compute the variable value.
 
         Args:
@@ -38,7 +38,7 @@ class Psi2(DiagnosticVariable):
 class Psi21L(Psi2):
     """PSi2 for one layer models."""
 
-    def _compute(self, prognostic: BasePrognosticPSIQ) -> torch.Tensor:
+    def _compute(self, prognostic: BasePSIQ) -> torch.Tensor:
         """Compute the variable value.
 
         Args:

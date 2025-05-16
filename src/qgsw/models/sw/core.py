@@ -20,13 +20,13 @@ from qgsw.fields.variables.covariant import (
     PressureTilde,
     ZonalVelocityFlux,
 )
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import BaseStateUVH, StateUVH, StateUVHAlpha
+from qgsw.fields.variables.tuples import (
     UVH,
     UVHT,
     BaseUVH,
     UVHTAlpha,
 )
-from qgsw.fields.variables.state import BaseStateUVH, StateUVH, StateUVHAlpha
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import overload
 
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     UVH,
     UVHT,
     BaseUVH,

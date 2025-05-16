@@ -9,7 +9,7 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.exceptions import RescalingShapeMismatchError
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     UVH,
     UVHT,
     UVHTAlpha,

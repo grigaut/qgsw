@@ -8,7 +8,7 @@ from qgsw.fields.variables.physical import (
     Pressure,
     SurfaceHeightAnomaly,
 )
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.specs import DEVICE
 
 

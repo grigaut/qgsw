@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from qgsw import verbose
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     UVH,
 )
 from qgsw.models.names import ModelCategory, get_category

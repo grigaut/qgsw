@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from qgsw.exceptions import RescalingShapeMismatchError
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.models.synchronization.rescaling import Rescaler
 from qgsw.specs import defaults
 

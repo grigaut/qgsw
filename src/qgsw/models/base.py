@@ -20,14 +20,14 @@ from qgsw.fields.variables.covariant import (
     PhysicalMeridionalVelocity,
     PhysicalZonalVelocity,
 )
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import BaseState, BaseStateUVH, StateUVH
+from qgsw.fields.variables.tuples import (
     PSIQ,
     UVH,
-    BasePrognosticPSIQ,
-    BasePrognosticTuple,
+    BasePSIQ,
+    BaseTuple,
     BaseUVH,
 )
-from qgsw.fields.variables.state import BaseState, BaseStateUVH, StateUVH
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -51,11 +51,11 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.grid import Grid2D
     from qgsw.specs._utils import Device
 
-Prognostic = TypeVar("Prognostic", bound=BasePrognosticTuple)
+Prognostic = TypeVar("Prognostic", bound=BaseTuple)
 AdvectedPrognostic = TypeVar("AdvectedPrognostic", bound=Union[UVH, PSIQ])
 State = TypeVar("State", bound=BaseState)
 PrognosticUVH = TypeVar("PrognosticUVH", bound=BaseUVH)
-PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePrognosticPSIQ)
+PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePSIQ)
 
 
 class ModelCounter(type):

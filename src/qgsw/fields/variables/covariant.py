@@ -24,11 +24,11 @@ from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.prognostic_tuples import (
+    from qgsw.fields.variables.state import StateUVH
+    from qgsw.fields.variables.tuples import (
         BaseUVH,
         UVHTAlpha,
     )
-    from qgsw.fields.variables.state import StateUVH
     from qgsw.masks import Masks
 
 

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class BasePrognosticTuple:
+class BaseTuple:
     """Prognostic tuple base class."""
 
     def __mul__(self, other: float) -> Self:
@@ -53,7 +53,7 @@ class BasePrognosticTuple:
         return self.__add__(-1 * other)
 
 
-P = TypeVar("P", bound=BasePrognosticTuple)
+P = TypeVar("P", bound=BaseTuple)
 
 
 class ParallelSlice(Generic[P]):
@@ -102,7 +102,7 @@ class ParallelSlice(Generic[P]):
         return self._prognostic.__class__(*[v[key] for v in self._prognostic])
 
 
-class BasePrognosticPSIQ(BasePrognosticTuple, metaclass=ABCMeta):
+class BasePSIQ(BaseTuple, metaclass=ABCMeta):
     """Base Prognostic tuple for PSIQ tuple."""
 
     psi: torch.Tensor
@@ -114,7 +114,7 @@ class BasePrognosticPSIQ(BasePrognosticTuple, metaclass=ABCMeta):
         """PSIQ."""
 
 
-class BaseUVH(BasePrognosticTuple, metaclass=ABCMeta):
+class BaseUVH(BaseTuple, metaclass=ABCMeta):
     """Base Prognostic tuple for UVH tuple."""
 
     u: torch.Tensor
@@ -164,7 +164,7 @@ class _PSIQTAlpha(NamedTuple):
     alpha: torch.Tensor
 
 
-class PSIQ(BasePrognosticPSIQ, _PSIQ):
+class PSIQ(BasePSIQ, _PSIQ):
     """Stream function and potential vorticity."""
 
     @property
@@ -245,7 +245,7 @@ class PSIQ(BasePrognosticPSIQ, _PSIQ):
         return cls(psi=psi, q=q)
 
 
-class PSIQT(BasePrognosticPSIQ, _PSIQT):
+class PSIQT(BasePSIQ, _PSIQT):
     """Stream function, potential vorticity and time."""
 
     @property
@@ -342,7 +342,7 @@ class PSIQT(BasePrognosticPSIQ, _PSIQT):
         )
 
 
-class PSIQTAlpha(BasePrognosticPSIQ, _PSIQTAlpha):
+class PSIQTAlpha(BasePSIQ, _PSIQTAlpha):
     """Time, alpha, stream function and potential vorticity."""
 
     @property

@@ -13,7 +13,7 @@ from qgsw.fields.variables.physical import (
     TotalKineticEnergy,
     compute_W,
 )
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.specs import DEVICE
 

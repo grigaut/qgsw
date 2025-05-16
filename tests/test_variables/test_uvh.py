@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from qgsw.exceptions import ParallelSlicingError
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     UVH,
     UVHT,
     BaseUVH,

@@ -9,7 +9,7 @@ import torch
 from qgsw.models.qg.psiq.variables import Psi2
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.prognostic_tuples import PSIQTAlpha
+    from qgsw.fields.variables.tuples import PSIQTAlpha
     from qgsw.filters.base import _Filter
 
 

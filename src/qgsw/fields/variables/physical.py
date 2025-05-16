@@ -50,13 +50,13 @@ from qgsw.models.core.utils import OptimizableFunction
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.prognostic_tuples import (
+    from qgsw.fields.variables.state import StateUVH
+    from qgsw.fields.variables.tuples import (
         UVHT,
-        BasePrognosticPSIQ,
+        BasePSIQ,
         BaseUVH,
         UVHTAlpha,
     )
-    from qgsw.fields.variables.state import StateUVH
     from qgsw.models.qg.uvh.projectors.core import QGProjector
 
 
@@ -935,7 +935,7 @@ class ProgStreamFunctionDiag(DiagnosticVariable):
     _description = PrognosticStreamFunction.get_description()
     _scope = PrognosticStreamFunction.get_scope()
 
-    def _compute(self, vars_tuple: BasePrognosticPSIQ) -> torch.Tensor:
+    def _compute(self, vars_tuple: BasePSIQ) -> torch.Tensor:
         """Compute variable value.
 
         Args:
@@ -963,7 +963,7 @@ class ProgPotentialVorticityDiag(DiagnosticVariable):
     _description = PrognosticPotentialVorticity.get_description()
     _scope = PrognosticPotentialVorticity.get_scope()
 
-    def _compute(self, vars_tuple: BasePrognosticPSIQ) -> torch.Tensor:
+    def _compute(self, vars_tuple: BasePSIQ) -> torch.Tensor:
         """Compute variable value.
 
         Args:

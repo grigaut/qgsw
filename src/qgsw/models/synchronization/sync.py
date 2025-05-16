@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
-    from qgsw.fields.variables.prognostic_tuples import UVH
+    from qgsw.fields.variables.tuples import UVH
     from qgsw.models.names import ModelCategory
     from qgsw.models.qg.uvh.projectors.core import QGProjector
 

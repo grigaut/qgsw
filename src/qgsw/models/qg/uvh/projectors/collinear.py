@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw import verbose
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,

@@ -6,11 +6,11 @@ from functools import cached_property
 import torch
 from torch import Tensor
 
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import StatePSIQAlpha
+from qgsw.fields.variables.tuples import (
     PSIQ,
     PSIQTAlpha,
 )
-from qgsw.fields.variables.state import StatePSIQAlpha
 from qgsw.filters.base import _Filter
 from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.models.core.finite_diff import laplacian_h

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from qgsw.fields.variables.prognostic_tuples import BaseUVH
+from qgsw.fields.variables.tuples import BaseUVH
 from qgsw.models.names import ModelCategory
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 

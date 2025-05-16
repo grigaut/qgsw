@@ -16,10 +16,10 @@ from qgsw.fields.variables.physical import (
     ZonalVelocity,
 )
 from qgsw.fields.variables.prognostic import CollinearityCoefficient, Time
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     PSIQT,
     UVHT,
-    BasePrognosticTuple,
+    BaseTuple,
     UVHTAlpha,
 )
 from qgsw.models.names import ModelName
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
     from qgsw.configs.models import ModelConfig
 
-T = TypeVar("T", bound=BasePrognosticTuple)
+T = TypeVar("T", bound=BaseTuple)
 
 
 class _OutputFile(NamedTuple):

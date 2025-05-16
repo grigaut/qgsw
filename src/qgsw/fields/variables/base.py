@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 
     import torch
 
-    from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
     from qgsw.fields.variables.state import StateUVH
+    from qgsw.fields.variables.tuples import BaseTuple
     from qgsw.utils.units._units import Unit
 
 
@@ -143,11 +143,11 @@ class DiagnosticVariable(Variable, ABC):
         return self._require_alpha
 
     @abstractmethod
-    def _compute(self, vars_tuple: BasePrognosticTuple) -> torch.Tensor:
+    def _compute(self, vars_tuple: BaseTuple) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            vars_tuple (BasePrognosticTuple): Prognostic variables
+            vars_tuple (BaseTuple): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -156,11 +156,11 @@ class DiagnosticVariable(Variable, ABC):
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
 
-    def compute(self, vars_tuple: BasePrognosticTuple) -> torch.Tensor:
+    def compute(self, vars_tuple: BaseTuple) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            vars_tuple (BasePrognosticTuple): Prognostic variables
+            vars_tuple (BaseTuple): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -172,12 +172,12 @@ class DiagnosticVariable(Variable, ABC):
 
     def compute_no_slice(
         self,
-        vars_tuple: BasePrognosticTuple,
+        vars_tuple: BaseTuple,
     ) -> torch.Tensor:
         """Compute the value of the variable.
 
         Args:
-            vars_tuple (BasePrognosticTuple): Prognostic variables
+            vars_tuple (BaseTuple): Prognostic variables
             (t, α,) u,v and h.
                 ├── (t: (n_ens,)-shaped)
                 ├── (α: (n_ens,)-shaped)
@@ -240,12 +240,12 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
 
     def compute_no_slice(
         self,
-        vars_tuple: BasePrognosticTuple,
+        vars_tuple: BaseTuple,
     ) -> torch.Tensor:
         """Compute the variable value if outdated.
 
         Args:
-            vars_tuple (BasePrognosticTuple): BasePrognosticTuple.
+            vars_tuple (BaseTuple): BaseTuple.
 
         Returns:
             torch.Tensor: Variable value.
@@ -256,11 +256,11 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._value = self._var.compute(vars_tuple)
         return self._value
 
-    def compute(self, vars_tuple: BasePrognosticTuple) -> torch.Tensor:
+    def compute(self, vars_tuple: BaseTuple) -> torch.Tensor:
         """Compute the variable value if outdated.
 
         Args:
-            vars_tuple (BasePrognosticTuple): BasePrognosticTuple.
+            vars_tuple (BaseTuple): BaseTuple.
 
         Returns:
             torch.Tensor: Variable value.

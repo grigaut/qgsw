@@ -12,7 +12,7 @@ from qgsw.fields.variables.physical import (
 )
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.prognostic_tuples import (
+    from qgsw.fields.variables.tuples import (
         UVHTAlpha,
     )
     from qgsw.filters.base import _Filter

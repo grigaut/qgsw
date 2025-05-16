@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.prognostic_tuples import UVH, UVHTAlpha
 from qgsw.fields.variables.state import StateUVHAlpha
+from qgsw.fields.variables.tuples import UVH, UVHTAlpha
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker

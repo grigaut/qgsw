@@ -29,7 +29,7 @@ from qgsw.utils.named_object import NamedObject
 
 if TYPE_CHECKING:
     from qgsw.configs.core import Configuration
-    from qgsw.fields.variables.prognostic_tuples import BaseUVH
+    from qgsw.fields.variables.tuples import BaseUVH
     from qgsw.models.base import ModelUVH
 
 
