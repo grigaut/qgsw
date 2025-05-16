@@ -5,7 +5,7 @@ save = true
 type = "interval"           # "interval"
 # quantity = 100
 interval_duration = 86_400  # seconds
-directory = "tmp"
+directory = "assimilation"
 
 [physics]
 rho = 1000
