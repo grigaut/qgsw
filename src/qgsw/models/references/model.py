@@ -13,6 +13,7 @@ from qgsw.configs.core import Configuration
 from qgsw.models.instantiation import (
     instantiate_model_from_config,
 )
+from qgsw.specs import defaults
 
 try:
     from typing import Self
@@ -155,7 +156,7 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
         self._folder = Path(output_folder)
         output = RunOutput(self._folder)
         self._config = output.summary.configuration
-        self._ts = torch.tensor(list(output.seconds()))
+        self._ts = torch.tensor(list(output.seconds()), **defaults.get())
         self._outs: list[_OutputReader] = list(output.outputs())
         self.at_time(self._ts[0])
 
