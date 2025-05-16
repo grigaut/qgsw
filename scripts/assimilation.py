@@ -73,6 +73,7 @@ t = 0
 
 summary.register_start()
 prefix = config.model.prefix
+ref_prefix = config.simulation.reference.prefix
 output_dir = config.io.output.directory
 
 # Collinearity Coefficient
@@ -102,6 +103,8 @@ with Progress() as progress:
             )
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.pt"))
+            ref.at_time(model.time)
+            ref.save(output_dir.joinpath(f"{ref_prefix}{n}.pt"))
             summary.register_step(n)
         model.step()
         t += dt

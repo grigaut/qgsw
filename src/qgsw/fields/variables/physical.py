@@ -19,7 +19,6 @@ from qgsw.fields.variables.prognostic import (
     PrognosticStreamFunction,
     Time,
 )
-from qgsw.fields.variables.state import StateUVH
 from qgsw.models.core.helmholtz import (
     compute_laplace_dstI,
     solve_helmholtz_dstI,

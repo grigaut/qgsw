@@ -97,6 +97,7 @@ class ModelOutputReferenceConfig(NamedObjectConfig[ReferenceName], BaseModel):
     """Config for ModelOutputReference."""
 
     type: Literal[ReferenceName.MODEL_OUTPUT]
+    prefix: str
     folder: DirectoryPath
 
     @field_serializer("folder")
@@ -135,6 +136,7 @@ class ModelReferenceConfig(NamedObjectConfig[ReferenceName], BaseModel):
     """Config for ModelReference."""
 
     type: Literal[ReferenceName.MODEL]
+    prefix: str
     model: ModelConfig
 
 

@@ -7,14 +7,16 @@ from abc import ABCMeta, abstractmethod
 from typing_extensions import Self
 
 from qgsw.exceptions import ParallelSlicingError
+from qgsw.fields.variables.covariant import (
+    PhysicalLayerDepthAnomaly,
+    PhysicalMeridionalVelocity,
+    PhysicalZonalVelocity,
+)
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
-    LayerDepthAnomaly,
-    MeridionalVelocity,
     PrognosticPotentialVorticity,
     PrognosticStreamFunction,
     Time,
-    ZonalVelocity,
 )
 from qgsw.specs import defaults
 from qgsw.utils import tensorio
@@ -586,9 +588,9 @@ class UVH(BaseUVH, _UVH):
             Self: UVH.
         """
         data = tensorio.load(file, dtype=dtype, device=device)
-        u = data[ZonalVelocity.get_name()]
-        v = data[MeridionalVelocity.get_name()]
-        h = data[LayerDepthAnomaly.get_name()]
+        u = data[PhysicalZonalVelocity.get_name()]
+        v = data[PhysicalMeridionalVelocity.get_name()]
+        h = data[PhysicalLayerDepthAnomaly.get_name()]
         return cls(u=u, v=v, h=h)
 
 

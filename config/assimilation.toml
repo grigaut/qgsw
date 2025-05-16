@@ -26,9 +26,9 @@ config ="output/g5k/double_gyre_qg_long/_config.toml"
 
 [simulation.reference]
 type = "model"
+prefix = "reference_step_"
 [simulation.reference.model]
 type = "QG"
-prefix = "reference_step_"
 layers = [
     400,
     1100,

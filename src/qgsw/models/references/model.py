@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ from qgsw.configs.core import Configuration
 from qgsw.models.instantiation import (
     instantiate_model_from_config,
 )
+from qgsw.specs import defaults
 
 try:
     from typing import Self
@@ -93,6 +95,14 @@ class ModelReference(NamedObject[ReferenceName], Reference):
         """
         return self._core.physical
 
+    def save(self, file: str | Path) -> None:
+        """Save the data to another file.
+
+        Args:
+            file (str | Path): Filepath to save data into.
+        """
+        self._core.io.save(Path(file))
+
     def retrieve_P(self) -> QGProjector:  # noqa: N802
         """Retrieve projector associated with reference.
 
@@ -146,7 +156,7 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
         self._folder = Path(output_folder)
         output = RunOutput(self._folder)
         self._config = output.summary.configuration
-        self._ts = torch.tensor(list(output.seconds()))
+        self._ts = torch.tensor(list(output.seconds()), **defaults.get())
         self._outs: list[_OutputReader] = list(output.outputs())
         self.at_time(self._ts[0])
 
@@ -186,6 +196,18 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
             trigger_level=2,
         )
         return self._data.read()
+
+    def save(self, file: str | Path) -> None:
+        """Save the data to another file.
+
+        Args:
+            file (str | Path): Filepath to save data into.
+        """
+        shutil.copy(self._data.path, Path(file))
+        verbose.display(
+            msg=f"Copied {self._data.path} to {file}.",
+            trigger_level=1,
+        )
 
     def retrieve_P(self) -> QGProjector:  # noqa: N802
         """Retrieve projector associated with reference.
