@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.fields.variables.dynamics import (
+from qgsw.fields.variables.physical import (
     Psi2,
     StreamFunctionFromVorticity,
 )
 
 if TYPE_CHECKING:
-    from qgsw.fields.variables.prognostic_tuples import (
+    from qgsw.fields.variables.tuples import (
         UVHTAlpha,
     )
     from qgsw.filters.base import _Filter

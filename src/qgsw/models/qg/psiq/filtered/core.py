@@ -6,11 +6,11 @@ from functools import cached_property
 import torch
 from torch import Tensor
 
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import StatePSIQAlpha
+from qgsw.fields.variables.tuples import (
     PSIQ,
     PSIQTAlpha,
 )
-from qgsw.fields.variables.state import StatePSIQAlpha
 from qgsw.filters.base import _Filter
 from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.models.core.finite_diff import laplacian_h
@@ -135,6 +135,9 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         """2D filter."""
         return self._filter
 
+    def _set_io(self, state: StatePSIQAlpha) -> None:
+        self._io = IO(state.t, state.psi, state.q, state.alpha)
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StatePSIQAlpha.steady(
@@ -145,12 +148,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             dtype=self.dtype,
             device=self.device.get(),
         )
-        self._io = IO(
-            t=self._state.t,
-            psi=self._state.psi,
-            q=self._state.q,
-            alpha=self._state.alpha,
-        )
+        self._set_io()
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
 

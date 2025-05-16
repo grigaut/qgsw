@@ -12,7 +12,7 @@ except ImportError:
 import torch
 
 from qgsw.exceptions import UnsetAError
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.masks import Masks
 from qgsw.models.core.helmholtz import (
     compute_capacitance_matrices,

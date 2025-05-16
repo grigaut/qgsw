@@ -96,7 +96,7 @@ class ModelConfig(
 ):
     """Model configuration."""
 
-    prefix: str
+    prefix: str = Field("model_output_step_")
     name: Union[str, None] = None
     layers: list[PositiveFloat]
     reduced_gravity: list[PositiveFloat]

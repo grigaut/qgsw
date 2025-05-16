@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw.fields.variables.dynamics import (
+from qgsw.fields.variables.covariant import (
+    KineticEnergy,
     MaskedVorticity,
     MeridionalVelocityFlux,
     PhysicalLayerDepthAnomaly,
@@ -19,14 +20,13 @@ from qgsw.fields.variables.dynamics import (
     PressureTilde,
     ZonalVelocityFlux,
 )
-from qgsw.fields.variables.energetics import KineticEnergy
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import BaseStateUVH, StateUVH, StateUVHAlpha
+from qgsw.fields.variables.tuples import (
     UVH,
     UVHT,
-    BasePrognosticUVH,
+    BaseUVH,
     UVHTAlpha,
 )
-from qgsw.fields.variables.state import BaseStateUVH, StateUVH, StateUVHAlpha
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import finite_diff, schemes
 from qgsw.models.io import IO
@@ -65,7 +65,7 @@ def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
     return torch.cat([-torch.diff(x, dim=dim), x.narrow(dim, -1, 1)], dim=dim)
 
 
-T = TypeVar("T", bound=BasePrognosticUVH)
+T = TypeVar("T", bound=BaseUVH)
 State = TypeVar("State", bound=BaseStateUVH)
 
 
@@ -222,10 +222,10 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         """
         super()._create_diagnostic_vars(state)
 
-        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
+        h_phys = self._state[PhysicalLayerDepthAnomaly.get_name()]
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = Pressure(g_prime=self.g_prime, eta_phys=eta_phys)
         self._pressure_name = p.get_name()
@@ -515,11 +515,12 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
 
     def _create_diagnostic_vars(self, state: StateUVHAlpha) -> None:
         self._state.unbind()
+        self._create_physical_variables(state)
 
-        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
+        h_phys = self._state[PhysicalLayerDepthAnomaly.get_name()]
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = PressureTilde(g_prime=self.g_prime, eta_phys=eta_phys)
         self._pressure_name = p.get_name()
@@ -531,6 +532,13 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
         p.bind(state)
         k_energy.bind(state)
 
+    def _set_io(self, state: StateUVHAlpha) -> None:
+        self._io = IO(
+            state.t,
+            state.alpha,
+            *state.physical,
+        )
+
     def _set_state(self) -> None:
         self._state = StateUVHAlpha.steady(
             n_ens=self.n_ens,
@@ -539,10 +547,4 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
             ny=self.space.ny,
             dtype=self.dtype,
             device=self.device.get(),
-        )
-        self._io = IO(
-            t=self._state.t,
-            u=self._state.u,
-            v=self._state.v,
-            h=self._state.h,
         )

@@ -3,20 +3,17 @@
 import pytest
 import torch
 
-from qgsw.fields.variables.dynamics import (
-    PhysicalLayerDepthAnomaly,
-    PhysicalSurfaceHeightAnomaly,
-    Pressure,
-    StreamFunction,
-)
-from qgsw.fields.variables.energetics import (
+from qgsw.fields.variables.physical import (
     ModalAvailablePotentialEnergy,
     ModalKineticEnergy,
+    Pressure,
+    StreamFunction,
+    SurfaceHeightAnomaly,
     TotalAvailablePotentialEnergy,
     TotalKineticEnergy,
     compute_W,
 )
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.specs import DEVICE
 
@@ -64,14 +61,11 @@ def A(H: torch.Tensor, g_prime: torch.Tensor) -> torch.Tensor:  # noqa: N802, N8
 
 @pytest.fixture
 def psi(
-    dx: float,
-    dy: float,
     g_prime: torch.Tensor,
     f0: float,
 ) -> StreamFunction:
     """Stream function."""
-    h_phys = PhysicalLayerDepthAnomaly(ds=dx * dy)
-    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys)
+    eta_phys = SurfaceHeightAnomaly()
     p = Pressure(g_prime.unsqueeze(1).unsqueeze(1), eta_phys)
     return StreamFunction(p, f0)
 

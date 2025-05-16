@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union
 
+import numpy as np
 import torch
 
+from qgsw.configs.core import Configuration
+from qgsw.forcing.wind import WindForcing
 from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.uvh.core import QG
@@ -23,17 +26,35 @@ from qgsw.models.sw.filtering import (
     SWFilterBarotropicExact,
     SWFilterBarotropicSpectral,
 )
+from qgsw.models.synchronization.initial_conditions import InitialCondition
+from qgsw.perturbations.core import Perturbation
+from qgsw.spatial.core.discretization import (
+    SpaceDiscretization2D,
+)
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.specs import defaults
+from qgsw.utils import time_params
 
 if TYPE_CHECKING:
     from qgsw.configs.models import (
         ModelConfig,
     )
-    from qgsw.perturbations.core import Perturbation
+    from qgsw.configs.perturbation import PerturbationConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.simulations import SimulationConfig
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.configs.windstress import WindStressConfig
     from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.spatial.core.discretization import (
-        SpaceDiscretization2D,
-    )
+
+Model = Union[
+    SW,
+    SWFilterBarotropicSpectral,
+    SWFilterBarotropicExact,
+    QG,
+    QGPSIQ,
+    QGCollinearSF,
+    QGCollinearFilteredSF,
+]
 
 
 def instantiate_model(
@@ -42,15 +63,7 @@ def instantiate_model(
     space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
     Ro: float,  # noqa: N803
-) -> (
-    SW
-    | SWFilterBarotropicSpectral
-    | SWFilterBarotropicExact
-    | QG
-    | QGPSIQ
-    | QGCollinearSF
-    | QGCollinearFilteredSF
-):
+) -> Model:
     """Instantiate the model, given the configuration and the perturbation.
 
     Args:
@@ -234,3 +247,80 @@ def get_model_class(  # noqa: PLR0911
         return SWFilterBarotropicSpectral
     msg = f"Unrecognized model type: {model_config.type}"
     raise ValueError(msg)
+
+
+def instantiate_model_from_config(
+    model_config: ModelConfig,
+    space: SpaceConfig,
+    windstress: WindStressConfig,
+    physics: PhysicsConfig,
+    perturbation: PerturbationConfig,
+    simulation: SimulationConfig,
+    *,
+    dtype: torch.dtype | None = None,
+    device: torch.device | None = None,
+) -> Model:
+    """Instantiate model from configuration.
+
+    Args:
+        model_config (ModelConfig): Model configuration.
+        space (SpaceConfig): Space configuration.
+        windstress (WindStressConfig): Windstress.
+        physics (PhysicsConfig): Physics.
+        perturbation (PerturbationConfig): Perturbation.
+        simulation (SimulationConfig): Simulation.
+        dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+        device (torch.device | None, optional): Devcie. Defaults to None.
+
+    Returns:
+        Model: Model.
+    """
+    specs = defaults.get(dtype=dtype, device=device)
+    # Sub configs
+
+    # Model Set-up
+    ## Vortex
+    perturbation = Perturbation.from_config(
+        perturbation_config=perturbation,
+    )
+    space_2d = SpaceDiscretization2D.from_config(space)
+
+    model = instantiate_model(
+        model_config,
+        physics.beta_plane,
+        space_2d,
+        perturbation,
+        Ro=physics.Ro,
+    )
+    model.slip_coef = physics.slip_coef
+    model.bottom_drag_coef = physics.bottom_drag_coefficient
+
+    if np.isnan(simulation.dt):
+        model.dt = time_params.compute_dt(
+            model.prognostic.uvh,
+            model.space,
+            model.g_prime,
+            model.H,
+        )
+    else:
+        model.dt = simulation.dt
+    model.compute_time_derivatives(model.prognostic.uvh)
+    ## Wind Forcing
+    wind = WindForcing.from_config(windstress, space, physics)
+    taux, tauy = wind.compute()
+    model.set_wind_forcing(taux, tauy)
+    # Initial condition -------------------------------------------------------
+    ic = InitialCondition(model)
+    if (startup := simulation.startup) is None:
+        ic.set_steady(**specs)
+    else:
+        ic_conf = Configuration.from_toml(simulation.startup.config)
+        ic.set_initial_condition_from_file(
+            file=startup.file,
+            space_config=ic_conf.space,
+            model_config=ic_conf.model,
+            physics_config=ic_conf.physics,
+            **specs,
+        )
+    # -------------------------------------------------------------------------
+    return model

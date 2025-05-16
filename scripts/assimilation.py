@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import numpy as np
 import torch
 from rich.progress import Progress
 
@@ -10,20 +9,17 @@ from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
-from qgsw.forcing.wind import WindForcing
-from qgsw.models.instantiation import instantiate_model
+from qgsw.models.instantiation import (
+    instantiate_model_from_config,
+)
 from qgsw.models.names import ModelName
 from qgsw.models.qg.uvh.modified.utils import is_modified
+from qgsw.models.references.core import load_reference
 from qgsw.models.synchronization.initial_conditions import InitialCondition
 from qgsw.models.synchronization.sync import Synchronizer
-from qgsw.perturbations.core import Perturbation
 from qgsw.run_summary import RunSummary
 from qgsw.simulation.steps import Steps
-from qgsw.spatial.core.discretization import (
-    SpaceDiscretization2D,
-)
 from qgsw.specs import defaults
-from qgsw.utils import time_params
 
 torch.backends.cudnn.deterministic = True
 
@@ -39,72 +35,20 @@ summary = RunSummary.from_configuration(config)
 if config.io.output.save:
     summary.to_file(config.io.output.directory)
 
-
-# Common Set-up
-## Wind Forcing
-wind = WindForcing.from_config(config.windstress, config.space, config.physics)
-taux, tauy = wind.compute()
-## Rossby
-Ro = 0.1
-
-# Model Set-up
-## Vortex
-perturbation = Perturbation.from_config(
-    perturbation_config=config.perturbation,
-)
-space_2d = SpaceDiscretization2D.from_config(config.space)
-
-model_ref = instantiate_model(
-    config.simulation.reference,
-    config.physics.beta_plane,
-    space_2d,
-    perturbation,
-    Ro=0.1,
-)
-
-model_ref.slip_coef = config.physics.slip_coef
-model_ref.bottom_drag_coef = config.physics.bottom_drag_coefficient
-if np.isnan(config.simulation.dt):
-    model_ref.dt = time_params.compute_dt(
-        model_ref.prognostic.uvh,
-        model_ref.space,
-        model_ref.g_prime,
-        model_ref.H,
-    )
-else:
-    model_ref.dt = config.simulation.dt
-model_ref.compute_time_derivatives(model_ref.prognostic.uvh)
-model_ref.set_wind_forcing(taux, tauy)
-
-model = instantiate_model(
+model = instantiate_model_from_config(
     config.model,
-    config.physics.beta_plane,
-    space_2d,
-    perturbation,
-    Ro=0.1,
+    config.space,
+    config.windstress,
+    config.physics,
+    config.perturbation,
+    config.simulation,
+    **specs,
 )
+ic = InitialCondition(model)
+ref = load_reference(config)
 
-model.slip_coef = config.physics.slip_coef
-model.bottom_drag_coef = config.physics.bottom_drag_coefficient
-if np.isnan(config.simulation.dt):
-    model.dt = time_params.compute_dt(
-        model.prognostic.uvh,
-        model.space,
-        model.g_prime,
-        model.H,
-    )
-else:
-    model.dt = config.simulation.dt
-model.set_wind_forcing(taux, tauy)
+synchronize = Synchronizer(ref, model)
 
-model_sync = Synchronizer(model_ref, model)
-
-verbose.display(f"\n[Reference Model: {model_ref.name}]", trigger_level=1)
-verbose.display(msg=model_ref.__repr__(), trigger_level=1)
-verbose.display(f"\n[Model: {model_ref.name}]", trigger_level=1)
-verbose.display(msg=model.__repr__(), trigger_level=1)
-
-nl_ref = model_ref.space.nl
 nl = model.space.nl
 if model.get_type() == ModelName.QG_SANITY_CHECK:
     nl += 1
@@ -112,25 +56,10 @@ if model.get_type() == ModelName.QG_SANITY_CHECK:
 nx = model.space.nx
 ny = model.space.ny
 
-# Initial condition ----------------------------------------------------------
-ic = InitialCondition(model_ref)
-if (startup := config.simulation.startup) is None:
-    ic.set_steady(**specs)
-else:
-    ic_conf = Configuration.from_toml(config.simulation.startup.config)
-    ic.set_initial_condition_from_file(
-        file=startup.file,
-        space_config=ic_conf.space,
-        model_config=ic_conf.model,
-        physics_config=ic_conf.physics,
-        **specs,
-    )
-# ----------------------------------------------------------------------------
-
 dt = model.dt
 t_end = config.simulation.duration
 
-steps = Steps(t_end=t_end, dt=dt)
+steps = Steps(t_start=0, t_end=t_end, dt=dt)
 verbose.display(steps.__repr__(), trigger_level=1)
 
 ns = steps.simulation_steps()
@@ -143,8 +72,8 @@ summary.register_steps(t_end=t_end, dt=dt, n_steps=steps.n_tot)
 t = 0
 
 summary.register_start()
-prefix_ref = config.simulation.reference.prefix
 prefix = config.model.prefix
+ref_prefix = config.simulation.reference.prefix
 output_dir = config.io.output.directory
 
 # Collinearity Coefficient
@@ -166,19 +95,17 @@ with Progress() as progress:
         )
         progress.advance(simulation)
         if sync:
-            model_sync()
+            synchronize()
         if save:
             verbose.display(
                 msg=f"[n={n:05d}/{steps.n_tot:05d}]",
                 trigger_level=1,
             )
-            # Save Reference Model
-            model_ref.io.save(output_dir.joinpath(f"{prefix_ref}{n}.pt"))
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.pt"))
+            ref.at_time(model.time)
+            ref.save(output_dir.joinpath(f"{ref_prefix}{n}.pt"))
             summary.register_step(n)
-
-        model_ref.step()
         model.step()
         t += dt
 

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import torch
@@ -13,9 +14,8 @@ from qgsw.exceptions import InvalidSavingFileError
 from qgsw.fields.variables.prognostic import Time
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from qgsw.fields.variables.base import (
+        BoundDiagnosticVariable,
         PrognosticVariable,
     )
 
@@ -25,8 +25,8 @@ class IO:
 
     def __init__(
         self,
-        *args: PrognosticVariable,
-        **kwargs: PrognosticVariable,
+        *args: PrognosticVariable | BoundDiagnosticVariable,
+        **kwargs: PrognosticVariable | BoundDiagnosticVariable,
     ) -> None:
         """Instantiate the object.
 
@@ -34,14 +34,16 @@ class IO:
             *args (BoundDiagnosticVariable): Prognostic variables.
             **kwargs (BoundDiagnosticVariable): Prognostic variables.
         """
-        self._prog: list[PrognosticVariable] = list(args) + list(
+        self._vars: list[PrognosticVariable | BoundDiagnosticVariable] = list(
+            args,
+        ) + list(
             kwargs.values(),
         )
 
     @property
-    def prognostic_vars(self) -> list[PrognosticVariable]:
+    def vars(self) -> list[PrognosticVariable]:
         """Prognostic variables."""
-        return self._prog
+        return self._vars
 
     def _raise_if_invalid_savefile(self, output_file: Path) -> None:
         """Raise an error if the saving file is invalid.
@@ -62,9 +64,10 @@ class IO:
         Args:
             output_file (Path): File to save value in (.pt).
         """
+        output_file = Path(output_file)
         self._raise_if_invalid_savefile(output_file=output_file)
         to_save = {
-            var.name: var.get().to(torch.float32).cpu() for var in self._prog
+            var.name: var.get().to(torch.float32).cpu() for var in self._vars
         }
         torch.save(to_save, f=output_file)
 
@@ -80,7 +83,7 @@ class IO:
             str: Informations to print.
         """
         snippets = []
-        for var in self._prog:
+        for var in self._vars:
             if var.name == Time.get_name():
                 snippets.append(
                     f"{var.name} [{var.unit.value}]: {var.get().cpu().item()}",

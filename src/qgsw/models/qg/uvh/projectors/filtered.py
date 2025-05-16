@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 import torch
 
 from qgsw import verbose
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.masks import Masks
 from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (

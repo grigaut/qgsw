@@ -13,6 +13,7 @@ slip_coef = 1.0
 f0 = 9.375e-5           # mean coriolis (s^-1)
 beta = 1.754e-11                # coriolis gradient (m^-1 s^-1)
 bottom_drag_coefficient = 3.60577e-8
+Ro = 0.1
 
 [simulation]
 type = "assimilation"
@@ -24,12 +25,14 @@ file ="output/g5k/double_gyre_qg_long/results_step_876000.pt"
 config ="output/g5k/double_gyre_qg_long/_config.toml"
 
 [simulation.reference]
-type = "QG"
+type = "model"
 prefix = "reference_step_"
+[simulation.reference.model]
+type = "QG"
 layers = [
     400,
     1100,
-    2600,
+    2600
 ]
 reduced_gravity = [
     9.81,

@@ -1,15 +1,18 @@
 """Test state object."""
 
+import pytest
 import torch
 
+from qgsw.exceptions import StateBindingError
 from qgsw.fields.variables.coefficients.core import UniformCoefficient
-from qgsw.fields.variables.dynamics import (
-    PhysicalLayerDepthAnomaly,
-    PhysicalSurfaceHeightAnomaly,
+from qgsw.fields.variables.covariant import PhysicalSurfaceHeightAnomaly
+from qgsw.fields.variables.physical import (
+    LayerDepthAnomaly,
     PressureTilde,
+    SurfaceHeightAnomaly,
 )
-from qgsw.fields.variables.prognostic_tuples import PSIQ, UVH
 from qgsw.fields.variables.state import StatePSIQ, StateUVH, StateUVHAlpha
+from qgsw.fields.variables.tuples import PSIQ, UVH
 from qgsw.specs import DEVICE
 
 
@@ -102,42 +105,6 @@ def test_psiq_init_update() -> None:
     assert (state.q.get() == q).all()
 
 
-def test_nested_bound_variables() -> None:
-    """Verify the behavior of nested variables."""
-    # Define state
-    state = StateUVH.steady(
-        1,
-        2,
-        10,
-        10,
-        dtype=torch.float64,
-        device=DEVICE.get(),
-    )
-    # Define variables
-    h = PhysicalLayerDepthAnomaly(ds=1)
-    eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h)
-    # Bind only eta_phys
-    eta_bound = eta_phys.bind(state)
-    # Compute eta_phys and h
-    eta0 = eta_phys.compute(state.prognostic)
-    # Assert both variables are bound
-    assert len(state.diag_vars) == 2  # noqa: PLR2004
-    # Assert both variables are bound once
-    assert len(state.diag_vars) == 2  # noqa: PLR2004
-    # Compute eta_phys
-    eta1 = eta_bound.get()
-    # Compare values of eta_phys and h
-    assert (eta0 == eta1).all()
-    # Update state
-    state.update_uvh(UVH(state.u.get(), state.v.get(), state.h.get() + 2))
-    # Assert all variables must be updated
-    assert all(not var.up_to_date for var in state.diag_vars.values())
-    # Compute the value of eta_phys
-    eta2 = eta_bound.get()
-    # Assert eta_phys has changed
-    assert not (eta1 == eta2).all()
-
-
 def test_state_alpha_updates() -> None:
     """Test updates on StateUVHAlpha."""
     state = StateUVHAlpha.steady(
@@ -180,9 +147,8 @@ def test_state_update_only_alpha() -> None:
         dtype=torch.float64,
         device=DEVICE.get(),
     )
-    h_phys = PhysicalLayerDepthAnomaly(ds=2).bind(state)
-    h_tilde = PhysicalLayerDepthAnomaly(ds=2)
-    eta_tilde = PhysicalSurfaceHeightAnomaly(h_tilde)
+    h_phys = LayerDepthAnomaly().bind(state)
+    eta_tilde = SurfaceHeightAnomaly()
     pressure_tilde = PressureTilde(g_tilde, eta_tilde).bind(state)
     h_phys.get()
     pressure_tilde.get()
@@ -201,3 +167,46 @@ def test_state_update_only_alpha() -> None:
     )
     assert not h_phys.up_to_date
     assert not pressure_tilde.up_to_date
+
+
+def test_variable_rebinding() -> None:
+    """Test rebinding a variable with same name as already bound variable."""
+    n_ens = 1
+    nl = 2
+    nx = 10
+    ny = 10
+    state = StateUVH.steady(
+        n_ens,
+        nl,
+        nx,
+        ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    h = LayerDepthAnomaly()
+    h.bind(state)
+    eta = PhysicalSurfaceHeightAnomaly(LayerDepthAnomaly())
+    with pytest.raises(StateBindingError):
+        eta.bind(state)
+
+
+def test_cascade_binding() -> None:
+    """Test variable dependency binding."""
+    n_ens = 1
+    nl = 2
+    nx = 10
+    ny = 10
+    state = StateUVH.steady(
+        n_ens,
+        nl,
+        nx,
+        ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    h = LayerDepthAnomaly()
+    eta = PhysicalSurfaceHeightAnomaly(h)
+    assert h.get_name() not in state.diag_vars
+    eta.bind(state)
+    assert eta.get_name() in state.diag_vars
+    assert h.get_name() in state.diag_vars

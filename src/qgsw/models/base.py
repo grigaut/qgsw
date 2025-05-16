@@ -15,14 +15,19 @@ from qgsw.exceptions import (
     IncoherentWithMaskError,
     UnsetTimestepError,
 )
-from qgsw.fields.variables.prognostic_tuples import (
-    PSIQ,
-    UVH,
-    BasePrognosticPSIQ,
-    BasePrognosticTuple,
-    BasePrognosticUVH,
+from qgsw.fields.variables.covariant import (
+    PhysicalLayerDepthAnomaly,
+    PhysicalMeridionalVelocity,
+    PhysicalZonalVelocity,
 )
 from qgsw.fields.variables.state import BaseState, BaseStateUVH, StateUVH
+from qgsw.fields.variables.tuples import (
+    PSIQ,
+    UVH,
+    BasePSIQ,
+    BaseTuple,
+    BaseUVH,
+)
 from qgsw.models.core import finite_diff, flux
 from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
@@ -46,11 +51,11 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.grid import Grid2D
     from qgsw.specs._utils import Device
 
-Prognostic = TypeVar("Prognostic", bound=BasePrognosticTuple)
+Prognostic = TypeVar("Prognostic", bound=BaseTuple)
 AdvectedPrognostic = TypeVar("AdvectedPrognostic", bound=Union[UVH, PSIQ])
 State = TypeVar("State", bound=BaseState)
-PrognosticUVH = TypeVar("PrognosticUVH", bound=BasePrognosticUVH)
-PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePrognosticPSIQ)
+PrognosticUVH = TypeVar("PrognosticUVH", bound=BaseUVH)
+PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePSIQ)
 
 
 class ModelCounter(type):
@@ -158,6 +163,11 @@ class _Model(
         return f"\n[Model] -> `{self.name}`\n" + "\n".join(
             self.get_repr_parts(),
         )
+
+    @property
+    def time(self) -> torch.Tensor:
+        """Model time."""
+        return self._state.t.get()
 
     @property
     def name(self) -> str:
@@ -383,6 +393,12 @@ class ModelUVH(
         self._set_fluxes(optimize)
 
     @property
+    def physical(self) -> PrognosticUVH:
+        """Physical UVH."""
+        u, v, h = self._state.physical
+        return self.prognostic.with_uvh(UVH(u.get(), v.get(), h.get()))
+
+    @property
     def u(self) -> torch.Tensor:
         """StateUVH Variable u: Zonal Speed.
 
@@ -411,6 +427,27 @@ class ModelUVH(
     def P(self) -> QGProjector:  # noqa: N802
         """QG Projector."""
 
+    def _set_io(self, state: State_uvh) -> None:
+        self._io = IO(
+            state.t,
+            *state.physical,
+        )
+
+    def _create_physical_variables(self, state: State_uvh) -> None:
+        u_phys = PhysicalZonalVelocity(self.space.dx)
+        v_phys = PhysicalMeridionalVelocity(self.space.dy)
+        h_phys = PhysicalLayerDepthAnomaly(self.space.ds)
+
+        u_phys.bind(state)
+        v_phys.bind(state)
+        h_phys.bind(state)
+
+        self._set_io(state)
+
+    def _create_diagnostic_vars(self, state: State_uvh) -> None:
+        super()._create_diagnostic_vars(state)
+        self._create_physical_variables(state)
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StateUVH.steady(
@@ -420,12 +457,6 @@ class ModelUVH(
             ny=self.space.ny,
             dtype=self.dtype,
             device=self.device.get(),
-        )
-        self._io = IO(
-            t=self._state.t,
-            u=self._state.u,
-            v=self._state.v,
-            h=self._state.h,
         )
 
     def _set_fluxes(self, optimize: bool) -> None:  # noqa: FBT001

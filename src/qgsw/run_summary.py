@@ -201,7 +201,7 @@ class RunSummary:
         """
         if not self.configuration.io.output.save:
             return
-        for var in io.prognostic_vars:
+        for var in io.vars:
             self._summary[self._variables].append(
                 var.to_dict(),
             )

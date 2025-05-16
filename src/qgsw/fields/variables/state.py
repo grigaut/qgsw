@@ -11,6 +11,12 @@ except ImportError:
     from typing_extensions import Self
 
 
+from qgsw.exceptions import StateBindingError
+from qgsw.fields.variables.covariant import (
+    PhysicalLayerDepthAnomaly,
+    PhysicalMeridionalVelocity,
+    PhysicalZonalVelocity,
+)
 from qgsw.fields.variables.prognostic import (
     CollinearityCoefficient,
     LayerDepthAnomaly,
@@ -20,7 +26,7 @@ from qgsw.fields.variables.prognostic import (
     Time,
     ZonalVelocity,
 )
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     PSIQ,
     PSIQT,
     UVH,
@@ -146,8 +152,14 @@ class BaseState(ABC, Generic[T]):
         Args:
             variable (BoundDiagnosticVariable): Variable.
         """
-        if variable.name in self.diag_vars:
+        if variable.id in [v.id for v in self.diag_vars.values()]:
             return
+        if variable.name in self.diag_vars:
+            msg = (
+                "A different variable with the same "
+                "name is already bound to state."
+            )
+            raise StateBindingError(msg)
         self.diag_vars[variable.name] = variable
 
     def unbind(self) -> None:
@@ -202,13 +214,45 @@ class BaseStateUVH(BaseState[TUVHT], Generic[TUVHT], metaclass=ABCMeta):
         self._prog_vars[LayerDepthAnomaly.get_name()] = self._h
 
     @property
+    def physical(
+        self,
+    ) -> tuple[
+        BoundDiagnosticVariable[PhysicalZonalVelocity],
+        BoundDiagnosticVariable[PhysicalMeridionalVelocity],
+        BoundDiagnosticVariable[PhysicalLayerDepthAnomaly],
+    ]:
+        """Physical UVH."""
+        try:
+            u_phys = self.__getitem__(PhysicalZonalVelocity.get_name())
+        except AttributeError as e:
+            msg = "Physical zonal velocity variable is not bound to state yet."
+            raise AttributeError(msg) from e
+        try:
+            v_phys = self.__getitem__(PhysicalMeridionalVelocity.get_name())
+        except AttributeError as e:
+            msg = (
+                "Physical meridional velocity variable "
+                "is not bound to state yet."
+            )
+            raise AttributeError(msg) from e
+        try:
+            h_phys = self.__getitem__(PhysicalLayerDepthAnomaly.get_name())
+        except AttributeError as e:
+            msg = (
+                "Physical layer depth anomaly variable "
+                "is not bound to state yet."
+            )
+            raise AttributeError(msg) from e
+        return (u_phys, v_phys, h_phys)
+
+    @property
     def u(self) -> ZonalVelocity:
         """Prognostic zonal velocity."""
         return self._u
 
     @property
     def v(self) -> MeridionalVelocity:
-        """Prognostic meriodional velocity."""
+        """Prognostic meridional velocity."""
         return self._v
 
     @property
