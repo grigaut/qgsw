@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Literal, Union
 
 from pydantic import (
     BaseModel,
-    DirectoryPath,
     Field,
     PositiveFloat,
     field_serializer,
@@ -98,7 +97,7 @@ class ModelOutputReferenceConfig(NamedObjectConfig[ReferenceName], BaseModel):
 
     type: Literal[ReferenceName.MODEL_OUTPUT]
     prefix: str
-    folder: DirectoryPath
+    folder: Path
 
     @field_serializer("folder")
     def serialize_folder_as_str(self, folder: Path) -> str:
@@ -111,25 +110,6 @@ class ModelOutputReferenceConfig(NamedObjectConfig[ReferenceName], BaseModel):
             str: Path as posix.
         """
         return folder.as_posix()
-
-    @field_validator("folder", mode="after")
-    @classmethod
-    def contains_config(cls, value: Path) -> Path:
-        """Verify that the folder contains a _config.toml file.
-
-        Args:
-            value (Path): Filepath.
-
-        Raises:
-            ValueError: If folder does not have a _config.toml file.
-
-        Returns:
-            Path: Filepath
-        """
-        if not value.joinpath("_config.toml").is_file():
-            msg = f"{value} must contain '_config.toml' file."
-            raise ValueError(msg)
-        return value
 
 
 class ModelReferenceConfig(NamedObjectConfig[ReferenceName], BaseModel):
