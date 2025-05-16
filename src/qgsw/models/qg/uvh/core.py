@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import torch
 
 from qgsw.exceptions import UnsetTimestepError
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.state import StateUVH
+from qgsw.fields.variables.tuples import (
     UVH,
     UVHT,
-    BasePrognosticTuple,
+    BaseTuple,
 )
-from qgsw.fields.variables.state import StateUVH
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import schemes
 from qgsw.models.names import ModelName
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
-T = TypeVar("T", bound=BasePrognosticTuple)
+T = TypeVar("T", bound=BaseTuple)
 Projector = TypeVar("Projector", bound=QGProjector)
 State = TypeVar("State", bound=StateUVH)
 

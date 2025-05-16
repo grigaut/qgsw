@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from qgsw.fields.variables.prognostic_tuples import BasePrognosticUVH
+from qgsw.fields.variables.tuples import BaseUVH
 from qgsw.models.names import ModelCategory
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 
@@ -31,14 +31,6 @@ class Reference(ABC):
         """
 
     @abstractmethod
-    def retrieve_dxdy(self) -> tuple[float, float]:
-        """Retrieve dx and dy.
-
-        Returns:
-            tuple[float, float]: dx, dy
-        """
-
-    @abstractmethod
     def retrieve_category(self) -> ModelCategory:
         """Retrieve model category..
 
@@ -61,11 +53,11 @@ class Reference(ABC):
             raise ValueError(msg)
 
     @abstractmethod
-    def load(self) -> BasePrognosticUVH:
+    def load(self) -> BaseUVH:
         """Load the data.
 
         Returns:
-            BasePrognosticUVH: Stored prognostic variables.
+            BaseUVH: Stored physical variables.
         """
 
     @classmethod

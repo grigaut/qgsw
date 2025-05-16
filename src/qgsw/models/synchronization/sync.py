@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
-    from qgsw.fields.variables.prognostic_tuples import UVH
+    from qgsw.fields.variables.tuples import UVH
     from qgsw.models.names import ModelCategory
     from qgsw.models.qg.uvh.projectors.core import QGProjector
 
@@ -53,8 +53,6 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
         self._ic.set_initial_condition(
             self._ref.prognostic.uvh,
             self._ref.P,
-            self._ref.space.dx,
-            self._ref.space.dy,
             self._ref.get_category(),
         )
         verbose.display(
@@ -70,24 +68,18 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
         uvh: UVH,
         qg_proj: QGProjector,
         *,
-        dx: float,
-        dy: float,
         initial_condition_cat: str | ModelCategory,
     ) -> None:
         """Synchronize both models to a given uvh.
 
         Args:
-            uvh (UVH): uvh to use as reference: u,v and h.
+            uvh (UVH): (physical) uvh to use as reference: u,v and h.
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
             qg_proj (QGProjector): QG Projector to set initial for model_in.
                 This projector is the one associated with the model
                 which computed uvh.
-            dx (float): Infinitesimal distance in the X direction,
-                associated with the model which computed uvh.
-            dy (float): Infinitesimal distance in the y direction,
-                associated with the model which computed uvh.
             initial_condition_cat (str | ModelCategory): Category of the
                 initial condition, hence the category of the model
                 which computed uvh.
@@ -96,8 +88,6 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
         syncin.set_initial_condition(
             uvh,
             qg_proj,
-            dx,
-            dy,
             initial_condition_cat,
         )
         self()
@@ -143,12 +133,9 @@ class Synchronizer(_Synchronizer[Reference]):
     def __call__(self) -> None:
         """Rescale if necessary and synchronize model to ref."""
         self._ref.at_time(self._model.time.item())
-        prognostic = self._ref.load()
-        dx, dy = self._ref.retrieve_dxdy()
+        physical = self._ref.load()
         self._ic.set_initial_condition(
-            prognostic.uvh,
+            physical.uvh,
             self._ref.retrieve_P(),
-            dx,
-            dy,
             self._ref.retrieve_category(),
         )

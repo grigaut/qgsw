@@ -3,7 +3,7 @@
 import torch
 
 from qgsw.fields.errors.base import PointWiseError
-from qgsw.fields.variables.prognostic_tuples import BasePrognosticTuple
+from qgsw.fields.variables.tuples import BaseTuple
 
 
 class RMSE(PointWiseError):  # noqa: N818
@@ -14,82 +14,82 @@ class RMSE(PointWiseError):  # noqa: N818
 
     def _compute(
         self,
-        prognostic: BasePrognosticTuple,
-        prognostic_ref: BasePrognosticTuple,
+        vars_tuple: BaseTuple,
+        vars_tuple_ref: BaseTuple,
     ) -> torch.Tensor:
         """Compute error.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables value.
-            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            vars_tuple (BaseTuple):  Variables tuple value.
+            vars_tuple_ref (BaseTuple): Reference tuple
             variables.
             value.
 
         Returns:
             torch.Tensor: Error.
         """
-        value = self._var.compute(prognostic)
-        value_ref = self._var_ref.compute(prognostic_ref)
+        value = self._var.compute(vars_tuple)
+        value_ref = self._var_ref.compute(vars_tuple_ref)
         return torch.square(value - value_ref)
 
     def compute_point_wise(
         self,
-        prognostic: BasePrognosticTuple,
-        prognostic_ref: BasePrognosticTuple,
+        vars_tuple: BaseTuple,
+        vars_tuple_ref: BaseTuple,
     ) -> torch.Tensor:
         """Compute point-wise error.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables value.
-            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            vars_tuple (BaseTuple):  Variables tuple value.
+            vars_tuple_ref (BaseTuple): Reference tuple
             variables.
             value.
 
         Returns:
             torch.Tensor: Error.
         """
-        return torch.sqrt(self._compute(prognostic, prognostic_ref))
+        return torch.sqrt(self._compute(vars_tuple, vars_tuple_ref))
 
     def compute_level_wise(
         self,
-        prognostic: BasePrognosticTuple,
-        prognostic_ref: BasePrognosticTuple,
+        vars_tuple: BaseTuple,
+        vars_tuple_ref: BaseTuple,
     ) -> torch.Tensor:
         """Compute level-wise error.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables value.
-            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            vars_tuple (BaseTuple):  Variables tuple value.
+            vars_tuple_ref (BaseTuple): Reference tuple
             variables.
             value.
 
         Returns:
             torch.Tensor: Error.
         """
-        value = self._var.compute(prognostic)
-        value_ref = self._var_ref.compute(prognostic_ref)
+        value = self._var.compute(vars_tuple)
+        value_ref = self._var_ref.compute(vars_tuple_ref)
         point_wise = torch.square(value - value_ref)
         mean_err = torch.mean(point_wise, dim=(-1, -2))
         return torch.sqrt(mean_err)
 
     def compute_ensemble_wise(
         self,
-        prognostic: BasePrognosticTuple,
-        prognostic_ref: BasePrognosticTuple,
+        vars_tuple: BaseTuple,
+        vars_tuple_ref: BaseTuple,
     ) -> torch.Tensor:
         """Compute ensemble-wise error.
 
         Args:
-            prognostic (BasePrognosticTuple): Prognostic variables value.
-            prognostic_ref (BasePrognosticTuple): Reference prognostic
+            vars_tuple (BaseTuple):  Variables tuple value.
+            vars_tuple_ref (BaseTuple): Reference tuple
             variables.
             value.
 
         Returns:
             torch.Tensor: Error.
         """
-        value = self._var.compute(prognostic)
-        value_ref = self._var_ref.compute(prognostic_ref)
+        value = self._var.compute(vars_tuple)
+        value_ref = self._var_ref.compute(vars_tuple_ref)
         point_wise = torch.square(value - value_ref)
         mean_err = torch.mean(point_wise, dim=(-1, -2, -3))
         return torch.sqrt(mean_err)

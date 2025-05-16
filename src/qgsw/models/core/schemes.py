@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from typing import TypeVar, Union
 
-from qgsw.fields.variables.prognostic_tuples import PSIQ, UVH
+from qgsw.fields.variables.tuples import PSIQ, UVH
 
 Prognostic = TypeVar("Prognostic", bound=Union[UVH, PSIQ])
 

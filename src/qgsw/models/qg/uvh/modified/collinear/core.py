@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, TypeVar
 
 from qgsw import verbose
 from qgsw.exceptions import InvalidLayersDefinitionError
-from qgsw.fields.variables.prognostic_tuples import UVHTAlpha
 from qgsw.fields.variables.state import StateUVHAlpha
+from qgsw.fields.variables.tuples import UVHTAlpha
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
@@ -57,6 +57,13 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
 
+    def _set_io(self, state: StateUVHAlpha) -> None:
+        self._io = IO(
+            state.t,
+            state.alpha,
+            *state.physical,
+        )
+
     def _set_state(self) -> None:
         """Set the state."""
         self._state = StateUVHAlpha.steady(
@@ -66,13 +73,6 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
             ny=self.space.ny,
             dtype=self.dtype,
             device=self.device.get(),
-        )
-        self._io = IO(
-            t=self._state.t,
-            u=self._state.u,
-            v=self._state.v,
-            h=self._state.h,
-            alpha=self._state.alpha,
         )
 
     def _set_H(self, h: torch.Tensor) -> None:  # noqa: N802

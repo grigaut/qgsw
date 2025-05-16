@@ -3,10 +3,10 @@
 import torch
 from torch._tensor import Tensor
 
-from qgsw.fields.variables.dynamics import (
+from qgsw.fields.variables.physical import (
     Psi2,
 )
-from qgsw.fields.variables.prognostic_tuples import (
+from qgsw.fields.variables.tuples import (
     UVHTAlpha,
 )
 

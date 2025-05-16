@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
-from qgsw.fields.variables.prognostic_tuples import UVH
+from qgsw.fields.variables.tuples import UVH
 from qgsw.models.core.helmholtz import HelmholtzNeumannSolver
 from qgsw.models.core.helmholtz_multigrid import MG_Helmholtz
 from qgsw.models.names import ModelName

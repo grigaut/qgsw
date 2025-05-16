@@ -29,7 +29,7 @@ from qgsw.utils.named_object import NamedObject
 
 if TYPE_CHECKING:
     from qgsw.configs.core import Configuration
-    from qgsw.fields.variables.prognostic_tuples import BasePrognosticUVH
+    from qgsw.fields.variables.tuples import BaseUVH
     from qgsw.models.base import ModelUVH
 
 
@@ -85,13 +85,13 @@ class ModelReference(NamedObject[ReferenceName], Reference):
         for _ in steps.simulation_steps():
             self._core.step()
 
-    def load(self) -> BasePrognosticUVH:
+    def load(self) -> BaseUVH:
         """Load the data.
 
         Returns:
-            BasePrognosticUVH: Model's prognostic variables.
+            BaseUVH: Model's physical variables.
         """
-        return self._core.prognostic
+        return self._core.physical
 
     def retrieve_P(self) -> QGProjector:  # noqa: N802
         """Retrieve projector associated with reference.
@@ -100,14 +100,6 @@ class ModelReference(NamedObject[ReferenceName], Reference):
             QGProjector: Projector
         """
         return self._core.P
-
-    def retrieve_dxdy(self) -> tuple[float, float]:
-        """Retrieve dx and dy.
-
-        Returns:
-            tuple[float, float]: dx, dy
-        """
-        return self._core.space.dx, self._core.space.dy
 
     def retrieve_category(self) -> ModelCategory:
         """Retrieve model category..
@@ -183,11 +175,11 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
         ts_index = torch.argmin((self._ts - time).abs()).item()
         self._data: _OutputReader = self._outs[ts_index]
 
-    def load(self) -> BasePrognosticUVH:
+    def load(self) -> BaseUVH:
         """Load the data.
 
         Returns:
-            BasePrognosticUVH: Stored prognostic variables.
+            BaseUVH: Stored physical variables.
         """
         verbose.display(
             msg=f"Loading reference data from {self._data.path}",
@@ -206,14 +198,6 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
             model_config=self._config.model,
             physics_config=self._config.physics,
         )
-
-    def retrieve_dxdy(self) -> tuple[float, float]:
-        """Retrieve dx and dy.
-
-        Returns:
-            tuple[float, float]: dx, dy
-        """
-        return self._config.space.dx.item(), self._config.space.dy.item()
 
     def retrieve_category(self) -> ModelCategory:
         """Retrieve model category..
