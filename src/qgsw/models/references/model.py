@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -92,6 +93,14 @@ class ModelReference(NamedObject[ReferenceName], Reference):
             BaseUVH: Model's physical variables.
         """
         return self._core.physical
+
+    def save(self, file: str | Path) -> None:
+        """Save the data to another file.
+
+        Args:
+            file (str | Path): Filepath to save data into.
+        """
+        self._core.io.save(Path(file))
 
     def retrieve_P(self) -> QGProjector:  # noqa: N802
         """Retrieve projector associated with reference.
@@ -186,6 +195,18 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
             trigger_level=2,
         )
         return self._data.read()
+
+    def save(self, file: str | Path) -> None:
+        """Save the data to another file.
+
+        Args:
+            file (str | Path): Filepath to save data into.
+        """
+        shutil.copy(self._data.path, Path(file))
+        verbose.display(
+            msg=f"Copied {self._data.path} to {file}.",
+            trigger_level=1,
+        )
 
     def retrieve_P(self) -> QGProjector:  # noqa: N802
         """Retrieve projector associated with reference.

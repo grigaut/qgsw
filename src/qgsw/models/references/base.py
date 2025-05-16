@@ -1,17 +1,22 @@
 """Base class for references."""
 
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-from qgsw.fields.variables.tuples import BaseUVH
-from qgsw.models.names import ModelCategory
-from qgsw.models.qg.uvh.projectors.core import QGProjector
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
 
-from qgsw.configs.core import Configuration
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from qgsw.configs.core import Configuration
+    from qgsw.fields.variables.tuples import BaseUVH
+    from qgsw.models.names import ModelCategory
+    from qgsw.models.qg.uvh.projectors.core import QGProjector
 
 
 class Reference(ABC):
@@ -58,6 +63,14 @@ class Reference(ABC):
 
         Returns:
             BaseUVH: Stored physical variables.
+        """
+
+    @abstractmethod
+    def save(self, file: str | Path) -> None:
+        """Save the data to another file.
+
+        Args:
+            file (str | Path): Filepath to save data into.
         """
 
     @classmethod
