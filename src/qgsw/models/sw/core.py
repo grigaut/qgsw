@@ -517,10 +517,10 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
         self._state.unbind()
         self._create_physical_variables(state)
 
-        h_phys = PhysicalLayerDepthAnomaly(ds=self.space.ds)
         U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
         V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
         omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
+        h_phys = self._state[PhysicalLayerDepthAnomaly.get_name()]
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
         p = PressureTilde(g_prime=self.g_prime, eta_phys=eta_phys)
         self._pressure_name = p.get_name()

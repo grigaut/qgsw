@@ -11,6 +11,7 @@ except ImportError:
     from typing_extensions import Self
 
 
+from qgsw.exceptions import StateBindingError
 from qgsw.fields.variables.covariant import (
     PhysicalLayerDepthAnomaly,
     PhysicalMeridionalVelocity,
@@ -151,8 +152,14 @@ class BaseState(ABC, Generic[T]):
         Args:
             variable (BoundDiagnosticVariable): Variable.
         """
-        if variable.name in self.diag_vars:
+        if variable.id in [v.id for v in self.diag_vars.values()]:
             return
+        if variable.name in self.diag_vars:
+            msg = (
+                "A different variable with the same "
+                "name is already bound to state."
+            )
+            raise StateBindingError(msg)
         self.diag_vars[variable.name] = variable
 
     def unbind(self) -> None:

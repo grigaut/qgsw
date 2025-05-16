@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
 from abc import ABC, abstractmethod
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from qgsw.fields.base import Field
@@ -35,6 +37,11 @@ class Variable(Field):
     def unit(self) -> Unit:
         """Variable unit."""
         return self._unit
+
+    @cached_property
+    def id(self) -> uuid.UUID:
+        """Variable id."""
+        return uuid.uuid1()
 
     def __repr__(self) -> str:
         """Variable string representation."""
@@ -222,6 +229,11 @@ class BoundDiagnosticVariable(Variable, Generic[DiagVar]):
         self._name = self._var.name
         self._description = self._var.description
         self._scope = self._var.scope
+
+    @cached_property
+    def id(self) -> uuid.UUID:
+        """Variable id."""
+        return self._var.id
 
     @property
     def require_time(self) -> bool:

@@ -1,8 +1,11 @@
 """Test state object."""
 
+import pytest
 import torch
 
+from qgsw.exceptions import StateBindingError
 from qgsw.fields.variables.coefficients.core import UniformCoefficient
+from qgsw.fields.variables.covariant import PhysicalSurfaceHeightAnomaly
 from qgsw.fields.variables.physical import (
     LayerDepthAnomaly,
     PressureTilde,
@@ -164,3 +167,46 @@ def test_state_update_only_alpha() -> None:
     )
     assert not h_phys.up_to_date
     assert not pressure_tilde.up_to_date
+
+
+def test_variable_rebinding() -> None:
+    """Test rebinding a variable with same name as already bound variable."""
+    n_ens = 1
+    nl = 2
+    nx = 10
+    ny = 10
+    state = StateUVH.steady(
+        n_ens,
+        nl,
+        nx,
+        ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    h = LayerDepthAnomaly()
+    h.bind(state)
+    eta = PhysicalSurfaceHeightAnomaly(LayerDepthAnomaly())
+    with pytest.raises(StateBindingError):
+        eta.bind(state)
+
+
+def test_cascade_binding() -> None:
+    """Test variable dependency binding."""
+    n_ens = 1
+    nl = 2
+    nx = 10
+    ny = 10
+    state = StateUVH.steady(
+        n_ens,
+        nl,
+        nx,
+        ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+    h = LayerDepthAnomaly()
+    eta = PhysicalSurfaceHeightAnomaly(h)
+    assert h.get_name() not in state.diag_vars
+    eta.bind(state)
+    assert eta.get_name() in state.diag_vars
+    assert h.get_name() in state.diag_vars
