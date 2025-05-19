@@ -54,7 +54,7 @@ def interpolate_physical_variable(
 class Rescaler:
     """Rescaler."""
 
-    __slots__ = ("_P", "_dx", "_dy", "_masks", "_nx", "_ny")
+    __slots__ = ("_dx", "_dy", "_masks", "_nx", "_ny")
 
     def __init__(
         self,
@@ -63,7 +63,6 @@ class Rescaler:
         dx_out: float,
         dy_out: float,
         masks: Masks | None = None,
-        qg_proj: QGProjector | None = None,
     ) -> None:
         """Instantiate Rescaler..
 
@@ -73,9 +72,6 @@ class Rescaler:
             dx_out (float): Output dx.
             dy_out (float): Output dy.
             masks (Masks | None, optional): Masks for output. Defaults to None.
-            qg_proj (QGProjector | None, optional): QG Projector, if None the
-                rescale uvh is not guaranteed to be quai-geostrophic.
-                Defaults to None.
         """
         self._nx = nx_out
         self._ny = ny_out
@@ -86,7 +82,6 @@ class Rescaler:
             ny_out,
             device=defaults.get_device(),
         )
-        self._P = qg_proj
 
     @property
     def output_hshape(self) -> tuple[int, int]:
@@ -151,14 +146,24 @@ class Rescaler:
             h_out[0, k] += h_in[0, k].mean() - h_out[0, k].mean()
         return h_out * hmask
 
-    def rescale_uvh(self, uvh: UVH) -> UVH:
+    def rescale_uvh(self, uvh: UVH, proj: QGProjector | None = None) -> UVH:
         """Rescale uvh.
+
+        WARNING: Rescaling is performed on physical variables.
+
+        Rescaling process:
+        1. Interpolate u, v and h.
+        2. If the output is expected to quasi-geostrophic: Project u,v and h
+        3. Ensure mass conservation by corrected h amplitudes
 
         Args:
             uvh (UVH): Input (physical) uvh: u,v and h.
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
+            proj (QGProjector | None, optional): QG projector related with
+                input data. If None, the rescaled data won't be QG.
+                Defaults to None.
 
         Returns:
             UVH: Output (physical) uvh: u,v and h.
@@ -195,13 +200,16 @@ class Rescaler:
 
         uvh_i = UVH(u_i, v_i, h_i)  # Physical
 
-        if self._P:
+        if proj is not None:
+            proj_i = proj.to_shape(self._nx, self._ny)
             uvh_i_cov = covphys.to_cov(
                 UVH(u_i, v_i, h_i),
                 self._dx,
                 self._dy,
             )  # Covariant
-            uvh_i_cov = self._P.project(uvh_i_cov)
+            uvh_i_cov = proj_i.project(
+                uvh_i_cov,
+            )
             uvh_i = covphys.to_phys(
                 uvh_i_cov,
                 self._dx,
@@ -212,7 +220,11 @@ class Rescaler:
 
         return UVH(uvh_i.u, uvh_i.v, h_i)
 
-    def rescale_uvht(self, uvht: UVHT) -> UVHT:
+    def rescale_uvht(
+        self,
+        uvht: UVHT,
+        proj: QGProjector | None = None,
+    ) -> UVHT:
         """Rescale UVHT.
 
         Args:
@@ -221,6 +233,9 @@ class Rescaler:
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
+            proj (QGProjector | None, optional): QG projector related with
+                input data. If None, the rescaled data won't be QG.
+                Defaults to None.
 
         Returns:
             UVHT: Output (physical) uvht: t,u,v and h.
@@ -231,12 +246,13 @@ class Rescaler:
         """
         return UVHT.from_uvh(
             uvht.t,
-            self.rescale_uvh(uvht.uvh),
+            self.rescale_uvh(uvht.uvh, proj),
         )
 
     def rescale_uvht_alpha(
         self,
         uvht_alpha: UVHTAlpha,
+        proj: QGProjector | None = None,
     ) -> UVHTAlpha:
         """Rescale UVHTAlpha.
 
@@ -247,6 +263,9 @@ class Rescaler:
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
+            proj (QGProjector | None, optional): QG projector related with
+                input data. If None, the rescaled data won't be QG.
+                Defaults to None.
 
         Returns:
             UVHTAlpha: Output (physical) uvhtα: t,α,u,v and h.
@@ -264,24 +283,31 @@ class Rescaler:
         return UVHTAlpha.from_uvh(
             uvht_alpha.t,
             alpha_i,
-            self.rescale_uvh(uvht_alpha.uvh),
+            self.rescale_uvh(uvht_alpha.uvh, proj),
         )
 
     @overload
-    def __call__(self, prognostic: UVH) -> UVH: ...
+    def __call__(
+        self,
+        prognostic: UVH,
+        proj: QGProjector | None = None,
+    ) -> UVH: ...
     @overload
     def __call__(
         self,
         prognostic: UVHT,
+        proj: QGProjector | None = None,
     ) -> UVHT: ...
     @overload
     def __call__(
         self,
         prognostic: UVHTAlpha,
+        proj: QGProjector | None = None,
     ) -> UVHTAlpha: ...
     def __call__(
         self,
         prognostic: UVH | UVHT | UVHTAlpha,
+        proj: QGProjector | None = None,
     ) -> UVH | UVHT | UVHTAlpha:
         """Perform rescaling.
 
@@ -292,6 +318,9 @@ class Rescaler:
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
                 ├── v: (n_ens, nl, nx_in, ny_in+1)-shaped
                 └── h: (n_ens, nl, nx_in, ny_in)-shaped
+            proj (QGProjector | None, optional): QG projector related with
+                input data. If None, the rescaled data won't be QG.
+                Defaults to None.
 
         Raises:
             TypeError: If prognostic is neither UVH, UVHT or UVHTAlpha
@@ -305,11 +334,11 @@ class Rescaler:
                 └── h: (n_ens, nl, nx_out, ny_out)-shaped
         """
         if isinstance(prognostic, UVH):
-            return self.rescale_uvh(prognostic)
+            return self.rescale_uvh(prognostic, proj)
         if isinstance(prognostic, UVHT):
-            return self.rescale_uvht(prognostic)
+            return self.rescale_uvht(prognostic, proj)
         if isinstance(prognostic, UVHTAlpha):
-            return self.rescale_uvht_alpha(prognostic)
+            return self.rescale_uvht_alpha(prognostic, proj)
         msg = "Unsupported prognostic type."
         raise TypeError(msg)
 
@@ -347,16 +376,10 @@ class Rescaler:
         Returns:
             Rescaler: Rescaler.
         """
-        qg_proj = (
-            model.P
-            if model.get_category() == ModelCategory.QUASI_GEOSTROPHIC
-            else None
-        )
         return cls(
             model.space.nx,
             model.space.ny,
             model.space.dx,
             model.space.dy,
             model.masks,
-            qg_proj,
         )
