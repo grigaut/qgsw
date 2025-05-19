@@ -118,13 +118,15 @@ class InitialCondition:
     def _rescale(
         self,
         uvh: UVH,
-        P: QGProjector,  # noqa: N803
+        proj: QGProjector,
     ) -> tuple[UVH, QGProjector]:
         """Rescale UVH.
 
         Args:
             uvh (UVH): Input (physical) UVH.
-            P (QGProjector): Projects (if output is QG).
+            proj (QGProjector | None, optional): QG projector related with
+                input data. If None, the rescaled data won't be QG.
+                Defaults to None.
 
         Returns:
             tuple[UVH, QGProjector]: Interpolated (physical) UVH, QG projector
@@ -134,21 +136,21 @@ class InitialCondition:
         nx_model, ny_model = self._model.space.nx, self._model.space.ny
         require_scaling = nx != nx_model or ny != ny_model
         if not require_scaling:
-            return uvh, P
+            return uvh, proj
         self._raise_if_incompatible_shapes(
             nxin=nx,
             nyin=ny,
             nxout=nx_model,
             nyout=ny_model,
         )
-        uvh_i = self._rescaler(uvh)
-        qg_proj_in = P.to_shape(nx_model, ny_model)
-        return uvh_i, qg_proj_in
+        uvh_i = self._rescaler(uvh, proj)
+        proj_i = proj.to_shape(nx_model, ny_model)
+        return uvh_i, proj_i
 
     def set_initial_condition(
         self,
         uvh: UVH,
-        P: QGProjector,  # noqa: N803
+        proj: QGProjector,
         input_category: str | ModelCategory = ModelCategory.SHALLOW_WATER,
     ) -> None:
         """Set the initial condition.
@@ -160,7 +162,7 @@ class InitialCondition:
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
-            P (QGProjector): QGProjector associated with input uvh.
+            proj (QGProjector): QGProjector associated with input uvh.
             input_category (str | ModelCategory, optional): Input model
                 category. Defaults to ModelCategory.SHALLOW_WATER
 
@@ -168,16 +170,16 @@ class InitialCondition:
             ValueError: If the model category is not recognized.
         """
         if input_category == ModelCategory.QUASI_GEOSTROPHIC:
-            return self.set_initial_condition_from_qg(uvh, P)
+            return self.set_initial_condition_from_qg(uvh, proj)
         if input_category == ModelCategory.SHALLOW_WATER:
-            return self.set_initial_condition_from_sw(uvh, P)
+            return self.set_initial_condition_from_sw(uvh, proj)
         msg = f"Unrecognized model category: {input_category}."
         raise ValueError(msg)
 
     def set_initial_condition_from_sw(
         self,
         uvh: UVH,
-        P: QGProjector,  # noqa: N803
+        proj: QGProjector,
     ) -> None:
         """Set initial condition from SW uvh.
 
@@ -186,15 +188,15 @@ class InitialCondition:
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
-            P (QGProjector): QGProjector associated with input uvh.
+            proj (QGProjector): QGProjector associated with input uvh.
         """
         verbose.display(
             msg=f"Setting initial condition for '{self._model.name}' model.",
             trigger_level=2,
         )
-        uvh_i, proj_i = self._rescale(uvh, P)
         if self._model.get_category() == ModelCategory.QUASI_GEOSTROPHIC:
             # SW -> QG
+            uvh_i, proj_i = self._rescale(uvh, proj)
             uvh_cov = covphys.to_cov(
                 uvh_i,
                 self._model.space.dx,
@@ -204,6 +206,7 @@ class InitialCondition:
             self._model.set_p(p_qg[:, : self._nl])
         else:
             # SW -> SW
+            uvh_i, proj_i = self._rescale(uvh, None)
             self._model.set_physical_uvh(*uvh_i.parallel_slice[:, : self._nl])
         verbose.display(
             msg="Initial condition set.",
@@ -213,7 +216,7 @@ class InitialCondition:
     def set_initial_condition_from_qg(
         self,
         uvh: UVH,
-        P: QGProjector,  # noqa: N803
+        proj: QGProjector,
     ) -> None:
         """Set initial condition from QG uvh.
 
@@ -222,21 +225,23 @@ class InitialCondition:
                 ├── u: (n_ens, nl, nx+1, ny)-shaped
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
-            P (QGProjector): QGProjector associated with input uvh.
+            proj (QGProjector): QGProjector associated with input uvh.
         """
         verbose.display(
             msg=f"Setting initial condition for '{self._model.name}' model.",
             trigger_level=2,
         )
-        uvh_i, proj_i = self._rescale(uvh, P)
         if self._model.get_category() == ModelCategory.SHALLOW_WATER:
             # QG -> SW
+            uvh_i, proj_i = self._rescale(uvh, None)
             self._model.set_physical_uvh(*uvh_i.parallel_slice[:, : self._nl])
-        elif self._model.space.nl == uvh_i.h.shape[-3]:
+        elif self._model.space.nl == uvh.h.shape[-3]:
             # QG -> QG with same number of layers
+            uvh_i, _ = self._rescale(uvh, proj)
             self._model.set_physical_uvh(*uvh_i)
         else:
             # QG -> QG
+            uvh_i, proj_i = self._rescale(uvh, proj)
             uvh_cov = covphys.to_cov(
                 uvh_i,
                 self._model.space.dx,
@@ -279,7 +284,7 @@ class InitialCondition:
                 Path(file),
                 **specs,
             ),
-            P=QGProjector.from_config(
+            proj=QGProjector.from_config(
                 space_config,
                 model_config,
                 physics_config,
