@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 class InitialCondition:
     """Initial condition.
 
-    Perform rescaling using Rescaling if input data shape does not match output
+    Perform rescaling using Rescaler if input data shape does not match output
     model shapes.
     """
 

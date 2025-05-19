@@ -149,6 +149,13 @@ class Rescaler:
     def rescale_uvh(self, uvh: UVH, proj: QGProjector | None = None) -> UVH:
         """Rescale uvh.
 
+        WARNING: Rescaling is performed on physical variables.
+
+        Rescaling process:
+        1. Interpolate u, v and h.
+        2. If the output is expected to quasi-geostrophic: Project u,v and h
+        3. Ensure mass conservation by corrected h amplitudes
+
         Args:
             uvh (UVH): Input (physical) uvh: u,v and h.
                 ├── u: (n_ens, nl, nx_in+1, ny_in)-shaped
