@@ -246,6 +246,22 @@ class PSIQ(BasePSIQ, _PSIQ):
         q = data[q_name]
         return cls(psi=psi, q=q)
 
+    @classmethod
+    def is_file_readable(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        keys = tensorio.load(file).keys()
+        return (
+            PrognosticStreamFunction.get_name() in keys
+            and PrognosticPotentialVorticity.get_name() in keys
+        )
+
 
 class PSIQT(BasePSIQ, _PSIQT):
     """Stream function, potential vorticity and time."""
@@ -342,6 +358,19 @@ class PSIQT(BasePSIQ, _PSIQT):
             t,
             PSIQ.from_file(file, dtype=dtype, device=device),
         )
+
+    @classmethod
+    def is_file_readable(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        keys = tensorio.load(file).keys()
+        return Time.get_name() in keys and PSIQ.is_file_readable(file)
 
 
 class PSIQTAlpha(BasePSIQ, _PSIQTAlpha):
@@ -474,6 +503,22 @@ class PSIQTAlpha(BasePSIQ, _PSIQTAlpha):
             PSIQT.from_file(file, dtype=dtype, device=device),
         )
 
+    @classmethod
+    def is_file_readable(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        keys = tensorio.load(file).keys()
+        return (
+            CollinearityCoefficient.get_name() in keys
+            and PSIQT.is_file_readable(file)
+        )
+
 
 class _UVH(NamedTuple):
     """Zonal velocity, meridional velocity and layer thickness."""
@@ -593,6 +638,23 @@ class UVH(BaseUVH, _UVH):
         h = data[PhysicalLayerDepthAnomaly.get_name()]
         return cls(u=u, v=v, h=h)
 
+    @classmethod
+    def is_file_readable(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        keys = tensorio.load(file).keys()
+        return (
+            PhysicalZonalVelocity.get_name() in keys
+            and PhysicalMeridionalVelocity.get_name() in keys
+            and PhysicalLayerDepthAnomaly.get_name() in keys
+        )
+
 
 class UVHT(BaseUVH, _UVHT):
     """Time, Zonal velocity, meridional velocity and layer thickness."""
@@ -703,6 +765,19 @@ class UVHT(BaseUVH, _UVHT):
         )
         t = data[Time.get_name()]
         return cls.from_uvh(t, UVH.from_file(file, dtype=dtype, device=device))
+
+    @classmethod
+    def is_file_readable(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        keys = tensorio.load(file).keys()
+        return Time.get_name() in keys and UVH.is_file_readable(file)
 
 
 class UVHTAlpha(BaseUVH, _UVHTAlpha):
@@ -846,4 +921,20 @@ class UVHTAlpha(BaseUVH, _UVHTAlpha):
         return cls.from_uvht(
             alpha,
             UVHT.from_file(file, dtype=dtype, device=device),
+        )
+
+    @classmethod
+    def is_file_readable(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        keys = tensorio.load(file).keys()
+        return (
+            CollinearityCoefficient.get_name() in keys
+            and UVHT.is_file_readable(file)
         )

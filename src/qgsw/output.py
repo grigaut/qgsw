@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 import torch
 
+from qgsw.exceptions import ConfigurationError
 from qgsw.fields.variables.physical import (
     LayerDepthAnomaly,
     MeridionalVelocity,
@@ -25,6 +26,7 @@ from qgsw.fields.variables.tuples import (
 from qgsw.models.names import ModelName
 from qgsw.models.qg.uvh.modified.utils import is_modified
 from qgsw.run_summary import RunSummary
+from qgsw.simulation.names import SimulationName
 from qgsw.specs import DEVICE
 from qgsw.utils import tensorio
 from qgsw.utils.sorting import sort_files
@@ -41,22 +43,22 @@ class _OutputFile(NamedTuple):
     """Output file tuple."""
 
     step: int
-    second: float
-    timestep: timedelta
+    dt: float
     path: Path
     dtype = torch.float64
     device = DEVICE.get()
+
+    @property
+    def second(self) -> float:
+        return self.step * self.dt
+
+    @property
+    def timestep(self) -> float:
+        return timedelta(seconds=self.second)
 
 
 class _OutputReader(ABC, Generic[T]):
     """Output file wrapper."""
-
-    step: int
-    second: float
-    timestep: timedelta
-    path: Path
-    dtype = torch.float64
-    device = DEVICE.get()
 
     @abstractmethod
     def read(self) -> T: ...
@@ -76,6 +78,18 @@ class OutputFilePSIQ(_OutputReader[PSIQT], _OutputFile):
             dtype=torch.float64,
             device=DEVICE.get(),
         )
+
+    @classmethod
+    def can_read(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        return PSIQT.is_file_readable(file)
 
 
 class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
@@ -98,6 +112,18 @@ class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
         h = data[LayerDepthAnomaly.get_name()]
         return UVHT(u, v, h, t)
 
+    @classmethod
+    def can_read(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        return UVHT.is_file_readable(file)
+
 
 class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
     """Output file wrapper."""
@@ -119,6 +145,18 @@ class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
         h = data[LayerDepthAnomaly.get_name()]
         alpha = data[CollinearityCoefficient.get_name()]
         return UVHTAlpha(u, v, h, t, alpha)
+
+    @classmethod
+    def can_read(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        return UVHTAlpha.is_file_readable(file)
 
 
 class RunOutput:
@@ -145,17 +183,14 @@ class RunOutput:
             model_type = model_config.type
         files = list(self.folder.glob(f"{prefix}*.pt"))
         steps, files = sort_files(files, prefix, ".pt")
-        dt = self._summary.configuration.simulation.dt
-        seconds = [step * dt for step in steps]
-        timesteps = [timedelta(seconds=sec) for sec in seconds]
+        self._dt = self._summary.configuration.simulation.dt
 
         if is_modified(model_type):
             self._outputs = [
                 OutputFileAlpha(
                     step=steps[i],
-                    timestep=timesteps[i],
                     path=files[i],
-                    second=seconds[i],
+                    dt=self._dt,
                 )
                 for i in range(len(files))
             ]
@@ -163,9 +198,8 @@ class RunOutput:
             self._outputs = [
                 OutputFilePSIQ(
                     step=steps[i],
-                    timestep=timesteps[i],
                     path=files[i],
-                    second=seconds[i],
+                    dt=self._dt,
                 )
                 for i in range(len(files))
             ]
@@ -173,9 +207,8 @@ class RunOutput:
             self._outputs = [
                 OutputFileUVH(
                     step=steps[i],
-                    timestep=timesteps[i],
                     path=files[i],
-                    second=seconds[i],
+                    dt=self._dt,
                 )
                 for i in range(len(files))
             ]
@@ -230,7 +263,7 @@ class RunOutput:
         Yields:
             Iterator[float]: Seconds iterator.
         """
-        return (output.second for output in iter(self._outputs))
+        return (output.second for output in self.outputs())
 
     def outputs(self) -> Iterator[_OutputReader]:
         """Sorted outputs.
@@ -239,6 +272,27 @@ class RunOutput:
             Iterator[_OutputFile]: Outputs iterator.
         """
         return iter(self._outputs)
+
+    def ref_outputs(self) -> Iterator[OutputFileUVH]:
+        """Reference outputs.
+
+        Raises:
+            ConfigurationError: If the run is not an 'assimilation' run.
+
+        Yields:
+            Iterator[OutputFileUVH]: Outputs.
+        """
+        sim_config = self._summary.configuration.simulation
+        if sim_config.type != SimulationName.ASSIMILATION:
+            msg = "Reference outputs are for 'assimilation' simulations only."
+            raise ConfigurationError(msg)
+        prefix = sim_config.reference.prefix
+        files = list(self.folder.glob(f"{prefix}*.pt"))
+        steps, files = sort_files(files, prefix, ".pt")
+        return (
+            OutputFileUVH(step=steps[i], path=files[i], dt=self._dt)
+            for i in range(len(files))
+        )
 
 
 def check_time_compatibility(*runs: RunOutput) -> None:

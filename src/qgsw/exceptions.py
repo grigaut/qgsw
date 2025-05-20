@@ -69,6 +69,10 @@ class UnspecifiedConditionCategoryError(Exception):
     """When condition category is not specified."""
 
 
+class ConfigurationError(Exception):
+    """Configuration-related errors."""
+
+
 class RescalingShapeMismatchError(Exception):
     """When rescaling shapes mismatch."""
 
