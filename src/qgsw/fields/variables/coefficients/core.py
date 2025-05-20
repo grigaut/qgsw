@@ -244,7 +244,12 @@ class UniformCoefficient(Coefficient[float]):
             p_ref.flatten().cpu().numpy(),
             bounds=(-1, 1),
         )
-
+        verbose.display(
+            msg=(
+                f"Optimal coefficient inferred with a cost of {solution.cost}."
+            ),
+            trigger_level=2,
+        )
         return solution.x.item()
 
 
@@ -569,6 +574,12 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             weighted_p.cpu().numpy(),
             p_ref.flatten().cpu().numpy(),
             bounds=(-1, 1),
+        )
+        verbose.display(
+            msg=(
+                f"Optimal coefficient inferred with a cost of {solution.cost}."
+            ),
+            trigger_level=2,
         )
         return solution.x.tolist()
 
