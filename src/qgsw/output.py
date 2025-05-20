@@ -79,6 +79,18 @@ class OutputFilePSIQ(_OutputReader[PSIQT], _OutputFile):
             device=DEVICE.get(),
         )
 
+    @classmethod
+    def can_read(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        return PSIQT.is_file_readable(file)
+
 
 class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
     """Output file wrapper."""
@@ -99,6 +111,18 @@ class OutputFileUVH(_OutputReader[UVHT], _OutputFile):
         v = data[MeridionalVelocity.get_name()]
         h = data[LayerDepthAnomaly.get_name()]
         return UVHT(u, v, h, t)
+
+    @classmethod
+    def can_read(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        return UVHT.is_file_readable(file)
 
 
 class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
@@ -121,6 +145,18 @@ class OutputFileAlpha(_OutputReader[UVHTAlpha], _OutputFile):
         h = data[LayerDepthAnomaly.get_name()]
         alpha = data[CollinearityCoefficient.get_name()]
         return UVHTAlpha(u, v, h, t, alpha)
+
+    @classmethod
+    def can_read(cls, file: str | Path) -> bool:
+        """Check whether a file is readable.
+
+        Args:
+            file (str | Path): File to read.
+
+        Returns:
+            bool: True if from_file can read the file.
+        """
+        return UVHTAlpha.is_file_readable(file)
 
 
 class RunOutput:
