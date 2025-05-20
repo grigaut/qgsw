@@ -8,6 +8,7 @@ import numpy as np
 import torch
 
 from qgsw.configs.core import Configuration
+from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
 from qgsw.forcing.wind import WindForcing
 from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQ
@@ -294,6 +295,9 @@ def instantiate_model_from_config(
     )
     model.slip_coef = physics.slip_coef
     model.bottom_drag_coef = physics.bottom_drag_coefficient
+    if is_modified(model.get_type()):
+        alpha = instantiate_coef(model_config, space)
+        model.alpha = alpha.get()
 
     if np.isnan(simulation.dt):
         model.dt = time_params.compute_dt(
