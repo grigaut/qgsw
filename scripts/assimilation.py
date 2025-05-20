@@ -78,8 +78,16 @@ output_dir = config.io.output.directory
 
 # Collinearity Coefficient
 modified = is_modified(config.model.type)
-if modified:
+if modified and config.model.collinearity_coef.use_optimal:
     coef = instantiate_coef(config.model, config.space)
+    P_ref = ref.retrieve_P()
+    ref.at_time(model.time)
+    pressure = P_ref.compute_p(ref.load().uvh)[1]
+    if model.get_type() == ModelName.QG_FILTERED:
+        p = model.P.filter(pressure[0, 0])
+    else:
+        p = pressure[0, 0]
+    coef.with_optimal_values(p, pressure[0, 1])
     model.alpha = coef.get()
 
 
@@ -95,6 +103,15 @@ with Progress() as progress:
         )
         progress.advance(simulation)
         if sync:
+            if modified and config.model.collinearity_coef.use_optimal:
+                ref.at_time(model.time)
+                pressure = P_ref.compute_p(ref.load().uvh)[1]
+                if model.get_type() == ModelName.QG_FILTERED:
+                    p = model.P.filter(pressure[0, 0])
+                else:
+                    p = pressure[0, 0]
+                coef.with_optimal_values(p, pressure[0, 1])
+                model.alpha = coef.get()
             synchronize()
         if save:
             verbose.display(
