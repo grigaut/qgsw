@@ -130,7 +130,7 @@ class PrognosticVariable(ABC, Variable):
         Returns:
             torch.Tensor: Value of the variable.
         """
-        return self._data.__getitem__(self.slices)
+        return self._data
 
 
 class DiagnosticVariable(Variable, ABC):
