@@ -27,6 +27,7 @@ from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
 )
 from qgsw.models.qg.uvh.projectors.collinear import (
     CollinearProjector,
+    CollinearPVProjector,
     CollinearSFProjector,
 )
 from qgsw.models.synchronization.rescaling import interpolate_physical_variable
@@ -53,6 +54,15 @@ class CollinearFilteredProjector(CollinearProjector, ABC):
     def filter(self) -> GaussianHighPass2D:
         """Filter."""
         return self._filter
+
+    @property
+    def sigma(self) -> float:
+        """Filter standard deviation."""
+        return self.filter.sigma
+
+    @sigma.setter
+    def sigma(self, value: float) -> None:
+        self.filter.sigma = value
 
     @classmethod
     @abstractmethod
@@ -428,5 +438,159 @@ class CollinearFilteredSFProjector(
                 device=specs["device"],
             ),
         )
-        P.filter.sigma = model_config.sigma
+        P.sigma = model_config.sigma
+        return P
+
+
+class CollinearFilteredPVProjector(
+    CollinearPVProjector,
+    CollinearFilteredProjector,
+):
+    """QG Projector considering collinear filtered potential vorticity."""
+
+    @with_shapes(
+        A=(2, 2),
+        H=(2, 1, 1),
+    )
+    def __init__(
+        self,
+        A: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,  # noqa: N803
+        space: SpaceDiscretization3D,
+        f0: float,
+        masks: Masks,
+    ) -> None:
+        """Instantiate the projector.
+
+        Args:
+            A (torch.Tensor): Stretching matrix.
+            H (torch.Tensor): Layers reference thickness.
+            g_prime (torch.Tensor): Reduced gravity in the layer 2.
+            space (SpaceDiscretization3D): 3D space discretization.
+            f0 (float): _description_
+            masks (Masks): _description_
+        """
+        super().__init__(A=A, H=H, space=space, f0=f0, masks=masks)
+        self._filter = self.create_filter(self._sigma)
+
+    @classmethod
+    @with_shapes(
+        H=(2, 1, 1),
+    )
+    def Q(  # noqa: N802
+        cls,
+        uvh: UVH,
+        H: torch.Tensor,  # noqa: N803
+        alpha: torch.Tensor,
+        f0: float,
+        ds: float,
+        filt: _Filter,
+        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+    ) -> torch.Tensor:
+        """PV linear operator.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+            H (torch.Tensor): Layers reference thickness.
+                └── (nl, 1, 1)-shaped.
+            alpha (torch.Tensor): Collinearity coefficient.
+            f0 (float): f0.
+            ds (float): ds.
+            filt (_Filter): Filter.
+            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            to surface interpolation function.
+
+        Returns:
+            torch.Tensor: Physical Potential Vorticity * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
+        """
+        # Compute ω = ∂_x v - ∂_y u
+        omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
+            uvh.u[..., 1:-1, :],
+            dim=-1,
+        )
+        # Compute ω-f_0*h/H
+        q = (omega - f0 * points_to_surfaces(uvh.h) / H[0, 0, 0]) * (f0 / ds)
+        q_filt = filt(q[0, 0]).unsqueeze(0).unsqueeze(0)
+        q_tilde = points_to_surfaces(alpha) * q_filt
+        return torch.cat([q, q_tilde], dim=1)
+
+    def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
+        """PV linear operator.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Physical Pressure * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
+        """
+        return self.Q(
+            uvh=uvh,
+            f0=self._f0,
+            H=self.H,
+            alpha=self.alpha,
+            ds=self._space.ds,
+            filt=self.filter,
+            points_to_surfaces=self._points_to_surface,
+        )
+
+    @classmethod
+    def create_filter(
+        cls,
+        sigma: float,
+    ) -> GaussianHighPass2D:
+        """Create filter.
+
+        Args:
+            sigma (float): Filter standard deviation.
+
+        Returns:
+            SpectralGaussianHighPass2D: Filter.
+        """
+        return GaussianHighPass2D(sigma=sigma)
+
+    @classmethod
+    def from_config(
+        cls,
+        space_config: SpaceConfig,
+        model_config: ModelConfig,
+        physics_config: PhysicsConfig,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> Self:
+        """Builds Projector from configuration.
+
+        WARNING: alpha is not set.
+
+        Args:
+            space_config (SpaceConfig): Space configuration.
+            model_config (ModelConfig): Model configuration.
+            physics_config (PhysicsConfig): _description_
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+
+        Returns:
+            Self: CollinearPVProjector.
+        """
+        specs = defaults.get(dtype=dtype, device=device)
+        P = cls(  # noqa: N806
+            compute_A(model_config.h[:1], model_config.g_prime, **specs),
+            model_config.h.unsqueeze(-1).unsqueeze(-1),
+            SpaceDiscretization3D.from_config(space_config, model_config),
+            physics_config.f0,
+            masks=Masks.empty(
+                space_config.nx,
+                space_config.ny,
+                device=specs["device"],
+            ),
+        )
+        P.sigma = model_config.sigma
         return P
