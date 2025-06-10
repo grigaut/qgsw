@@ -203,7 +203,7 @@ class InitialCondition:
                 self._model.space.dy,
             )
             p_qg = proj_i.compute_p(uvh_cov)[0]
-            self._model.set_p(p_qg[:, : self._nl])
+            self._model.set_p(p_qg[:, : self._nl + 1])
         else:
             # SW -> SW
             uvh_i, proj_i = self._rescale(uvh, None)

@@ -56,7 +56,7 @@ levels_nb = config.model.h.shape[0]
 
 if config.model.type in [ModelName.QG_COLLINEAR_SF, ModelName.QG_COLLINEAR_PV]:
     levels_nb -= 1
-if config.model.type == ModelName.QG_FILTERED_SF:
+if config.model.type in [ModelName.QG_FILTERED_SF, ModelName.QG_FILTERED_PV]:
     levels_nb -= 1
 
 if not run.summary.is_finished:

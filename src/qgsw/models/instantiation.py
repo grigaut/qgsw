@@ -18,6 +18,7 @@ from qgsw.models.qg.uvh.modified.collinear.core import (
     QGCollinearSF,
 )
 from qgsw.models.qg.uvh.modified.filtered.core import (
+    QGCollinearFilteredPV,
     QGCollinearFilteredSF,
 )
 from qgsw.models.qg.uvh.modified.sanity_check.core import QGSanityCheck
@@ -183,7 +184,10 @@ def _instantiate_modified(
         model.beta_plane.f0,
         Ro,
     )
-    if model_config.type == ModelName.QG_FILTERED_SF:
+    if model_config.type in [
+        ModelName.QG_FILTERED_SF,
+        ModelName.QG_FILTERED_PV,
+    ]:
         model.P.filter.sigma = model_config.sigma
     uvh0 = QGProjector.G(
         p0,
@@ -215,7 +219,7 @@ ModelClass = Union[
 ]
 
 
-def get_model_class(  # noqa: PLR0911
+def get_model_class(  # noqa: C901, PLR0911
     model_config: ModelConfig,
 ) -> ModelClass:
     """Get the model class.
@@ -243,6 +247,8 @@ def get_model_class(  # noqa: PLR0911
         return QGCollinearPV
     if model_type == ModelName.QG_FILTERED_SF:
         return QGCollinearFilteredSF
+    if model_type == ModelName.QG_FILTERED_PV:
+        return QGCollinearFilteredPV
     if model_type == ModelName.QG_SANITY_CHECK:
         return QGSanityCheck
     if model_type == ModelName.SW_FILTER_EXACT:

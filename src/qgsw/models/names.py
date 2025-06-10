@@ -12,6 +12,7 @@ class ModelName(Name):
     QG_COLLINEAR_SF = "QGCollinearSF"
     QG_COLLINEAR_PV = "QGCollinearPV"
     QG_FILTERED_SF = "QGCollinearFilteredSF"
+    QG_FILTERED_PV = "QGCollinearFilteredPV"
     QG_SANITY_CHECK = "QGSanityCheck"
     SW_FILTER_SPECTRAL = "SWFilterBarotropicSpectral"
     SW_FILTER_EXACT = "SWFilterBarotropicExact"
@@ -24,7 +25,7 @@ class ModelCategory(Name):
     QUASI_GEOSTROPHIC = "Quasi-Geostrophic"
 
 
-def get_category(model_name: ModelName) -> ModelCategory:  # noqa: PLR0911
+def get_category(model_name: ModelName) -> ModelCategory:  # noqa: C901, PLR0911
     """Get model category from model name.
 
     Args:
@@ -51,6 +52,8 @@ def get_category(model_name: ModelName) -> ModelCategory:  # noqa: PLR0911
     if model_name == ModelName.QG_COLLINEAR_PV:
         return ModelCategory.QUASI_GEOSTROPHIC
     if model_name == ModelName.QG_FILTERED_SF:
+        return ModelCategory.QUASI_GEOSTROPHIC
+    if model_name == ModelName.QG_FILTERED_PV:
         return ModelCategory.QUASI_GEOSTROPHIC
     if model_name == ModelName.QG_SANITY_CHECK:
         return ModelCategory.QUASI_GEOSTROPHIC
