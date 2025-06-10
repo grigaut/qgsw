@@ -116,16 +116,18 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
     ) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
             offset_p0 (torch.Tensor): Offset for the pressure in top layer.
                 └── (1, 1, nx, ny)-shaped
             offset_p1 (torch.Tensor): Offset for the pressure in bottom layer.
                 └── (1, 1, nx, ny)-shaped
         """
         uvh = self.P.G(
-            p,
+            p[:, : self.space.nl],
             self.A,
             self.H,
             self._g_prime,
@@ -254,16 +256,14 @@ class QGCollinearFilteredPV(QGAlpha[CollinearFilteredPVProjector]):
     ) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least more than 1 layer than the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
-            offset_p0 (torch.Tensor): Offset for the pressure in top layer.
-                └── (1, 1, nx, ny)-shaped
-            offset_p1 (torch.Tensor): Offset for the pressure in bottom layer.
-                └── (1, 1, nx, ny)-shaped
+                └── (n_ens, >= nl+1, nx+1, ny+1)-shaped
         """
         uvh = self.P.G(
-            p,
+            p[:, : self.space.nl + 1],
             self.A,
             self.H,
             self._space.dx,

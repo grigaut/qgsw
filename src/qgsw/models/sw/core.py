@@ -271,12 +271,14 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
         """
-        uvh = QGProjector.G(
-            p,
+        uvh = self.P.G(
+            p[:, : self.space.nl],
             compute_A(
                 self.H[:, 0, 0],
                 self.g_prime[:, 0, 0],

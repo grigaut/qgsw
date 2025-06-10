@@ -243,12 +243,14 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
         """
         uvh = self.P.G(
-            p,
+            p[:, : self.space.nl],
             self.A,
             self._H,
             self._g_prime,
@@ -413,12 +415,14 @@ class QGCollinearPV(QGAlpha[CollinearPVProjector]):
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, 2, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
         """
         uvh = self.P.G(
-            p,
+            p[:, : self.space.nl],
             self.A,
             self._H,
             self._space.dx,
