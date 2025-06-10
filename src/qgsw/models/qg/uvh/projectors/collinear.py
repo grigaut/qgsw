@@ -632,7 +632,6 @@ class CollinearPVProjector(CollinearProjector):
         return cls(
             compute_A(model_config.h[:1], model_config.g_prime, **specs),
             model_config.h.unsqueeze(-1).unsqueeze(-1),
-            model_config.g_prime.unsqueeze(-1).unsqueeze(-1),
             SpaceDiscretization3D.from_config(space_config, model_config),
             physics_config.f0,
             masks=Masks.empty(
