@@ -227,9 +227,11 @@ class _Model(
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
         """
 
     @abstractmethod
