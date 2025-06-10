@@ -65,7 +65,7 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
             trigger_level=1,
         )
         self.__instance_nb = next(self._instance_count)
-        self.__name = f"{self.__class__.__name__}-{self.__instance_nb}"
+        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
         ModelParamChecker.__init__(
             self,
             space_2d=space_2d,

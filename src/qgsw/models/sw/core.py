@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import torch
 import torch.nn.functional as F  # noqa: N812
 
+from qgsw import verbose
 from qgsw.fields.variables.covariant import (
     KineticEnergy,
     MaskedVorticity,
@@ -478,6 +479,12 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self.__instance_nb = next(self._instance_count)
+        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
+        verbose.display(
+            msg=f"Creating {self.__class__.__name__} model...",
+            trigger_level=1,
+        )
         ModelParamChecker.__init__(
             self,
             space_2d=space_2d,

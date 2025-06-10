@@ -107,7 +107,7 @@ class _Model(
             not. Defaults to True.
         """
         self.__instance_nb = next(self._instance_count)
-        self.__name = f"{self.__class__.__name__}-{self.__instance_nb}"
+        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
         verbose.display(
             msg=f"Creating {self.__class__.__name__} model...",
             trigger_level=1,
@@ -172,10 +172,7 @@ class _Model(
     @property
     def name(self) -> str:
         """Object name."""
-        try:
-            return self._name
-        except AttributeError:
-            return self.__name
+        return self._name
 
     @name.setter
     def name(self, name: str) -> None:
