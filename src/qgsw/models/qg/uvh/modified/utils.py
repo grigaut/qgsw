@@ -14,6 +14,6 @@ def is_modified(model_type: str) -> bool:
     """
     if model_type in [ModelName.QG_COLLINEAR_SF, ModelName.QG_COLLINEAR_PV]:
         return True
-    if model_type == ModelName.QG_FILTERED:  # noqa: SIM103
+    if model_type == ModelName.QG_FILTERED_SF:  # noqa: SIM103
         return True
     return False

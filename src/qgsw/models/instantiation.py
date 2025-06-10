@@ -183,7 +183,7 @@ def _instantiate_modified(
         model.beta_plane.f0,
         Ro,
     )
-    if model_config.type == ModelName.QG_FILTERED:
+    if model_config.type == ModelName.QG_FILTERED_SF:
         model.P.filter.sigma = model_config.sigma
     uvh0 = QGProjector.G(
         p0,
@@ -241,7 +241,7 @@ def get_model_class(  # noqa: PLR0911
         return QGCollinearSF
     if model_type == ModelName.QG_COLLINEAR_PV:
         return QGCollinearPV
-    if model_type == ModelName.QG_FILTERED:
+    if model_type == ModelName.QG_FILTERED_SF:
         return QGCollinearFilteredSF
     if model_type == ModelName.QG_SANITY_CHECK:
         return QGSanityCheck
