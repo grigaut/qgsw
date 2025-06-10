@@ -585,6 +585,27 @@ class CollinearPVProjector(CollinearProjector):
             points_to_surfaces=self._points_to_surface,
         )
 
+    def to_shape(self, nx: int, ny: int) -> Self:
+        """Recreate a QGProjector with another shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            Self: QGProjector.
+        """
+        proj = CollinearPVProjector(
+            A=self.A,
+            H=self.H,
+            space=self.space.to_shape(nx, ny, self.space.nl),
+            f0=self._f0,
+            masks=self.masks,
+        )
+        alpha = self.alpha
+        proj.alpha = interpolate_physical_variable(alpha, (nx, ny))
+        return proj
+
     @classmethod
     def from_config(
         cls,
