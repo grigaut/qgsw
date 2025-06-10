@@ -14,6 +14,7 @@ from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.uvh.core import QG
 from qgsw.models.qg.uvh.modified.collinear.core import (
+    QGCollinearPV,
     QGCollinearSF,
 )
 from qgsw.models.qg.uvh.modified.filtered.core import (
@@ -238,6 +239,8 @@ def get_model_class(  # noqa: PLR0911
         return QGPSIQ
     if model_type == ModelName.QG_COLLINEAR_SF:
         return QGCollinearSF
+    if model_type == ModelName.QG_COLLINEAR_PV:
+        return QGCollinearPV
     if model_type == ModelName.QG_FILTERED:
         return QGCollinearFilteredSF
     if model_type == ModelName.QG_SANITY_CHECK:

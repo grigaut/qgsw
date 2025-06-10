@@ -19,7 +19,10 @@ from qgsw.models.qg.uvh.modified.collinear.variable_set import (
     QGCollinearSFVariableSet,
 )
 from qgsw.models.qg.uvh.modified.filtered.pv import compute_g_tilde
-from qgsw.models.qg.uvh.projectors.collinear import CollinearSFProjector
+from qgsw.models.qg.uvh.projectors.collinear import (
+    CollinearPVProjector,
+    CollinearSFProjector,
+)
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
@@ -286,3 +289,170 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
             dict[str, DiagnosticVariable]: Variables dictionnary.
         """
         return QGCollinearSFVariableSet.get_variable_set(space, physics, model)
+
+
+class QGCollinearPV(QGAlpha[CollinearPVProjector]):
+    """QG model with collinear potential vorticity."""
+
+    _type = ModelName.QG_COLLINEAR_PV
+
+    _supported_layers_nb: int = 2
+    _core: SWCollinearSublayer
+
+    def __init__(
+        self,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        optimize: bool = True,  # noqa: FBT001, FBT002
+    ) -> None:
+        """Collinear Sublayer Stream Function.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (2,) shaped
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (2,) shaped
+            beta_plane (Beta_Plane): Beta plane.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        verbose.display(
+            msg=f"Creating {self.__class__.__name__} model...",
+            trigger_level=1,
+        )
+        self.__instance_nb = next(self._instance_count)
+        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
+        ModelParamChecker.__init__(
+            self,
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+        )
+        self._space = keep_top_layer(self._space)
+
+        self._compute_coriolis(self._space.omega.remove_z_h())
+        ##Topography and Ref values
+        self._set_ref_variables()
+
+        # initialize state
+        self._set_state()
+        # initialize variables
+        self._create_diagnostic_vars(self._state)
+
+        self._set_utils(optimize)
+        self._set_fluxes(optimize)
+        self._core = self._init_core_model(
+            space_2d=space_2d,
+            H=H,
+            g_prime=g_prime,
+            beta_plane=beta_plane,
+            optimize=optimize,
+        )
+        self.A = self.compute_A(self._H[:, 0, 0], self._g_prime[:, 0, 0])
+        self._set_projector()
+
+    @property
+    def H(self) -> torch.Tensor:  # noqa: N802
+        """Layers thickness.
+
+        └── (1, 1, 1) shaped
+        """
+        return self._H[:1, ...]
+
+    @property
+    def g_prime(self) -> torch.Tensor:
+        """Reduced Gravity.
+
+        └── (1, 1, 1) shaped
+        """
+        return self._g_prime[:1, ...]
+
+    @QGAlpha.alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        """Alpha setter."""
+        QGAlpha.alpha.fset(self, alpha)
+        self._core.alpha = alpha
+        self.P.alpha = alpha
+        self._create_diagnostic_vars(self._state)
+
+    def _init_core_model(
+        self,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,  # noqa: N803
+        g_prime: torch.Tensor,
+        beta_plane: BetaPlane,
+        optimize: bool,  # noqa: FBT001
+    ) -> SWCollinearSublayer:
+        """Initialize the core Shallow Water model.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (2,) shaped
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (2,) shaped
+            beta_plane (Beta_Plane): Beta plane.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+
+        Returns:
+            SW: Core model (One layer).
+        """
+        return SWCollinearSublayer(
+            space_2d=space_2d,
+            H=H,  # Only consider top layer
+            g_prime=g_prime,  # Only consider top layer
+            beta_plane=beta_plane,
+            optimize=optimize,
+        )
+
+    def set_p(self, p: torch.Tensor) -> None:
+        """Set the initial pressure.
+
+        Args:
+            p (torch.Tensor): Pressure.
+                └── (n_ens, 2, nx+1, ny+1)-shaped
+        """
+        uvh = self.P.G(
+            p,
+            self.A,
+            self._H,
+            self._space.dx,
+            self._space.dy,
+            self._space.ds,
+            self.beta_plane.f0,
+            self.points_to_surfaces,
+        )
+        self.set_uvh(*uvh)
+
+    def _set_projector(self) -> None:
+        self._P = CollinearPVProjector(
+            self.A,
+            self._H,
+            space=self.space,
+            f0=self.beta_plane.f0,
+            masks=self.masks,
+        )
+
+    @classmethod
+    def get_variable_set(
+        cls,
+        space: SpaceConfig,
+        physics: PhysicsConfig,
+        model: ModelConfig,
+    ) -> dict[str, DiagnosticVariable]:
+        """Create variable set.
+
+        Args:
+            space (SpaceConfig): Space configuration.
+            physics (PhysicsConfig): Physics configuration.
+            model (ModelConfig): Model configuaration.
+
+        Returns:
+            dict[str, DiagnosticVariable]: Variables dictionnary.
+        """
+        raise NotImplementedError
