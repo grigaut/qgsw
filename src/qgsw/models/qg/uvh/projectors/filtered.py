@@ -76,8 +76,6 @@ class CollinearFilteredSFProjector(
 ):
     """QG Projector."""
 
-    _sigma = 1
-
     @with_shapes(
         A=(1, 1),
         H=(2, 1, 1),
