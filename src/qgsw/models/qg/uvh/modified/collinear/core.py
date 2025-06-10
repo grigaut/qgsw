@@ -99,7 +99,6 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
     _type = ModelName.QG_COLLINEAR_SF
 
     _supported_layers_nb: int = 2
-    _coefficient_set = False
     _core: SWCollinearSublayer
 
     def __init__(
