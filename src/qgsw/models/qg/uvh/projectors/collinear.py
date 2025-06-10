@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
 
 
-class CollinearQGProjector(QGProjector):
+class CollinearSFProjector(QGProjector):
     """QG Projector."""
 
     _MAX_ITERATIONS = 1000
@@ -341,7 +341,7 @@ class CollinearQGProjector(QGProjector):
         Returns:
             Self: QGProjector.
         """
-        proj = CollinearQGProjector(
+        proj = CollinearSFProjector(
             A=self.A,
             H=self.H,
             g_prime=self._g_prime,
@@ -373,7 +373,7 @@ class CollinearQGProjector(QGProjector):
             device (torch.device | None, optional): Device. Defaults to None.
 
         Returns:
-            Self: CollinearQGProjector.
+            Self: CollinearSFProjector.
         """
         specs = defaults.get(dtype=dtype, device=device)
         g_tilde = compute_g_tilde(model_config.g_prime)

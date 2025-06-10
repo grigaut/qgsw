@@ -23,7 +23,7 @@ from qgsw.masks import Masks
 from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
-from qgsw.models.qg.uvh.projectors.collinear import CollinearQGProjector
+from qgsw.models.qg.uvh.projectors.collinear import CollinearSFProjector
 from qgsw.models.synchronization.rescaling import interpolate_physical_variable
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs import defaults
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from qgsw.filters.base import _Filter
 
 
-class CollinearFilteredQGProjector(CollinearQGProjector):
+class CollinearFilteredQGProjector(CollinearSFProjector):
     """QG Projector."""
 
     _sigma = 1

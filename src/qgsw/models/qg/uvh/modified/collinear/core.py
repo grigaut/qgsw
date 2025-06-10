@@ -19,7 +19,7 @@ from qgsw.models.qg.uvh.modified.collinear.variable_set import (
     QGCollinearSFVariableSet,
 )
 from qgsw.models.qg.uvh.modified.filtered.pv import compute_g_tilde
-from qgsw.models.qg.uvh.projectors.collinear import CollinearQGProjector
+from qgsw.models.qg.uvh.projectors.collinear import CollinearSFProjector
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sw.core import SWCollinearSublayer
 from qgsw.spatial.core.discretization import (
@@ -93,7 +93,7 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
         super()._set_H(h)
 
 
-class QGCollinearSF(QGAlpha[CollinearQGProjector]):
+class QGCollinearSF(QGAlpha[CollinearSFProjector]):
     """Modified QG model implementing CoLinear Sublayer Behavior."""
 
     _type = ModelName.QG_COLLINEAR_SF
@@ -260,7 +260,7 @@ class QGCollinearSF(QGAlpha[CollinearQGProjector]):
         self.set_uvh(*uvh)
 
     def _set_projector(self) -> None:
-        self._P = CollinearQGProjector(
+        self._P = CollinearSFProjector(
             self.A,
             self._H,
             g_prime=self._g_prime,
