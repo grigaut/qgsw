@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 import torch
@@ -34,7 +35,57 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
 
 
-class CollinearSFProjector(QGProjector):
+class CollinearProjector(QGProjector, ABC):
+    """Base class for Collinear Projectors."""
+
+    @property
+    def alpha(self) -> torch.Tensor:
+        """Alpha."""
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self._alpha = alpha
+
+    def _set_helmholtz_solver(self, lambd: torch.Tensor, f0: float) -> None:
+        """Set the Helmholtz Solver.
+
+        Args:
+            lambd (torch.Tensor): Matrix A's eigenvalues.
+                └── (1, 1, 1, 1)-shaped.
+            f0 (float): f0.
+        """
+        if len(self._masks.psi_irrbound_xids) > 0:
+            # Handle Non rectangular geometry
+            raise NotImplementedError
+        super()._set_helmholtz_solver(lambd, f0)
+
+    @classmethod
+    @abstractmethod
+    def from_config(
+        cls,
+        space_config: SpaceConfig,
+        model_config: ModelConfig,
+        physics_config: PhysicsConfig,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> Self:
+        """Builds Projector frm configuration.
+
+        Args:
+            space_config (SpaceConfig): Space configuration.
+            model_config (ModelConfig): Model configuration.
+            physics_config (PhysicsConfig): _description_
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+
+        Returns:
+            Self: CollinearProjector.
+        """
+
+
+class CollinearSFProjector(CollinearProjector):
     """QG Projector considering collinear stream function."""
 
     _MAX_ITERATIONS = 1000
@@ -74,34 +125,12 @@ class CollinearSFProjector(QGProjector):
         )
         self._g_prime = g_prime
 
-    @property
-    def alpha(self) -> torch.Tensor:
-        """Alpha."""
-        return self._alpha
-
-    @alpha.setter
-    def alpha(self, alpha: torch.Tensor) -> None:
-        self._alpha = alpha
-
     @QGProjector.A.setter
     @with_shapes(A=(1, 1))
     def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803
         """Set the stretching matrix."""
         # A.shape = (1,1) -> Cm2L = [[1]], lambd = A_11,  Cl2M = [[1]]
         QGProjector.A.fset(self, A)
-
-    def _set_helmholtz_solver(self, lambd: torch.Tensor, f0: float) -> None:
-        """Set the Helmholtz Solver.
-
-        Args:
-            lambd (torch.Tensor): Matrix A's eigenvalues.
-                └── (1, 1, 1, 1)-shaped.
-            f0 (float): f0.
-        """
-        if len(self._masks.psi_irrbound_xids) > 0:
-            # Handle Non rectangular geometry
-            raise NotImplementedError
-        super()._set_helmholtz_solver(lambd, f0)
 
     @classmethod
     @with_shapes(
