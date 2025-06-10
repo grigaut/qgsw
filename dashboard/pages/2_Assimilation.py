@@ -54,7 +54,7 @@ vars_dict_ref = get_model_class(model_config_ref).get_variable_set(
 )
 levels_nb = config.model.h.shape[0]
 
-if config.model.type == ModelName.QG_COLLINEAR_SF:
+if config.model.type in [ModelName.QG_COLLINEAR_SF, ModelName.QG_COLLINEAR_PV]:
     levels_nb -= 1
 if config.model.type == ModelName.QG_FILTERED:
     levels_nb -= 1
