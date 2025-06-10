@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 
 class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
-    """Modified QG Model implementing collinear pv behavior."""
+    """Modified QG Model implementing collinear sf behavior."""
 
     _type = ModelName.QG_FILTERED_SF
     _supported_layers_nb = 2
