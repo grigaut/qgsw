@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qgsw import verbose
+from qgsw.exceptions import InvalidLayerNumberError
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.uvh.modified.collinear.core import QGAlpha
@@ -125,9 +126,16 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
                 └── (1, 1, nx, ny)-shaped
             offset_p1 (torch.Tensor): Offset for the pressure in bottom layer.
                 └── (1, 1, nx, ny)-shaped
+
+        Raises:
+            InvalidLayerNumberError: If the layer number of p is invalid.
         """
+        if p.shape[1] < (nl := self.space.nl):
+            msg = f"p must have at least {nl} layers."
+            raise InvalidLayerNumberError(msg)
+
         uvh = self.P.G(
-            p[:, : self.space.nl],
+            p[:, :nl],
             self.A,
             self.H,
             self._g_prime,
@@ -260,10 +268,17 @@ class QGCollinearFilteredPV(QGAlpha[CollinearFilteredPVProjector]):
 
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, >= nl+1, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl +1 , nx+1, ny+1)-shaped
+
+        Raises:
+            InvalidLayerNumberError: If the layer number of p is invalid.
         """
+        if p.shape[1] < (nl := self.space.nl + 1):
+            msg = f"p must have at least {nl} layers."
+            raise InvalidLayerNumberError(msg)
+
         uvh = self.P.G(
-            p[:, : self.space.nl + 1],
+            p[:, :nl],
             self.A,
             self.H,
             self._space.dx,

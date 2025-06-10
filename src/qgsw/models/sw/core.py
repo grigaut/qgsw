@@ -11,6 +11,7 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
+from qgsw.exceptions import InvalidLayerNumberError
 from qgsw.fields.variables.covariant import (
     KineticEnergy,
     MaskedVorticity,
@@ -276,9 +277,16 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         Args:
             p (torch.Tensor): Pressure.
                 └── (n_ens, >= nl, nx+1, ny+1)-shaped
+
+        Raises:
+            InvalidLayerNumberError: If the layer number of p is invalid.
         """
+        if p.shape[1] < (nl := self.space.nl):
+            msg = f"p must have at least {nl} layers."
+            raise InvalidLayerNumberError(msg)
+
         uvh = self.P.G(
-            p[:, : self.space.nl],
+            p[:, :nl],
             compute_A(
                 self.H[:, 0, 0],
                 self.g_prime[:, 0, 0],

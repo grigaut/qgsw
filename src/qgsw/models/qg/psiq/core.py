@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import torch
 
 from qgsw import verbose
-from qgsw.exceptions import UnsetStencilError
+from qgsw.exceptions import InvalidLayerNumberError, UnsetStencilError
 from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
 from qgsw.fields.variables.tuples import (
     PSIQ,
@@ -506,8 +506,15 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         Args:
             p (torch.Tensor): Pressure.
                 └── (n_ens, >= nl, nx+1, ny+1)-shaped
+
+        Raises:
+            InvalidLayerNumberError: If the layer number of p is invalid.
         """
-        return self.set_psi(p[:, : self.space.nl] / self.beta_plane.f0)
+        if p.shape[1] < (nl := self.space.nl):
+            msg = f"p must have at least {nl} layers."
+            raise InvalidLayerNumberError(msg)
+
+        return self.set_psi(p[:, :nl] / self.beta_plane.f0)
 
     def set_q(self, q: torch.Tensor) -> None:
         """Set the value of potential vorticity.

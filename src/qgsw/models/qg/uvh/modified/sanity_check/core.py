@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import torch
 
+from qgsw.exceptions import InvalidLayerNumberError
 from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.fields.variables.tuples import UVH, UVHTAlpha
 from qgsw.models.io import IO
@@ -119,9 +120,16 @@ class QGSanityCheck(
         Args:
             p (torch.Tensor): Pressure.
                 └── (n_ens, >= nl, nx+1, ny+1)-shaped
+
+        Raises:
+            InvalidLayerNumberError: If the layer number of p is invalid.
         """
+        if p.shape[1] < (nl := self.space.nl):
+            msg = f"p must have at least {nl} layers."
+            raise InvalidLayerNumberError(msg)
+
         uvh = self._baseline.P.G(
-            p[:, : self.space.nl],
+            p[:, :nl],
             self._baseline.A,
             self._baseline.H,
             self._space.dx,
