@@ -402,6 +402,8 @@ class CollinearFilteredSFProjector(
     ) -> Self:
         """Builds Projector frm configuration.
 
+        WARNING: alpha is not set.
+
         Args:
             space_config (SpaceConfig): Space configuration.
             model_config (ModelConfig): Model configuration.
