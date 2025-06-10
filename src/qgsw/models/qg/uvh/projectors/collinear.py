@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 
 class CollinearSFProjector(QGProjector):
-    """QG Projector."""
+    """QG Projector considering collinear stream function."""
 
     _MAX_ITERATIONS = 1000
     _ATOL = 1e-8  # default value for torch.isclose

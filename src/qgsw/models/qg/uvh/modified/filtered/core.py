@@ -15,7 +15,7 @@ from qgsw.models.qg.uvh.modified.filtered.variable_set import (
     QGCollinearFilteredSFVariableSet,
 )
 from qgsw.models.qg.uvh.projectors.filtered import (
-    CollinearFilteredQGProjector,
+    CollinearFilteredSFProjector,
 )
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
 
 
-class QGCollinearFilteredSF(QGAlpha[CollinearFilteredQGProjector]):
+class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
     """Modified QG Model implementing collinear pv behavior."""
 
     _type = ModelName.QG_FILTERED
@@ -141,7 +141,7 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredQGProjector]):
         self.set_uvh(*uvh)
 
     def _set_projector(self) -> None:
-        self._P = CollinearFilteredQGProjector(
+        self._P = CollinearFilteredSFProjector(
             A=self.A,
             H=self.H,
             g_prime=self.g_prime,

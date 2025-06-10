@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from qgsw.filters.base import _Filter
 
 
-class CollinearFilteredQGProjector(CollinearSFProjector):
+class CollinearFilteredSFProjector(CollinearSFProjector):
     """QG Projector."""
 
     _sigma = 1
@@ -334,7 +334,7 @@ class CollinearFilteredQGProjector(CollinearSFProjector):
         Returns:
             Self: QGProjector.
         """
-        proj = CollinearFilteredQGProjector(
+        proj = CollinearFilteredSFProjector(
             A=self.A,
             H=self.H,
             g_prime=self._g_prime,
@@ -382,7 +382,7 @@ class CollinearFilteredQGProjector(CollinearSFProjector):
             device (torch.device | None, optional): Device. Defaults to None.
 
         Returns:
-            Self: CollinearFilteredQGProjector.
+            Self: CollinearFilteredSFProjector.
         """
         specs = defaults.get(dtype=dtype, device=device)
         g_tilde = compute_g_tilde(model_config.g_prime)
