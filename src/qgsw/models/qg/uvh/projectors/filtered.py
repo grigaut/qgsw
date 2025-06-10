@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.modified.filtered.pv import compute_g_tilde
 
@@ -23,7 +25,10 @@ from qgsw.masks import Masks
 from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,
 )
-from qgsw.models.qg.uvh.projectors.collinear import CollinearSFProjector
+from qgsw.models.qg.uvh.projectors.collinear import (
+    CollinearProjector,
+    CollinearSFProjector,
+)
 from qgsw.models.synchronization.rescaling import interpolate_physical_variable
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.specs import defaults
@@ -38,7 +43,37 @@ if TYPE_CHECKING:
     from qgsw.filters.base import _Filter
 
 
-class CollinearFilteredSFProjector(CollinearSFProjector):
+class CollinearFilteredProjector(CollinearProjector, ABC):
+    """Base class for collinear and filtered projectors."""
+
+    _filter: _Filter
+    _sigma = 1
+
+    @property
+    def filter(self) -> GaussianHighPass2D:
+        """Filter."""
+        return self._filter
+
+    @classmethod
+    @abstractmethod
+    def create_filter(
+        cls,
+        sigma: float,
+    ) -> GaussianHighPass2D:
+        """Create filter.
+
+        Args:
+            sigma (float): Filter standard deviation.
+
+        Returns:
+            SpectralGaussianHighPass2D: Filter.
+        """
+
+
+class CollinearFilteredSFProjector(
+    CollinearSFProjector,
+    CollinearFilteredProjector,
+):
     """QG Projector."""
 
     _sigma = 1
@@ -76,11 +111,6 @@ class CollinearFilteredSFProjector(CollinearSFProjector):
             masks=masks,
         )
         self._filter = self.create_filter(self._sigma)
-
-    @property
-    def filter(self) -> GaussianHighPass2D:
-        """Filter."""
-        return self._filter
 
     @cached_property
     def offset_p0_default(self) -> torch.Tensor:
