@@ -601,4 +601,6 @@ class ModelUVH(
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         super().step()
-        self._state.update_uvh(self.update(self._state.prognostic.uvh))
+        uvh = self._state.prognostic.uvh
+        uvh_updated = self.update(uvh)
+        self._state.update_uvh(uvh_updated)
