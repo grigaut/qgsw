@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
 
+from torch.utils import checkpoint
+
 from qgsw import verbose
 from qgsw.exceptions import (
     InvalidLayerNumberError,
     InvalidLayersDefinitionError,
 )
 from qgsw.fields.variables.state import StateUVHAlpha
-from qgsw.fields.variables.tuples import UVHTAlpha
+from qgsw.fields.variables.tuples import UVH, UVHTAlpha
+from qgsw.models.core import schemes
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
@@ -53,6 +56,7 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
 
     _supported_layers_nb: int
     _A: torch.Tensor
+    _requires_grad = False
 
     @property
     def alpha(self) -> torch.Tensor:
@@ -62,6 +66,12 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
+        self.requires_grad_(self.alpha.requires_grad)
+
+    @property
+    def requires_grad(self) -> bool:
+        """Is True if gradients need to be computed, False otherwise."""
+        return self._requires_grad
 
     def _set_io(self, state: StateUVHAlpha) -> None:
         self._io = IO(
@@ -97,6 +107,68 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
             )
             raise InvalidLayersDefinitionError(msg)
         super()._set_H(h)
+
+    def update(self, prognostic: UVH) -> UVH:
+        """Update prognostic.
+
+        Args:
+            prognostic (UVH): u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            UVH: update prognostic variables.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+        """
+        if self.save_p_values:
+            self._p_vals = []
+
+        def time_integration(
+            u: torch.Tensor,
+            v: torch.Tensor,
+            h: torch.Tensor,
+        ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            return schemes.rk3_ssp(
+                UVH(u, v, h),
+                self.dt,
+                self.compute_time_derivatives,
+            )
+
+        if self.requires_grad:
+            u, v, h = prognostic
+            u_grad = u.clone().requires_grad_(True)  # noqa: FBT003
+            v_grad = v.clone().requires_grad_(True)  # noqa: FBT003
+            h_grad = h.clone().requires_grad_(True)  # noqa: FBT003
+            uvh_tuple = checkpoint.checkpoint(
+                time_integration,
+                u_grad,
+                v_grad,
+                h_grad,
+            )
+            return UVH(*uvh_tuple)
+        return time_integration(prognostic.u, prognostic.v, prognostic.h)
+
+    def requires_grad_(self, requires_grad: bool) -> None:  # noqa: FBT001
+        """Set requires_grad attribute to True.
+
+        Hence, the model will compute checkpoints when doing update.
+
+        Args:
+            requires_grad (bool): True if gradients need to be computed,
+                False otherwise.
+        """
+        self._requires_grad = requires_grad
+        if self.requires_grad:
+            verbose.display(
+                msg=(
+                    "Model set to track gradients."
+                    " Model steps will register pytorch checkpoints."
+                ),
+                trigger_level=1,
+            )
 
 
 class QGCollinearSF(QGAlpha[CollinearSFProjector]):
