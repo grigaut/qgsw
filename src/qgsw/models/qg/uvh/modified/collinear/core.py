@@ -147,6 +147,7 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
                 u_grad,
                 v_grad,
                 h_grad,
+                use_reentrant=True,
             )
             return UVH(*uvh_tuple)
         return time_integration(prognostic.u, prognostic.v, prognostic.h)
