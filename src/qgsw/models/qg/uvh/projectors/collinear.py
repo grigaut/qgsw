@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import torch
@@ -34,8 +36,58 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
 
 
-class CollinearQGProjector(QGProjector):
-    """QG Projector."""
+class CollinearProjector(QGProjector, ABC):
+    """Base class for Collinear Projectors."""
+
+    @property
+    def alpha(self) -> torch.Tensor:
+        """Alpha."""
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self._alpha = alpha
+
+    def _set_helmholtz_solver(self, lambd: torch.Tensor, f0: float) -> None:
+        """Set the Helmholtz Solver.
+
+        Args:
+            lambd (torch.Tensor): Matrix A's eigenvalues.
+                └── (1, 1, 1, 1)-shaped.
+            f0 (float): f0.
+        """
+        if len(self._masks.psi_irrbound_xids) > 0:
+            # Handle Non rectangular geometry
+            raise NotImplementedError
+        super()._set_helmholtz_solver(lambd, f0)
+
+    @classmethod
+    @abstractmethod
+    def from_config(
+        cls,
+        space_config: SpaceConfig,
+        model_config: ModelConfig,
+        physics_config: PhysicsConfig,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> Self:
+        """Builds Projector frm configuration.
+
+        Args:
+            space_config (SpaceConfig): Space configuration.
+            model_config (ModelConfig): Model configuration.
+            physics_config (PhysicsConfig): _description_
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+
+        Returns:
+            Self: CollinearProjector.
+        """
+
+
+class CollinearSFProjector(CollinearProjector):
+    """QG Projector considering collinear stream function."""
 
     _MAX_ITERATIONS = 1000
     _ATOL = 1e-8  # default value for torch.isclose
@@ -74,34 +126,12 @@ class CollinearQGProjector(QGProjector):
         )
         self._g_prime = g_prime
 
-    @property
-    def alpha(self) -> torch.Tensor:
-        """Alpha."""
-        return self._alpha
-
-    @alpha.setter
-    def alpha(self, alpha: torch.Tensor) -> None:
-        self._alpha = alpha
-
     @QGProjector.A.setter
     @with_shapes(A=(1, 1))
     def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803
         """Set the stretching matrix."""
         # A.shape = (1,1) -> Cm2L = [[1]], lambd = A_11,  Cl2M = [[1]]
         QGProjector.A.fset(self, A)
-
-    def _set_helmholtz_solver(self, lambd: torch.Tensor, f0: float) -> None:
-        """Set the Helmholtz Solver.
-
-        Args:
-            lambd (torch.Tensor): Matrix A's eigenvalues.
-                └── (1, 1, 1, 1)-shaped.
-            f0 (float): f0.
-        """
-        if len(self._masks.psi_irrbound_xids) > 0:
-            # Handle Non rectangular geometry
-            raise NotImplementedError
-        super()._set_helmholtz_solver(lambd, f0)
 
     @classmethod
     @with_shapes(
@@ -341,7 +371,7 @@ class CollinearQGProjector(QGProjector):
         Returns:
             Self: QGProjector.
         """
-        proj = CollinearQGProjector(
+        proj = CollinearSFProjector(
             A=self.A,
             H=self.H,
             g_prime=self._g_prime,
@@ -365,6 +395,8 @@ class CollinearQGProjector(QGProjector):
     ) -> Self:
         """Builds Projector frm configuration.
 
+        WARNING: alpha is not set.
+
         Args:
             space_config (SpaceConfig): Space configuration.
             model_config (ModelConfig): Model configuration.
@@ -373,7 +405,7 @@ class CollinearQGProjector(QGProjector):
             device (torch.device | None, optional): Device. Defaults to None.
 
         Returns:
-            Self: CollinearQGProjector.
+            Self: CollinearSFProjector.
         """
         specs = defaults.get(dtype=dtype, device=device)
         g_tilde = compute_g_tilde(model_config.g_prime)
@@ -381,6 +413,229 @@ class CollinearQGProjector(QGProjector):
             compute_A(model_config.h[:1], g_tilde, **specs),
             model_config.h.unsqueeze(-1).unsqueeze(-1),
             model_config.g_prime.unsqueeze(-1).unsqueeze(-1),
+            SpaceDiscretization3D.from_config(space_config, model_config),
+            physics_config.f0,
+            masks=Masks.empty(
+                space_config.nx,
+                space_config.ny,
+                device=specs["device"],
+            ),
+        )
+
+
+class CollinearPVProjector(CollinearProjector):
+    """QG Projector considering collinear potential vorticity."""
+
+    @with_shapes(
+        A=(2, 2),
+        H=(2, 1, 1),
+    )
+    def __init__(
+        self,
+        A: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,  # noqa: N803
+        space: SpaceDiscretization3D,
+        f0: float,
+        masks: Masks,
+    ) -> None:
+        """Instantiate the projector.
+
+        Args:
+            A (torch.Tensor): Stretching matrix.
+                └── (nl, nl)-shaped
+            H (torch.Tensor): Layers reference thickness.
+                └── (nl, 1, 1)-shaped
+            space (SpaceDiscretization3D): 3D space discretization.
+            f0 (float): f0.
+            masks (Masks): Masks.
+        """
+        super().__init__(A, H, space, f0, masks)
+
+    @classmethod
+    @with_shapes(
+        H=(2, 1, 1),
+    )
+    def Q(  # noqa: N802
+        cls,
+        uvh: UVH,
+        H: torch.Tensor,  # noqa: N803
+        alpha: torch.Tensor,
+        f0: float,
+        ds: float,
+        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+    ) -> torch.Tensor:
+        """PV linear operator.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+            H (torch.Tensor): Layers reference thickness.
+                └── (nl, 1, 1)-shaped.
+            alpha (torch.Tensor): Collinearity coefficient.
+            f0 (float): f0.
+            ds (float): ds.
+            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            to surface interpolation function.
+
+        Returns:
+            torch.Tensor: Physical Potential Vorticity * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
+        """
+        # Compute ω = ∂_x v - ∂_y u
+        omega = torch.diff(uvh.v[..., 1:-1], dim=-2) - torch.diff(
+            uvh.u[..., 1:-1, :],
+            dim=-1,
+        )
+        # Compute ω-f_0*h/H
+        q = (omega - f0 * points_to_surfaces(uvh.h) / H[0, 0, 0]) * (f0 / ds)
+        q_tilde = points_to_surfaces(alpha) * q
+        return torch.cat([q, q_tilde], dim=1)
+
+    def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
+        """PV linear operator.
+
+        Args:
+            uvh (UVH): Prognostic u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: Physical Pressure * f0.
+                └── (n_ens, nl, nx-1, ny-1)-shaped.
+        """
+        return self.Q(
+            uvh=uvh,
+            f0=self._f0,
+            H=self.H,
+            alpha=self.alpha,
+            ds=self._space.ds,
+            points_to_surfaces=self._points_to_surface,
+        )
+
+    @classmethod
+    @with_shapes(
+        A=(2, 2),
+        H=(2, 1, 1),
+    )
+    def G(  # noqa: N802
+        cls,
+        p: torch.Tensor,
+        A: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,  # noqa: N803
+        dx: float,
+        dy: float,
+        ds: float,
+        f0: float,
+        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        p_i: torch.Tensor | None = None,
+    ) -> UVH:
+        """Geostrophic operator.
+
+        Args:
+            p (torch.float):Pressure.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+            A (torch.Tensor): Stretching matrix.
+                └── (nl,nl)-shaped.
+            H (torch.Tensor): Layers reference thickness.
+                └── (n_ens, nl, 1, 1)-shaped.
+            dx (float): dx.
+            dy (float): dy.
+            ds (float): ds.
+            f0 (float): f0.
+            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            to surface function.
+            p_i (torch.Tensor | None, optional): Interpolated pressure.
+            Defaults to None.
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            UVH: Prognostic variables u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+        """
+        uvh_2l = super().G(p, A, H, dx, dy, ds, f0, points_to_surfaces, p_i)
+        return uvh_2l.parallel_slice[:, :1]
+
+    def _G(self, p: torch.Tensor, p_i: torch.Tensor | None) -> UVH:  # noqa: N802
+        """Geostrophic operator.
+
+        Args:
+            p (torch.float):Pressure, (n_ens, nl, nx+1, ny+1)-shaped.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+            p_i (torch.Tensor | None): Interpolated pressure.
+                └── (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            UVH: Prognostic variables u,v and h.
+                ├── u: (n_ens, nl, nx+1, ny)-shaped
+                ├── v: (n_ens, nl, nx, ny+1)-shaped
+                └── h: (n_ens, nl, nx, ny)-shaped
+        """
+        return self.G(
+            p=p,
+            p_i=p_i,
+            A=self._A,
+            H=self._H,
+            dx=self._space.dx,
+            dy=self._space.dy,
+            ds=self._space.ds,
+            f0=self._f0,
+            points_to_surfaces=self._points_to_surface,
+        )
+
+    def to_shape(self, nx: int, ny: int) -> Self:
+        """Recreate a QGProjector with another shape.
+
+        Args:
+            nx (int): New nx.
+            ny (int): New ny.
+
+        Returns:
+            Self: QGProjector.
+        """
+        proj = CollinearPVProjector(
+            A=self.A,
+            H=self.H,
+            space=self.space.to_shape(nx, ny, self.space.nl),
+            f0=self._f0,
+            masks=self.masks,
+        )
+        alpha = self.alpha
+        proj.alpha = interpolate_physical_variable(alpha, (nx, ny))
+        return proj
+
+    @classmethod
+    def from_config(
+        cls,
+        space_config: SpaceConfig,
+        model_config: ModelConfig,
+        physics_config: PhysicsConfig,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> Self:
+        """Builds Projector from configuration.
+
+        WARNING: alpha is not set.
+
+        Args:
+            space_config (SpaceConfig): Space configuration.
+            model_config (ModelConfig): Model configuration.
+            physics_config (PhysicsConfig): _description_
+            dtype (torch.dtype | None, optional): Dtype. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+
+        Returns:
+            Self: CollinearPVProjector.
+        """
+        specs = defaults.get(dtype=dtype, device=device)
+        return cls(
+            compute_A(model_config.h[:1], model_config.g_prime, **specs),
+            model_config.h.unsqueeze(-1).unsqueeze(-1),
             SpaceDiscretization3D.from_config(space_config, model_config),
             physics_config.f0,
             masks=Masks.empty(

@@ -22,7 +22,7 @@ from qgsw.fields.variables.physical import (
 from qgsw.models.qg.uvh.modified.collinear.variables import (
     CollinearPsi2,
 )
-from qgsw.models.qg.uvh.projectors.collinear import CollinearQGProjector
+from qgsw.models.qg.uvh.projectors.collinear import CollinearSFProjector
 from qgsw.models.qg.uvh.variable_set import QGVariableSet
 
 if TYPE_CHECKING:
@@ -71,7 +71,7 @@ class QGCollinearSFVariableSet(QGVariableSet):
             physics (PhysicsConfig): Physics configuration.
         """
         var_dict[SurfaceHeightAnomaly.get_name()] = SurfaceHeightAnomaly()
-        P = CollinearQGProjector.from_config(space, model, physics)  # noqa: N806
+        P = CollinearSFProjector.from_config(space, model, physics)  # noqa: N806
         var_dict[QGPressure.get_name()] = QGPressure(P, space.dx, space.dy)
 
     @classmethod

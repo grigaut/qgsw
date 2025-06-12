@@ -12,8 +12,6 @@ def is_modified(model_type: str) -> bool:
     Returns:
         bool: Whether the model is modified or not.
     """
-    if model_type == ModelName.QG_COLLINEAR_SF:
+    if model_type in [ModelName.QG_COLLINEAR_SF, ModelName.QG_COLLINEAR_PV]:
         return True
-    if model_type == ModelName.QG_FILTERED:  # noqa: SIM103
-        return True
-    return False
+    return model_type in [ModelName.QG_FILTERED_SF, ModelName.QG_FILTERED_PV]

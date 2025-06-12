@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import torch
 import torch.nn.functional as F  # noqa: N812
 
+from qgsw import verbose
+from qgsw.exceptions import InvalidLayerNumberError
 from qgsw.fields.variables.covariant import (
     KineticEnergy,
     MaskedVorticity,
@@ -270,12 +272,21 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
+
+        Raises:
+            InvalidLayerNumberError: If the layer number of p is invalid.
         """
-        uvh = QGProjector.G(
-            p,
+        if p.shape[1] < (nl := self.space.nl):
+            msg = f"p must have at least {nl} layers."
+            raise InvalidLayerNumberError(msg)
+
+        uvh = self.P.G(
+            p[:, :nl],
             compute_A(
                 self.H[:, 0, 0],
                 self.g_prime[:, 0, 0],
@@ -478,6 +489,12 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
+        self.__instance_nb = next(self._instance_count)
+        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
+        verbose.display(
+            msg=f"Creating {self.__class__.__name__} model...",
+            trigger_level=1,
+        )
         ModelParamChecker.__init__(
             self,
             space_2d=space_2d,

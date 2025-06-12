@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
-from qgsw.exceptions import UnsetTimestepError
+from qgsw.exceptions import InvalidLayerNumberError, UnsetTimestepError
 from qgsw.fields.variables.state import StateUVH
 from qgsw.fields.variables.tuples import (
     UVH,
@@ -220,12 +220,20 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
+
+        Raises:
+            InvalidLayerNumberError: If the layer number of p is invalid.
         """
+        if p.shape[1] < (nl := self.space.nl):
+            msg = f"p must have at least {nl} layers."
+            raise InvalidLayerNumberError(msg)
         uvh = self.P.G(
-            p,
+            p[:, :nl],
             self.A,
             self.H,
             self._space.dx,

@@ -83,7 +83,10 @@ if modified and config.model.collinearity_coef.use_optimal:
     P_ref = ref.retrieve_P()
     ref.at_time(model.time)
     pressure = P_ref.compute_p(ref.load().uvh)[1]
-    if model.get_type() == ModelName.QG_FILTERED:
+    if model.get_type() in [
+        ModelName.QG_FILTERED_SF,
+        ModelName.QG_FILTERED_PV,
+    ]:
         p = model.P.filter(pressure[0, 0])
     else:
         p = pressure[0, 0]
@@ -106,7 +109,10 @@ with Progress() as progress:
             if modified and config.model.collinearity_coef.use_optimal:
                 ref.at_time(model.time)
                 pressure = P_ref.compute_p(ref.load().uvh)[1]
-                if model.get_type() == ModelName.QG_FILTERED:
+                if model.get_type() in [
+                    ModelName.QG_FILTERED_SF,
+                    ModelName.QG_FILTERED_PV,
+                ]:
                     p = model.P.filter(pressure[0, 0])
                 else:
                     p = pressure[0, 0]

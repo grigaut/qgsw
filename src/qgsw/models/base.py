@@ -107,7 +107,7 @@ class _Model(
             not. Defaults to True.
         """
         self.__instance_nb = next(self._instance_count)
-        self.__name = f"{self.__class__.__name__}-{self.__instance_nb}"
+        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
         verbose.display(
             msg=f"Creating {self.__class__.__name__} model...",
             trigger_level=1,
@@ -172,10 +172,7 @@ class _Model(
     @property
     def name(self) -> str:
         """Object name."""
-        try:
-            return self._name
-        except AttributeError:
-            return self.__name
+        return self._name
 
     @name.setter
     def name(self, name: str) -> None:
@@ -230,9 +227,11 @@ class _Model(
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
 
+        The pressure must contain at least as many layers as the model.
+
         Args:
             p (torch.Tensor): Pressure.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
+                └── (n_ens, >= nl, nx+1, ny+1)-shaped
         """
 
     @abstractmethod
@@ -602,4 +601,6 @@ class ModelUVH(
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         super().step()
-        self._state.update_uvh(self.update(self._state.prognostic.uvh))
+        uvh = self._state.prognostic.uvh
+        uvh_updated = self.update(uvh)
+        self._state.update_uvh(uvh_updated)
