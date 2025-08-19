@@ -17,6 +17,7 @@ ignore = [
     "RUF002",
     # ambiguous-unicode-character-comment
     "RUF003",
+    "COM812"
 ]
 unfixable = [
     # Remove unused-imports

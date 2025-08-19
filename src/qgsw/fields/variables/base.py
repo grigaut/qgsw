@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 class Variable(Field):
-    """Variable."""
+    """Variables."""
 
     _unit: Unit
 

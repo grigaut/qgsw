@@ -1,6 +1,6 @@
 """Model Configuration."""
 
-# ruff: noqa: TC001, UP007
+# ruff: noqa: UP007
 from __future__ import annotations
 
 from functools import cached_property

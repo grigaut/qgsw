@@ -1,6 +1,6 @@
 """Input/Output Configuration."""
 
-# ruff: noqa: UP007, A005
+# ruff: noqa: UP007
 
 from __future__ import annotations
 
