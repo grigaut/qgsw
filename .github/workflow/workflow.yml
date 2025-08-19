@@ -1,6 +1,6 @@
 name: Run tests and perform linting
 on:
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   Tests:
