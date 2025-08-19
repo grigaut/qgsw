@@ -50,7 +50,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         """
         self._g2 = g_prime[1:2]
         g_tilde = g_prime[:1] * g_prime[1:2] / (g_prime[1:2] + g_prime[:1])
-        self._H1 = H[1:2]
+        self._H1 = H[:1]
         super().__init__(
             space_2d=space_2d,
             H=H[:1],
@@ -148,7 +148,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             dtype=self.dtype,
             device=self.device.get(),
         )
-        self._set_io()
+        self._set_io(self._state)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
 
