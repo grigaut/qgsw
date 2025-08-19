@@ -123,6 +123,9 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         # wind forcing
         self.set_wind_forcing(0.0, 0.0)
 
+        # Beta-effect
+        self._beta_effect = self.beta_plane.beta * (self._y - self._y0)
+
     @property
     def flux_stencil(self) -> int:
         """Flux stencil size."""
@@ -189,6 +192,14 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         └── (n_ens, nl, nx,ny)-shaped.
         """
         return self._state.q.get()
+
+    @property
+    def q_anom(self) -> torch.Tensor:
+        """Potential Vorticity anomaly.
+
+        └── (n_ens, nl, nx,ny)-shaped.
+        """
+        return self.q - self._beta_effect
 
     def _set_solver(self) -> None:
         """Set Helmholtz equation solver."""
@@ -367,12 +378,11 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             self.A,
             psi,
         )
-        beta_effect = self.beta_plane.beta * (self._y - self._y0)
         return self.masks.h * (
             self._points_to_surfaces(
                 self.masks.psi * (lap_psi - stretching),
             )
-            + beta_effect
+            + self._beta_effect
         )
 
     def _compute_psi_from_q(self, q: torch.Tensor) -> torch.Tensor:
@@ -523,9 +533,18 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             q (torch.Tensor): Potential vorticity.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        q_i = self._points_to_surfaces(q)
-        psi = self._compute_psi_from_q(q_i)
-        self._state.update_psiq(PSIQ(psi, q))
+        self.set_q_anomaly(q_anom=q - self._beta_effect)
+
+    def set_q_anomaly(self, q_anom: torch.Tensor) -> None:
+        """Set the value of potential vorticity.
+
+        Args:
+            q_anom (torch.Tensor): Potential vorticity anomaly.
+                └── (n_ens, nl, nx, ny)-shaped
+        """
+        q_anom_i = self._points_to_surfaces(q_anom)
+        psi = self._compute_psi_from_q(q_anom_i)
+        self._state.update_psiq(PSIQ(psi, q_anom + self._beta_effect))
 
     def set_psi(self, psi: torch.Tensor) -> None:
         """Set the value of stream function.
