@@ -119,7 +119,7 @@ class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
     _type = ModelName.SW_FILTER_SPECTRAL
 
     def _set_solver(self) -> None:
-        """Set Helmoltz Solver for barotropic and spectral."""
+        """Set Helmholtz Solver for barotropic and spectral."""
         verbose.display(
             msg="Using barotropic filter in spectral approximation.",
             trigger_level=2,
@@ -201,7 +201,7 @@ class SWFilterBarotropicExact(BaseSWFilterBarotropic):
     _type = ModelName.SW_FILTER_EXACT
 
     def _set_solver(self) -> None:
-        """Set Helmoltz Solver for barotropic and exact form."""
+        """Set Helmholtz Solver for barotropic and exact form."""
         verbose.display(
             msg="Using barotropic filter in exact form.",
             trigger_level=2,

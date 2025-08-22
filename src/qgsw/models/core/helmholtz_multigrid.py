@@ -1,7 +1,7 @@
 # ruff: noqa: PGH004
 # ruff: noqa
 """
-Pytorch implementation of multigrid solver for 2D generalized Helmoltz equation
+Pytorch implementation of multigrid solver for 2D generalized Helmholtz equation
     ∇.(c∇u) - λu = rhs
 with homegenous Neumann BC, where the coefficent c possibly varies in space.
 Assuming staggered grid:
@@ -184,7 +184,7 @@ def restrict(v, divisor=4):
 
 class MG_Helmholtz:
     """
-    Multrigrid solver for generalized Helmoltz equations
+    Multrigrid solver for generalized Helmholtz equations
         ∇.(c∇u) - λu = rhs
     c being a possibly non-constant coefficient for
     masked domains embedded in a rectangle.
