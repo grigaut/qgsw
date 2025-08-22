@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from qgsw.fields.scope import Scope
-from qgsw.models.core import finite_diff
+from qgsw.solver import finite_diff
 from qgsw.utils.units._units import Unit
 
 try:
@@ -20,8 +20,8 @@ from qgsw.fields.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
 )
-from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
+from qgsw.solver.finite_diff import reverse_cumsum
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import StateUVH

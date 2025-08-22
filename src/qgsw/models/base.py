@@ -28,13 +28,14 @@ from qgsw.fields.variables.tuples import (
     BaseTuple,
     BaseUVH,
 )
-from qgsw.models.core import finite_diff, flux
-from qgsw.models.core.finite_diff import reverse_cumsum
+from qgsw.models.core import flux
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.io import IO
 from qgsw.models.names import ModelCategory, ModelName, get_category
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.solver import finite_diff
+from qgsw.solver.finite_diff import reverse_cumsum
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE

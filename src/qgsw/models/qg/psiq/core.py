@@ -18,18 +18,11 @@ from qgsw.fields.variables.tuples import (
 from qgsw.masks import Masks
 from qgsw.models.base import _Model
 from qgsw.models.core import schemes
-from qgsw.models.core.finite_diff import grad_perp, laplacian_h
 from qgsw.models.core.flux import (
     div_flux_3pts,
     div_flux_3pts_mask,
     div_flux_5pts,
     div_flux_5pts_mask,
-)
-from qgsw.models.core.helmholtz import (
-    compute_capacitance_matrices,
-    compute_laplace_dstI,
-    solve_helmholtz_dstI,
-    solve_helmholtz_dstI_cmm,
 )
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.io import IO
@@ -39,6 +32,13 @@ from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
+)
+from qgsw.solver.finite_diff import grad_perp, laplacian_h
+from qgsw.solver.helmholtz import (
+    compute_capacitance_matrices,
+    compute_laplace_dstI,
+    solve_helmholtz_dstI,
+    solve_helmholtz_dstI_cmm,
 )
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import DEVICE

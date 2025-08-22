@@ -30,13 +30,14 @@ from qgsw.fields.variables.tuples import (
     UVHTAlpha,
 )
 from qgsw.models.base import ModelUVH
-from qgsw.models.core import finite_diff, schemes
+from qgsw.models.core import schemes
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sw.variable_set import SWVariableSet
+from qgsw.solver import finite_diff
 from qgsw.spatial.core import grid_conversion as convert
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,

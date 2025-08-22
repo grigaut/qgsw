@@ -13,11 +13,11 @@ from qgsw.fields.variables.tuples import (
 )
 from qgsw.filters.base import _Filter
 from qgsw.filters.high_pass import GaussianHighPass2D
-from qgsw.models.core.finite_diff import laplacian_h
-from qgsw.models.core.helmholtz import solve_helmholtz_dstI
 from qgsw.models.io import IO
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.solver.finite_diff import laplacian_h
+from qgsw.solver.helmholtz import solve_helmholtz_dstI
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import defaults
 

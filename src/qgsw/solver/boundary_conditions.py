@@ -2,7 +2,7 @@
 
 import torch
 
-from qgsw.models.core.finite_diff import laplacian1D
+from qgsw.solver.finite_diff import laplacian1D
 
 
 class BilinearExtendedBoundary:
