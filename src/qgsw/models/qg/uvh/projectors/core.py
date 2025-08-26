@@ -14,16 +14,16 @@ import torch
 from qgsw.exceptions import UnsetAError
 from qgsw.fields.variables.tuples import UVH
 from qgsw.masks import Masks
-from qgsw.models.core.helmholtz import (
-    compute_capacitance_matrices,
-    compute_laplace_dstI,
-    solve_helmholtz_dstI,
-    solve_helmholtz_dstI_cmm,
-)
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
     compute_layers_to_mode_decomposition,
+)
+from qgsw.solver.helmholtz import (
+    compute_capacitance_matrices,
+    compute_laplace_dstI,
+    solve_helmholtz_dstI,
+    solve_helmholtz_dstI_cmm,
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
 from qgsw.spatial.core.grid_conversion import points_to_surfaces

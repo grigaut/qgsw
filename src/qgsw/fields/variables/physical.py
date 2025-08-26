@@ -19,12 +19,12 @@ from qgsw.fields.variables.prognostic import (
     PrognosticStreamFunction,
     Time,
 )
-from qgsw.models.core.helmholtz import (
-    compute_laplace_dstI,
-    solve_helmholtz_dstI,
-)
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
+)
+from qgsw.solver.helmholtz import (
+    compute_laplace_dstI,
+    solve_helmholtz_dstI,
 )
 from qgsw.specs import DEVICE
 from qgsw.utils.covphys import to_cov
@@ -44,8 +44,8 @@ from qgsw.fields.variables.base import (
     BoundDiagnosticVariable,
     DiagnosticVariable,
 )
-from qgsw.models.core.finite_diff import reverse_cumsum
 from qgsw.models.core.utils import OptimizableFunction
+from qgsw.solver.finite_diff import reverse_cumsum
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 
 if TYPE_CHECKING:

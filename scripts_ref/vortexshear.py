@@ -13,7 +13,7 @@ import torch.nn.functional as F
 
 sys.path.append("../src")
 
-from qgsw.models.core.helmholtz import compute_laplace_dstI, dstI2D
+from qgsw.solver.helmholtz import compute_laplace_dstI, dstI2D
 from qgsw.models import SW, QG, SWFilterBarotropic
 
 torch.backends.cudnn.deterministic = True
