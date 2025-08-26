@@ -1,5 +1,9 @@
 """Staggered Grid Masks."""
 
+from __future__ import annotations
+
+from qgsw.specs import defaults
+
 try:
     from typing import Self
 except ImportError:
@@ -492,14 +496,14 @@ class Masks:
         cls,
         nx: int,
         ny: int,
-        device: torch.device,
+        device: torch.device | None = None,
     ) -> Self:
         """Create an empty mask.
 
         Args:
             nx (int): Number of points in the X direction.
             ny (int): Number of points in the Y direction.
-            device (torch.device): Device.
+            device (torch.device | None): Device. Defaults to None.
 
         Returns:
             Self: Mask
@@ -512,16 +516,16 @@ class Masks:
         nx: int,
         ny: int,
         *,
-        device: torch.device,
+        device: torch.device | None = None,
     ) -> torch.Tensor:
         """Create an empty mask.
 
         Args:
             nx (int): Number of points in the X direction.
             ny (int): Number of points in the Y direction.
-            device (torch.device): Device.
+            device (torch.device | None): Device. Defaults to None.
 
         Returns:
             Self: torch.Tensor
         """
-        return torch.ones((nx, ny), device=device)
+        return torch.ones((nx, ny), device=defaults.get_device(device))
