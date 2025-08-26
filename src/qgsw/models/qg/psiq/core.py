@@ -201,6 +201,14 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """
         return self.q - self._beta_effect
 
+    @property
+    def vorticity(self) -> torch.Tensor:
+        """Vorticity.
+
+        └── (n_ens, nl, nx,ny)-shaped.
+        """
+        return self._compute_vort_from_psi(self.psi)
+
     def _set_solver(self) -> None:
         """Set Helmholtz equation solver."""
         # homogeneous Helmholtz solutions
@@ -383,6 +391,24 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 self.masks.psi * (lap_psi - stretching),
             )
             + self._beta_effect
+        )
+
+    def _compute_vort_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
+        """Compute vorticity from streamfunction.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+
+        Returns:
+            torch.Tensor: Vorticity.
+                └── (n_ens, nl, nx, ny)-shaped
+        """
+        lap_psi = laplacian_h(psi, self.space.dx, self.space.dy)
+        return self.masks.h * (
+            self._points_to_surfaces(
+                self.masks.psi * (lap_psi),
+            )
         )
 
     def _compute_psi_from_q(self, q: torch.Tensor) -> torch.Tensor:
