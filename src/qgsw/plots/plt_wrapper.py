@@ -10,6 +10,8 @@ from matplotlib import pyplot as plt
 
 Param = ParamSpec("Param")
 
+DEFAULT_CMAP = "RdBu_r"
+
 
 def imshow(
     data: torch.Tensor | np.ndarray,
@@ -30,7 +32,7 @@ def imshow(
         data = data.cpu().numpy()
     kwargs.setdefault("vmax", np.max(np.abs(data)))
     kwargs.setdefault("vmin", -kwargs["vmax"])
-    kwargs.setdefault("cmap", "RdBu_r")
+    kwargs.setdefault("cmap", DEFAULT_CMAP)
     if ax is None:
         ax = plt.subplot()
 
