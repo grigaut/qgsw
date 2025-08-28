@@ -33,6 +33,7 @@ def imshow(
     kwargs.setdefault("vmax", np.max(np.abs(data)))
     kwargs.setdefault("vmin", -kwargs["vmax"])
     kwargs.setdefault("cmap", DEFAULT_CMAP)
+    kwargs.setdefault("origin", "lower")
     if ax is None:
         ax = plt.subplot()
 
