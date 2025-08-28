@@ -3,6 +3,7 @@
 import torch
 
 from qgsw.solver.finite_diff import laplacian1D
+from qgsw.specs import defaults
 
 
 class BilinearExtendedBoundary:
@@ -10,8 +11,6 @@ class BilinearExtendedBoundary:
 
     @staticmethod
     def compute(
-        x: torch.Tensor,
-        y: torch.Tensor,
         ut: torch.Tensor,
         ub: torch.Tensor,
         ul: torch.Tensor,
@@ -24,10 +23,6 @@ class BilinearExtendedBoundary:
             of the complementary coordinate.
 
         Args:
-            x (torch.Tensor): 1D x coordinates.
-                └── (nx,)-shaped
-            y (torch.Tensor): 1D y coordinates.
-                └── (ny,)-shaped
             ut (torch.Tensor): Boundary condition at the top (y=y_max)
                 └── (..., nl, ny)-shaped
             ub (torch.Tensor): Boundary condition at the bottom (y=y_min)
@@ -42,9 +37,10 @@ class BilinearExtendedBoundary:
                 └── (..., nl, nx, ny)-shaped
         """
         ## Compute grid parameters
-        a, b, c, d = x[0], x[-1], y[0], y[-1]
-        xi = (x - a) / (b - a)  # (nx,)-shaped
-        eta = (y - c) / (d - c)  # (ny,)-shaped
+        nx = ut.shape[-1]
+        ny = ul.shape[-1]
+        xi = torch.linspace(0, 1, nx, **defaults.get())
+        eta = torch.linspace(0, 1, ny, **defaults.get())
         xx, yy = torch.meshgrid(xi, eta, indexing="ij")
         # Reshape
         xx = xx[None, :, :]  # (1, nx, ny)-shaped
@@ -82,22 +78,18 @@ class BilinearExtendedBoundary:
 
     @staticmethod
     def compute_laplacian(
-        x: torch.Tensor,
-        y: torch.Tensor,
         ut: torch.Tensor,
         ub: torch.Tensor,
         ul: torch.Tensor,
         ur: torch.Tensor,
+        dx: float,
+        dy: float,
     ) -> torch.Tensor:
         """Compute the laplacian of the bilinear-extended boundary field.
 
         Δu = (1-x)∂²_y ul + x∂²_y ur + (1-y)∂²_x ub + y∂²_x ut
 
         Args:
-            x (torch.Tensor): 1D x coordinates.
-                └── (nx,)-shaped
-            y (torch.Tensor): 1D y coordinates.
-                └── (ny,)-shaped
             ut (torch.Tensor): Boundary condition at the top (y=y_max)
                 └── (..., nl, ny)-shaped
             ub (torch.Tensor): Boundary condition at the bottom (y=y_min)
@@ -106,16 +98,19 @@ class BilinearExtendedBoundary:
                 └── (..., nl, nx)-shaped
             ur (torch.Tensor): Boundary condition on the right (x=x_max)
                 └── (..., nl, nx)-shaped
+            dx (float): Infinitesimal distance in the x direction.
+            dy (float): Infinitesimal distance in the y direction.
 
         Returns:
             torch.Tensor: Laplacian of the bilinear-extended field obtained
             using `boundary_extension_bilinear`.
                 └── (..., nl, nx, ny)-shaped
         """
-        dx = x[1] - x[0]
-        dy = y[1] - y[0]
-        a, b, c, d = x[0], x[-1], y[0], y[-1]
-        xi_in, eta_in = (x[1:-1] - a) / (b - a), (y[1:-1] - c) / (d - c)
+        # Compute grid
+        nx = ut.shape[-1]
+        ny = ul.shape[-1]
+        xi_in = torch.linspace(0, 1, nx, **defaults.get())[1:-1]
+        eta_in = torch.linspace(0, 1, ny, **defaults.get())[1:-1]
         xx_in, yy_in = torch.meshgrid(xi_in, eta_in, indexing="ij")
         xx_in = xx_in[None, :, :]  # (1, nx, ny)-shaped
         yy_in = yy_in[None, :, :]  # (1, nx, ny)-shaped
