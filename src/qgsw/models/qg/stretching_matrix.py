@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import torch
 
+from qgsw.specs import defaults
+
 
 def compute_A(  # noqa: N802
     H: torch.Tensor,  # noqa: N803
     g_prime: torch.Tensor,
-    dtype: torch.dtype,
-    device: torch.device,
+    dtype: torch.dtype | None = None,
+    device: torch.device | None = None,
 ) -> torch.Tensor:
     """Compute the stretching operator matrix A.
 
@@ -19,7 +21,7 @@ def compute_A(  # noqa: N802
         g_prime (torch.Tensor): Reduced gravity values.
             └── (nl, )-shaped
         dtype (torch.dtype): Data type
-        device (str, optional): Device type. Defaults to DEVICE.
+        device (torch.device | None): Device. Defaults to None.
 
     Returns:
         torch.Tensor: Streching operator matrix
@@ -28,14 +30,10 @@ def compute_A(  # noqa: N802
     nl = H.shape[0]
     if nl == 1:
         return torch.tensor(
-            [[1.0 / (H * g_prime)]],
-            dtype=dtype,
-            device=device,
+            [[1.0 / (H * g_prime)]], **defaults.get(dtype=dtype, device=device)
         )
     A = torch.zeros(  # noqa: N806
-        (nl, nl),
-        dtype=dtype,
-        device=device,
+        (nl, nl), **defaults.get(dtype=dtype, device=device)
     )
     A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
     A[0, 1] = -1.0 / (H[0] * g_prime[1])

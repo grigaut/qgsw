@@ -13,6 +13,9 @@ class AnimatedHeatmaps(BaseAnimatedPlot[torch.Tensor]):
     """Animated Heatmap with shared colorscale."""
 
     _color_bar_text = ""
+    _zmax = None
+    _zmin = None
+    _colorscale = pco.diverging.RdBu_r
 
     def __init__(
         self,
@@ -32,6 +35,16 @@ class AnimatedHeatmaps(BaseAnimatedPlot[torch.Tensor]):
     def colorbar(self) -> go.heatmap.ColorBar:
         """Plot colorbar."""
         return self._colorbar
+
+    def set_zbounds(self, zmin: float, zmax: float) -> None:
+        """Set zmin and zmax.
+
+        Args:
+            zmin (float): zmin.
+            zmax (float): zmax.
+        """
+        self._zmin = zmin
+        self._zmax = zmax
 
     def _create_colorbar(self) -> go.heatmap.ColorBar:
         """Create the colorbar.
@@ -58,6 +71,7 @@ class AnimatedHeatmaps(BaseAnimatedPlot[torch.Tensor]):
     def _add_traces(self) -> None:
         """Initialize the traces."""
         zmax = self._compute_zmax(self._datas[0][1])
+        zmin = -zmax if self._zmin is None else self._zmin
         showscales = self._compute_showscales(self._datas[0][1])
         for subplot_index in range(self.n_subplots):
             row, col = self.map_subplot_index_to_subplot_loc(subplot_index)
@@ -65,8 +79,8 @@ class AnimatedHeatmaps(BaseAnimatedPlot[torch.Tensor]):
                 go.Heatmap(
                     z=self._datas[0][1][subplot_index],
                     showscale=showscales[subplot_index],
-                    colorscale=pco.diverging.RdBu_r,
-                    zmin=-zmax,
+                    colorscale=self._colorscale,
+                    zmin=zmin,
                     zmax=zmax,
                     colorbar=self.colorbar,
                 ),
@@ -84,16 +98,17 @@ class AnimatedHeatmaps(BaseAnimatedPlot[torch.Tensor]):
             go.Frame: Frame.
         """
         frame_arrays = self._datas[frame_index][1]
-        zmax = self._compute_zmax(frame_arrays)
+        zmax = self._compute_zmax(self._datas[0][1])
+        zmin = -zmax if self._zmin is None else self._zmin
         showscales = self._compute_showscales(frame_arrays)
         return go.Frame(
             data=[
                 go.Heatmap(
                     z=frame_arrays[subplot_index],
-                    colorscale=pco.diverging.RdBu_r,
+                    colorscale=self._colorscale,
                     showscale=showscales[subplot_index],
                     colorbar=self.colorbar,
-                    zmin=-zmax,
+                    zmin=zmin,
                     zmax=zmax,
                 )
                 for subplot_index in range(self.n_subplots)
@@ -150,6 +165,8 @@ class AnimatedHeatmaps(BaseAnimatedPlot[torch.Tensor]):
             float: Maximum values over the arrays, np.nan only if all array
             are entirely made of nans.
         """
+        if self._zmax is not None:
+            return self._zmax
         not_empty_arrays = [
             array for array in arrays if ~torch.isnan(array).all()
         ]

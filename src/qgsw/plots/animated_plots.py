@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import TYPE_CHECKING, Generic, TypeVar
+from pathlib import Path
+from typing import Generic, TypeVar
 
+import imageio
 import plotly.graph_objects as go
+import plotly.io as pio
 from plotly.subplots import make_subplots
 
 from qgsw.plots.base import BasePlot
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 T = TypeVar("T")
 
@@ -345,3 +345,50 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
                 f"frame_{self._datas[frame_index][0]}.png",
             ),
         )
+
+    def save_video(
+        self,
+        output_file: str | Path,
+        *,
+        width: int = 500,
+        height: int = 500,
+        fps: int = 25,
+    ) -> None:
+        """Save the animated plot as a video.
+
+        Args:
+            output_file (str | Path): Output location.
+            width (int, optional): Video width. Defaults to 500.
+            height (int, optional): Video height. Defaults to 500.
+            fps (int, optional): Frame per second. Defaults to 25.
+
+        Raises:
+            ValueError: If the output file is neither .gif or .mp4.
+        """
+        output = Path(output_file)
+        if output.suffix not in [".gif", ".mp4"]:
+            msg = (
+                f"Unusuported output given ('{output.suffix}') type, "
+                "only .gif or .mp4 are supported."
+            )
+            raise ValueError(msg)
+
+        figure = self._create_figure()
+        figure.update_xaxes(self._create_xaxis())
+        figure.update_yaxes(self._create_yaxis())
+        frames = self._generate_frames()
+        images = []
+        for i, fr in enumerate(frames):
+            # Apply frame data to the base figure
+            figure.update(data=fr.data)
+            figure.update_layout(title=self._datas[i][0])
+            # Render frame to image
+            img_bytes = pio.to_image(
+                figure,
+                format="png",
+                width=width,
+                height=height,
+                engine="kaleido",
+            )
+            images.append(imageio.v2.imread(img_bytes))
+        imageio.v2.mimwrite(output, images, fps=fps)
