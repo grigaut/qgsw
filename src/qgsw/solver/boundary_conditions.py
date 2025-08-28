@@ -2,25 +2,21 @@
 
 import torch
 
+from qgsw import specs
 from qgsw.solver.finite_diff import laplacian1D
-from qgsw.specs import defaults
 
 
 class BilinearExtendedBoundary:
     """Boundary extrapolation using bilinear functions."""
 
-    @staticmethod
-    def compute(
+    def __init__(
+        self,
         ut: torch.Tensor,
         ub: torch.Tensor,
         ul: torch.Tensor,
         ur: torch.Tensor,
-    ) -> torch.Tensor:
-        """Extrapolate boundary values on rectangular domain to the interior.
-
-        Approach: find a bilinear function that matches values at corners
-            and interpolate residual boundary data using linear function
-            of the complementary coordinate.
+    ) -> None:
+        """Instantiate the boundary condition.
 
         Args:
             ut (torch.Tensor): Boundary condition at the top (y=y_max)
@@ -31,22 +27,51 @@ class BilinearExtendedBoundary:
                 └── (..., nl, nx)-shaped
             ur (torch.Tensor): Boundary condition on the right (x=x_max)
                 └── (..., nl, nx)-shaped
+        """
+        self._ut = ut
+        self._ub = ub
+        self._ul = ul
+        self._ur = ur
+        self._compute_grids(ut, ul)
+
+    def _compute_grids(self, ut: torch.Tensor, ul: torch.Tensor) -> None:
+        """Compute the grids.
+
+        Args:
+            ut (torch.Tensor): Boundary condition at the top (y=y_max)
+                └── (..., nl, ny)-shaped
+            ul (torch.Tensor): Boundary condition on the left (x=x_min)
+                └── (..., nl, nx)-shaped
+        """
+        nx, ny = ut.shape[-1], ul.shape[-1]
+        self._x = torch.linspace(0, 1, nx, **specs.from_tensor(ut))
+        self._y = torch.linspace(0, 1, ny, **specs.from_tensor(ut))
+
+    def compute(
+        self,
+    ) -> torch.Tensor:
+        """Extrapolate boundary values on rectangular domain to the interior.
+
+        Approach: find a bilinear function that matches values at corners
+            and interpolate residual boundary data using linear function
+            of the complementary coordinate.
 
         Returns:
             torch.Tensor: Bilinear-extended boundary field
                 └── (..., nl, nx, ny)-shaped
         """
         ## Compute grid parameters
-        nx = ut.shape[-1]
-        ny = ul.shape[-1]
-        xi = torch.linspace(0, 1, nx, **defaults.get())
-        eta = torch.linspace(0, 1, ny, **defaults.get())
-        xx, yy = torch.meshgrid(xi, eta, indexing="ij")
+        xx, yy = torch.meshgrid(self._x, self._y, indexing="ij")
         # Reshape
         xx = xx[None, :, :]  # (1, nx, ny)-shaped
         yy = yy[None, :, :]  # (1, nx, ny)-shaped
-        eta = eta[None, None, :]  # (1, 1, ny)-shaped
-        xi = xi[None, :, None]  # (1, nx, 1)-shaped
+        x = self._x[None, :, None]  # (1, nx, 1)-shaped
+        y = self._y[None, None, :]  # (1, 1, ny)-shaped
+        ## Variables
+        ut = self._ut
+        ub = self._ub
+        ul = self._ul
+        ur = self._ur
         ## Compute corner values
         u_bl = (ub[..., :, 0] + ul[..., :, 0]) / 2  # (..., nl)-shaped
         u_br = (ub[..., :, -1] + ur[..., :, 0]) / 2  # (..., nl)-shaped
@@ -59,11 +84,11 @@ class BilinearExtendedBoundary:
         u_tr = u_tr[..., :, None, None]  # (..., nl, 1, 1)-shaped
         ## Boundary values that are zero at corners
         # ula and ura: (..., nl, 1, ny)-shaped
-        ula = ul[..., :, None, :] - u_bl * (1 - eta) - u_tl * eta
-        ura = ur[..., :, None, :] - u_br * (1 - eta) - u_tr * eta
+        ula = ul[..., :, None, :] - u_bl * (1 - y) - u_tl * y
+        ura = ur[..., :, None, :] - u_br * (1 - y) - u_tr * y
         # uta and uba: (..., nl, nx, 1)-shaped
-        uba = ub[..., :, :, None] - u_bl * (1 - xi) - u_br * xi
-        uta = ut[..., :, :, None] - u_tl * (1 - xi) - u_tr * xi
+        uba = ub[..., :, :, None] - u_bl * (1 - x) - u_br * x
+        uta = ut[..., :, :, None] - u_tl * (1 - x) - u_tr * x
         # Sum linear extension of zero-ed boundary values + corner contribution
         # Empty corner contribution
         u_empty_corner = ula * (1 - xx) + ura * xx + uba * (1 - yy) + uta * yy
@@ -76,12 +101,8 @@ class BilinearExtendedBoundary:
         )
         return u_empty_corner + u_corners
 
-    @staticmethod
     def compute_laplacian(
-        ut: torch.Tensor,
-        ub: torch.Tensor,
-        ul: torch.Tensor,
-        ur: torch.Tensor,
+        self,
         dx: float,
         dy: float,
     ) -> torch.Tensor:
@@ -90,14 +111,6 @@ class BilinearExtendedBoundary:
         Δu = (1-x)∂²_y ul + x∂²_y ur + (1-y)∂²_x ub + y∂²_x ut
 
         Args:
-            ut (torch.Tensor): Boundary condition at the top (y=y_max)
-                └── (..., nl, ny)-shaped
-            ub (torch.Tensor): Boundary condition at the bottom (y=y_min)
-                └── (..., nl, ny)-shaped
-            ul (torch.Tensor): Boundary condition on the left (x=x_min)
-                └── (..., nl, nx)-shaped
-            ur (torch.Tensor): Boundary condition on the right (x=x_max)
-                └── (..., nl, nx)-shaped
             dx (float): Infinitesimal distance in the x direction.
             dy (float): Infinitesimal distance in the y direction.
 
@@ -107,15 +120,16 @@ class BilinearExtendedBoundary:
                 └── (..., nl, nx, ny)-shaped
         """
         # Compute grid
-        nx = ut.shape[-1]
-        ny = ul.shape[-1]
-        xi_in = torch.linspace(0, 1, nx, **defaults.get())[1:-1]
-        eta_in = torch.linspace(0, 1, ny, **defaults.get())[1:-1]
-        xx_in, yy_in = torch.meshgrid(xi_in, eta_in, indexing="ij")
+        x_in = self._x[1:-1]
+        y_in = self._y[1:-1]
+        xx_in, yy_in = torch.meshgrid(x_in, y_in, indexing="ij")
         xx_in = xx_in[None, :, :]  # (1, nx, ny)-shaped
         yy_in = yy_in[None, :, :]  # (1, nx, ny)-shaped
-        eta_in = eta_in[None, None, :]  # (1, 1, ny)-shaped
-        xi_in = xi_in[None, :, None]  # (1, nx, 1)-shaped
+        ## Variables
+        ut = self._ut
+        ub = self._ub
+        ul = self._ul
+        ur = self._ur
         # 1D laplacian of x-wise boundary conditions
         lap_ub = laplacian1D(ub, dx)
         lap_ut = laplacian1D(ut, dx)
