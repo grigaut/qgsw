@@ -5,6 +5,8 @@ try:
 except ImportError:
     from typing_extensions import Self
 
+from typing import TypedDict
+
 import torch
 
 
@@ -73,3 +75,10 @@ class Device:
             Self: Device.
         """
         return Device("cuda") if torch.cuda.is_available() else Device("cpu")
+
+
+class TensorSpecs(TypedDict):
+    """Defaults specs."""
+
+    dtype: torch.dtype
+    device: torch.device
