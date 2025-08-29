@@ -117,7 +117,7 @@ class BilinearExtendedBoundary:
         Returns:
             torch.Tensor: Laplacian of the bilinear-extended field obtained
             using `boundary_extension_bilinear`.
-                └── (..., nl, nx, ny)-shaped
+                └── (..., nl, nx-2, ny-2)-shaped
         """
         # Compute grid
         x_in = self._x[1:-1]
