@@ -142,7 +142,7 @@ class Boundaries:
             top=field[..., imin : imax + 1, jmax],
             bottom=field[..., imin : imax + 1, jmin],
             left=field[..., imin, jmin : jmax + 1],
-            right=field[..., imin, jmin : jmax + 1],
+            right=field[..., imax, jmin : jmax + 1],
         )
 
 
