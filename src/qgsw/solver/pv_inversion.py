@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F  # noqa: N812
@@ -17,6 +18,9 @@ from qgsw.solver.boundary_conditions.interpolation import (
 from qgsw.solver.helmholtz import compute_laplace_dstI, solve_helmholtz_dstI
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import defaults
+
+if TYPE_CHECKING:
+    from qgsw.solver.boundary_conditions.base import Boundaries
 
 
 class BasePVInversion:
@@ -208,7 +212,15 @@ class InhomogeneousPVInversion(BasePVInversion):
         self._homogeneous_solver = HomogeneousPVInversion(A, f0, dx, dy)
         self._boundary = None
 
-    def set_boundaries(
+    def set_boundaries(self, boundaries: Boundaries) -> None:
+        """Set the boundary values.
+
+        Args:
+            boundaries (Boundaries): Boundary conditions.
+        """
+        self._boundary = BilinearExtendedBoundary(boundaries)
+
+    def set_boundaries_from_tensors(
         self,
         ut: torch.Tensor,
         ub: torch.Tensor,
@@ -227,7 +239,7 @@ class InhomogeneousPVInversion(BasePVInversion):
             ur (torch.Tensor): Boundary condition on the right (x=x_max)
                 └── (..., nl, nx)-shaped
         """
-        self._boundary = BilinearExtendedBoundary(ut, ub, ul, ur)
+        self._boundary = BilinearExtendedBoundary.from_tensors(ut, ub, ul, ur)
 
     def compute_stream_function(self, pv: torch.Tensor) -> torch.Tensor:
         """Compute the stream function from the potential vorticity.

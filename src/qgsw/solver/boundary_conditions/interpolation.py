@@ -1,51 +1,57 @@
 """Non-homogenous boundary conditions."""
 
+from __future__ import annotations
+
+from qgsw.specs import defaults
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 import torch
 
 from qgsw import specs
+from qgsw.solver.boundary_conditions.base import Boundaries, TimedBoundaries
 from qgsw.solver.finite_diff import laplacian1D
 
 
 class BilinearExtendedBoundary:
     """Boundary extrapolation using bilinear functions."""
 
-    def __init__(
-        self,
-        ut: torch.Tensor,
-        ub: torch.Tensor,
-        ul: torch.Tensor,
-        ur: torch.Tensor,
-    ) -> None:
+    def __init__(self, boundaries: Boundaries) -> None:
         """Instantiate the boundary condition.
 
         Args:
-            ut (torch.Tensor): Boundary condition at the top (y=y_max)
-                └── (..., nl, ny)-shaped
-            ub (torch.Tensor): Boundary condition at the bottom (y=y_min)
-                └── (..., nl, ny)-shaped
-            ul (torch.Tensor): Boundary condition on the left (x=x_min)
-                └── (..., nl, nx)-shaped
-            ur (torch.Tensor): Boundary condition on the right (x=x_max)
-                └── (..., nl, nx)-shaped
+            boundaries (Boundaries): Boundary conditions.
         """
-        self._ut = ut
-        self._ub = ub
-        self._ul = ul
-        self._ur = ur
-        self._compute_grids(ut, ul)
+        self._boundaries = boundaries
+        self._compute_grids(
+            boundaries.nx,
+            boundaries.ny,
+            **specs.from_tensor(boundaries.top),
+        )
 
-    def _compute_grids(self, ut: torch.Tensor, ul: torch.Tensor) -> None:
+    def _compute_grids(
+        self,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> None:
         """Compute the grids.
 
         Args:
-            ut (torch.Tensor): Boundary condition at the top (y=y_max)
-                └── (..., nl, ny)-shaped
-            ul (torch.Tensor): Boundary condition on the left (x=x_min)
-                └── (..., nl, nx)-shaped
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype | None, optional): Data type for the grid.
+                Defaults to None.
+            device (torch.device | None, optional): Device for the grid.
+                Defaults to None.
         """
-        nx, ny = ut.shape[-1], ul.shape[-1]
-        self._x = torch.linspace(0, 1, nx, **specs.from_tensor(ut))
-        self._y = torch.linspace(0, 1, ny, **specs.from_tensor(ut))
+        tensor_specs = defaults.get(dtype=dtype, device=device)
+        self._x = torch.linspace(0, 1, nx, **tensor_specs)
+        self._y = torch.linspace(0, 1, ny, **tensor_specs)
 
     def compute(
         self,
@@ -68,10 +74,10 @@ class BilinearExtendedBoundary:
         x = self._x[None, :, None]  # (1, nx, 1)-shaped
         y = self._y[None, None, :]  # (1, 1, ny)-shaped
         ## Variables
-        ut = self._ut
-        ub = self._ub
-        ul = self._ul
-        ur = self._ur
+        ut = self._boundaries.top
+        ub = self._boundaries.bottom
+        ul = self._boundaries.left
+        ur = self._boundaries.right
         ## Compute corner values
         u_bl = (ub[..., :, 0] + ul[..., :, 0]) / 2  # (..., nl)-shaped
         u_br = (ub[..., :, -1] + ur[..., :, 0]) / 2  # (..., nl)-shaped
@@ -126,10 +132,10 @@ class BilinearExtendedBoundary:
         xx_in = xx_in[None, :, :]  # (1, nx, ny)-shaped
         yy_in = yy_in[None, :, :]  # (1, nx, ny)-shaped
         ## Variables
-        ut = self._ut
-        ub = self._ub
-        ul = self._ul
-        ur = self._ur
+        ut = self._boundaries.top
+        ub = self._boundaries.bottom
+        ul = self._boundaries.left
+        ur = self._boundaries.right
         # 1D laplacian of x-wise boundary conditions
         lap_ub = laplacian1D(ub, dx)
         lap_ut = laplacian1D(ut, dx)
@@ -148,3 +154,77 @@ class BilinearExtendedBoundary:
             + (1 - yy_in) * lap_ub
             + yy_in * lap_ut
         )  # (..., nl, nx, ny)-shaped
+
+    @classmethod
+    def from_tensors(
+        cls,
+        top: torch.Tensor,
+        bottom: torch.Tensor,
+        left: torch.Tensor,
+        right: torch.Tensor,
+    ) -> Self:
+        """Instantiate the boundary interpolation using tensors.
+
+        Args:
+            top (torch.Tensor): Boundary condition at the top (y=y_max)
+                └── (..., nl, ny)-shaped
+            bottom (torch.Tensor): Boundary condition at the bottom (y=y_min)
+                └── (..., nl, ny)-shaped
+            left (torch.Tensor): Boundary condition on the left (x=x_min)
+                └── (..., nl, nx)-shaped
+            right (torch.Tensor): Boundary condition on the right (x=x_max)
+                └── (..., nl, nx)-shaped
+
+        Returns:
+            Self: BilinearExtendedBoundary
+        """
+        return cls(Boundaries(top=top, bottom=bottom, left=left, right=right))
+
+
+class TimeLinearInterpolation:
+    """Interpolate boundaries."""
+
+    def __init__(
+        self,
+        boundaries: list[TimedBoundaries],
+        *,
+        no_time_offset: bool = True,
+    ) -> None:
+        """Instantiate the boundary interpolation.
+
+        Args:
+            boundaries (list[TimedBoundaries]): List of timed boundaries.
+            no_time_offset (bool, optional): Whether to remove the time offset
+                or not. Defaults to True.
+        """
+        times = torch.tensor([b.time for b in boundaries])
+        argsort = torch.argsort(times)
+        self._times = times[argsort]
+        if no_time_offset:
+            self._times = self._times - self._times[0]
+        self._tmin = self._times[0]
+        self._tmax = self._times[-1]
+        self._boundaries = [boundaries[i].boundaries for i in argsort]
+
+    def get_at(self, time: float) -> Boundaries:
+        """Get the boundary conditions at a specific time.
+
+        Args:
+            time (float): Time.
+
+        Returns:
+            Boundaries: The boundary conditions at the specified time.
+        """
+        if time < self._tmin or time > self._tmax:
+            msg = (
+                f"Time must be greater than {self._tmin} "
+                f"and lower than {self._tmax}"
+            )
+            raise ValueError(msg)
+        # Find the two surrounding time points
+        i = torch.searchsorted(self._times, time)
+        t0, t1 = self._times[i - 1].item(), self._times[i].item()
+        b0, b1 = self._boundaries[i - 1], self._boundaries[i]
+        # Linear interpolation
+        alpha = (time - t0) / (t1 - t0)
+        return b0 * alpha + b1 * (1 - alpha)
