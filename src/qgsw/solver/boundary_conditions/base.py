@@ -121,6 +121,30 @@ class Boundaries:
             msg = "Both left and right boundaries must have the same shape."
             raise ValueError(msg)
 
+    @classmethod
+    def extract(
+        cls, field: torch.Tensor, imin: int, imax: int, jmin: int, jmax: int
+    ) -> Self:
+        """Extract boundary conditions from a field.
+
+        Args:
+            field (torch.Tensor): Field to extract from.
+                └── (..., Nx, Ny)-shaped
+            imin (int): Minimum index in the x direction.
+            imax (int): Maximum index in the x direction.
+            jmin (int): Minimum index in the y direction.
+            jmax (int): Maximum index in the y direction.
+
+        Returns:
+            Self: Extracted boundaries.
+        """
+        return cls(
+            top=field[..., imin : imax + 1, jmax],
+            bottom=field[..., imin : imax + 1, jmin],
+            left=field[..., imin, jmin : jmax + 1],
+            right=field[..., imin, jmin : jmax + 1],
+        )
+
 
 @dataclass(frozen=True)
 class TimedBoundaries:
@@ -159,4 +183,33 @@ class TimedBoundaries:
             boundaries=Boundaries(
                 top=top, bottom=bottom, left=left, right=right
             ),
+        )
+
+    @classmethod
+    def extract(
+        cls,
+        field: torch.Tensor,
+        time: float,
+        imin: int,
+        imax: int,
+        jmin: int,
+        jmax: int,
+    ) -> Self:
+        """Extract boundary conditions from a field.
+
+        Args:
+            field (torch.Tensor): Field to extract from.
+                └── (..., Nx, Ny)-shaped
+            time (float): Time of the boundary conditions.
+            imin (int): Minimum index in the x direction.
+            imax (int): Maximum index in the x direction.
+            jmin (int): Minimum index in the y direction.
+            jmax (int): Maximum index in the y direction.
+
+        Returns:
+            Self: Extracted boundaries.
+        """
+        return cls(
+            time=time,
+            boundaries=Boundaries.extract(field, imin, imax, jmin, jmax),
         )
