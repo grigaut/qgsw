@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+from functools import cached_property
+
+from qgsw.solver.boundary_conditions.io import BoundaryConditionLoader
 from qgsw.specs import defaults
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
+from typing import TYPE_CHECKING
+
 import torch
 
 from qgsw import specs
 from qgsw.solver.boundary_conditions.base import Boundaries, TimedBoundaries
 from qgsw.solver.finite_diff import laplacian1D
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class BilinearExtendedBoundary:
@@ -206,6 +214,16 @@ class TimeLinearInterpolation:
         self._tmax = self._times[-1]
         self._boundaries = [boundaries[i].boundaries for i in argsort]
 
+    @cached_property
+    def tmax(self) -> float:
+        """Maximum time of the interpolation."""
+        return self._tmax.item()
+
+    @cached_property
+    def tmin(self) -> float:
+        """Minimum time of the interpolation."""
+        return self._tmin.item()
+
     def get_at(self, time: float) -> Boundaries:
         """Get the boundary conditions at a specific time.
 
@@ -228,3 +246,16 @@ class TimeLinearInterpolation:
         # Linear interpolation
         alpha = (time - t0) / (t1 - t0)
         return b0 * alpha + b1 * (1 - alpha)
+
+    @classmethod
+    def from_file(cls, file: Path | str) -> Self:
+        """Load the interpolation from a file.
+
+        Args:
+            file (Path | str): The file path to load the interpolation from.
+
+        Returns:
+            Self: The loaded interpolation.
+        """
+        loader = BoundaryConditionLoader(file)
+        return cls(loader.load())
