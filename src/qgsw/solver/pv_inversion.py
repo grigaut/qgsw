@@ -11,7 +11,9 @@ from qgsw import specs
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.solver.boundary_conditions import BilinearExtendedBoundary
+from qgsw.solver.boundary_conditions.interpolation import (
+    BilinearExtendedBoundary,
+)
 from qgsw.solver.helmholtz import compute_laplace_dstI, solve_helmholtz_dstI
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
 from qgsw.specs import defaults
