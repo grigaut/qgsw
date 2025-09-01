@@ -38,6 +38,8 @@ class BoundaryConditionSaver:
         if self._file.suffix != ".pt":
             msg = "File must have a .pt extension."
             raise ValueError(msg)
+        # Create the output directory
+        self._file.parent.mkdir(parents=True, exist_ok=True)
 
     def _create(self, time_boundary: TimedBoundaries) -> None:
         self._times = torch.tensor([time_boundary.time])
