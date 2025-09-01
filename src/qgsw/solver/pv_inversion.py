@@ -30,7 +30,12 @@ if TYPE_CHECKING:
 
 
 class BasePVInversion(ABC):
-    """Base class for Helmoholtz solvers with Dirichlet boundary conditions."""
+    """Base class for Helmoholtz solvers with Dirichlet boundary conditions.
+
+    Convention:
+        - potential vorticity: (..., nl, nx, ny)-shaped
+        - stream function: (..., nl, nx+1, ny+1)-shaped
+    """
 
     _nl = None
     _nx = None
