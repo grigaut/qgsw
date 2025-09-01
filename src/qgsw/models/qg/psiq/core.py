@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.solver.boundary_conditions.base import Boundaries
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 T = TypeVar("T", bound=BasePSIQ)
@@ -397,6 +398,14 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
         self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
 
+    def set_boundaries(self, boundaries: Boundaries) -> None:
+        """Set the boundaries.
+
+        Args:
+            boundaries (Boundaries): Boundaries.
+        """
+        self._solver.set_boundaries(boundaries)
+
     def advection_rhs(self, prognostic: PSIQ) -> torch.Tensor:
         """Right hand side advection.
 
@@ -452,6 +461,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         # Solve Helmholtz equation
         dq_i = self._points_to_surfaces(dq)
+
         dpsi = self._compute_psi_from_q(dq_i)
 
         return PSIQ(dpsi, dq)
