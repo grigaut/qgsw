@@ -15,11 +15,20 @@ from qgsw.filters.base import _Filter
 from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.models.io import IO
 from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.stretching_matrix import (
+    compute_layers_to_mode_decomposition,
+)
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.solver.finite_diff import laplacian_h
-from qgsw.solver.helmholtz import solve_helmholtz_dstI
+from qgsw.solver.helmholtz import (
+    compute_capacitance_matrices,
+    compute_laplace_dstI,
+    solve_helmholtz_dstI,
+    solve_helmholtz_dstI_cmm,
+)
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
-from qgsw.specs import defaults
+from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.specs import DEVICE, defaults
 
 
 class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
@@ -135,6 +144,44 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         """2D filter."""
         return self._filter
 
+    def _set_solver(self) -> None:
+        """Set Helmholtz equation solver."""
+        # homogeneous Helmholtz solutions
+        cst = torch.ones(
+            (1, self.space.nl, self.space.nx + 1, self.space.ny + 1),
+            dtype=torch.float64,
+            device=DEVICE.get(),
+        )
+        if len(self.masks.psi_irrbound_xids) > 0:
+            self.cap_matrices = compute_capacitance_matrices(
+                self.helmholtz_dst,
+                self.masks.psi_irrbound_xids,
+                self.masks.psi_irrbound_yids,
+            )
+            sol = solve_helmholtz_dstI_cmm(
+                (cst * self.masks.psi)[..., 1:-1, 1:-1],
+                self.helmholtz_dst,
+                self.cap_matrices,
+                self.masks.psi_irrbound_xids,
+                self.masks.psi_irrbound_yids,
+                self.masks.psi,
+            )
+        else:
+            self.cap_matrices = None
+            sol = solve_helmholtz_dstI(
+                cst[..., 1:-1, 1:-1],
+                self.helmholtz_dst,
+            )
+
+        self.homsol = cst + sol * self.beta_plane.f0**2 * self.lambd
+        self.homsol_mean = (
+            points_to_surfaces(self.homsol) * self.masks.h
+        ).mean(
+            (-1, -2),
+            keepdim=True,
+        )
+        self.helmholtz_dst = self.helmholtz_dst.type(torch.float32)
+
     def _set_io(self, state: StatePSIQAlpha) -> None:
         self._io = IO(state.t, state.psi, state.q, state.alpha)
 
@@ -223,3 +270,29 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         )
         psi_modes += gamma * self.homsol
         return torch.einsum("lm,...mxy->...lxy", self.Cm2l, psi_modes)
+
+    def compute_auxillary_matrices(self) -> None:
+        """Compute auxiliary matrices."""
+        super().compute_auxillary_matrices()
+
+        # layer-to-mode and mode-to-layer matrices
+        self.Cm2l, lambd, self.Cl2m = compute_layers_to_mode_decomposition(
+            self.A,
+        )
+        self.lambd = lambd.reshape((1, self.space.nl, 1, 1))
+
+        # For Helmholtz equations
+        nx, ny = self.space.nx, self.space.ny
+        laplace_dst = (
+            compute_laplace_dstI(
+                nx,
+                ny,
+                self.space.dx,
+                self.space.dy,
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            .unsqueeze(0)
+            .unsqueeze(0)
+        )
+        self.helmholtz_dst = laplace_dst - self.beta_plane.f0**2 * self.lambd
