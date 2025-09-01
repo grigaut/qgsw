@@ -460,9 +460,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         dq = self.advection_rhs(prognostic)
 
         # Solve Helmholtz equation
-        dq_i = self._points_to_surfaces(dq)
-
-        dpsi = self._compute_psi_from_q(dq_i)
+        dpsi = self._compute_psi_from_q(dq)
 
         return PSIQ(dpsi, dq)
 
