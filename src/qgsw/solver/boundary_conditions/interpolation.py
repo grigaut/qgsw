@@ -240,7 +240,7 @@ class TimeLinearInterpolation:
             )
             raise ValueError(msg)
         # Find the two surrounding time points
-        i = torch.searchsorted(self._times, time)
+        i = torch.searchsorted(self._times, time, right=True)
         t0, t1 = self._times[i - 1].item(), self._times[i].item()
         b0, b1 = self._boundaries[i - 1], self._boundaries[i]
         # Linear interpolation
