@@ -137,6 +137,10 @@ class Boundaries:
 
         Returns:
             Self: Extracted boundaries.
+                ├── top: (..., imax-imin+1)-shaped
+                ├── bottom: (..., imax-imin+1)-shaped
+                ├── left: (..., jmax-jmin+1)-shaped
+                └── right: (..., jmax-jmin+1)-shaped
         """
         return cls(
             top=field[..., imin : imax + 1, jmax],
@@ -144,6 +148,52 @@ class Boundaries:
             left=field[..., imin, jmin : jmax + 1],
             right=field[..., imax, jmin : jmax + 1],
         )
+
+    @classmethod
+    def extract_sf(
+        cls, sf: torch.Tensor, imin: int, imax: int, jmin: int, jmax: int
+    ) -> Self:
+        """Extract boundary conditions from a stream function field.
+
+        Args:
+            sf (torch.Tensor): Field to extract from.
+                └── (..., Nx, Ny)-shaped
+            imin (int): Minimum index in the x direction.
+            imax (int): Maximum index in the x direction.
+            jmin (int): Minimum index in the y direction.
+            jmax (int): Maximum index in the y direction.
+
+        Returns:
+            Self: Extracted boundaries.
+                ├── top: (..., imax-imin+1)-shaped
+                ├── bottom: (..., imax-imin+1)-shaped
+                ├── left: (..., jmax-jmin+1)-shaped
+                └── right: (..., jmax-jmin+1)-shaped
+        """
+        return cls.extract(sf, imin, imax, jmin, jmax)
+
+    @classmethod
+    def extract_pv(
+        cls, pv: torch.Tensor, imin: int, imax: int, jmin: int, jmax: int
+    ) -> Self:
+        """Extract boundary conditions from a potential vorticity field.
+
+        Args:
+            pv (torch.Tensor): Field to extract from.
+                └── (..., Nx, Ny)-shaped
+            imin (int): Minimum index in the x direction.
+            imax (int): Maximum index in the x direction.
+            jmin (int): Minimum index in the y direction.
+            jmax (int): Maximum index in the y direction.
+
+        Returns:
+            Self: Extracted boundaries.
+                ├── top: (..., imax-imin+2)-shaped
+                ├── bottom: (..., imax-imin+2)-shaped
+                ├── left: (..., jmax-jmin+2)-shaped
+                └── right: (..., jmax-jmin+2)-shaped
+        """
+        return cls.extract(pv, imin - 1, imax, jmin - 1, jmax)
 
 
 @dataclass(frozen=True)
@@ -188,8 +238,8 @@ class TimedBoundaries:
     @classmethod
     def extract(
         cls,
-        field: torch.Tensor,
         time: float,
+        field: torch.Tensor,
         imin: int,
         imax: int,
         jmin: int,
@@ -198,9 +248,9 @@ class TimedBoundaries:
         """Extract boundary conditions from a field.
 
         Args:
+            time (float): Time of the boundary conditions.
             field (torch.Tensor): Field to extract from.
                 └── (..., Nx, Ny)-shaped
-            time (float): Time of the boundary conditions.
             imin (int): Minimum index in the x direction.
             imax (int): Maximum index in the x direction.
             jmin (int): Minimum index in the y direction.
@@ -208,8 +258,78 @@ class TimedBoundaries:
 
         Returns:
             Self: Extracted boundaries.
+                ├── top: (..., imax-imin+1)-shaped
+                ├── bottom: (..., imax-imin+1)-shaped
+                ├── left: (..., jmax-jmin+1)-shaped
+                └── right: (..., jmax-jmin+1)-shaped
         """
         return cls(
             time=time,
             boundaries=Boundaries.extract(field, imin, imax, jmin, jmax),
+        )
+
+    @classmethod
+    def extract_sf(
+        cls,
+        time: float,
+        sf: torch.Tensor,
+        imin: int,
+        imax: int,
+        jmin: int,
+        jmax: int,
+    ) -> Self:
+        """Extract boundary conditions from a stream function field.
+
+        Args:
+            time (float): Time of the boundary conditions.
+            sf (torch.Tensor): Field to extract from.
+                └── (..., Nx, Ny)-shaped
+            imin (int): Minimum index in the x direction.
+            imax (int): Maximum index in the x direction.
+            jmin (int): Minimum index in the y direction.
+            jmax (int): Maximum index in the y direction.
+
+        Returns:
+            Self: Extracted boundaries.
+                ├── top: (..., imax-imin+1)-shaped
+                ├── bottom: (..., imax-imin+1)-shaped
+                ├── left: (..., jmax-jmin+1)-shaped
+                └── right: (..., jmax-jmin+1)-shaped
+        """
+        return cls(
+            time=time,
+            boundaries=Boundaries.extract_sf(sf, imin, imax, jmin, jmax),
+        )
+
+    @classmethod
+    def extract_pv(
+        cls,
+        time: float,
+        pv: torch.Tensor,
+        imin: int,
+        imax: int,
+        jmin: int,
+        jmax: int,
+    ) -> Self:
+        """Extract boundary conditions from a potential vorticity field.
+
+        Args:
+            time (float): Time of the boundary conditions.
+            pv (torch.Tensor): Field to extract from.
+                └── (..., Nx, Ny)-shaped
+            imin (int): Minimum index in the x direction.
+            imax (int): Maximum index in the x direction.
+            jmin (int): Minimum index in the y direction.
+            jmax (int): Maximum index in the y direction.
+
+        Returns:
+            Self: Extracted boundaries.
+                ├── top: (..., imax-imin+2)-shaped
+                ├── bottom: (..., imax-imin+2)-shaped
+                ├── left: (..., jmax-jmin+2)-shaped
+                └── right: (..., jmax-jmin+2)-shaped
+        """
+        return cls(
+            time=time,
+            boundaries=Boundaries.extract_pv(pv, imin, imax, jmin, jmax),
         )

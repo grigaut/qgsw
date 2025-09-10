@@ -13,7 +13,7 @@ from qgsw.exceptions import (
 )
 from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.fields.variables.tuples import UVH, UVHTAlpha
-from qgsw.models.core import schemes
+from qgsw.models.core import time_steppers
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
@@ -131,7 +131,7 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
             v: torch.Tensor,
             h: torch.Tensor,
         ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-            return schemes.rk3_ssp(
+            return time_steppers.rk3_ssp(
                 UVH(u, v, h),
                 self.dt,
                 self.compute_time_derivatives,

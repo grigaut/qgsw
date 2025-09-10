@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 import torch
 import torch.nn.functional as F  # noqa: N812
 
+from qgsw.fields.variables.tuples import PSIQ
 from qgsw.masks import Masks
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
-from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.boundary_conditions.interpolation import (
     BilinearExtendedBoundary,
 )
@@ -27,6 +27,7 @@ from qgsw.specs import defaults
 
 if TYPE_CHECKING:
     from qgsw.masks import Masks
+    from qgsw.solver.boundary_conditions.base import Boundaries
 
 
 class BasePVInversion(ABC):
@@ -429,6 +430,39 @@ class InhomogeneousPVInversion(BasePVInversion):
             )
             raise NotImplementedError(msg)
 
+    @property
+    def psiq_b(self) -> PSIQ:
+        """Boundary-fields interpolation (q_b != 0).
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: psi_b, q_b
+                ├── psi_b: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q_b : (n_ens, nl, nx, ny)-shaped
+        """
+        return self._psiq_b
+
+    @property
+    def psiq_h(self) -> PSIQ:
+        """Homogeneous component of the boundary field (q_h = -q_b).
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: psi_h, q_h
+                ├── psi_h: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q_h : (n_ens, nl, nx, ny)-shaped
+        """
+        return self._psiq_h
+
+    @property
+    def psiq_bc(self) -> PSIQ:
+        """Boundary conditions-related fields (q_bc = 0).
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: psi_bc, q_bc
+                ├── psi_bc: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q_bc : (n_ens, nl, nx, ny)-shaped
+        """
+        return self._psiq_bc
+
     def set_boundaries(self, boundaries: Boundaries) -> None:
         """Set the boundary field.
 
@@ -436,6 +470,17 @@ class InhomogeneousPVInversion(BasePVInversion):
             boundaries (Boundaries): Boundary conditions.
         """
         self._boundary = BilinearExtendedBoundary(boundaries)
+        sf_b = self._boundary.compute()
+        pv_b = self._compute_pv_boundary(sf_b)
+        sf_h = self._homogeneous_solver.compute_stream_function(
+            -pv_b, ensure_mass_conservation=False
+        )
+        pv_h = -pv_b
+        sf_bc = sf_b + sf_h
+        pv_bc = torch.zeros_like(pv_h)
+        self._psiq_b = PSIQ(sf_b, pv_b)
+        self._psiq_h = PSIQ(sf_h, pv_h)
+        self._psiq_bc = PSIQ(sf_bc, pv_bc)
 
     def set_boundaries_from_tensors(
         self,
@@ -471,14 +516,31 @@ class InhomogeneousPVInversion(BasePVInversion):
             torch.Tensor: Stream function
                 └── (..., nl, nx+1, ny+1)-shaped
         """
-        sf_boundary = self._boundary.compute()
+        sf_i, sf_h, sf_b = self.compute_stream_function_components(pv)
+        return sf_i + sf_h + sf_b
 
-        pv_b = self._compute_pv_boundary(sf_boundary)
-        pv_tot = pv - pv_b
-        sf_homogeneous = self._homogeneous_solver.compute_stream_function(
-            pv_tot, ensure_mass_conservation=False
+    def compute_stream_function_components(
+        self, pv: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute the stream function components from the potential vorticity.
+
+        Boundary conditions are set to match self._boundary.
+
+        Args:
+            pv (torch.Tensor): Potential vorticity
+                └── (..., nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Homogeneous stream function,
+                boundary stream function.
+                ├── ѱ_i (..., nl, nx+1, ny+1)-shaped
+                ├── ѱ_h (..., nl, nx+1, ny+1)-shaped
+                └── ѱ_b (..., nl, nx+1, ny+1)-shaped
+        """
+        sf_i = self._homogeneous_solver.compute_stream_function(
+            pv, ensure_mass_conservation=False
         )
-        return sf_homogeneous + sf_boundary
+        return sf_i, self.psiq_h.psi, self.psiq_b.psi
 
     def _compute_pv_boundary(self, sf_boundary: torch.Tensor) -> torch.Tensor:
         laplacian_boundary = self._boundary.compute_laplacian(
@@ -489,93 +551,3 @@ class InhomogeneousPVInversion(BasePVInversion):
             - self._f0**2
             * torch.einsum("lm,...mxy->...lxy", self._A, sf_boundary)
         )
-
-
-class PVInversion(BasePVInversion):
-    """Solver for PV inversion."""
-
-    def __init__(
-        self,
-        A: torch.Tensor,  # noqa: N803
-        f0: float,
-        dx: float,
-        dy: float,
-        masks: Masks | None = None,
-    ) -> None:
-        """Potential vorticity inversion with inhomogeneous boundary.
-
-        Args:
-            A (torch.Tensor): Stretching matrix.
-            f0 (float): Coriolis parameter.
-            dx (float): Grid spacing in the x-direction.
-            dy (float): Grid spacing in the y-direction.
-            masks (Masks | None, optional): Masks. Defaults to None.
-        """
-        super().__init__(A, f0, dx, dy, masks)
-        self._solver = HomogeneousPVInversion(A, f0, dx, dy, masks)
-        self._homogeneous = True
-
-    @property
-    def boundary_type(self) -> str:
-        """Type of boundary."""
-        return "Homogeneous" if self._homogeneous else "Inhomogeneous"
-
-    def set_boundaries(self, boundaries: Boundaries) -> None:
-        """Set the boundary values.
-
-        Args:
-            boundaries (Boundaries): Boundary conditions.
-        """
-        if self._homogeneous:
-            self._solver = InhomogeneousPVInversion(
-                self._A, self._f0, self._dx, self._dy, self._masks
-            )
-            self._homogeneous = False
-        self._solver.set_boundaries(boundaries)
-
-    def set_boundaries_from_tensors(
-        self,
-        ut: torch.Tensor,
-        ub: torch.Tensor,
-        ul: torch.Tensor,
-        ur: torch.Tensor,
-    ) -> None:
-        """Set the boundary values.
-
-        Args:
-            ut (torch.Tensor): Boundary condition at the top (y=y_max)
-                └── (..., nl, ny)-shaped
-            ub (torch.Tensor): Boundary condition at the bottom (y=y_min)
-                └── (..., nl, ny)-shaped
-            ul (torch.Tensor): Boundary condition on the left (x=x_min)
-                └── (..., nl, nx)-shaped
-            ur (torch.Tensor): Boundary condition on the right (x=x_max)
-                └── (..., nl, nx)-shaped
-        """
-        self.set_boundaries(Boundaries(ut, ub, ul, ur))
-
-    def set_homogeneous_boundaries(self) -> None:
-        """Set homogeneous boundaries."""
-        if self._homogeneous:
-            return
-        self._solver = HomogeneousPVInversion(
-            self._A,
-            self._f0,
-            self._dx,
-            self._dy,
-            self._masks,
-        )
-        self._homogeneous = True
-
-    def compute_stream_function(self, pv: torch.Tensor) -> torch.Tensor:
-        """Compute the stream function from the potential vorticity.
-
-        Args:
-            pv (torch.Tensor): Potential vorticity
-                └── (..., nl, nx, ny)-shaped
-
-        Returns:
-            torch.Tensor: Stream function
-                └── (..., nl, nx+1, ny+1)-shaped
-        """
-        return self._solver.compute_stream_function(pv)

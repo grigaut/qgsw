@@ -245,7 +245,7 @@ class TimeLinearInterpolation:
         b0, b1 = self._boundaries[i - 1], self._boundaries[i]
         # Linear interpolation
         alpha = (time - t0) / (t1 - t0)
-        return b0 * alpha + b1 * (1 - alpha)
+        return b0 * (1 - alpha) + b1 * alpha
 
     @classmethod
     def from_file(cls, file: Path | str) -> Self:

@@ -357,10 +357,509 @@ def flux_5pts(q, u, dim):
     return flux
 
 
-def div_flux_5pts(q, u, v, dx, dy):
+def div_flux_5pts(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq], assuming 0 on the boundary for q.
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx, ny)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx, ny)-shaped
+    """
     q_flux_y = F.pad(flux_5pts(q, v, dim=-1), (1, 1, 0, 0))
     q_flux_x = F.pad(flux_5pts(q, u, dim=-2), (0, 0, 1, 1))
 
+    return (
+        torch.diff(q_flux_x, dim=-2) / dx + torch.diff(q_flux_y, dim=-1) / dy
+    )
+
+
+def flux_5pts_only(q: torch.Tensor, u: torch.Tensor, dim: int) -> torch.Tensor:
+    """
+    Flux computation for staggerded variables q and u, with solid boundaries.
+    Upwind-biased stencil:
+      - 5 points inside domain only
+
+    Args:
+        q: tracer field to interpolate, torch.Tensor, shape[dim] = n
+        u: transport velocity, torch.Tensor, shape[dim] = n - 5
+        dim: dimension along which computations are done
+
+    Returns:
+        flux: tracer flux computed on u points, torch.Tensor, shape[dim] = n - 5
+        qi: tracer field interpolated on u points, torch.Tensor, shape[dim] = n - 5
+    """
+
+    n = q.shape[dim]
+
+    # 5-points inside domain
+    qmm, qm, q0, qp, qpp = (
+        q.narrow(dim, 0, n - 4),
+        q.narrow(dim, 1, n - 4),
+        q.narrow(dim, 2, n - 4),
+        q.narrow(dim, 3, n - 4),
+        q.narrow(dim, 4, n - 4),
+    )
+    qi_left_in = reconstruction.linear5_left(qmm, qm, q0, qp, qpp)
+    qi_right_in = reconstruction.linear5_left(qpp, qp, q0, qm, qmm)
+
+    # positive and negative parts of velocity
+    u_pos = F.relu(u)
+    u_neg = u - u_pos
+
+    qi_left = qi_left_in.narrow(dim, 0, n - 5)
+    qi_right = qi_right_in.narrow(dim, 1, n - 5)
+
+    # upwind flux computation
+    return u_pos * qi_left + u_neg * qi_right
+
+
+def div_flux_5pts_only(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq], using a large q field.
+
+    The large q field allows using 5 pts linear reconstruction evry where in the domain.
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx+6, ny+6)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx, ny)-shaped
+    """
+    q_flux_y = flux_5pts_only(q[..., 3:-3, :], v, dim=-1)
+    q_flux_x = flux_5pts_only(q[..., :, 3:-3], u, dim=-2)
+
+    return (
+        torch.diff(q_flux_x, dim=-2) / dx + torch.diff(q_flux_y, dim=-1) / dy
+    )
+
+
+def flux_5_pts_replicate_qi_boundaries(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    dim: int,
+) -> torch.Tensor:
+    """
+    Flux computation for staggerded variables q and u, with solid boundaries.
+    Upwind-biased stencil:
+      - 5 points inside domain.
+      - 1 or 3 points near boundaries.
+
+    To remove the 0-padding at the boundary, the reconstruction of q
+    is replicated on the outer boundary: qi(x) = qi(x+dx).
+
+    Args:
+        q: tracer field to interpolate, torch.Tensor, shape[dim] = n
+        u: transport velocity, torch.Tensor, shape[dim] = n-1
+        dim: dimension along which computations are done
+
+    Returns:
+        flux: tracer flux computed on u points, torch.Tensor, shape[dim] = n-1
+        qi: tracer field interpolated on u points, torch.Tensor, shape[dim] = n-1
+    """
+    n = q.shape[dim]
+
+    # 5-points inside domain
+    qmm, qm, q0, qp, qpp = (
+        q.narrow(dim, 0, n - 4),
+        q.narrow(dim, 1, n - 4),
+        q.narrow(dim, 2, n - 4),
+        q.narrow(dim, 3, n - 4),
+        q.narrow(dim, 4, n - 4),
+    )
+    qi_left_in = reconstruction.linear5_left(qmm, qm, q0, qp, qpp)
+    qi_right_in = reconstruction.linear5_left(qpp, qp, q0, qm, qmm)
+    # qi_left_in = weno5z(qmm, qm, q0, qp, qpp)
+    # qi_right_in = weno5z(qpp, qp, q0, qm, qmm)
+
+    # 3pts-2pts near boundary
+    qm, q0, qp = (
+        torch.cat([q.narrow(dim, 0, 1), q.narrow(dim, -3, 1)], dim=dim),
+        torch.cat([q.narrow(dim, 1, 1), q.narrow(dim, -2, 1)], dim=dim),
+        torch.cat([q.narrow(dim, 2, 1), q.narrow(dim, -1, 1)], dim=dim),
+    )
+    qi_left_b = reconstruction.weno3z(qm, q0, qp)
+    qi_right_b = reconstruction.weno3z(qp, q0, qm)
+
+    qi_0 = reconstruction.linear2_centered(
+        q.narrow(dim, 0, 1), q.narrow(dim, 1, 1)
+    )
+    qi_m1 = reconstruction.linear2_centered(
+        q.narrow(dim, -2, 1), q.narrow(dim, -1, 1)
+    )
+
+    qi_left = torch.cat(
+        [
+            qi_0,
+            qi_0,
+            qi_left_b.narrow(dim, 0, 1),
+            qi_left_in,
+            qi_left_b.narrow(dim, -1, 1),
+            qi_left_b.narrow(dim, -1, 1),
+        ],
+        dim=dim,
+    )
+    qi_right = torch.cat(
+        [
+            qi_right_b.narrow(dim, 0, 1),
+            qi_right_b.narrow(dim, 0, 1),
+            qi_right_in,
+            qi_right_b.narrow(dim, -1, 1),
+            qi_m1,
+            qi_m1,
+        ],
+        dim=dim,
+    )
+
+    # positive and negative parts of velocity
+    u_pos = F.relu(u)
+    u_neg = u - u_pos
+
+    # upwind flux computation
+    flux = u_pos * qi_left + u_neg * qi_right
+
+    return flux
+
+
+def div_flux_5pts_replicate_qi_boundaries(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq].
+
+    The value of the reconstruction q is duplicated on the border of the domain
+    using next order decomposition: qi(x) = qi(x+dx).
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx, ny)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx, ny)-shaped
+    """
+    q_flux_y = flux_5_pts_replicate_qi_boundaries(q, v, dim=-1)
+    q_flux_x = flux_5_pts_replicate_qi_boundaries(q, u, dim=-2)
+
+    return (
+        torch.diff(q_flux_x, dim=-2) / dx + torch.diff(q_flux_y, dim=-1) / dy
+    )
+
+
+def flux_5_pts_replicate_qi_boundaries_next_order(
+    q: torch.Tensor, u: torch.Tensor, dim: int
+) -> torch.Tensor:
+    """
+    Flux computation for staggerded variables q and u, with solid boundaries.
+    Upwind-biased stencil:
+      - 5 points inside domain.
+      - 1 or 3 points near boundaries.
+
+    To remove the 0-padding at the boundary, the reconstruction of q
+    is replicated on the outer boundary: qi(x) = 2qi(x+dx) - qi(x+2dx).
+
+    Args:
+        q: tracer field to interpolate, torch.Tensor, shape[dim] = n
+        u: transport velocity, torch.Tensor, shape[dim] = n-1
+        dim: dimension along which computations are done
+
+    Returns:
+        flux: tracer flux computed on u points, torch.Tensor, shape[dim] = n-1
+        qi: tracer field interpolated on u points, torch.Tensor, shape[dim] = n-1
+    """
+    n = q.shape[dim]
+
+    # 5-points inside domain
+    qmm, qm, q0, qp, qpp = (
+        q.narrow(dim, 0, n - 4),
+        q.narrow(dim, 1, n - 4),
+        q.narrow(dim, 2, n - 4),
+        q.narrow(dim, 3, n - 4),
+        q.narrow(dim, 4, n - 4),
+    )
+    qi_left_in = reconstruction.linear5_left(qmm, qm, q0, qp, qpp)
+    qi_right_in = reconstruction.linear5_left(qpp, qp, q0, qm, qmm)
+    # qi_left_in = weno5z(qmm, qm, q0, qp, qpp)
+    # qi_right_in = weno5z(qpp, qp, q0, qm, qmm)
+
+    # 3pts-2pts near boundary
+    qm, q0, qp = (
+        torch.cat([q.narrow(dim, 0, 1), q.narrow(dim, -3, 1)], dim=dim),
+        torch.cat([q.narrow(dim, 1, 1), q.narrow(dim, -2, 1)], dim=dim),
+        torch.cat([q.narrow(dim, 2, 1), q.narrow(dim, -1, 1)], dim=dim),
+    )
+    qi_left_b = reconstruction.weno3z(qm, q0, qp)
+    qi_right_b = reconstruction.weno3z(qp, q0, qm)
+
+    qi_0 = reconstruction.linear2_centered(
+        q.narrow(dim, 0, 1), q.narrow(dim, 1, 1)
+    )
+    qi_m1 = reconstruction.linear2_centered(
+        q.narrow(dim, -2, 1), q.narrow(dim, -1, 1)
+    )
+
+    qi_left = torch.cat(
+        [
+            2 * qi_0 - qi_left_b.narrow(dim, 0, 1),
+            qi_0,
+            qi_left_b.narrow(dim, 0, 1),
+            qi_left_in,
+            qi_left_b.narrow(dim, -1, 1),
+            2 * qi_left_b.narrow(dim, -1, 1) - qi_left_in.narrow(dim, -1, 1),
+        ],
+        dim=dim,
+    )
+    qi_right = torch.cat(
+        [
+            2 * qi_right_b.narrow(dim, 0, 1) - qi_right_in.narrow(dim, 0, 1),
+            qi_right_b.narrow(dim, 0, 1),
+            qi_right_in,
+            qi_right_b.narrow(dim, -1, 1),
+            qi_m1,
+            2 * qi_m1 - qi_right_b.narrow(dim, -1, 1),
+        ],
+        dim=dim,
+    )
+
+    # positive and negative parts of velocity
+    u_pos = F.relu(u)
+    u_neg = u - u_pos
+
+    # upwind flux computation
+    flux = u_pos * qi_left + u_neg * qi_right
+
+    return flux
+
+
+def div_flux_5pts_replicate_qi_boundaries_next_order(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq].
+
+    The value of the reconstruction q is duplicated on the border of the domain
+    using next order decomposition: qi(x) = 2qi(x+dx)-qi(x+2dx).
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx, ny)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx, ny)-shaped
+    """
+    q_flux_y = flux_5_pts_replicate_qi_boundaries_next_order(q, v, dim=-1)
+    q_flux_x = flux_5_pts_replicate_qi_boundaries_next_order(q, u, dim=-2)
+
+    return (
+        torch.diff(q_flux_x, dim=-2) / dx + torch.diff(q_flux_y, dim=-1) / dy
+    )
+
+
+def flux_5_pts_replicate_q_boundaries(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    dim: int,
+) -> torch.Tensor:
+    """
+    Flux computation for staggerded variables q and u, with solid boundaries.
+    Upwind-biased stencil:
+      - 5 points inside domain.
+      - 1 or 3 points near boundaries.
+
+    To remove the 0-padding at the boundary, q is replicated on the outer
+    boundary along dim: q(x) = q(x+dx).
+
+    Args:
+        q: tracer field to interpolate, torch.Tensor, shape[dim] = n
+        u: transport velocity, torch.Tensor, shape[dim] = n-1
+        dim: dimension along which computations are done
+
+    Returns:
+        flux: tracer flux computed on u points, torch.Tensor, shape[dim] = n-1
+        qi: tracer field interpolated on u points, torch.Tensor, shape[dim] = n-1
+    """
+
+    first_bound = q.select(dim=dim, index=0).unsqueeze(dim)
+    last_bound = q.select(dim=dim, index=-1).unsqueeze(dim)
+
+    q = torch.cat([first_bound, q, last_bound], dim=dim)
+
+    return flux_5pts(q, u, dim)
+
+
+def div_flux_5pts_replicate_q_boundaries(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq].
+
+    The value of q is duplicated on the border of the domain using
+    q(x) = q(x+dx).
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx, ny)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx, ny)-shaped
+    """
+    q_flux_y = flux_5_pts_replicate_q_boundaries(q, v, dim=-1)
+    q_flux_x = flux_5_pts_replicate_q_boundaries(q, u, dim=-2)
+
+    return (
+        torch.diff(q_flux_x, dim=-2) / dx + torch.diff(q_flux_y, dim=-1) / dy
+    )
+
+
+def flux_5_pts_replicate_q_boundaries_next_order(
+    q: torch.Tensor, u: torch.Tensor, dim: int
+) -> torch.Tensor:
+    """
+    Flux computation for staggerded variables q and u, with solid boundaries.
+    Upwind-biased stencil:
+      - 5 points inside domain.
+      - 1 or 3 points near boundaries.
+
+    To remove the 0-padding at the boundary, q is replicated on the outer
+    boundary along dim: q(x) = 2q(x + 2dx) - q(x + 2dx).
+
+    Args:
+        q: tracer field to interpolate, torch.Tensor, shape[dim] = n
+        u: transport velocity, torch.Tensor, shape[dim] = n-1
+        dim: dimension along which computations are done
+
+    Returns:
+        flux: tracer flux computed on u points, torch.Tensor, shape[dim] = n-1
+        qi: tracer field interpolated on u points, torch.Tensor, shape[dim] = n-1
+    """
+
+    q0 = q.select(dim=dim, index=0).unsqueeze(dim)
+    q1 = q.select(dim=dim, index=1).unsqueeze(dim)
+    q_2 = q.select(dim=dim, index=-2).unsqueeze(dim)
+    q_1 = q.select(dim=dim, index=-1).unsqueeze(dim)
+
+    q = torch.cat([2 * q0 - q1, q, 2 * q_1 - q_2], dim=dim)
+
+    return flux_5pts(q, u, dim)
+
+
+def div_flux_5pts_replicate_q_boundaries_next_order(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq].
+
+    The value of q is duplicated on the border of the domain using next order
+    decomposition q(x) = 2q(x + dx) - q(x + 2dx).
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx, ny)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx, ny)-shaped
+    """
+    q_flux_y = flux_5_pts_replicate_q_boundaries_next_order(q, v, dim=-1)
+    q_flux_x = flux_5_pts_replicate_q_boundaries_next_order(q, u, dim=-2)
+
+    return (
+        torch.diff(q_flux_x, dim=-2) / dx + torch.diff(q_flux_y, dim=-1) / dy
+    )
+
+
+def div_flux_5pts_with_bc(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq], with boundary conditions on q.
+
+    q is assumed to have non-zero boundaries, thus explaining is (nx+2) x (ny+2) shape.
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx+2, ny+2)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx, ny)-shaped
+    """
+    q_flux_y = flux_5pts(q[..., 1:-1, :], v, dim=-1)
+    q_flux_x = flux_5pts(q[..., :, 1:-1], u, dim=-2)
     return (
         torch.diff(q_flux_x, dim=-2) / dx + torch.diff(q_flux_y, dim=-1) / dy
     )
