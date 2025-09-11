@@ -9,10 +9,10 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.fields.variables.tuples import PSIQ
-from qgsw.masks import Masks
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
+from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.boundary_conditions.interpolation import (
     BilinearExtendedBoundary,
 )
@@ -27,11 +27,10 @@ from qgsw.specs import defaults
 
 if TYPE_CHECKING:
     from qgsw.masks import Masks
-    from qgsw.solver.boundary_conditions.base import Boundaries
 
 
 class BasePVInversion(ABC):
-    """Base class for Helmoholtz solvers with Dirichlet boundary conditions.
+    """Base class for Helmholtz solvers with Dirichlet boundary conditions.
 
     Convention:
         - potential vorticity: (..., nl, nx, ny)-shaped
@@ -421,7 +420,7 @@ class InhomogeneousPVInversion(BasePVInversion):
             masks (Masks | None, optional): Masks. Defaults to None.
         """
         super().__init__(A, f0, dx, dy, masks)
-        self._homogeneous_solver = HomogeneousPVInversion(A, f0, dx, dy)
+        self._homogeneous_solver = HomogeneousPVInversion(A, f0, dx, dy, masks)
         self._boundary = None
         if self._masks is not None and len(self._masks.psi_irrbound_xids) > 0:
             msg = (
@@ -484,24 +483,26 @@ class InhomogeneousPVInversion(BasePVInversion):
 
     def set_boundaries_from_tensors(
         self,
-        ut: torch.Tensor,
-        ub: torch.Tensor,
-        ul: torch.Tensor,
-        ur: torch.Tensor,
+        top: torch.Tensor,
+        bottom: torch.Tensor,
+        left: torch.Tensor,
+        right: torch.Tensor,
     ) -> None:
         """Set the boundary values.
 
         Args:
-            ut (torch.Tensor): Boundary condition at the top (y=y_max)
+            top (torch.Tensor): Boundary condition at the top (y=y_max)
                 └── (..., nl, ny)-shaped
-            ub (torch.Tensor): Boundary condition at the bottom (y=y_min)
+            bottom (torch.Tensor): Boundary condition at the bottom (y=y_min)
                 └── (..., nl, ny)-shaped
-            ul (torch.Tensor): Boundary condition on the left (x=x_min)
+            left (torch.Tensor): Boundary condition on the left (x=x_min)
                 └── (..., nl, nx)-shaped
-            ur (torch.Tensor): Boundary condition on the right (x=x_max)
+            right (torch.Tensor): Boundary condition on the right (x=x_max)
                 └── (..., nl, nx)-shaped
         """
-        self._boundary = BilinearExtendedBoundary.from_tensors(ut, ub, ul, ur)
+        self.set_boundaries(
+            Boundaries(top=top, bottom=bottom, left=left, right=right)
+        )
 
     def compute_stream_function(self, pv: torch.Tensor) -> torch.Tensor:
         """Compute the stream function from the potential vorticity.
@@ -521,7 +522,7 @@ class InhomogeneousPVInversion(BasePVInversion):
 
     def compute_stream_function_components(
         self, pv: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Compute the stream function components from the potential vorticity.
 
         Boundary conditions are set to match self._boundary.
