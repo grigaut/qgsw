@@ -63,3 +63,8 @@ def subplots(
     kwargs.setdefault("constrained_layout", True)
     kwargs.setdefault("figsize", ((4 * ncols, 4 * nrows + 1)))
     return plt.subplots(nrows=nrows, ncols=ncols, **kwargs)
+
+
+def show(**kwargs: Param.kwargs) -> None:
+    """Wrapper for plt.show."""
+    return plt.show(**kwargs)
