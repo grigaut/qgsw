@@ -243,8 +243,7 @@ class HomogeneousPVInversion(BasePVInversion):
         )
         sol = self._compute_homsol(cst, self._helmholtz_dstI)
         self._homsol = cst + sol * self._f0**2 * self._lambd
-        homsol_i = points_to_surfaces(self._homsol)
-        self._homsol_mean = homsol_i.mean((-1, -2), keepdim=True)
+        self._homsol_mean = self._homsol.mean((-1, -2), keepdim=True)
         return self._homsol, self._homsol_mean
 
     def _homsol_irregular_geometry(
@@ -361,11 +360,9 @@ class HomogeneousPVInversion(BasePVInversion):
             torch.Tensor: Corrected stream function modes
                 └── (..., nl, nx+1, ny+1)-shaped
         """
-        sf_modes_i = points_to_surfaces(sf_modes)
-        sf_modes_i_mean = sf_modes_i.mean((-1, -2), keepdim=True)
-        alpha = -sf_modes_i_mean / self._homsol_mean
-        sf_modes += alpha * self._homsol
-        return sf_modes
+        sf_modes_mean = sf_modes.mean((-1, -2), keepdim=True)
+        alpha = -sf_modes_mean / self._homsol_mean
+        return sf_modes + alpha * self._homsol
 
     def compute_stream_function(
         self,
