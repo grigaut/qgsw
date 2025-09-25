@@ -70,6 +70,6 @@ def get_save_specs(
         TensorSpecs: Default specs.
     """
     return TensorSpecs(
-        dtype=dtype or torch.float32,
+        dtype=dtype or torch.float64,
         device=device or torch.device("cpu"),
     )
