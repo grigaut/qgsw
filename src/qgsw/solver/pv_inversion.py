@@ -376,7 +376,7 @@ class HomogeneousPVInversion(BasePVInversion):
 
         Args:
             pv (torch.Tensor): Potential vorticity.
-                └── (..., nl, nx, ny)-shaped
+                └── (..., nl, nx-1, ny-1)-shaped
             ensure_mass_conservation (bool, optional): Whether to ensure mass
                 conservation.
 
@@ -384,9 +384,9 @@ class HomogeneousPVInversion(BasePVInversion):
             torch.Tensor: Stream function
                 └── (..., nl, nx+1, ny+1)-shaped
         """
-        self._set_shape(*pv.shape[-3:])
-        pv_i = points_to_surfaces(pv)
-        rhs = torch.einsum("lm,...mxy->...lxy", self._Cl2m, pv_i)
+        nl, nx, ny = pv.shape[-3:]
+        self._set_shape(nl, nx + 1, ny + 1)
+        rhs = torch.einsum("lm,...mxy->...lxy", self._Cl2m, pv)
         sf_modes = self._solve_modespace(rhs, self._helmholtz_dstI)
         if ensure_mass_conservation:
             sf_modes = self._correct_sf_for_mass_conservation(sf_modes)
@@ -433,7 +433,7 @@ class InhomogeneousPVInversion(BasePVInversion):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: psi_b, q_b
                 ├── psi_b: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q_b : (n_ens, nl, nx, ny)-shaped
+                └──  q_b : (n_ens, nl, nx-1, ny-1)-shaped
         """
         return self._psiq_b
 
@@ -444,7 +444,7 @@ class InhomogeneousPVInversion(BasePVInversion):
         Returns:
             tuple[torch.Tensor, torch.Tensor]: psi_h, q_h
                 ├── psi_h: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q_h : (n_ens, nl, nx, ny)-shaped
+                └──  q_h : (n_ens, nl, nx-1, ny-1)-shaped
         """
         return self._psiq_h
 
@@ -467,13 +467,14 @@ class InhomogeneousPVInversion(BasePVInversion):
         """
         self._boundary = BilinearExtendedBoundary(boundaries)
         sf_b = self._boundary.compute()
-        pv_b = self._compute_pv_boundary(sf_b)
+        pv_b_int = self._compute_interior_pv_boundary()
         sf_h = self._homogeneous_solver.compute_stream_function(
-            -pv_b, ensure_mass_conservation=False
+            -pv_b_int, ensure_mass_conservation=False
         )
+        pv_b = self._compute_pv_boundary()
         pv_h = -pv_b
         sf_bc = sf_b + sf_h
-        pv_bc = torch.zeros_like(pv_h)
+        pv_bc = torch.zeros_like(pv_b)
         self._psiq_b = PSIQ(sf_b, pv_b)
         self._psiq_h = PSIQ(sf_h, pv_h)
         self._psiq_bc = PSIQ(sf_bc, pv_bc)
@@ -540,12 +541,22 @@ class InhomogeneousPVInversion(BasePVInversion):
         )
         return sf_i, self.psiq_h.psi, self.psiq_b.psi
 
-    def _compute_pv_boundary(self, sf_boundary: torch.Tensor) -> torch.Tensor:
+    def _compute_pv_boundary(self) -> torch.Tensor:
         laplacian_boundary = self._boundary.compute_laplacian(
             self._dx, self._dy
         )
+        sf_boundary = self._boundary.compute()
         return points_to_surfaces(
             F.pad(laplacian_boundary, (1, 1, 1, 1))
             - self._f0**2
             * torch.einsum("lm,...mxy->...lxy", self._A, sf_boundary)
+        )
+
+    def _compute_interior_pv_boundary(self) -> torch.Tensor:
+        laplacian_boundary = self._boundary.compute_laplacian(
+            self._dx, self._dy
+        )
+        sf_boundary_interior = self._boundary.compute()[..., 1:-1, 1:-1]
+        return laplacian_boundary - self._f0**2 * torch.einsum(
+            "lm,...mxy->...lxy", self._A, sf_boundary_interior
         )

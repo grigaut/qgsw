@@ -6,6 +6,7 @@ import contextlib
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.exceptions import InvalidLayerNumberError, UnsetStencilError
@@ -34,14 +35,14 @@ from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
-from qgsw.solver.finite_diff import grad_perp, laplacian_h
+from qgsw.solver.finite_diff import grad_perp, laplacian, laplacian_h
 from qgsw.solver.pv_inversion import (
     BasePVInversion,
     HomogeneousPVInversion,
     InhomogeneousPVInversion,
 )
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.specs import DEVICE
+from qgsw.specs import DEVICE, defaults
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
@@ -100,14 +101,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
 
         # grid params
-        self._y = torch.linspace(
-            0.5 * self._space.dy,
-            self.space.ly - 0.5 * self._space.dy,
-            self._space.ny,
-            dtype=torch.float64,
-            device=DEVICE.get(),
-        ).unsqueeze(0)
-        self._y0 = 0.5 * self._space.ly
+        self.y0 = 0.5 * self._space.ly
 
         # auxillary matrices for elliptic equation
         self.compute_auxillary_matrices()
@@ -128,8 +122,24 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         # wind forcing
         self.set_wind_forcing(0.0, 0.0)
 
-        # Beta-effect
-        self._beta_effect = self.beta_plane.beta * (self._y - self._y0)
+    @property
+    def y0(self) -> float:
+        """Reference y0."""
+        return self._y0
+
+    @y0.setter
+    def y0(self, y0: float) -> None:
+        """Set y0."""
+        self._y0 = y0
+        # Beta effect
+        y = torch.linspace(
+            0.5 * self.space.dy,
+            self.space.ly - 0.5 * self.space.dy,
+            self.space.ny,
+            **defaults.get(),
+        ).unsqueeze(0)
+        self.y = y
+        self._beta_effect = self.beta_plane.beta * (y - self.y0)
 
     @property
     def flux_stencil(self) -> int:
@@ -454,6 +464,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             self.A,
             psi,
         )
+        if self.with_bc:
+            return vort - self.masks.h * self._points_to_surfaces(stretching)
         return vort - self.masks.h * self._points_to_surfaces(
             self.masks.psi * stretching
         )
@@ -469,6 +481,12 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Vorticity.
                 └── (n_ens, nl, nx, ny)-shaped
         """
+        if self.with_bc:
+            boundary = self._sf_bcmap1.get_at(self.time.item())
+            psi_with_bc = boundary.expand(psi)
+            self.p = psi_with_bc
+            lap_psi = laplacian(psi_with_bc, self.space.dx, self.space.dy)
+            return self.masks.h * self._points_to_surfaces(lap_psi)
         lap_psi = laplacian_h(psi, self.space.dx, self.space.dy)
         return self.masks.h * (
             self._points_to_surfaces(
@@ -487,7 +505,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Stream function.
                 └── (n_ens, nl, nx+1, ny+1)-shaped
         """
-        return self.solver.compute_stream_function(q)
+        return self.solver.compute_stream_function(self._points_to_surfaces(q))
 
     def set_wind_forcing(
         self,
@@ -534,23 +552,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: 3 points wide potential vorticity boundary condition.
                 └── (n_ens, nl, nx+6, ny+6)-shaped
         """
-        ne, nl, nx, ny = self.q.shape
-        q_ext = torch.zeros(
-            (ne, nl, nx + 6, ny + 6), dtype=self.q.dtype, device=self.q.device
-        )
-        q_ext[..., :, 0] = pv_boundary3.bottom
-        q_ext[..., :, -1] = pv_boundary3.top
-        q_ext[..., 0, :] = pv_boundary3.left
-        q_ext[..., -1, :] = pv_boundary3.right
-        q_ext[..., 1:-1, 1] = pv_boundary2.bottom
-        q_ext[..., 1:-1, -2] = pv_boundary2.top
-        q_ext[..., 1, 1:-1] = pv_boundary2.left
-        q_ext[..., -2, 1:-1] = pv_boundary2.right
-        q_ext[..., 2:-2, 2] = pv_boundary1.bottom
-        q_ext[..., 2:-2, -3] = pv_boundary1.top
-        q_ext[..., 2, 2:-2] = pv_boundary1.left
-        q_ext[..., -3, 2:-2] = pv_boundary1.right
-        return q_ext
+        q_ext = torch.zeros_like(self.q)
+        q_ext = pv_boundary1.expand(q_ext)
+        q_ext = pv_boundary2.expand(q_ext)
+        return pv_boundary3.expand(q_ext)
 
     def _compute_q_ext(self, pv_boundary: Boundaries) -> torch.Tensor:
         """Compute exterior band for potential vorticity.
@@ -562,21 +567,13 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Potential vorticity boundary condition.
                 └── (n_ens, nl, nx+2, ny+2)-shaped
         """
-        ne, nl, nx, ny = self.q.shape
-        q_ext = torch.zeros(
-            (ne, nl, nx + 2, ny + 2),
-            dtype=self.q.dtype,
-            device=self.q.device,
-        )
-        q_ext[..., :, 0] = pv_boundary.bottom
-        q_ext[..., :, -1] = pv_boundary.top
-        q_ext[..., 0, :] = pv_boundary.left
-        q_ext[..., -1, :] = pv_boundary.right
-        return q_ext
+        q_ext = torch.zeros_like(self.q)
+        return pv_boundary.expand(q_ext)
 
     def set_boundary_maps(
         self,
         sf_boundary_map: TimeLinearInterpolation,
+        sf_boundary_map1: TimeLinearInterpolation,
         pv_boundary_map: TimeLinearInterpolation,
         *,
         pv_boundary_map1: TimeLinearInterpolation | None = None,
@@ -586,7 +583,11 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         Args:
             sf_boundary_map (TimeLinearInterpolation): Boundary map
-                for stream function.
+                for stream function at locations
+                (imin,imax+1,jmin,jmax+1).
+            sf_boundary_map1 (TimeLinearInterpolation): Boundary map
+                for stream function at locations
+                (imin-1,imax+2,jmin-1,jmax+2).
             pv_boundary_map (TimeLinearInterpolation): Boundary map
                 for potential vorticity at locations
                 (imin,imax,jmin,jmax).
@@ -599,6 +600,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """
         self._switch_to_inhomogeneous()
         self._sf_bcmap = sf_boundary_map
+        self._sf_bcmap1 = sf_boundary_map1
         self._pv_bcmap = pv_boundary_map
         if self.wide:
             self._pv_bcmap1 = pv_boundary_map1
@@ -623,22 +625,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             )
         else:
             self._q_ext = self._compute_q_ext(pv_boundary)
-
-    def _compute_advection(self, psiq: PSIQ) -> torch.Tensor:
-        """Compute advection pv advection.
-
-        Args:
-            psiq (PSIQ): Prognostic tuple.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            torch.Tensor: RHS: J(ѱ, q)
-                └──  (n_ens, nl, nx, ny)-shaped
-        """
-        if self.with_bc:
-            return self._compute_advection_inhomogeneous(psiq)
-        return self._compute_advection_homogeneous(psiq)
 
     def _compute_advection_homogeneous(self, psiq: PSIQ) -> torch.Tensor:
         """Compute advection pv advection for homogeneous problem.
@@ -685,7 +671,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             q_full[..., 1:-1, 1:-1] = q
         return self.div_flux(q_full, u, v)
 
-    def _compute_drag(self, psi: torch.Tensor) -> torch.Tensor:
+    def _compute_drag_homogeneous(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute wind and bottom drag contribution.
 
         Args:
@@ -699,6 +685,35 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         omega = self._points_to_surfaces(
             self._laplacian_h(psi, self.space.dx, self.space.dy)
             * self.masks.psi,
+        )
+        bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
+        if self.space.nl == 1:
+            fcg_drag = self._curl_tau + bottom_drag
+        elif self.space.nl == 2:  # noqa: PLR2004
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
+        else:
+            fcg_drag = torch.cat(
+                [self._curl_tau, self.zeros_inside, bottom_drag],
+                dim=-3,
+            )
+        return fcg_drag
+
+    def _compute_drag_inhomogeneous(self, psi: torch.Tensor) -> torch.Tensor:
+        """Compute wind and bottom drag contribution.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+                └──  psi: (n_ens, nl, nx+1, ny+1)-shaped
+
+        Returns:
+            torch.Tensor: Wind and bottom drag.
+                └──  (n_ens, nl, nx, ny)-shaped
+        """
+        sf_boundary = self._sf_bcmap1.get_at(self.time.item())
+        sf_wide = F.pad(psi, (1, 1, 1, 1))
+        sf_boundary.set_to(sf_wide, inplace=True)
+        omega = points_to_surfaces(
+            laplacian(sf_wide, self.space.dx, self.space.dy)
         )
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
@@ -748,15 +763,16 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         psi, q = prognostic
         div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
         # wind forcing + bottom drag
-        fcg_drag = self._compute_drag(psi)
-        dq_i = (-div_flux + fcg_drag) * self.masks.h
-
+        fcg_drag = self._compute_drag_homogeneous(psi)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dq_i = self._points_to_surfaces(dq)
         # Solve Helmholtz equation
-        dpsi_i = self._solver_homogeneous.compute_stream_function(
+        dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
             ensure_mass_conservation=True,
         )
-        return PSIQ(dpsi_i, dq_i)
+        self.dpsi = dpsi
+        return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_inhomogeneous(
         self,
@@ -781,13 +797,13 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         q = q_i + q_bc
         advection_psi_q = self._compute_advection_inhomogeneous(PSIQ(psi, q))
         div_flux = advection_psi_q
-
         # wind forcing + bottom drag
-        fcg_drag = self._compute_drag(psi)
-        dq_i = (-div_flux + fcg_drag) * self.masks.h
-
+        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dq_i = self._points_to_surfaces(dq)
+        self.dqi = dq_i
         # Solve Helmholtz equation
-        dpsi_i = self._solver_homogeneous.compute_stream_function(
+        dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
             ensure_mass_conservation=False,
         )
@@ -797,7 +813,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 self.time.item() + self._rk3_step / 3 * self.dt
             )
 
-        return PSIQ(dpsi_i, dq_i)
+        return PSIQ(dpsi, dq)
 
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
@@ -820,6 +836,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
     def set_q(self, q: torch.Tensor) -> None:
         """Set the value of potential vorticity.
 
+        WARNING: with inhomogeneous boundary condition this might introduce
+        errors in ѱ due to interpolation of q.
+        You should use the `set_psiq` method instead.
+
         Args:
             q (torch.Tensor): Potential vorticity.
                 └── (n_ens, nl, nx, ny)-shaped
@@ -829,15 +849,25 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
     def set_q_anomaly(self, q_anom: torch.Tensor) -> None:
         """Set the value of potential vorticity.
 
+        WARNING: with inhomogeneous boundary condition this might introduce
+        errors in ѱ due to interpolation of q_anom.
+        You should use the `set_psiq` method instead.
+
         Args:
             q_anom (torch.Tensor): Potential vorticity anomaly.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        psi = self.solver.compute_stream_function(q_anom)
+        psi = self.solver.compute_stream_function(
+            self._points_to_surfaces(q_anom)
+        )
         self._state.update_psiq(PSIQ(psi, q_anom + self._beta_effect))
 
     def set_psi(self, psi: torch.Tensor) -> None:
         """Set the value of stream function.
+
+        WARNING: with inhomogeneous boundary condition this might introduce
+        errors in q due to different beta effects.
+        You should use the `set_psiq` method instead.
 
         Args:
             psi (torch.Tensor): Stream function.
@@ -846,18 +876,14 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         q = self._compute_q_from_psi(psi)
         self._state.update_psiq(PSIQ(psi, q))
 
-        """Update prognostic tuple.
+    def set_psiq(self, psi: torch.Tensor, q: torch.Tensor) -> None:
+        """Set both psi and q.
 
         Args:
-            prognostic (PSIQ): Prognostic variable to advect.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            PSIQ: Updated prognostic variable to advect.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+            psi (torch.Tensor): Stream function tensor.
+            q (torch.Tensor): Potential vorticity tensor.
         """
+        self._state.update_psiq(PSIQ(psi, q))
 
     def update(self, prognostic: PSIQ) -> PSIQ:
         """Update prognostic.
