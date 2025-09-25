@@ -122,34 +122,6 @@ class Boundaries:
             raise ValueError(msg)
 
     @classmethod
-    def extract(
-        cls, field: torch.Tensor, imin: int, imax: int, jmin: int, jmax: int
-    ) -> Self:
-        """Extract boundary conditions from a field.
-
-        Args:
-            field (torch.Tensor): Field to extract from.
-                └── (..., Nx, Ny)-shaped
-            imin (int): Minimum index in the x direction.
-            imax (int): Maximum index in the x direction.
-            jmin (int): Minimum index in the y direction.
-            jmax (int): Maximum index in the y direction.
-
-        Returns:
-            Self: Extracted boundaries.
-                ├── top: (..., imax-imin+1)-shaped
-                ├── bottom: (..., imax-imin+1)-shaped
-                ├── left: (..., jmax-jmin+1)-shaped
-                └── right: (..., jmax-jmin+1)-shaped
-        """
-        return cls(
-            top=field[..., imin : imax + 1, jmax],
-            bottom=field[..., imin : imax + 1, jmin],
-            left=field[..., imin, jmin : jmax + 1],
-            right=field[..., imax, jmin : jmax + 1],
-        )
-
-    @classmethod
     def extract_sf(
         cls, sf: torch.Tensor, imin: int, imax: int, jmin: int, jmax: int
     ) -> Self:
@@ -170,7 +142,12 @@ class Boundaries:
                 ├── left: (..., jmax-jmin+1)-shaped
                 └── right: (..., jmax-jmin+1)-shaped
         """
-        return cls.extract(sf, imin, imax, jmin, jmax)
+        return cls(
+            top=sf[..., imin : imax + 1, jmax],
+            bottom=sf[..., imin : imax + 1, jmin],
+            left=sf[..., imin, jmin : jmax + 1],
+            right=sf[..., imax, jmin : jmax + 1],
+        )
 
     @classmethod
     def extract_pv(
@@ -193,7 +170,12 @@ class Boundaries:
                 ├── left: (..., jmax-jmin+2)-shaped
                 └── right: (..., jmax-jmin+2)-shaped
         """
-        return cls.extract(pv, imin - 1, imax, jmin - 1, jmax)
+        return cls(
+            top=pv[..., imin:imax, jmax - 1],
+            bottom=pv[..., imin:imax, jmin],
+            left=pv[..., imin, jmin:jmax],
+            right=pv[..., imax - 1, jmin:jmax],
+        )
 
 
 @dataclass(frozen=True)

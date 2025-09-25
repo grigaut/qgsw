@@ -23,7 +23,7 @@ def test_extraction(field: torch.Tensor) -> None:
     imax = 20
     jmin = 10
     jmax = 30
-    boundaries = Boundaries.extract(field, imin, imax, jmin, jmax)
+    boundaries = Boundaries.extract_sf(field, imin, imax, jmin, jmax)
     assert (boundaries.top == field[..., imin : imax + 1, jmax]).all()
     assert (boundaries.bottom == field[..., imin : imax + 1, jmin]).all()
     assert (boundaries.left == field[..., imin, jmin : jmax + 1]).all()
@@ -36,7 +36,7 @@ def test_boundary_interpolation(field: torch.Tensor) -> None:
     imax = 20
     jmin = 10
     jmax = 30
-    boundaries = Boundaries.extract(field, imin, imax, jmin, jmax)
+    boundaries = Boundaries.extract_sf(field, imin, imax, jmin, jmax)
     be = BilinearExtendedBoundary(boundaries)
     boundary_interpolated = be.compute()
     top_i = boundary_interpolated[..., :, -1]
@@ -78,8 +78,8 @@ def test_operations(
     imax = 20
     jmin = 10
     jmax = 30
-    b = operation(Boundaries.extract(field, imin, imax, jmin, jmax))
-    b2 = Boundaries.extract(operation(field), imin, imax, jmin, jmax)
+    b = operation(Boundaries.extract_sf(field, imin, imax, jmin, jmax))
+    b2 = Boundaries.extract_sf(operation(field), imin, imax, jmin, jmax)
     assert (b2.top == b.top).all()
     assert (b2.bottom == b.bottom).all()
     assert (b2.left == b.left).all()
