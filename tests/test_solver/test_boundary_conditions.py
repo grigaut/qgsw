@@ -71,7 +71,8 @@ testoperations = [
 
 @pytest.mark.parametrize("operation", testoperations)
 def test_operations(
-    field: torch.Tensor, operation: Callable[[torch.Tensor], torch.Tensor]
+    field: torch.Tensor,
+    operation: Callable[[torch.Tensor], torch.Tensor],
 ) -> None:
     """Test operations on boundaries."""
     imin = 5
@@ -84,3 +85,42 @@ def test_operations(
     assert (b2.bottom == b.bottom).all()
     assert (b2.left == b.left).all()
     assert (b2.right == b.right).all()
+
+
+def test_adding_boundary() -> None:
+    """Test Boundary.set_to."""
+    data = torch.rand((2, 3, 20, 30))
+    imin = 5
+    imax = 15
+    jmin = 8
+    jmax = 20
+    data_int = data[..., imin + 2 : imax - 1, jmin + 2 : jmax - 1]
+    boundary_inner = Boundaries.extract_sf(
+        data, imin + 1, imax - 1, jmin + 1, jmax - 1
+    )
+    boundary_outer = Boundaries.extract_sf(data, imin, imax, jmin, jmax)
+    data_ = torch.nn.functional.pad(data_int, (2, 2, 2, 2))
+    boundary_inner.set_to(data_, offset=1, inplace=True)
+    boundary_outer.set_to(data_, offset=0, inplace=True)
+    torch.testing.assert_close(
+        data_, data[..., imin : imax + 1, jmin : jmax + 1]
+    )
+
+
+def test_expand() -> None:
+    """Test Boundary.expand."""
+    data = torch.rand((2, 3, 20, 30))
+    imin = 5
+    imax = 15
+    jmin = 8
+    jmax = 20
+    data_ = data[..., imin + 2 : imax - 1, jmin + 2 : jmax - 1]
+    boundary_inner = Boundaries.extract_sf(
+        data, imin + 1, imax - 1, jmin + 1, jmax - 1
+    )
+    boundary_outer = Boundaries.extract_sf(data, imin, imax, jmin, jmax)
+    data_ = boundary_inner.expand(data_)
+    data_ = boundary_outer.expand(data_)
+    torch.testing.assert_close(
+        data_, data[..., imin : imax + 1, jmin : jmax + 1]
+    )

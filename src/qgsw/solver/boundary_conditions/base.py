@@ -1,5 +1,7 @@
 """Base classes for boundary conditions."""
 
+from __future__ import annotations
+
 try:
     from typing import Self
 except ImportError:
@@ -7,8 +9,10 @@ except ImportError:
 
 from dataclasses import dataclass
 from functools import cached_property
+from typing import Literal, overload
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 
 
 @dataclass(frozen=True)
@@ -41,7 +45,7 @@ class Boundaries:
         """Number of points in the y direction."""
         return self.left.shape[-1]
 
-    def __add__(self, other: "Boundaries") -> "Boundaries":
+    def __add__(self, other: Boundaries) -> Boundaries:
         """Add two boundary conditions."""
         if not isinstance(other, Boundaries):
             return NotImplemented
@@ -52,7 +56,7 @@ class Boundaries:
             right=self.right + other.right,
         )
 
-    def __radd__(self, other: "Boundaries") -> "Boundaries":
+    def __radd__(self, other: Boundaries) -> Boundaries:
         """Add two boundary conditions."""
         if not isinstance(other, Boundaries):
             return NotImplemented
@@ -63,7 +67,7 @@ class Boundaries:
             right=self.right + other.right,
         )
 
-    def __sub__(self, other: "Boundaries") -> "Boundaries":
+    def __sub__(self, other: Boundaries) -> Boundaries:
         """Subtract two boundary conditions."""
         if not isinstance(other, Boundaries):
             return NotImplemented
@@ -74,7 +78,7 @@ class Boundaries:
             right=self.right - other.right,
         )
 
-    def __rmul__(self, scalar: float) -> "Boundaries":
+    def __rmul__(self, scalar: float) -> Boundaries:
         """Multiply boundary condition with scalar."""
         if not isinstance(scalar, (float, int)):
             return NotImplemented
@@ -85,7 +89,7 @@ class Boundaries:
             right=self.right * scalar,
         )
 
-    def __mul__(self, scalar: float) -> "Boundaries":
+    def __mul__(self, scalar: float) -> Boundaries:
         """Multiply boundary condition with scalar."""
         if not isinstance(scalar, (float, int)):
             return NotImplemented
@@ -96,7 +100,7 @@ class Boundaries:
             right=self.right * scalar,
         )
 
-    def __truediv__(self, scalar: float) -> "Boundaries":
+    def __truediv__(self, scalar: float) -> Boundaries:
         """Multiply boundary condition with scalar."""
         if not isinstance(scalar, (float, int)):
             return NotImplemented
@@ -120,6 +124,74 @@ class Boundaries:
         if self.left.shape != self.right.shape:
             msg = "Both left and right boundaries must have the same shape."
             raise ValueError(msg)
+
+    @overload
+    def set_to(
+        self,
+        field: torch.Tensor,
+        *,
+        offset: int,
+        inplace: Literal[True],
+    ) -> None: ...
+    @overload
+    def set_to(
+        self,
+        field: torch.Tensor,
+        *,
+        offset: int,
+        inplace: Literal[False],
+    ) -> torch.Tensor: ...
+    def set_to(
+        self,
+        field: torch.Tensor,
+        *,
+        offset: int = 0,
+        inplace: bool = True,
+    ) -> torch.Tensor | None:
+        """Add boundary to a given Tensor.
+
+        Args:
+            field (torch.Tensor): Field to add boundary to.
+            offset (int, optional): Offset. If 0, the outer most border
+                will be completed. Defaults to 0.
+            inplace (bool, optional): Whether to perform operation inplace or
+                not. Defaults to True.
+
+        Returns:
+            torch.Tensor | None: Tensor with boundary if inplace is True,
+                otherwise nothing.
+        """
+        if not inplace:
+            field = torch.clone(field)
+        nx, ny = field.shape[-2:]
+        lx = nx - offset * 2
+        ly = ny - offset * 2
+        if lx != self.bottom.shape[-1]:
+            msg = "Mismatching size at top/bottom boundary."
+            raise ValueError(msg)
+        if ly != self.left.shape[-1]:
+            msg = "Mismatching size at left/right boundary."
+            raise ValueError(msg)
+        field_left = field[..., offset, :].narrow(-1, offset, ly)
+        field_left[:] = self.left
+        field_right = field[..., -(offset + 1), :].narrow(-1, offset, ly)
+        field_right[:] = self.right
+        field_bottom = field[..., :, offset].narrow(-1, offset, lx)
+        field_bottom[:] = self.bottom
+        field_top = field[..., :, -(offset + 1)].narrow(-1, offset, lx)
+        field_top[:] = self.top
+        return field if not inplace else None
+
+    def expand(self, field: torch.Tensor) -> torch.Tensor:
+        """Expand a tensor by adding the boundary.
+
+        Args:
+            field (torch.Tensor): Tensor to expand.
+
+        Returns:
+            torch.Tensor: Expanded tensor.
+        """
+        return self.set_to(F.pad(field, (1, 1, 1, 1)), inplace=False)
 
     @classmethod
     def extract_sf(
