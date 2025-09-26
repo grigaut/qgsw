@@ -5,8 +5,8 @@ from pathlib import Path
 
 import toml
 import torch
-
 from qgsw.fields.variables.variable_sets import create_qg_variable_set
+
 from qgsw.output import RunOutput, check_time_compatibility
 from qgsw.plots.heatmaps import AnimatedHeatmaps
 from qgsw.specs import DEVICE
