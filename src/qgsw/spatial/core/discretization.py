@@ -291,6 +291,57 @@ class SpaceDiscretization2D:
         return self._omega
 
     @property
+    def psi(self) -> Grid2D:
+        """Psi Grid, same as Omega grid.
+
+        └── (nx+1, ny+1)-shaped
+
+        Pattern:
+
+        y
+        ^
+
+        :       :       :       :
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+        ѱ-------ѱ-------ѱ-------ѱ..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        :       :       :       :
+
+
+        v
+        x
+        """
+        return self.omega
+
+    @property
     def h(self) -> Grid2D:
         """H Grid.
 
@@ -343,6 +394,57 @@ class SpaceDiscretization2D:
         for more details.
         """
         return self._h
+
+    @property
+    def q(self) -> Grid2D:
+        """PV Grid. Same as the h grid.
+
+        └── (nx, ny)-shaped
+
+        Pattern:
+
+        y
+        ^
+
+        :       :       :       :
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
+        """
+        return self.h
 
     @property
     def u(self) -> Grid2D:
@@ -838,6 +940,59 @@ class SpaceDiscretization3D:
         return self._omega
 
     @property
+    def psi(self) -> Grid3D:
+        """X,Y cordinates of the Psi grid ('classical' grid corners).
+
+        Same as Omega grid.
+
+        └── (nx+1, ny+1)-shaped
+
+        Pattern:
+
+        y
+        ^
+
+        :       :       :       :
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+        ѱ-------ѱ-------ѱ-------ѱ..   > y
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        |       |       |       |
+        |       |       |       |
+        |       |       |       |
+        ѱ-------ѱ-------ѱ-------ѱ..
+        :       :       :       :
+
+
+        v
+        x
+        """
+        return self.omega
+
+    @property
     def h(self) -> Grid3D:
         """X,Y coordinates of the H grid (center of 'classical' grid cells).
 
@@ -885,11 +1040,61 @@ class SpaceDiscretization3D:
 
         v
         x
-
-        See https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002663#JAME21507.indd%3Ahl_jame21507-fig-0001%3A73
-        for more details.
         """
         return self._h
+
+    @property
+    def q(self) -> Grid3D:
+        """X,Y coordinates of the q grid (center of 'classical' grid cells).
+
+        Same as H grid.
+
+        └── (nx, ny)-shaped
+
+        Pattern:
+
+        y
+        ^
+
+        :       :       :       :
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..   > x
+
+        Warning: 2DMesh have x coordinate as first coordinate.
+        Therefore, the actual pattern implementation corresponds to a
+        90° clockwise rotation of the preceding pattern:
+
+         ------- ------- ------- ..   > y
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        |       |       |       |
+        |   q   |   q   |   q   |
+        |       |       |       |
+         ------- ------- ------- ..
+        :       :       :       :
+
+
+        v
+        x
+        """
+        return self.h
 
     @property
     def u(self) -> Grid3D:

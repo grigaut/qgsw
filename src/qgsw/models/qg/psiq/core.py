@@ -42,7 +42,7 @@ from qgsw.solver.pv_inversion import (
     InhomogeneousPVInversion,
 )
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
-from qgsw.specs import DEVICE, defaults
+from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
@@ -132,14 +132,17 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """Set y0."""
         self._y0 = y0
         # Beta effect
-        y = torch.linspace(
-            0.5 * self.space.dy,
-            self.space.ly - 0.5 * self.space.dy,
-            self.space.ny,
-            **defaults.get(),
-        ).unsqueeze(0)
-        self.y = y
-        self._beta_effect = self.beta_plane.beta * (y - self.y0)
+        y = self.space.q.xyz.y[0, 0, :].unsqueeze(0)
+        beta_effect = self.beta_plane.beta * (y - self.y0)
+        if hasattr(self, "_state"):
+            verbose.display(
+                "WARNING: The β-effect has been modified."
+                "The potential vorticity might be inconsistent with actual"
+                "β-effect value. Best would be setting y0 "
+                "right after instantiation.",
+                trigger_level=1,
+            )
+        self._beta_effect = beta_effect
 
     @property
     def flux_stencil(self) -> int:
@@ -884,6 +887,17 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             q (torch.Tensor): Potential vorticity tensor.
         """
         self._state.update_psiq(PSIQ(psi, q))
+
+    def set_psiqanom(self, psi: torch.Tensor, q: torch.Tensor) -> None:
+        """Set both psi and q.
+
+        Args:
+            psi (torch.Tensor): Stream function tensor.
+            q (torch.Tensor): Potential vorticity tensor.
+        """
+        self._state.update_psiq(
+            PSIQ(psi, q + self._masks.h * self._beta_effect)
+        )
 
     def update(self, prognostic: PSIQ) -> PSIQ:
         """Update prognostic.
