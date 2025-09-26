@@ -30,7 +30,7 @@ from qgsw.fields.variables.tuples import (
     UVHTAlpha,
 )
 from qgsw.models.base import ModelUVH
-from qgsw.models.core import schemes
+from qgsw.models.core import time_steppers
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
@@ -264,7 +264,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        return schemes.rk3_ssp(
+        return time_steppers.rk3_ssp(
             prognostic,
             self.dt,
             self.compute_time_derivatives,

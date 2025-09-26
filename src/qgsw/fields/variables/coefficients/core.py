@@ -42,9 +42,9 @@ Values = TypeVar("Values")
 
 
 class Coefficient(
-    Generic[Values],
     NamedObject[CoefficientName],
     Variable,
+    Generic[Values],
     metaclass=ABCMeta,
 ):
     """Coefficient base class."""

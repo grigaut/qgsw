@@ -10,6 +10,7 @@ import torch
 from qgsw import verbose
 from qgsw.exceptions import InvalidSavingFileError
 from qgsw.fields.variables.prognostic import Time
+from qgsw.specs import defaults
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.base import (
@@ -64,8 +65,10 @@ class IO:
         """
         output_file = Path(output_file)
         self._raise_if_invalid_savefile(output_file=output_file)
+        save_specs = defaults.get_save_specs()
         to_save = {
-            var.name: var.get().to(torch.float32).cpu() for var in self._vars
+            var.name: var.get().to(save_specs["dtype"]).cpu()
+            for var in self._vars
         }
         torch.save(to_save, f=output_file)
 

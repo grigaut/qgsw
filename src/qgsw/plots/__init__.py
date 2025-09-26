@@ -1,5 +1,5 @@
 """Plotting related tools."""
 
-from qgsw.plots.plt_wrapper import imshow
+from qgsw.plots.plt_wrapper import imshow, show, subplots
 
-__all__ = ["imshow"]
+__all__ = ["imshow", "show", "subplots"]

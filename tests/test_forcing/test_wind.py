@@ -15,7 +15,7 @@ def test_cosine_wind_forcing() -> None:
     ly = 5120.0e3
     ny = 256
 
-    x, y = torch.meshgrid(
+    _, y = torch.meshgrid(
         torch.linspace(
             0,
             lx,

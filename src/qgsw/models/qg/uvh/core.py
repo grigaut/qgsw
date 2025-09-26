@@ -14,7 +14,7 @@ from qgsw.fields.variables.tuples import (
     BaseTuple,
 )
 from qgsw.models.base import ModelUVH
-from qgsw.models.core import schemes
+from qgsw.models.core import time_steppers
 from qgsw.models.names import ModelName
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
@@ -348,7 +348,7 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
         """
         if self.save_p_values:
             self._p_vals = []
-        return schemes.rk3_ssp(
+        return time_steppers.rk3_ssp(
             prognostic,
             self.dt,
             self.compute_time_derivatives,

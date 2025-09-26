@@ -6,6 +6,7 @@ from typing import ParamSpec
 
 import numpy as np
 import torch
+from matplotlib import figure
 from matplotlib import pyplot as plt
 
 Param = ParamSpec("Param")
@@ -33,6 +34,7 @@ def imshow(
     kwargs.setdefault("vmax", np.max(np.abs(data)))
     kwargs.setdefault("vmin", -kwargs["vmax"])
     kwargs.setdefault("cmap", DEFAULT_CMAP)
+    kwargs.setdefault("origin", "lower")
     if ax is None:
         ax = plt.subplot()
 
@@ -40,3 +42,29 @@ def imshow(
     ax.figure.colorbar(cbar, ax=ax)
     if title is not None:
         ax.set_title(title)
+
+
+def subplots(
+    nrows: int = 1,
+    ncols: int = 1,
+    **kwargs: Param.kwargs,
+) -> tuple[figure.Figure, np.ndarray]:
+    """Wrapper for plt.subplots.
+
+    Args:
+        nrows (int, optional): Number of rows. Defaults to 1.
+        ncols (int, optional): Number of columns. Defaults to 1.
+        **kwargs: optional arguments to pass to plt.subplots.
+
+    Returns:
+        tuple[mpl.figure.Figure, np.ndarray]: Figure, Axes array.
+    """
+    kwargs.setdefault("squeeze", False)
+    kwargs.setdefault("constrained_layout", True)
+    kwargs.setdefault("figsize", ((4 * ncols, 4 * nrows + 1)))
+    return plt.subplots(nrows=nrows, ncols=ncols, **kwargs)
+
+
+def show(**kwargs: Param.kwargs) -> None:
+    """Wrapper for plt.show."""
+    return plt.show(**kwargs)
