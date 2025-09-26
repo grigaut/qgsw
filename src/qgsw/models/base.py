@@ -74,8 +74,8 @@ class ABCCounter(ModelCounter, ABCMeta):
 
 class _Model(
     ModelParamChecker,
-    Generic[Prognostic, State, AdvectedPrognostic],
     NamedObject[ModelName],
+    Generic[Prognostic, State, AdvectedPrognostic],
     metaclass=ABCCounter,
 ):
     """Base class for models."""

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, TypeVar
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class _Synchronizer(Generic[T], ABC):
+class _Synchronizer(Generic[T], meta=ABCMeta):
     __slots__ = ("_ic", "_model", "_ref")
 
     def __init__(self, reference: T, model: ModelUVH) -> None:
