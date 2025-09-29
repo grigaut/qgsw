@@ -53,6 +53,11 @@ def compute_layers_to_mode_decomposition(
 
     A = Cm2l @ Λ @ Cl2m
 
+    Eigen values are sorted in descending order. Hence, if the model has 3
+    layers, first eigen value will correspond to second baroclinic mode,
+    second eigen value to first baroclinic mode and last eigen value to the
+    barotropic mode.
+
     Args:
         A (torch.Tensor): Stretching Operator.
             └── (nl, nl)-shaped
@@ -74,3 +79,27 @@ def compute_layers_to_mode_decomposition(
     # mode to layer
     Cm2l = R  # noqa: N806
     return Cm2l, lambd, Cl2m
+
+
+def compute_deformation_radii(
+    A: torch.Tensor,  # noqa: N803
+    f0: float,
+) -> torch.Tensor:
+    """Compute deformation radii.
+
+    Radii are returned in ascending order. Hence, if the model has 3
+    layers, first radius will correspond to second baroclinic mode,
+    second radius to first baroclinic mode and last radius to the
+    barotropic mode.
+
+    Args:
+        A (torch.Tensor): Stretching matrix.
+            └── (nl, nl)-shaped
+        f0 (float): Coriolis parameter.
+
+    Returns:
+        torch.Tensor: Deformation radii.
+            └── (nl,)-shaped
+    """
+    _, Lambda, _ = compute_layers_to_mode_decomposition(A)  # noqa: N806
+    return 1 / f0 / Lambda.sqrt()
