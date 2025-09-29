@@ -6,6 +6,7 @@ from functools import cached_property
 
 from qgsw.solver.boundary_conditions.io import BoundaryConditionLoader
 from qgsw.specs import defaults
+from qgsw.utils.interpolation import LinearInterpolation
 
 try:
     from typing import Self
@@ -205,24 +206,21 @@ class TimeLinearInterpolation:
             no_time_offset (bool, optional): Whether to remove the time offset
                 or not. Defaults to True.
         """
-        times = torch.tensor([b.time for b in boundaries])
-        argsort = torch.argsort(times)
-        self._times = times[argsort]
-        if no_time_offset:
-            self._times = self._times - self._times[0]
-        self._tmin = self._times[0]
-        self._tmax = self._times[-1]
-        self._boundaries = [boundaries[i].boundaries for i in argsort]
+        self._interp = LinearInterpolation[Boundaries](
+            xs=(tb.time for tb in boundaries),
+            ys=[tb.boundaries for tb in boundaries],
+            remove_x_offset=no_time_offset,
+        )
 
     @cached_property
     def tmax(self) -> float:
         """Maximum time of the interpolation."""
-        return self._tmax.item()
+        return self._interp.xmax
 
     @cached_property
     def tmin(self) -> float:
         """Minimum time of the interpolation."""
-        return self._tmin.item()
+        return self._interp.xmin
 
     def get_at(self, time: float) -> Boundaries:
         """Get the boundary conditions at a specific time.
@@ -233,19 +231,7 @@ class TimeLinearInterpolation:
         Returns:
             Boundaries: The boundary conditions at the specified time.
         """
-        if time < self._tmin or time > self._tmax:
-            msg = (
-                f"Time must be greater than {self._tmin} "
-                f"and lower than {self._tmax}"
-            )
-            raise ValueError(msg)
-        # Find the two surrounding time points
-        i = torch.searchsorted(self._times, time, right=True)
-        t0, t1 = self._times[i - 1].item(), self._times[i].item()
-        b0, b1 = self._boundaries[i - 1], self._boundaries[i]
-        # Linear interpolation
-        alpha = (time - t0) / (t1 - t0)
-        return b0 * (1 - alpha) + b1 * alpha
+        return self._interp(time)
 
     @classmethod
     def from_file(cls, file: Path | str) -> Self:
