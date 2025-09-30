@@ -159,7 +159,8 @@ class BoundaryConditionLoader:
         """Load the boundary conditions from a file.
 
         Returns:
-            list[TimedBoundaries]: The loaded boundary conditions.
+            list[list[float], list[Boundaries]]: The loaded time
+                and boundary conditions.
         """
         load_specs = defaults.get(dtype=dtype, device=device)
         data = torch.load(self._file)
