@@ -33,9 +33,9 @@ def test_extraction(field: torch.Tensor) -> None:
 def test_negative_index(field: torch.tensor) -> None:
     """Test boundary extraction."""
     imin = 1
-    imax = -1
+    imax = -2
     jmin = 2
-    jmax = -2
+    jmax = -3
     boundaries = Boundaries.extract(field, imin, imax, jmin, jmax)
     boundaries_ref = Boundaries.extract(field, 1, 24, 2, 38)
     assert boundaries == boundaries_ref
@@ -154,6 +154,13 @@ def test_expand() -> None:
     data_ = boundary_inner.expand(data_)
     data_ = boundary_outer.expand(data_)
     torch.testing.assert_close(data_, data[..., imin:imax, jmin:jmax])
+
+    imin = 0
+    imax = -1
+    jmin = 0
+    jmax = -1
+    boundaries = Boundaries.extract(data, imin, imax, jmin, jmax)
+    assert (data == boundaries.expand(data[..., 1:-1, 1:-1])).all()
 
 
 def test_wide_expansion() -> None:

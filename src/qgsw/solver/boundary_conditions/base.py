@@ -189,10 +189,10 @@ class Boundaries:
     ) -> tuple[int, int, int, int]:
         nx, ny = field.shape[-2:]
         return (
-            nx * (imin < 0) + imin,
-            nx * (imax < 0) + imax,
-            ny * (jmin < 0) + jmin,
-            ny * (jmax < 0) + jmax,
+            (nx + 1) * (imin < 0) + imin,
+            (nx + 1) * (imax < 0) + imax,
+            (ny + 1) * (jmin < 0) + jmin,
+            (ny + 1) * (jmax < 0) + jmax,
         )
 
     @classmethod
