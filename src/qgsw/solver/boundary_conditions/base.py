@@ -90,6 +90,19 @@ class Boundaries:
             right=self.right * scalar,
         )
 
+    def __eq__(self, other: object) -> bool:
+        """Check if two boundary conditions are equal."""
+        if not isinstance(other, Boundaries):
+            return NotImplemented
+        return (
+            torch.equal(self.top, other.top)
+            and torch.equal(self.bottom, other.bottom)
+            and torch.equal(self.left, other.left)
+            and torch.equal(self.right, other.right)
+        )
+
+    __hash__ = None
+
     def __truediv__(self, scalar: float) -> Boundaries:
         """Multiply boundary condition with scalar."""
         if not isinstance(scalar, (float, int)):
@@ -166,6 +179,23 @@ class Boundaries:
         return self.top.shape[-1]
 
     @classmethod
+    def _compute_ij(
+        cls,
+        field: torch.Tensor,
+        imin: int,
+        imax: int,
+        jmin: int,
+        jmax: int,
+    ) -> tuple[int, int, int, int]:
+        nx, ny = field.shape[-2:]
+        return (
+            nx * (imin < 0) + imin,
+            nx * (imax < 0) + imax,
+            ny * (jmin < 0) + jmin,
+            ny * (jmax < 0) + jmax,
+        )
+
+    @classmethod
     def extract(
         cls,
         field: torch.Tensor,
@@ -194,6 +224,7 @@ class Boundaries:
                 └── right: (..., jmax-jmin+2*width, width)-shaped
         """
         w = width
+        imin, imax, jmin, jmax = cls._compute_ij(field, imin, imax, jmin, jmax)
         return cls(
             top=field[
                 ..., imin - (w - 1) : imax + (w - 1), jmax - 1 : jmax + w - 1

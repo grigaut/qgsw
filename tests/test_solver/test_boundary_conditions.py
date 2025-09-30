@@ -30,6 +30,17 @@ def test_extraction(field: torch.Tensor) -> None:
     assert (boundaries.right == field[..., imax - 1 : imax, jmin:jmax]).all()
 
 
+def test_negative_index(field: torch.tensor) -> None:
+    """Test boundary extraction."""
+    imin = 1
+    imax = -1
+    jmin = 2
+    jmax = -2
+    boundaries = Boundaries.extract(field, imin, imax, jmin, jmax)
+    boundaries_ref = Boundaries.extract(field, 1, 24, 2, 38)
+    assert boundaries == boundaries_ref
+
+
 def test_wide_extraction(field: torch.Tensor) -> None:
     """Test wide boundary extraction."""
     imin = 5
