@@ -49,10 +49,9 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.solver.boundary_conditions.interpolation import (
-        TimeLinearInterpolation,
-    )
+    from qgsw.solver.boundary_conditions.base import Boundaries
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
+    from qgsw.utils.interpolation import LinearInterpolation
 
 T = TypeVar("T", bound=BasePSIQ)
 State = TypeVar("State", bound=BaseStatePSIQ)
@@ -483,8 +482,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └── (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
-            boundary = self._sf_bc_interp1.get_at(self.time.item())
-            psi_with_bc = boundary.expand(psi)
+            boundary = self._sf_bc_interp(self.time.item())
+            psi_with_bc = boundary.get_band(1).expand(psi)
             self.p = psi_with_bc
             lap_psi = laplacian(psi_with_bc, self.space.dx, self.space.dy)
             return self.masks.h * self._points_to_surfaces(lap_psi)
@@ -538,16 +537,16 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
     def set_boundary_maps(
         self,
-        sf_bc_interp: TimeLinearInterpolation,
-        pv_bc_interp: TimeLinearInterpolation,
+        sf_bc_interp: LinearInterpolation[Boundaries],
+        pv_bc_interp: LinearInterpolation[Boundaries],
     ) -> None:
         """Set the boundary maps.
 
         Args:
-            sf_bc_interp (TimeLinearInterpolation): Boundary map
+            sf_bc_interp (LinearInterpolation[Boundaries]): Boundary map
                 for stream function at locations
                 (imin,imax+1,jmin,jmax+1).
-            pv_bc_interp (TimeLinearInterpolation): Boundary map
+            pv_bc_interp (LinearInterpolation[Boundaries]): Boundary map
                 for potential vorticity at locations
                 (imin,imax,jmin,jmax).
         """
@@ -562,8 +561,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         Args:
             time (float): Time.
         """
-        sf_boundary = self._sf_bc_interp.get_at(time)
-        pv_boundary = self._pv_bc_interp.get_at(time)
+        sf_boundary = self._sf_bc_interp(time)
+        pv_boundary = self._pv_bc_interp(time)
         self._solver_inhomogeneous.set_boundaries(sf_boundary.get_band(0))
 
         if self.wide:
@@ -659,7 +658,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Wind and bottom drag.
                 └──  (n_ens, nl, nx, ny)-shaped
         """
-        sf_boundary = self._sf_bc_interp.get_at(self.time.item())
+        sf_boundary = self._sf_bc_interp(self.time.item())
         sf_wide = sf_boundary.expand(psi[..., 1:-1, 1:-1])
         omega = points_to_surfaces(
             laplacian(sf_wide, self.space.dx, self.space.dy)

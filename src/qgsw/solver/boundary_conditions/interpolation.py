@@ -2,26 +2,18 @@
 
 from __future__ import annotations
 
-from functools import cached_property
-
-from qgsw.solver.boundary_conditions.io import BoundaryConditionLoader
+from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.specs import defaults
-from qgsw.utils.interpolation import LinearInterpolation
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
-from typing import TYPE_CHECKING
 
 import torch
 
 from qgsw import specs
-from qgsw.solver.boundary_conditions.base import Boundaries, TimedBoundaries
 from qgsw.solver.finite_diff import laplacian1D
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class BilinearExtendedBoundary:
@@ -191,60 +183,3 @@ class BilinearExtendedBoundary:
             Self: BilinearExtendedBoundary
         """
         return cls(Boundaries(top=top, bottom=bottom, left=left, right=right))
-
-
-class TimeLinearInterpolation:
-    """Interpolate boundaries."""
-
-    def __init__(
-        self,
-        boundaries: list[TimedBoundaries],
-        *,
-        no_time_offset: bool = True,
-    ) -> None:
-        """Instantiate the boundary interpolation.
-
-        Args:
-            boundaries (list[TimedBoundaries]): List of timed boundaries.
-            no_time_offset (bool, optional): Whether to remove the time offset
-                or not. Defaults to True.
-        """
-        self._interp = LinearInterpolation[Boundaries](
-            xs=(tb.time for tb in boundaries),
-            ys=[tb.boundaries for tb in boundaries],
-            remove_x_offset=no_time_offset,
-        )
-
-    @cached_property
-    def tmax(self) -> float:
-        """Maximum time of the interpolation."""
-        return self._interp.xmax
-
-    @cached_property
-    def tmin(self) -> float:
-        """Minimum time of the interpolation."""
-        return self._interp.xmin
-
-    def get_at(self, time: float) -> Boundaries:
-        """Get the boundary conditions at a specific time.
-
-        Args:
-            time (float): Time.
-
-        Returns:
-            Boundaries: The boundary conditions at the specified time.
-        """
-        return self._interp(time)
-
-    @classmethod
-    def from_file(cls, file: Path | str) -> Self:
-        """Load the interpolation from a file.
-
-        Args:
-            file (Path | str): The file path to load the interpolation from.
-
-        Returns:
-            Self: The loaded interpolation.
-        """
-        loader = BoundaryConditionLoader(file)
-        return cls(loader.load())

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import torch
 
-from qgsw.solver.boundary_conditions.base import TimedBoundaries
+from qgsw.solver.boundary_conditions.base import Boundaries, TimedBoundaries
 from qgsw.specs import defaults
 
 
@@ -155,7 +155,7 @@ class BoundaryConditionLoader:
         *,
         dtype: torch.dtype | None = None,
         device: torch.device | None = None,
-    ) -> list[TimedBoundaries]:
+    ) -> tuple[list[float], list[Boundaries]]:
         """Load the boundary conditions from a file.
 
         Returns:
@@ -163,19 +163,23 @@ class BoundaryConditionLoader:
         """
         load_specs = defaults.get(dtype=dtype, device=device)
         data = torch.load(self._file)
-        return [
-            TimedBoundaries.from_tensors(
-                time=time.to(**load_specs),
-                top=top.to(**load_specs),
-                bottom=bottom.to(**load_specs),
-                left=left.to(**load_specs),
-                right=right.to(**load_specs),
-            )
-            for time, top, bottom, left, right in zip(
-                data[self.time_key],
-                data[self.top_key],
-                data[self.bottom_key],
-                data[self.left_key],
-                data[self.right_key],
-            )
-        ]
+        return zip(
+            *[
+                (
+                    time,
+                    Boundaries(
+                        top=top.to(**load_specs),
+                        bottom=bottom.to(**load_specs),
+                        left=left.to(**load_specs),
+                        right=right.to(**load_specs),
+                    ),
+                )
+                for time, top, bottom, left, right in zip(
+                    data[self.time_key],
+                    data[self.top_key],
+                    data[self.bottom_key],
+                    data[self.left_key],
+                    data[self.right_key],
+                )
+            ]
+        )

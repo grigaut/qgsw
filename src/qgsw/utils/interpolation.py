@@ -1,7 +1,6 @@
 """Interpolation tools."""
 
 from collections.abc import Iterator
-from functools import cached_property
 from typing import Generic, TypeVar
 
 import torch
@@ -17,34 +16,24 @@ class LinearInterpolation(Generic[T]):
         xs: Iterator[float],
         ys: list[T],
         *,
-        remove_x_offset: bool = True,
+        remove_offset: bool = True,
     ) -> None:
         """Instantiate the linear interpolation.
 
         Args:
             xs (Iterator[float]): X values.
             ys (list[T]): Y values.
-            remove_x_offset (bool, optional): Whether to remove an eventual x
+            remove_offset (bool, optional): Whether to remove an eventual x
             offset or not. Defaults to True.
         """
         xx = torch.tensor(list(xs), dtype=torch.float64)
         argsort = torch.argsort(xx)
         self._xs = xx[argsort]
-        if remove_x_offset:
+        if remove_offset:
             self._xs = self._xs - self._xs[0]
         self._xmin = self._xs[0]
         self._xmax = self._xs[-1]
         self._ys = ys
-
-    @cached_property
-    def xmax(self) -> float:
-        """Maximum x of the interpolation."""
-        return self._xmax.item()
-
-    @cached_property
-    def xmin(self) -> float:
-        """Minimum x of the interpolation."""
-        return self._xmin.item()
 
     def __call__(self, x: float) -> T:
         """Get the y value at a specific x.
