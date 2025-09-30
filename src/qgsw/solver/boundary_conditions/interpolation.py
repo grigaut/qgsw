@@ -33,6 +33,9 @@ class BilinearExtendedBoundary:
         Args:
             boundaries (Boundaries): Boundary conditions.
         """
+        if boundaries.width != 1:
+            msg = "Bilinear extension only works for 1-point wide boundaries."
+            raise ValueError(msg)
         self._boundaries = boundaries
         self._compute_grids(
             boundaries.nx,
@@ -83,10 +86,10 @@ class BilinearExtendedBoundary:
         x = self._x[None, :, None]  # (1, nx, 1)-shaped
         y = self._y[None, None, :]  # (1, 1, ny)-shaped
         ## Variables
-        ut = self._boundaries.top
-        ub = self._boundaries.bottom
-        ul = self._boundaries.left
-        ur = self._boundaries.right
+        ut = self._boundaries.top[..., :, 0]
+        ub = self._boundaries.bottom[..., :, 0]
+        ul = self._boundaries.left[..., 0, :]
+        ur = self._boundaries.right[..., 0, :]
         ## Compute corner values
         u_bl = (ub[..., :, 0] + ul[..., :, 0]) / 2  # (..., nl)-shaped
         u_br = (ub[..., :, -1] + ur[..., :, 0]) / 2  # (..., nl)-shaped
@@ -141,10 +144,10 @@ class BilinearExtendedBoundary:
         xx_in = xx_in[None, :, :]  # (1, nx, ny)-shaped
         yy_in = yy_in[None, :, :]  # (1, nx, ny)-shaped
         ## Variables
-        ut = self._boundaries.top
-        ub = self._boundaries.bottom
-        ul = self._boundaries.left
-        ur = self._boundaries.right
+        ut = self._boundaries.top[..., :, 0]
+        ub = self._boundaries.bottom[..., :, 0]
+        ul = self._boundaries.left[..., 0, :]
+        ur = self._boundaries.right[..., 0, :]
         # 1D laplacian of x-wise boundary conditions
         lap_ub = laplacian1D(ub, dx)
         lap_ut = laplacian1D(ut, dx)

@@ -6,7 +6,6 @@ import contextlib
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
-import torch.nn.functional as F  # noqa: N812
 
 from qgsw import verbose
 from qgsw.exceptions import InvalidLayerNumberError, UnsetStencilError
@@ -50,7 +49,6 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
     from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.solver.boundary_conditions.base import Boundaries
     from qgsw.solver.boundary_conditions.interpolation import (
         TimeLinearInterpolation,
     )
@@ -485,7 +483,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └── (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
-            boundary = self._sf_bcmap1.get_at(self.time.item())
+            boundary = self._sf_bc_interp1.get_at(self.time.item())
             psi_with_bc = boundary.expand(psi)
             self.p = psi_with_bc
             lap_psi = laplacian(psi_with_bc, self.space.dx, self.space.dy)
@@ -538,76 +536,24 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
         self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
 
-    def _compute_wide_q_ext(
-        self,
-        pv_boundary1: Boundaries,
-        pv_boundary2: Boundaries,
-        pv_boundary3: Boundaries,
-    ) -> torch.Tensor:
-        """Compute a 3 points-wide exterior band for potential vorticity.
-
-        Args:
-            pv_boundary1 (Boundaries): Values for inner pv boundary.
-            pv_boundary2 (Boundaries): Values for middle pv boundary.
-            pv_boundary3 (Boundaries): Values for outer pv boundary.
-
-        Returns:
-            torch.Tensor: 3 points wide potential vorticity boundary condition.
-                └── (n_ens, nl, nx+6, ny+6)-shaped
-        """
-        q_ext = torch.zeros_like(self.q)
-        q_ext = pv_boundary1.expand(q_ext)
-        q_ext = pv_boundary2.expand(q_ext)
-        return pv_boundary3.expand(q_ext)
-
-    def _compute_q_ext(self, pv_boundary: Boundaries) -> torch.Tensor:
-        """Compute exterior band for potential vorticity.
-
-        Args:
-            pv_boundary (Boundaries): Values for pv boundary.
-
-        Returns:
-            torch.Tensor: Potential vorticity boundary condition.
-                └── (n_ens, nl, nx+2, ny+2)-shaped
-        """
-        q_ext = torch.zeros_like(self.q)
-        return pv_boundary.expand(q_ext)
-
     def set_boundary_maps(
         self,
-        sf_boundary_map: TimeLinearInterpolation,
-        sf_boundary_map1: TimeLinearInterpolation,
-        pv_boundary_map: TimeLinearInterpolation,
-        *,
-        pv_boundary_map1: TimeLinearInterpolation | None = None,
-        pv_boundary_map2: TimeLinearInterpolation | None = None,
+        sf_bc_interp: TimeLinearInterpolation,
+        pv_bc_interp: TimeLinearInterpolation,
     ) -> None:
         """Set the boundary maps.
 
         Args:
-            sf_boundary_map (TimeLinearInterpolation): Boundary map
+            sf_bc_interp (TimeLinearInterpolation): Boundary map
                 for stream function at locations
                 (imin,imax+1,jmin,jmax+1).
-            sf_boundary_map1 (TimeLinearInterpolation): Boundary map
-                for stream function at locations
-                (imin-1,imax+2,jmin-1,jmax+2).
-            pv_boundary_map (TimeLinearInterpolation): Boundary map
+            pv_bc_interp (TimeLinearInterpolation): Boundary map
                 for potential vorticity at locations
                 (imin,imax,jmin,jmax).
-            pv_boundary_map1 (TimeLinearInterpolation): Boundary map
-                for potential vorticity at locations
-                (imin-1,imax+1,jmin-1,jmax+1), only used if self.wide = True.
-            pv_boundary_map2 (TimeLinearInterpolation): Boundary map
-                for potential vorticity at locations
-                (imin-2,imax+2,jmin-2,jmax+2), only used if self.wide = True.
         """
         self._switch_to_inhomogeneous()
-        self._sf_bcmap = sf_boundary_map
-        self._sf_bcmap1 = sf_boundary_map1
-        self._pv_bcmap = pv_boundary_map
-        if self.wide:
-            self._pv_bcmap1 = pv_boundary_map1
-            self._pv_bcmap2 = pv_boundary_map2
+        self._sf_bc_interp = sf_bc_interp
+        self._pv_bc_interp = pv_bc_interp
         self._set_boundaries(self.time.item())
 
     def _set_boundaries(self, time: float) -> None:
@@ -616,18 +562,19 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         Args:
             time (float): Time.
         """
-        sf_boundary = self._sf_bcmap.get_at(time)
-        pv_boundary = self._pv_bcmap.get_at(time)
-        self._solver_inhomogeneous.set_boundaries(sf_boundary)
+        sf_boundary = self._sf_bc_interp.get_at(time)
+        pv_boundary = self._pv_bc_interp.get_at(time)
+        self._solver_inhomogeneous.set_boundaries(sf_boundary.get_band(0))
 
         if self.wide:
-            pv_boundary1 = self._pv_bcmap1.get_at(time)
-            pv_boundary2 = self._pv_bcmap2.get_at(time)
-            self._q_ext = self._compute_wide_q_ext(
-                pv_boundary, pv_boundary1, pv_boundary2
-            )
+            if pv_boundary.width != 3:  # noqa: PLR2004
+                msg = "For wide boundary, pv_boundary must be 3 points wide."
+                raise ValueError(msg)
+            q_ext = torch.zeros_like(self.q)
+            self._q_ext = pv_boundary.expand(q_ext)
         else:
-            self._q_ext = self._compute_q_ext(pv_boundary)
+            q_ext = torch.zeros_like(self.q)
+            self._q_ext = pv_boundary.get_band(0).expand(q_ext)
 
     def _compute_advection_homogeneous(self, psiq: PSIQ) -> torch.Tensor:
         """Compute advection pv advection for homogeneous problem.
@@ -712,9 +659,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Wind and bottom drag.
                 └──  (n_ens, nl, nx, ny)-shaped
         """
-        sf_boundary = self._sf_bcmap1.get_at(self.time.item())
-        sf_wide = F.pad(psi, (1, 1, 1, 1))
-        sf_boundary.set_to(sf_wide, inplace=True)
+        sf_boundary = self._sf_bc_interp.get_at(self.time.item())
+        sf_wide = sf_boundary.expand(psi[..., 1:-1, 1:-1])
         omega = points_to_surfaces(
             laplacian(sf_wide, self.space.dx, self.space.dy)
         )
