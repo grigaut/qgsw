@@ -676,8 +676,8 @@ class SpaceDiscretization2D:
         *,
         x: torch.Tensor,
         y: torch.Tensor,
-        x_unit: Unit,
-        y_unit: Unit,
+        x_unit: Unit = Unit.M,
+        y_unit: Unit = Unit.M,
     ) -> Self:
         """Generate ω, h, u, v grids from coordinates tensors.
 
@@ -1331,13 +1331,13 @@ class SpaceDiscretization3D:
     def from_tensors(
         cls,
         *,
-        x_unit: Unit,
-        y_unit: Unit,
-        zh_unit: Unit,
         x: torch.Tensor,
         y: torch.Tensor,
         z: torch.Tensor | None = None,
         h: torch.Tensor | None = None,
+        x_unit: Unit = Unit.M,
+        y_unit: Unit = Unit.M,
+        zh_unit: Unit = Unit.M,
     ) -> Self:
         """Generate ω, h, u, v grids from coordinates tensors.
 
