@@ -207,6 +207,21 @@ class Boundaries:
     ) -> Self:
         """Extract boundary conditions from a field.
 
+        A good rule of thumb to not mess up with index is that,
+        if data has been slice using [imin:imax,jmin:jmax], one needs to
+        perform Boundaries.extract(imin-1,imax+1,jmin-1,jmax+1), to be able
+        to expand the data slice.
+
+        Example:
+        >>> x = torch.rand((25,30))
+        >>> imin=5
+        >>> imax=10
+        >>> jmin=10
+        >>> jmax=20
+        >>> x_slice = x[imin:imax,jmin:jmax]
+        >>> bc = Boundaries.extract(x,imin-1,imax+1,jmin-1,jmax+1)
+        >>> bc.expand(x_slice)
+
         Args:
             field (torch.Tensor): Field to extract from.
                 └── (..., Nx, Ny)-shaped
