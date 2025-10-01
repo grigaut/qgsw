@@ -64,6 +64,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
     _time_stepper: str = "rk3"
     wide = False
+    _with_mean_flow = False
 
     def __init__(
         self,
@@ -252,6 +253,25 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             if self.with_bc
             else self._solver_homogeneous
         )
+
+    @property
+    def mean_flow(self) -> PSIQ:
+        """Mean flow."""
+        if not self._with_mean_flow:
+            msg = "No mean flow specified."
+            raise ValueError(msg)
+        return PSIQ(
+            psi=self._sf_bar,
+            q=self._pv_bar,
+        )
+
+    @property
+    def perturbation(self) -> PSIQ:
+        """Perturbation."""
+        if not self._with_mean_flow:
+            msg = "No mean flow specified."
+            raise ValueError(msg)
+        return PSIQ(self.psi, self.q) - self.mean_flow
 
     def _set_solver(self) -> None:
         """Set Helmholtz equation solver."""
@@ -561,19 +581,61 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         Args:
             time (float): Time.
         """
-        sf_boundary = self._sf_bc_interp(time)
-        pv_boundary = self._pv_bc_interp(time)
-        self._solver_inhomogeneous.set_boundaries(sf_boundary.get_band(0))
+        sf_bc = self._sf_bc_interp(time)
+        if self._with_mean_flow:
+            self._sf_bar = self._sf_bar_interp(time)
+            sf_bc -= self._sf_bar_bc_interp(time)
 
+        self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
+
+        pv_bc = self._pv_bc_interp(time)
         if self.wide:
-            if pv_boundary.width != 3:  # noqa: PLR2004
-                msg = "For wide boundary, pv_boundary must be 3 points wide."
+            if pv_bc.width != 3:  # noqa: PLR2004
+                msg = "For wide boundary, pv_bc must be 3 points wide."
                 raise ValueError(msg)
-            q_ext = torch.zeros_like(self.q)
-            self._q_ext = pv_boundary.expand(q_ext)
+            self._pv_bc = pv_bc
+            if self._with_mean_flow:
+                self._pv_bar = self._pv_bar_interp(time)
+                self._pv_bar_bc = self._pv_bar_bc_interp(time)
+                self._pv_bc -= self._pv_bar_bc
+
         else:
-            q_ext = torch.zeros_like(self.q)
-            self._q_ext = pv_boundary.get_band(0).expand(q_ext)
+            self._pv_bc = pv_bc.get_band(0)
+            if self._with_mean_flow:
+                self._pv_bar = self._pv_bar_interp(time)
+                self._pv_bar_bc = self._pv_bar_bc_interp(time).get_band(0)
+                self._pv_bc -= self._pv_bar_bc
+
+    def set_mean_flow(
+        self,
+        sf_bar_interp: LinearInterpolation[torch.Tensor],
+        pv_bar_interp: LinearInterpolation[torch.Tensor],
+        sf_bar_bc_interp: LinearInterpolation[Boundaries],
+        pv_bar_bc_interp: LinearInterpolation[Boundaries],
+    ) -> None:
+        """Set the mean flow.
+
+        Args:
+            sf_bar_interp (LinearInterpolation[torch.Tensor]): Mean stream
+                function flow.
+            pv_bar_interp (LinearInterpolation[torch.Tensor]): Associated mean
+                potential vorticity flow.
+            sf_bar_bc_interp (LinearInterpolation[Boundaries]): Boundary
+                conditions for stream function's mean flow.
+            pv_bar_bc_interp (LinearInterpolation[Boundaries]): Boundary
+                conditions for potential vorticity's mean flow.
+        """
+        if not self.with_bc:
+            msg = (
+                "Mean flow only works with inhomogeneous boundary conditions."
+            )
+            raise ValueError(msg)
+        self._with_mean_flow = True
+        self._sf_bar_interp = sf_bar_interp
+        self._pv_bar_interp = pv_bar_interp
+        self._sf_bar_bc_interp = sf_bar_bc_interp
+        self._pv_bar_bc_interp = pv_bar_bc_interp
+        self._set_boundaries(self.time.item())
 
     def _compute_advection_homogeneous(self, psiq: PSIQ) -> torch.Tensor:
         """Compute advection pv advection for homogeneous problem.
@@ -597,13 +659,16 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             v[..., 1:-1],
         )
 
-    def _compute_advection_inhomogeneous(self, psiq: PSIQ) -> torch.Tensor:
+    def _compute_advection_inhomogeneous(
+        self, psiq: PSIQ, q_bc: Boundaries
+    ) -> torch.Tensor:
         """Compute advection pv advection for inhomogeneous problem.
 
         Args:
             psiq (PSIQ): Prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  q : (n_ens, nl, nx, ny)-shaped
+            q_bc (Boundaries): Boundary conditions for potential vorticity.
 
         Returns:
             torch.Tensor: RHS: J(ѱ, q)
@@ -613,12 +678,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         u, v = self._grad_perp(psi)
         u /= self.space.dy
         v /= self.space.dx
-        q_full = self._q_ext
-        if self.wide:
-            q_full[..., 3:-3, 3:-3] = q
-        else:
-            q_full[..., 1:-1, 1:-1] = q
-        return self.div_flux(q_full, u, v)
+        q_with_bc = q_bc.expand(q)
+        return self.div_flux(q_with_bc, u, v)
 
     def _compute_drag_homogeneous(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute wind and bottom drag contribution.
@@ -689,6 +750,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
+            if self._with_mean_flow:
+                return self._compute_time_derivatives_mean_flow(prognostic)
             return self._compute_time_derivatives_inhomogeneous(prognostic)
         return self._compute_time_derivatives_homogeneous(prognostic)
 
@@ -743,7 +806,9 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
         q = q_i + q_bc
-        advection_psi_q = self._compute_advection_inhomogeneous(PSIQ(psi, q))
+        advection_psi_q = self._compute_advection_inhomogeneous(
+            PSIQ(psi, q), self._pv_bc
+        )
         div_flux = advection_psi_q
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
@@ -761,6 +826,56 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 self.time.item() + self._rk3_step / 3 * self.dt
             )
 
+        return PSIQ(dpsi, dq)
+
+    def _compute_time_derivatives_mean_flow(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute time derivatives for inhomogeneous problem.
+
+        Args:
+            prognostic (PSIQ): Homogeneous contribution
+                of prognostic variables.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi_pert_i, q_pert_i = prognostic
+        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
+        psi = psi_pert_i + psi_bc + self._sf_bar
+        q = q_pert_i + q_bc + self._pv_bar
+        advection_psi_q = self._compute_advection_inhomogeneous(
+            PSIQ(psi, q), self._pv_bc + self._pv_bar_bc
+        )
+        div_flux = advection_psi_q
+        if self.time_stepper == "rk3":
+            dt = self._rk3_step / 3 * self.dt
+            dt_q_bar = (
+                self._pv_bar_interp(self.time.item() + dt) - self._pv_bar
+            ) / (self.dt / 3)
+        else:
+            dt_q_bar = (
+                self._pv_bar_interp(self.time.item() + self.dt) - self._pv_bar
+            ) / (self.dt)
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
+        dq_i = self._points_to_surfaces(dq)
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=False,
+        )
+        if self.time_stepper == "rk3":
+            self._rk3_step += 1
+            self._set_boundaries(
+                self.time.item() + self._rk3_step / 3 * self.dt
+            )
         return PSIQ(dpsi, dq)
 
     def set_p(self, p: torch.Tensor) -> None:
@@ -858,6 +973,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └──  q : (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
+            if self._with_mean_flow:
+                return self._update_mean_flow(prognostic)
             return self._update_inhomogeneous(prognostic)
         return self._update_homogeneous(prognostic)
 
@@ -916,6 +1033,28 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         self._set_boundaries(self.time.item())
         psi_bc = self._solver_inhomogeneous.psiq_bc.psi
         return PSIQ(psiq_i.psi + psi_bc, psiq_i.q)
+
+    def _update_mean_flow(self, prognostic: PSIQ) -> PSIQ:
+        """Update prognostic tuple.
+
+        Args:
+            prognostic (PSIQ): Prognostic variable to advect.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            PSIQ: Updated prognostic variable to advect.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+        """
+        prognostic_pert = prognostic - self.mean_flow
+        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
+        prognostic_i = PSIQ(prognostic_pert.psi - psi_bc, prognostic_pert.q)
+        psiq_i = self._timestep(prognostic_i)
+        self._set_boundaries(self.time.item())
+        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
+        psi_bar, q_bar = self.mean_flow
+        return PSIQ(psiq_i.psi + psi_bc + psi_bar, psiq_i.q + q_bar)
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
