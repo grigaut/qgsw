@@ -57,3 +57,29 @@ class LinearInterpolation(Generic[T]):
         # Linear interpolation
         alpha = (x - x0) / (x1 - x0)
         return y0 * (1 - alpha) + y1 * alpha
+
+
+class ConstantInterpolation(Generic[T]):
+    """Linear Interpolation."""
+
+    def __init__(
+        self,
+        y: T,
+    ) -> None:
+        """Instantiate the linear interpolation.
+
+        Args:
+            y (T): Y value.
+        """
+        self._y = y
+
+    def __call__(self, x: float) -> T:  # noqa: ARG002
+        """Get the y value at a specific x.
+
+        Args:
+            x (float): X value, only for compatibility.
+
+        Returns:
+            T: Interpolation of ys evaluated at x.
+        """
+        return self._y
