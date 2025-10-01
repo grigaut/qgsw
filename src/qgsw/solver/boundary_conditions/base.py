@@ -68,6 +68,15 @@ class Boundaries:
             right=self.right - other.right,
         )
 
+    def __neg__(self) -> Boundaries:
+        """Implements behavior for negation using the - operator."""
+        return Boundaries(
+            top=-self.top,
+            bottom=-self.bottom,
+            left=-self.left,
+            right=-self.right,
+        )
+
     def __rmul__(self, scalar: float) -> Boundaries:
         """Multiply boundary condition with scalar."""
         if not isinstance(scalar, (float, int)):
