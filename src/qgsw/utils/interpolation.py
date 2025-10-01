@@ -52,6 +52,8 @@ class LinearInterpolation(Generic[T]):
             raise ValueError(msg)
         # Find the two surrounding time points
         i = torch.searchsorted(self._xs, x, right=True)
+        if i == len(self._xs):
+            return self._ys[-1]
         x0, x1 = self._xs[i - 1].item(), self._xs[i].item()
         y0, y1 = self._ys[i - 1], self._ys[i]
         # Linear interpolation
