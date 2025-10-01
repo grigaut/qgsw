@@ -821,11 +821,20 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
+            # Boundary condition interpolation
             self._rk3_step += 1
-            self._set_boundaries(
-                self.time.item() + self._rk3_step / 3 * self.dt
-            )
-
+            if self._rk3_step == 1:
+                coef = 1
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 2:  # noqa: PLR2004
+                coef = 1 / 2
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 3:  # noqa: PLR2004
+                # There won't be any additional step.
+                ...
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -872,10 +881,20 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
+            # Boundary condition interpolation
             self._rk3_step += 1
-            self._set_boundaries(
-                self.time.item() + self._rk3_step / 3 * self.dt
-            )
+            if self._rk3_step == 1:
+                coef = 1
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 2:  # noqa: PLR2004
+                coef = 1 / 2
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 3:  # noqa: PLR2004
+                # There won't be any additional step.
+                ...
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
     def set_p(self, p: torch.Tensor) -> None:
