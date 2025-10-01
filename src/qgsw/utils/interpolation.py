@@ -47,7 +47,7 @@ class LinearInterpolation(Generic[T]):
         if x < self._xmin or x > self._xmax:
             msg = (
                 f"X must be greater than {self._xmin} "
-                f"and lower than {self._xmax}"
+                f"and lower than {self._xmax}, got {x}."
             )
             raise ValueError(msg)
         # Find the two surrounding time points
