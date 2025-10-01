@@ -376,11 +376,19 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
         figure = self._create_figure()
         figure.update_xaxes(self._create_xaxis())
         figure.update_yaxes(self._create_yaxis())
+        rows_cols = [
+            self.map_subplot_index_to_subplot_loc(i)
+            for i in range(self.n_subplots)
+        ]
         frames = self._generate_frames()
         images = []
-        for i, fr in enumerate(frames):
+        for i, frame in enumerate(frames):
             # Apply frame data to the base figure
-            figure.update(data=fr.data)
+            figure.add_traces(
+                frame.data,
+                rows=[row for row, _ in rows_cols],
+                cols=[col for _, col in rows_cols],
+            )
             figure.update_layout(title=self._datas[i][0])
             # Render frame to image
             img_bytes = pio.to_image(
@@ -391,4 +399,5 @@ class BaseAnimatedPlot(BasePlot, ABC, Generic[T]):
                 engine="kaleido",
             )
             images.append(imageio.v2.imread(img_bytes))
+            figure.data = []
         imageio.v2.mimwrite(output, images, fps=fps)

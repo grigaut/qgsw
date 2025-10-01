@@ -28,10 +28,18 @@ def boundaries(shape: tuple[int, int, int, int]) -> Boundaries:
     x = torch.linspace(0, 2 * torch.pi, nx + 1, **defaults.get())
     y = torch.linspace(0, 2 * torch.pi, ny + 1, **defaults.get())
 
-    top = torch.stack([torch.sin((i + 1) * x) for i in range(nl)])
-    bottom = torch.stack([2 * torch.sin((i + 1) * x) for i in range(nl)])
-    left = torch.stack([torch.sin((i + 1) * y) for i in range(nl)])
-    right = torch.stack([2 * torch.sin((i + 1) * y) for i in range(nl)])
+    top = torch.stack(
+        [torch.sin((i + 1) * x).unsqueeze(-1) for i in range(nl)]
+    )
+    bottom = torch.stack(
+        [2 * torch.sin((i + 1) * x).unsqueeze(-1) for i in range(nl)]
+    )
+    left = torch.stack(
+        [torch.sin((i + 1) * y).unsqueeze(-2) for i in range(nl)]
+    )
+    right = torch.stack(
+        [2 * torch.sin((i + 1) * y).unsqueeze(-2) for i in range(nl)]
+    )
     return Boundaries(top, bottom, left, right)
 
 
@@ -44,7 +52,7 @@ def test_solver(pv: torch.Tensor, boundaries: Boundaries) -> None:
     solver.set_boundaries(boundaries)
     pv_i = points_to_surfaces(pv)
     sf = solver.compute_stream_function(pv_i)
-    torch.testing.assert_close(sf[0, ..., :, -1], boundaries.top)
-    torch.testing.assert_close(sf[0, ..., :, 0], boundaries.bottom)
-    torch.testing.assert_close(sf[0, ..., 0, :], boundaries.left)
-    torch.testing.assert_close(sf[0, ..., -1, :], boundaries.right)
+    torch.testing.assert_close(sf[0, ..., :, -1], boundaries.top[..., :, 0])
+    torch.testing.assert_close(sf[0, ..., :, 0], boundaries.bottom[..., :, 0])
+    torch.testing.assert_close(sf[0, ..., 0, :], boundaries.left[..., 0, :])
+    torch.testing.assert_close(sf[0, ..., -1, :], boundaries.right[..., 0, :])

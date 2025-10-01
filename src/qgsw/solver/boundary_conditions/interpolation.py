@@ -2,25 +2,18 @@
 
 from __future__ import annotations
 
-from functools import cached_property
-
-from qgsw.solver.boundary_conditions.io import BoundaryConditionLoader
+from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.specs import defaults
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
-from typing import TYPE_CHECKING
 
 import torch
 
 from qgsw import specs
-from qgsw.solver.boundary_conditions.base import Boundaries, TimedBoundaries
 from qgsw.solver.finite_diff import laplacian1D
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class BilinearExtendedBoundary:
@@ -32,6 +25,9 @@ class BilinearExtendedBoundary:
         Args:
             boundaries (Boundaries): Boundary conditions.
         """
+        if boundaries.width != 1:
+            msg = "Bilinear extension only works for 1-point wide boundaries."
+            raise ValueError(msg)
         self._boundaries = boundaries
         self._compute_grids(
             boundaries.nx,
@@ -82,10 +78,10 @@ class BilinearExtendedBoundary:
         x = self._x[None, :, None]  # (1, nx, 1)-shaped
         y = self._y[None, None, :]  # (1, 1, ny)-shaped
         ## Variables
-        ut = self._boundaries.top
-        ub = self._boundaries.bottom
-        ul = self._boundaries.left
-        ur = self._boundaries.right
+        ut = self._boundaries.top[..., :, 0]
+        ub = self._boundaries.bottom[..., :, 0]
+        ul = self._boundaries.left[..., 0, :]
+        ur = self._boundaries.right[..., 0, :]
         ## Compute corner values
         u_bl = (ub[..., :, 0] + ul[..., :, 0]) / 2  # (..., nl)-shaped
         u_br = (ub[..., :, -1] + ur[..., :, 0]) / 2  # (..., nl)-shaped
@@ -140,10 +136,10 @@ class BilinearExtendedBoundary:
         xx_in = xx_in[None, :, :]  # (1, nx, ny)-shaped
         yy_in = yy_in[None, :, :]  # (1, nx, ny)-shaped
         ## Variables
-        ut = self._boundaries.top
-        ub = self._boundaries.bottom
-        ul = self._boundaries.left
-        ur = self._boundaries.right
+        ut = self._boundaries.top[..., :, 0]
+        ub = self._boundaries.bottom[..., :, 0]
+        ul = self._boundaries.left[..., 0, :]
+        ur = self._boundaries.right[..., 0, :]
         # 1D laplacian of x-wise boundary conditions
         lap_ub = laplacian1D(ub, dx)
         lap_ut = laplacian1D(ut, dx)
@@ -187,75 +183,3 @@ class BilinearExtendedBoundary:
             Self: BilinearExtendedBoundary
         """
         return cls(Boundaries(top=top, bottom=bottom, left=left, right=right))
-
-
-class TimeLinearInterpolation:
-    """Interpolate boundaries."""
-
-    def __init__(
-        self,
-        boundaries: list[TimedBoundaries],
-        *,
-        no_time_offset: bool = True,
-    ) -> None:
-        """Instantiate the boundary interpolation.
-
-        Args:
-            boundaries (list[TimedBoundaries]): List of timed boundaries.
-            no_time_offset (bool, optional): Whether to remove the time offset
-                or not. Defaults to True.
-        """
-        times = torch.tensor([b.time for b in boundaries])
-        argsort = torch.argsort(times)
-        self._times = times[argsort]
-        if no_time_offset:
-            self._times = self._times - self._times[0]
-        self._tmin = self._times[0]
-        self._tmax = self._times[-1]
-        self._boundaries = [boundaries[i].boundaries for i in argsort]
-
-    @cached_property
-    def tmax(self) -> float:
-        """Maximum time of the interpolation."""
-        return self._tmax.item()
-
-    @cached_property
-    def tmin(self) -> float:
-        """Minimum time of the interpolation."""
-        return self._tmin.item()
-
-    def get_at(self, time: float) -> Boundaries:
-        """Get the boundary conditions at a specific time.
-
-        Args:
-            time (float): Time.
-
-        Returns:
-            Boundaries: The boundary conditions at the specified time.
-        """
-        if time < self._tmin or time > self._tmax:
-            msg = (
-                f"Time must be greater than {self._tmin} "
-                f"and lower than {self._tmax}"
-            )
-            raise ValueError(msg)
-        # Find the two surrounding time points
-        i = torch.searchsorted(self._times, time, right=True)
-        t0, t1 = self._times[i - 1].item(), self._times[i].item()
-        b0, b1 = self._boundaries[i - 1], self._boundaries[i]
-        # Linear interpolation
-        alpha = (time - t0) / (t1 - t0)
-        return b0 * (1 - alpha) + b1 * alpha
-
-    @classmethod
-    def from_file(cls, file: Path | str) -> Self:
-        """Load the interpolation from a file.
-
-        Args:
-            file (Path | str): The file path to load the interpolation from.
-
-        Returns:
-            Self: The loaded interpolation.
-        """
-        loader = BoundaryConditionLoader(file)
-        return cls(loader.load())

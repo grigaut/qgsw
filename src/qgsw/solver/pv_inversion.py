@@ -465,6 +465,12 @@ class InhomogeneousPVInversion(BasePVInversion):
         Args:
             boundaries (Boundaries): Boundary conditions.
         """
+        if boundaries.width != 1:
+            msg = (
+                "Only boundaries with width=1 are supported. "
+                f"Got width={boundaries.width}."
+            )
+            raise ValueError(msg)
         self._boundary = BilinearExtendedBoundary(boundaries)
         sf_b = self._boundary.compute()
         pv_b_int = self._compute_interior_pv_boundary()
