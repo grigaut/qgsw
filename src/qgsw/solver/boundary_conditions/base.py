@@ -152,10 +152,12 @@ class Boundaries:
         if (i + 1) > w:
             msg = f"Index {i} is out of bounds for width {w}."
             raise ValueError(msg)
-        top = self.top[..., w - i - 1 : -(w - i - 1), i]
-        bottom = self.bottom[..., w - i - 1 : -(w - i - 1), -i - 1]
-        left = self.left[..., -i - 1, w - i - 1 : -(w - i - 1)]
-        right = self.right[..., i, w - i - 1 : -(w - i - 1)]
+        offset = w - i - 1
+        s = slice(offset, -offset if offset != 0 else None)
+        top = self.top[..., s, i]
+        bottom = self.bottom[..., s, -i - 1]
+        left = self.left[..., -i - 1, s]
+        right = self.right[..., i, s]
         return Boundaries(
             top=top[..., :, None],
             bottom=bottom[..., :, None],
@@ -314,20 +316,19 @@ class Boundaries:
             msg = "Mismatching size at left/right boundary."
             raise ValueError(msg)
 
-        field_left = field[..., o : o + w, :].narrow(-1, o, ly)
+        s_left = slice(o, o + w)
+        s_right = slice(-(o + w), -o if o != 0 else None)
+
+        field_left = field[..., s_left, :].narrow(-1, o, ly)
         field_left[:] = self.left
 
-        field_right = field[..., -(o + w) : -o if o != 0 else None, :].narrow(
-            -1, o, ly
-        )
+        field_right = field[..., s_right, :].narrow(-1, o, ly)
         field_right[:] = self.right
 
-        field_bottom = field[..., :, o : o + w].narrow(-2, o, lx)
+        field_bottom = field[..., :, s_left].narrow(-2, o, lx)
         field_bottom[:] = self.bottom
 
-        field_top = field[..., :, -(o + w) : -o if o != 0 else None].narrow(
-            -2, o, lx
-        )
+        field_top = field[..., :, s_right].narrow(-2, o, lx)
         field_top[:] = self.top
 
         return field if not inplace else None
