@@ -166,20 +166,13 @@ class BaseState(ABC, Generic[T]):
         """Unbind all variables from state."""
         self._diag: dict[str, BoundDiagnosticVariable] = {}
 
+    @abstractmethod
     def update_time(self, time: torch.Tensor) -> None:
         """Update only the value of time.
 
         Args:
             time (torch.Tensor): Time.
         """
-        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
-            var.outdated()
-        prognostic = UVHT.from_uvh(
-            time,
-            self.prognostic.uvh,
-        )
-        self._prog = prognostic
-        self._update_prognostic_vars(prognostic)
 
     def increment_time(self, dt: float) -> None:
         """Increment time."""
@@ -327,6 +320,21 @@ class StatePSIQ(BaseStatePSIQ[PSIQT]):
         """
         self.prognostic = PSIQT.from_psiq(self.t.get(), psiq)
 
+    def update_time(self, time: torch.Tensor) -> None:
+        """Update only the value of time.
+
+        Args:
+            time (torch.Tensor): Time.
+        """
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
+        prognostic = PSIQT.from_psiq(
+            time,
+            self.prognostic.psiq,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
     @classmethod
     def steady(
         cls,
@@ -437,6 +445,22 @@ class StatePSIQAlpha(BaseStatePSIQ[PSIQTAlpha]):
             psiq,
         )
 
+    def update_time(self, time: torch.Tensor) -> None:
+        """Update only the value of time.
+
+        Args:
+            time (torch.Tensor): Time.
+        """
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
+        prognostic = PSIQTAlpha.from_psiq(
+            time,
+            self.alpha.get(),
+            self.prognostic.psiq,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
     @classmethod
     def steady(
         cls,
@@ -509,6 +533,21 @@ class StateUVH(BaseStateUVH[UVHT]):
             uvh (UVH): Prognostic u,v and h.
         """
         self.prognostic = UVHT.from_uvh(self.t.get(), uvh)
+
+    def update_time(self, time: torch.Tensor) -> None:
+        """Update only the value of time.
+
+        Args:
+            time (torch.Tensor): Time.
+        """
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
+        prognostic = UVHT.from_uvh(
+            time,
+            self.prognostic.uvh,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
 
     @classmethod
     def steady(
@@ -617,6 +656,22 @@ class StateUVHAlpha(BaseStateUVH[UVHTAlpha]):
             self.alpha.get(),
             uvh,
         )
+
+    def update_time(self, time: torch.Tensor) -> None:
+        """Update only the value of time.
+
+        Args:
+            time (torch.Tensor): Time.
+        """
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
+        prognostic = UVHTAlpha.from_uvh(
+            time,
+            self.alpha.get(),
+            self.prognostic.uvh,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
 
     @classmethod
     def steady(

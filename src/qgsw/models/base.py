@@ -197,6 +197,10 @@ class _Model(
         ModelParamChecker.slip_coef.fset(self, slip_coef)
         self._create_diagnostic_vars(self._state)
 
+    def reset_time(self) -> None:
+        """Reset time."""
+        self._state.update_time(torch.zeros_like(self._state.t.get()))
+
     def _compute_coriolis(
         self,
         omega_grid_2d: Grid2D,
