@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 import torch
-import torch.nn.functional as F  # noqa: N812
 
 from qgsw.fields.variables.tuples import PSIQ
 from qgsw.models.qg.stretching_matrix import (
@@ -418,35 +417,12 @@ class InhomogeneousPVInversion(BasePVInversion):
         """
         super().__init__(A, f0, dx, dy, masks)
         self._homogeneous_solver = HomogeneousPVInversion(A, f0, dx, dy, masks)
-        self._boundary = None
         if self._masks is not None and len(self._masks.psi_irrbound_xids) > 0:
             msg = (
                 "Irregular geometries not supported "
                 "for inhomogeneous boundaries."
             )
             raise NotImplementedError(msg)
-
-    @property
-    def psiq_b(self) -> PSIQ:
-        """Boundary-fields interpolation (q_b != 0).
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: psi_b, q_b
-                ├── psi_b: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q_b : (n_ens, nl, nx-1, ny-1)-shaped
-        """
-        return self._psiq_b
-
-    @property
-    def psiq_h(self) -> PSIQ:
-        """Homogeneous component of the boundary field (q_h = -q_b).
-
-        Returns:
-            tuple[torch.Tensor, torch.Tensor]: psi_h, q_h
-                ├── psi_h: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q_h : (n_ens, nl, nx-1, ny-1)-shaped
-        """
-        return self._psiq_h
 
     @property
     def psiq_bc(self) -> PSIQ:
@@ -477,12 +453,10 @@ class InhomogeneousPVInversion(BasePVInversion):
         sf_h = self._homogeneous_solver.compute_stream_function(
             -pv_b_int, ensure_mass_conservation=False
         )
-        pv_b = self._compute_pv_boundary()
-        pv_h = -pv_b
         sf_bc = sf_b + sf_h
-        pv_bc = torch.zeros_like(pv_b)
-        self._psiq_b = PSIQ(sf_b, pv_b)
-        self._psiq_h = PSIQ(sf_h, pv_h)
+        pv_bc = torch.zeros_like(points_to_surfaces(sf_b))
+        self._psi_b = sf_b
+        self._psi_h = sf_h
         self._psiq_bc = PSIQ(sf_bc, pv_bc)
 
     def set_boundaries_from_tensors(
@@ -545,18 +519,7 @@ class InhomogeneousPVInversion(BasePVInversion):
         sf_i = self._homogeneous_solver.compute_stream_function(
             pv, ensure_mass_conservation=False
         )
-        return sf_i, self.psiq_h.psi, self.psiq_b.psi
-
-    def _compute_pv_boundary(self) -> torch.Tensor:
-        laplacian_boundary = self._boundary.compute_laplacian(
-            self._dx, self._dy
-        )
-        sf_boundary = self._boundary.compute()
-        return points_to_surfaces(
-            F.pad(laplacian_boundary, (1, 1, 1, 1))
-            - self._f0**2
-            * torch.einsum("lm,...mxy->...lxy", self._A, sf_boundary)
-        )
+        return sf_i, self._psi_h, self._psi_b
 
     def _compute_interior_pv_boundary(self) -> torch.Tensor:
         laplacian_boundary = self._boundary.compute_laplacian(
@@ -565,4 +528,160 @@ class InhomogeneousPVInversion(BasePVInversion):
         sf_boundary_interior = self._boundary.compute()[..., 1:-1, 1:-1]
         return laplacian_boundary - self._f0**2 * torch.einsum(
             "lm,...mxy->...lxy", self._A, sf_boundary_interior
+        )
+
+
+class HomogeneousPVInversionCollinear(HomogeneousPVInversion):
+    """Homogeneous PV inversion solving collinear equation.
+
+    q = Δѱ - f_0^2 * (A_11 + ɑ * A_12) * ѱ.
+    """
+
+    def __init__(
+        self,
+        A: torch.Tensor,  # noqa: N803
+        alpha: torch.Tensor,
+        f0: float,
+        dx: float,
+        dy: float,
+        masks: Masks | None = None,
+    ) -> None:
+        """Potential vorticity inversion with homogeneous boundary.
+
+        Args:
+            A (torch.Tensor): Stretching matrix.
+                └── (..., 1, 2, 2)-shaped
+            alpha (torch.Tensor): Collinearity coefficient.
+                └── (..., 1, nx+1, ny+1)-shaped
+            f0 (float): Coriolis parameter.
+            dx (float): Grid spacing in the x-direction.
+            dy (float): Grid spacing in the y-direction.
+            masks (Masks | None, optional): Masks. Defaults to None.
+        """
+        BasePVInversion.__init__(self, A[:1, :1], f0, dx, dy, masks)
+        self._A12 = A[0, 1]
+        self._alpha = alpha
+        if masks is not None and len(masks.psi_irrbound_xids) > 0:
+            raise NotImplementedError
+
+        self._compute_homsol = self._homsol_regular_geometry
+        self._solve_modespace = self._solve_regular_geometry
+
+    def _compute_helmholtz_dstI(  # noqa: N802
+        self,
+        nx: int,
+        ny: int,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> torch.Tensor:
+        """Compute the Helmholtz operator in spectral space.
+
+        Args:
+            nx (int): Number of grid points in the x-direction.
+            ny (int): Number of grid points in the y-direction.
+            dtype (torch.dtype | None, optional): Data type of the tensor.
+                Defaults to None.
+            device (torch.device | None, optional): Device to create
+            the tensor on. Defaults to None.
+
+        Returns:
+            torch.Tensor: Helmholtz operator in spectral space.
+        """
+        laplacian = compute_laplace_dstI(
+            nx,
+            ny,
+            self._dx,
+            self._dy,
+            device=device,
+            dtype=dtype,
+        )
+        laplacian = laplacian.unsqueeze(0).unsqueeze(0)
+        return laplacian - self._f0**2 * (
+            self._lambd + self._alpha[..., 1:-1, 1:-1] * self._A12
+        )
+
+    def _compute_homogeneous_solution(
+        self,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> None:
+        """Compute homogeneous solution to use for mass conservation.
+
+        Args:
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype | None, optional): Data type.
+                Defaults to None.
+            device (torch.device | None, optional): Device.
+                Defaults to None.
+        """
+        cst = torch.ones(
+            (1, nl, nx + 1, ny + 1),
+            device=device,
+            dtype=dtype,
+        )
+        sol = self._compute_homsol(cst, self._helmholtz_dstI)
+        self._homsol = cst + sol * self._f0**2 * (
+            self._lambd + self._alpha * self._A12
+        )
+        self._homsol_mean = self._homsol.mean((-1, -2), keepdim=True)
+        return self._homsol, self._homsol_mean
+
+
+class InhomogeneousPVInversionCollinear(InhomogeneousPVInversion):
+    """Inhomogeneous PV inversion solving collinear equation.
+
+    q = Δѱ - f_0^2 * (A_11 + ɑ * A_12) * ѱ.
+    """
+
+    def __init__(
+        self,
+        A: torch.Tensor,  # noqa: N803
+        alpha: torch.Tensor,
+        f0: float,
+        dx: float,
+        dy: float,
+        masks: Masks | None = None,
+    ) -> None:
+        """Potential vorticity inversion with inhomogeneous boundary.
+
+        Args:
+            A (torch.Tensor): Stretching matrix.
+                └── (..., 1, 2, 2)-shaped
+            alpha (torch.Tensor): Collinearity coefficient.
+                └── (..., 1, nx+1, ny+1)-shaped
+            f0 (float): Coriolis parameter.
+            dx (float): Grid spacing in the x-direction.
+            dy (float): Grid spacing in the y-direction.
+            masks (Masks | None, optional): Masks. Defaults to None.
+        """
+        BasePVInversion.__init__(self, A, f0, dx, dy, masks)
+        self._homogeneous_solver = HomogeneousPVInversionCollinear(
+            A, alpha, f0, dx, dy, masks
+        )
+        self._alpha = alpha
+        self._A11 = A[0, 0]
+        self._A12 = A[0, 1]
+        if self._masks is not None and len(self._masks.psi_irrbound_xids) > 0:
+            msg = (
+                "Irregular geometries not supported "
+                "for inhomogeneous boundaries."
+            )
+            raise NotImplementedError(msg)
+
+    def _compute_interior_pv_boundary(self) -> torch.Tensor:
+        laplacian_boundary = self._boundary.compute_laplacian(
+            self._dx, self._dy
+        )
+        sf_boundary_interior = self._boundary.compute()[..., 1:-1, 1:-1]
+        return (
+            laplacian_boundary
+            - self._f0**2
+            * (self._A11 + self._alpha[..., 1:-1, 1:-1] * self._A12)
+            * sf_boundary_interior
         )
