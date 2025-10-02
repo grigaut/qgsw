@@ -67,9 +67,9 @@ def test_solver() -> None:
     """Test the inhomoegensous solver."""
     H = torch.tensor([400, 1100], **defaults.get())  # noqa: N806
     g_prime = torch.tensor([9.81, 0.025], **defaults.get())
-    f0 = 1
-    dx = 1
-    dy = 1
+    f0 = 1e-4
+    dx = 1e4
+    dy = 1e4
 
     A = compute_A(H, g_prime, **defaults.get())  # noqa: N806
 
@@ -84,16 +84,16 @@ def test_solver() -> None:
     solver.set_boundaries(psi_bc)
     psi_ = solver.compute_stream_function(q)
 
-    torch.testing.assert_close(psi, psi_)
+    torch.testing.assert_close(psi, psi_, rtol=1e-14, atol=1e-14)
 
 
 def test_collinear_solver() -> None:
     """Test the inhomogeneous solver."""
     H = torch.tensor([400, 1100], **defaults.get())  # noqa: N806
     g_prime = torch.tensor([9.81, 0.025], **defaults.get())
-    f0 = 1
-    dx = 1
-    dy = 1
+    f0 = 1e-4
+    dx = 1e4
+    dy = 1e4
 
     A = compute_A(H, g_prime, **defaults.get())  # noqa: N806
 
@@ -113,4 +113,4 @@ def test_collinear_solver() -> None:
     solver.set_boundaries(psi_bc)
     psi_ = solver.compute_stream_function(q)
 
-    torch.testing.assert_close(psi, psi_)
+    torch.testing.assert_close(psi, psi_, rtol=1e-14, atol=1e-14)
