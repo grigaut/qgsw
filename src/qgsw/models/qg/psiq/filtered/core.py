@@ -1,8 +1,5 @@
 """Collinear & filtered QGPSIQ model."""
 
-import warnings
-from functools import cached_property
-
 import torch
 from torch import Tensor
 
@@ -76,58 +73,6 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
-
-    @cached_property
-    def offset_psi0_default(self) -> torch.Tensor:
-        """Default offset for the pressure."""
-        return torch.zeros(
-            (1, 1, self._space.nx + 1, self._space.ny + 1),
-            **defaults.get(),
-        )
-
-    @property
-    def offset_psi0(self) -> torch.Tensor:
-        """Offset for the pressure."""
-        try:
-            return self._offset_psi0
-        except AttributeError:
-            return self.offset_psi0_default
-
-    @offset_psi0.setter
-    def offset_psi0(self, value: torch.Tensor) -> None:
-        """Set the offset for the pressure."""
-        warnings.warn(
-            f"Setting a value to {self.__class__.__name__}.offset_psi0"
-            " is very likely yo cause overflow.",
-            stacklevel=1,
-        )
-        self._offset_psi0 = value
-
-    @cached_property
-    def offset_psi1_default(self) -> torch.Tensor:
-        """Default offset for the pressure."""
-        return torch.zeros(
-            (1, 1, self._space.nx + 1, self._space.ny + 1),
-            **defaults.get(),
-        )
-
-    @property
-    def offset_psi1(self) -> torch.Tensor:
-        """Offset for the pressure."""
-        try:
-            return self._offset_psi1
-        except AttributeError:
-            return self.offset_psi1_default
-
-    @offset_psi1.setter
-    def offset_psi1(self, value: torch.Tensor) -> None:
-        """Set the offset for the pressure."""
-        warnings.warn(
-            f"Setting a value to {self.__class__.__name__}.offset_psi1"
-            " is very likely yo cause overflow.",
-            stacklevel=1,
-        )
-        self._offset_psi1 = value
 
     @property
     def sigma(self) -> torch.Tensor:
@@ -216,9 +161,9 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             self.A,
             psi,
         )
-        psi_filt = self._filter(psi[0, 0] - self.offset_psi0[0, 0])
+        psi_filt = self._filter(psi[0, 0])
         psi_filt = psi_filt.unsqueeze(0).unsqueeze(0)
-        psi2 = self.alpha * psi_filt + self.offset_psi1
+        psi2 = self.alpha * psi_filt
         source_term = -1 * self.beta_plane.f0**2 * psi2 / self._H1 / self._g2
         beta_effect = self.beta_plane.beta * (self._y - self._y0)
         return self.masks.h * (
@@ -244,9 +189,9 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             **defaults.get(),
         )
         for _ in range(100):
-            psi_filt = self._filter(psi_i[0, 0] - self.offset_psi0[0, 0])
+            psi_filt = self._filter(psi_i[0, 0])
             psi_filt = psi_filt.unsqueeze(0).unsqueeze(0)
-            psi2 = self.alpha * psi_filt + self.offset_psi1
+            psi2 = self.alpha * psi_filt
             psi2_interp = self._points_to_surfaces(
                 self._points_to_surfaces(psi2),
             )
