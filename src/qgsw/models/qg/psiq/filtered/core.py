@@ -340,6 +340,33 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             )
         return fcg_drag
 
+    def _compute_drag_homogeneous(self, psi: torch.Tensor) -> torch.Tensor:
+        """Compute wind and bottom drag contribution.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+                └──  psi: (n_ens, nl, nx+1, ny+1)-shaped
+
+        Returns:
+            torch.Tensor: Wind and bottom drag.
+                └──  (n_ens, nl, nx, ny)-shaped
+        """
+        omega = self._points_to_surfaces(
+            self._laplacian_h(psi, self.space.dx, self.space.dy)
+            * self.masks.psi,
+        )
+        bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
+        if self.space.nl - 1 == 1:
+            fcg_drag = self._curl_tau + bottom_drag
+        elif self.space.nl - 1 == 2:  # noqa: PLR2004
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
+        else:
+            fcg_drag = torch.cat(
+                [self._curl_tau, self.zeros_inside, bottom_drag],
+                dim=-3,
+            )
+        return fcg_drag
+
     def _set_solver(self) -> None:
         """Set Helmholtz equation solver."""
         # PV equation solver
