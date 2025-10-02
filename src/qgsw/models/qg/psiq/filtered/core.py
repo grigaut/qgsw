@@ -16,12 +16,16 @@ from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
 from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.solver.finite_diff import laplacian_h
+from qgsw.solver.finite_diff import laplacian, laplacian_h
 from qgsw.solver.helmholtz import (
     compute_capacitance_matrices,
     compute_laplace_dstI,
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
+)
+from qgsw.solver.pv_inversion import (
+    HomogeneousPVInversionCollinear,
+    InhomogeneousPVInversionCollinear,
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import points_to_surfaces
@@ -241,3 +245,135 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             .unsqueeze(0)
         )
         self.helmholtz_dst = laplace_dst - self.beta_plane.f0**2 * self.lambd
+
+
+class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+    """Collinear QGPSIQ model."""
+
+    def __init__(
+        self,
+        *,
+        space_2d: SpaceDiscretization2D,
+        H: Tensor,  # noqa: N803
+        beta_plane: BetaPlane,
+        g_prime: Tensor,
+        optimize: bool = True,
+    ) -> None:
+        """Model Instantiation.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        super().__init__(
+            space_2d=space_2d,
+            H=H,
+            beta_plane=beta_plane,
+            g_prime=g_prime,
+            optimize=optimize,
+        )
+        self._A11 = self.A[0, 0]
+        self._A12 = self.A[0, 1]
+        self.zeros_inside = (
+            torch.zeros(
+                (self.n_ens, self.space.nl - 3, self.space.nx, self.space.ny),
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            if (self.space.nl - 3) > 0
+            else None
+        )
+
+    @property
+    def alpha(self) -> torch.Tensor:
+        """Collinearity coefficient."""
+        return self._state.alpha.get()
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self._state.update_alpha(alpha)
+        self.compute_auxillary_matrices()
+        self._set_solver()
+
+    def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
+        vort = self._compute_vort_from_psi(psi)
+        stretching = (
+            self.beta_plane.f0**2 * (self._A11 + self.alpha * self._A12) * psi
+        )
+        if self.with_bc:
+            return vort - self.masks.h * self._points_to_surfaces(stretching)
+        return vort - self.masks.h * self._points_to_surfaces(
+            self.masks.psi * stretching
+        )
+
+    def _compute_drag_inhomogeneous(self, psi: torch.Tensor) -> torch.Tensor:
+        """Compute wind and bottom drag contribution.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+                └──  psi: (n_ens, nl, nx+1, ny+1)-shaped
+
+        Returns:
+            torch.Tensor: Wind and bottom drag.
+                └──  (n_ens, nl, nx, ny)-shaped
+        """
+        sf_boundary = self._sf_bc_interp(self.time.item())
+        sf_wide = sf_boundary.expand(psi[..., 1:-1, 1:-1])
+        omega = points_to_surfaces(
+            laplacian(sf_wide, self.space.dx, self.space.dy)
+        )
+        bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
+        if self.space.nl - 1 == 1:
+            fcg_drag = self._curl_tau + bottom_drag
+        elif self.space.nl - 1 == 2:  # noqa: PLR2004
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
+        else:
+            fcg_drag = torch.cat(
+                [self._curl_tau, self.zeros_inside, bottom_drag],
+                dim=-3,
+            )
+        return fcg_drag
+
+    def _set_solver(self) -> None:
+        """Set Helmholtz equation solver."""
+        # PV equation solver
+        self._solver_homogeneous = HomogeneousPVInversionCollinear(
+            self.A,
+            self.alpha,
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+        self._solver_inhomogeneous = InhomogeneousPVInversionCollinear(
+            self.A,
+            self.alpha,
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+
+    def _set_io(self, state: StatePSIQAlpha) -> None:
+        self._io = IO(state.t, state.psi, state.q, state.alpha)
+
+    def _set_state(self) -> None:
+        """Set the state."""
+        self._state = StatePSIQAlpha.steady(
+            n_ens=self.n_ens,
+            nl=self.space.nl - 1,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
+        self.alpha = torch.zeros_like(self.psi)
+        self._set_io(self._state)
+        q = self._compute_q_from_psi(self.psi)
+        self._state.update_psiq(PSIQ(self.psi, q))
