@@ -863,14 +863,24 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
         div_flux = advection_psi_q
         if self.time_stepper == "rk3":
-            dt = self._rk3_step / 3 * self.dt
-            dt_q_bar = (
-                self._pv_bar_interp(self.time.item() + dt) - self._pv_bar
-            ) / (self.dt / 3)
+            if self._rk3_step == 0:
+                coef = 0
+            elif self._rk3_step == 1:
+                coef = 1
+            elif self._rk3_step == 2:  # noqa: PLR2004
+                coef = 1 / 2
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+            dt = self.dt
+            t = self.time.item() + coef * dt
+            q_bar_t_dt = self._pv_bar_interp(t + dt)
+            q_bar_t = self._pv_bar_interp(t)
+            dt_q_bar = (q_bar_t_dt - q_bar_t) / dt
         else:
-            dt_q_bar = (
-                self._pv_bar_interp(self.time.item() + self.dt) - self._pv_bar
-            ) / (self.dt)
+            dt = self.dt
+            t = self.time.item()
+            dt_q_bar = (self._pv_bar_interp(t + dt) - self._pv_bar) / dt
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
