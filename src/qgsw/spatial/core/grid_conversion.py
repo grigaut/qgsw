@@ -62,7 +62,7 @@ def replicate_pad(f: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return mask_ * f_ + (1 - mask_) * f_out
 
 
-def points_to_surfaces(corners: torch.Tensor) -> torch.Tensor:
+def interpolate(corners: torch.Tensor) -> torch.Tensor:
     """Convert cell corners values to cell centers values.
 
            Cells corners                            Cells Centers
@@ -150,7 +150,7 @@ def omega_to_h(omega_grid: torch.Tensor) -> torch.Tensor:
         torch.Tensor: h grid.
             └── (nx, ny)-shaped
     """
-    return points_to_surfaces(omega_grid)
+    return interpolate(omega_grid)
 
 
 def omega_to_u(omega_grid: torch.Tensor) -> torch.Tensor:

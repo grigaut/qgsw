@@ -34,7 +34,7 @@ from qgsw.perturbations.core import Perturbation
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
 )
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import time_params
 
@@ -197,7 +197,7 @@ def _instantiate_modified(
         dy=model.space.dy,
         ds=model.space.ds,
         f0=model.beta_plane.f0,
-        points_to_surfaces=points_to_surfaces,
+        interpolate=interpolate,
     )
     model.set_uvh(
         u=torch.clone(uvh0.u[:, :1, ...]),

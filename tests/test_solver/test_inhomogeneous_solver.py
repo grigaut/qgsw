@@ -10,7 +10,7 @@ from qgsw.solver.pv_inversion import (
     InhomogeneousPVInversion,
     InhomogeneousPVInversionCollinear,
 )
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 
 
@@ -55,7 +55,7 @@ def test_solver_boundaries(pv: torch.Tensor, boundaries: Boundaries) -> None:
     )
     solver = InhomogeneousPVInversion(A, 1, 1, 1)
     solver.set_boundaries(boundaries)
-    pv_i = points_to_surfaces(pv)
+    pv_i = interpolate(pv)
     sf = solver.compute_stream_function(pv_i)
     torch.testing.assert_close(sf[0, ..., :, -1], boundaries.top[..., :, 0])
     torch.testing.assert_close(sf[0, ..., :, 0], boundaries.bottom[..., :, 0])

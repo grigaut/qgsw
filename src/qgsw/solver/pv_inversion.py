@@ -21,7 +21,7 @@ from qgsw.solver.helmholtz import (
     solve_helmholtz_dstI,
     solve_helmholtz_dstI_cmm,
 )
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 
 if TYPE_CHECKING:
@@ -454,7 +454,7 @@ class InhomogeneousPVInversion(BasePVInversion):
             -pv_b_int, ensure_mass_conservation=False
         )
         sf_bc = sf_b + sf_h
-        pv_bc = torch.zeros_like(points_to_surfaces(sf_b))
+        pv_bc = torch.zeros_like(interpolate(sf_b))
         self._psi_b = sf_b
         self._psi_h = sf_h
         self._psiq_bc = PSIQ(sf_bc, pv_bc)

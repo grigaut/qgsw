@@ -190,7 +190,7 @@ class CollinearFilteredSFProjector(
         f0: float,
         alpha: torch.Tensor,
         filt: _Filter,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
         offset_p0: torch.Tensor,
         offset_p1: torch.Tensor,
         p_i: torch.Tensor | None = None,
@@ -213,7 +213,7 @@ class CollinearFilteredSFProjector(
             alpha (torch.Tensor): Collinearity coeffciient.
                 └── (nx, ny)-shaped.
             filt (_Filter): Filter.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
                 to surface function.
             offset_p0 (torch.Tensor): Offset for the pressure in top layer.
                 └── (1, 1, nx, ny)-shaped
@@ -229,7 +229,7 @@ class CollinearFilteredSFProjector(
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        p_i = points_to_surfaces(p) if p_i is None else p_i
+        p_i = interpolate(p) if p_i is None else p_i
 
         # geostrophic balance
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
@@ -275,7 +275,7 @@ class CollinearFilteredSFProjector(
             f0=self._f0,
             alpha=self.alpha,
             filt=self.filter,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
             offset_p0=self.offset_p0_default,
             offset_p1=self.offset_p1_default,
         )
@@ -485,7 +485,7 @@ class CollinearFilteredPVProjector(
         f0: float,
         ds: float,
         filt: _Filter,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
     ) -> torch.Tensor:
         """PV linear operator.
 
@@ -500,7 +500,7 @@ class CollinearFilteredPVProjector(
             f0 (float): f0.
             ds (float): ds.
             filt (_Filter): Filter.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface interpolation function.
 
         Returns:
@@ -513,9 +513,9 @@ class CollinearFilteredPVProjector(
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        q = (omega - f0 * points_to_surfaces(uvh.h) / H[0, 0, 0]) * (f0 / ds)
+        q = (omega - f0 * interpolate(uvh.h) / H[0, 0, 0]) * (f0 / ds)
         q_filt = filt(q[0, 0]).unsqueeze(0).unsqueeze(0)
-        q_tilde = points_to_surfaces(alpha) * q_filt
+        q_tilde = interpolate(alpha) * q_filt
         return torch.cat([q, q_tilde], dim=1)
 
     def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
@@ -538,7 +538,7 @@ class CollinearFilteredPVProjector(
             alpha=self.alpha,
             ds=self._space.ds,
             filt=self.filter,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )
 
     @classmethod

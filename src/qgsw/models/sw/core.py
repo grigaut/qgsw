@@ -299,7 +299,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
             self._space.dy,
             self._space.ds,
             self.beta_plane.f0,
-            self.points_to_surfaces,
+            self.interpolate,
         )
         self.set_uvh(*uvh)
 
@@ -329,11 +329,11 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         # Zonal velocity -> corresponds to the v grid
         # Has no value on the boundary of the v grid
         U = self._state[ZonalVelocityFlux.get_name()].get()  # noqa: N806
-        U_m = self.points_to_surfaces(U)  # noqa: N806
+        U_m = self.interpolate(U)  # noqa: N806
         # Meridional velocity -> corresponds to the u grid
         # Has no value on the boundary of the u grid
         V = self._state[MeridionalVelocityFlux.get_name()].get()  # noqa: N806
-        V_m = self.points_to_surfaces(V)  # noqa: N806
+        V_m = self.interpolate(V)  # noqa: N806
 
         # Vortex-force + Coriolis
         omega = self._state[MaskedVorticity.get_name()].get()

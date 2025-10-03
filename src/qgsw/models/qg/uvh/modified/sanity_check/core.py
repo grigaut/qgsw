@@ -136,7 +136,7 @@ class QGSanityCheck(
             self._space.dy,
             self._space.ds,
             self.beta_plane.f0,
-            self.points_to_surfaces,
+            self.interpolate,
         )
         self.set_uvh(*uvh)
 
@@ -348,7 +348,7 @@ class QGSanityCheckProjector(QGProjector):
         f0: float,
         g2: torch.Tensor,
         p2_i: torch.Tensor,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
         p_i: torch.Tensor | None = None,
     ) -> UVH:
         """Geostrophic operator.
@@ -364,7 +364,7 @@ class QGSanityCheckProjector(QGProjector):
             dy (float): dy.
             ds (float): ds.
             f0 (float): f0.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface function.
             g2 (torch.Tensor): Reduced gravity in the second layer.
                 └── (1,)-shaped
@@ -380,7 +380,7 @@ class QGSanityCheckProjector(QGProjector):
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        p_i = points_to_surfaces(p) if p_i is None else p_i
+        p_i = interpolate(p) if p_i is None else p_i
 
         # geostrophic balance
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
@@ -418,5 +418,5 @@ class QGSanityCheckProjector(QGProjector):
             f0=self._f0,
             p2_i=self.p2_i_baseline,
             g2=self._g2,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )

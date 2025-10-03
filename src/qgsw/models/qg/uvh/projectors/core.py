@@ -26,7 +26,7 @@ from qgsw.solver.helmholtz import (
     solve_helmholtz_dstI_cmm,
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization3D
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE, defaults
 
 if TYPE_CHECKING:
@@ -66,7 +66,7 @@ class QGProjector:
         self._points_to_surface = OptimizableFunction[
             tuple[torch.Tensor],
             torch.Tensor,
-        ](points_to_surfaces)
+        ](interpolate)
 
         self.A = A
 
@@ -200,7 +200,7 @@ class QGProjector:
         dy: float,
         ds: float,
         f0: float,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
         p_i: torch.Tensor | None = None,
     ) -> UVH:
         """Geostrophic operator.
@@ -216,7 +216,7 @@ class QGProjector:
             dy (float): dy.
             ds (float): ds.
             f0 (float): f0.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface function.
             p_i (torch.Tensor | None, optional): Interpolated pressure.
             Defaults to None.
@@ -228,7 +228,7 @@ class QGProjector:
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        p_i = points_to_surfaces(p) if p_i is None else p_i
+        p_i = interpolate(p) if p_i is None else p_i
 
         # geostrophic balance
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
@@ -262,7 +262,7 @@ class QGProjector:
             dy=self._space.dy,
             ds=self._space.ds,
             f0=self._f0,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )
 
     @classmethod
@@ -272,7 +272,7 @@ class QGProjector:
         H: torch.Tensor,  # noqa: N803
         f0: float,
         ds: float,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
     ) -> torch.Tensor:
         """PV linear operator.
 
@@ -285,7 +285,7 @@ class QGProjector:
                 └── (nl, 1, 1)-shaped.
             f0 (float): f0.
             ds (float): ds.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface interpolation function.
 
         Returns:
@@ -298,7 +298,7 @@ class QGProjector:
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * points_to_surfaces(uvh.h) / H) * (f0 / ds)
+        return (omega - f0 * interpolate(uvh.h) / H) * (f0 / ds)
 
     def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
         """PV linear operator.
@@ -318,7 +318,7 @@ class QGProjector:
             f0=self._f0,
             H=self.H,
             ds=self._space.ds,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )
         self.q = q
         return q
