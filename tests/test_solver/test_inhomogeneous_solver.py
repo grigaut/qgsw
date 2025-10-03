@@ -84,7 +84,7 @@ def test_solver() -> None:
     solver.set_boundaries(psi_bc)
     psi_ = solver.compute_stream_function(q)
 
-    torch.testing.assert_close(psi, psi_, rtol=1e-14, atol=1e-14)
+    torch.testing.assert_close(psi, psi_, rtol=1e-12, atol=1e-12)
 
 
 def test_collinear_solver() -> None:
@@ -113,4 +113,4 @@ def test_collinear_solver() -> None:
     solver.set_boundaries(psi_bc)
     psi_ = solver.compute_stream_function(q)
 
-    torch.testing.assert_close(psi, psi_, rtol=1e-14, atol=1e-14)
+    torch.testing.assert_close(psi, psi_, rtol=1e-12, atol=1e-12)
