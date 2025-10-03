@@ -79,3 +79,7 @@ class RescalingShapeMismatchError(Exception):
 
 class StateBindingError(Exception):
     """When error occurs with state binding."""
+
+
+class SlicingError(Exception):
+    """When error occurs while slicing."""
