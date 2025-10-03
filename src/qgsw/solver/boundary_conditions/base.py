@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from qgsw.exceptions import SlicingError
+
 try:
     from typing import Self
 except ImportError:
@@ -172,6 +174,39 @@ class Boundaries:
             bottom=bottom[..., :, None],
             left=left[..., None, :],
             right=right[..., None, :],
+        )
+
+    def __getitem__(self, s: slice | int | tuple[slice | int]) -> Boundaries:
+        """Slice boundaries.
+
+        Args:
+            s (slice | int | list[slice  |  int]): Slicing arguments.
+
+        Raises:
+            SlicingError: If one of the two last dimensions is sliced.
+            SlicingError: If one of the two last dimensions is sliced.
+
+        Returns:
+            Boundaries: Sliced boundary.
+        """
+        d = self.top.dim() - 2
+        if isinstance(s, tuple):
+            while s[-1] is ...:
+                s = s[:-1]
+            invalid_1 = s[-1] != slice(None)
+            invalid_2 = len(s) > 2 and s[-2] != slice(None)  # noqa: PLR2004
+            invalid_end = invalid_1 or invalid_2
+            if invalid_end and (... in s or len(s) > d):
+                msg = f"Slicing is only allowed on the {d} first dimensions."
+                raise SlicingError(msg)
+        elif d == 0:
+            msg = f"Slicing is only allowed on the {d} first dimensions."
+            raise SlicingError(msg)
+        return Boundaries(
+            top=self.top.__getitem__(s),
+            bottom=self.bottom.__getitem__(s),
+            left=self.left.__getitem__(s),
+            right=self.right.__getitem__(s),
         )
 
     @cached_property

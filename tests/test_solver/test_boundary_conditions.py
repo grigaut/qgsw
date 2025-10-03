@@ -1,14 +1,20 @@
 """Test boundary conditions."""
 
-from collections.abc import Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 import torch
 
+from qgsw.exceptions import SlicingError
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.boundary_conditions.interpolation import (
     BilinearExtendedBoundary,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @pytest.fixture
@@ -181,3 +187,79 @@ def test_wide_expansion() -> None:
     )
     data_ = boundary.expand(data_)
     torch.testing.assert_close(data_, data[..., imin:imax, jmin:jmax])
+
+
+testslice = [
+    pytest.param(
+        lambda x: x[:1],
+        id="[:1]",
+    ),
+    pytest.param(
+        lambda x: x[:, 1],
+        id="[:,1]",
+    ),
+    pytest.param(
+        lambda x: x[:, 2:3],
+        id="[:,2:3]",
+    ),
+    pytest.param(
+        lambda x: x[:, 2:3, :, :],
+        id="[:,2:3,:,:]",
+    ),
+    pytest.param(
+        lambda x: x[:, 2:3, ...],
+        id="[:,2:3,...]",
+    ),
+    pytest.param(
+        lambda x: x[..., :1, 2:3, :, :],
+        id="[...,2:3,:,:]",
+    ),
+    pytest.param(
+        lambda x: x[..., 0, 2:3, :, :],
+        id="[..., 0, 2:3, :, :]",
+    ),
+]
+
+
+@pytest.mark.parametrize("f", testslice)
+def test_slicing(
+    f: Callable[[torch.Tensor], torch.Tensor]
+    | Callable[[Boundaries], Boundaries],
+) -> None:
+    """Test slicing boundaries."""
+    x = torch.rand((2, 3, 10, 20))
+    bc = Boundaries.extract(x, 1, -2, 1, -2, 2)
+    assert f(bc) == Boundaries.extract(f(x), 1, -2, 1, -2, 2)
+
+
+testslice = [
+    pytest.param(
+        lambda x: x[..., :1],
+        id="[...,:1]",
+    ),
+    pytest.param(
+        lambda x: x[..., 2:3, :],
+        id="[...,2:3,:]",
+    ),
+    pytest.param(
+        lambda x: x[:, :, 2:3, :],
+        id="[:,:,2:3,:]",
+    ),
+    pytest.param(
+        lambda x: x[..., 0],
+        id="[...,0]",
+    ),
+    pytest.param(
+        lambda x: x[:1, :1, :, 0],
+        id="[:1,:1,:,0]",
+    ),
+]
+
+
+@pytest.mark.parametrize("f", testslice)
+def test_slicing_errs(f: Callable[[Boundaries], Boundaries]) -> None:
+    """Test slicing boundaries."""
+    x = torch.rand((2, 3, 10, 20))
+    bc = Boundaries.extract(x, 1, -2, 1, -2, 2)
+    with pytest.raises(SlicingError):
+        f(bc)
