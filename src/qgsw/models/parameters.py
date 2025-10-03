@@ -14,7 +14,7 @@ from qgsw.exceptions import (
 from qgsw.masks import Masks
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
 
@@ -299,7 +299,7 @@ class ModelParamChecker:
                 f"{(self.space.nx, self.space.ny + 1)}-shaped."
             )
             raise InvalidModelParameterError(msg)
-        self._taux = points_to_surfaces(taux)
+        self._taux = interpolate(taux)
 
     def _set_tauy(self, tauy: torch.Tensor | float) -> None:
         """Set tauy value.
@@ -321,4 +321,4 @@ class ModelParamChecker:
                 f"{(self.space.nx + 1, self.space.ny)}-shaped."
             )
             raise InvalidModelParameterError(msg)
-        self._tauy = points_to_surfaces(tauy)
+        self._tauy = interpolate(tauy)

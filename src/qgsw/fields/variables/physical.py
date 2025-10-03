@@ -46,7 +46,7 @@ from qgsw.fields.variables.base import (
 )
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.solver.finite_diff import reverse_cumsum
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 
 if TYPE_CHECKING:
     from qgsw.fields.variables.state import StateUVH
@@ -348,7 +348,7 @@ class PotentialVorticity(DiagnosticVariable):
         self._dx = dx
         self._dy = dy
         self._f0 = f0
-        self._interp = OptimizableFunction(points_to_surfaces)
+        self._interp = OptimizableFunction(interpolate)
 
     def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
         """Compute the value of the variable.
@@ -498,7 +498,7 @@ class StreamFunctionFromVorticity(DiagnosticVariable):
                 └── (n_ens, nl, nx, ny)-shaped
         """
         vorticity = self._vorticity.compute_no_slice(vars_tuple)
-        return points_to_surfaces(
+        return interpolate(
             solve_helmholtz_dstI(vorticity, self._laplacian),
         )
 
@@ -688,7 +688,7 @@ class ZonalVelocity2(DiagnosticVariable):
             torch.Tensor: Physical zonal velocity in second layer..
                 └── (n_ens, 1, nx, ny-1)-shaped
         """
-        return points_to_surfaces(vars_tuple.u)[:, 1:2]
+        return interpolate(vars_tuple.u)[:, 1:2]
 
 
 class MeridionalVelocity2(DiagnosticVariable):
@@ -718,7 +718,7 @@ class MeridionalVelocity2(DiagnosticVariable):
             torch.Tensor: Physical zonal velocity in second layer..
                 └── (n_ens, 1, nx-1, ny)-shaped
         """
-        return points_to_surfaces(vars_tuple.v)[:, 1:2]
+        return interpolate(vars_tuple.v)[:, 1:2]
 
 
 class RefZonalVelocity2(DiagnosticVariable):
@@ -748,7 +748,7 @@ class RefZonalVelocity2(DiagnosticVariable):
             torch.Tensor: Physical zonal velocity in second layer..
                 └── (n_ens, 1, nx, ny-1)-shaped
         """
-        return torch.zeros_like(points_to_surfaces(vars_tuple.u)[:, :1])
+        return torch.zeros_like(interpolate(vars_tuple.u)[:, :1])
 
 
 class RefMeridionalVelocity2(DiagnosticVariable):
@@ -778,7 +778,7 @@ class RefMeridionalVelocity2(DiagnosticVariable):
             torch.Tensor: Physical zonal velocity in second layer..
                 └── (n_ens, 1, nx-1, ny)-shaped
         """
-        return torch.zeros_like(points_to_surfaces(vars_tuple.v)[:, :1])
+        return torch.zeros_like(interpolate(vars_tuple.v)[:, :1])
 
 
 class ZonalVelocityFromPsi2(DiagnosticVariable):

@@ -342,7 +342,7 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
             self._space.ds,
             self.beta_plane.f0,
             self.alpha,
-            self.points_to_surfaces,
+            self.interpolate,
         )
         self.set_uvh(*uvh)
 
@@ -519,7 +519,7 @@ class QGCollinearPV(QGAlpha[CollinearPVProjector]):
             self._space.dy,
             self._space.ds,
             self.beta_plane.f0,
-            self.points_to_surfaces,
+            self.interpolate,
         )
         self.set_uvh(*uvh)
 

@@ -150,7 +150,7 @@ class CollinearSFProjector(CollinearProjector):
         ds: float,
         f0: float,
         alpha: torch.Tensor,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
         p_i: torch.Tensor | None = None,
     ) -> UVH:
         """Geostrophic operator.
@@ -170,7 +170,7 @@ class CollinearSFProjector(CollinearProjector):
             f0 (float): f0.
             alpha (torch.Tensor): Collinearity coeffciient.
                 └── (nx, ny)-shaped.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface function.
             p_i (torch.Tensor | None, optional): Interpolated pressure.
             Defaults to None.
@@ -182,7 +182,7 @@ class CollinearSFProjector(CollinearProjector):
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        p_i = points_to_surfaces(p) if p_i is None else p_i
+        p_i = interpolate(p) if p_i is None else p_i
 
         # geostrophic balance
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
@@ -223,7 +223,7 @@ class CollinearSFProjector(CollinearProjector):
             ds=self._space.ds,
             f0=self._f0,
             alpha=self.alpha,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )
 
     @classmethod
@@ -236,7 +236,7 @@ class CollinearSFProjector(CollinearProjector):
         H: torch.Tensor,  # noqa: N803
         f0: float,
         ds: float,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
     ) -> torch.Tensor:
         """PV linear operator.
 
@@ -249,7 +249,7 @@ class CollinearSFProjector(CollinearProjector):
                 └── (nl, 1, 1)-shaped.
             f0 (float): f0.
             ds (float): ds.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface interpolation function.
 
         Returns:
@@ -262,9 +262,7 @@ class CollinearSFProjector(CollinearProjector):
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        return (omega - f0 * points_to_surfaces(uvh.h) / H[0, 0, 0]) * (
-            f0 / ds
-        )
+        return (omega - f0 * interpolate(uvh.h) / H[0, 0, 0]) * (f0 / ds)
 
     def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
         """PV linear operator.
@@ -284,7 +282,7 @@ class CollinearSFProjector(CollinearProjector):
             f0=self._f0,
             H=self.H,
             ds=self._space.ds,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )
 
     def QoG_inv(  # noqa: N802
@@ -462,7 +460,7 @@ class CollinearPVProjector(CollinearProjector):
         alpha: torch.Tensor,
         f0: float,
         ds: float,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
     ) -> torch.Tensor:
         """PV linear operator.
 
@@ -476,7 +474,7 @@ class CollinearPVProjector(CollinearProjector):
             alpha (torch.Tensor): Collinearity coefficient.
             f0 (float): f0.
             ds (float): ds.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface interpolation function.
 
         Returns:
@@ -489,8 +487,8 @@ class CollinearPVProjector(CollinearProjector):
             dim=-1,
         )
         # Compute ω-f_0*h/H
-        q = (omega - f0 * points_to_surfaces(uvh.h) / H[0, 0, 0]) * (f0 / ds)
-        q_tilde = points_to_surfaces(alpha) * q
+        q = (omega - f0 * interpolate(uvh.h) / H[0, 0, 0]) * (f0 / ds)
+        q_tilde = interpolate(alpha) * q
         return torch.cat([q, q_tilde], dim=1)
 
     def _Q(self, uvh: UVH) -> torch.Tensor:  # noqa: N802
@@ -512,7 +510,7 @@ class CollinearPVProjector(CollinearProjector):
             H=self.H,
             alpha=self.alpha,
             ds=self._space.ds,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )
 
     @classmethod
@@ -529,7 +527,7 @@ class CollinearPVProjector(CollinearProjector):
         dy: float,
         ds: float,
         f0: float,
-        points_to_surfaces: Callable[[torch.Tensor], torch.Tensor],
+        interpolate: Callable[[torch.Tensor], torch.Tensor],
         p_i: torch.Tensor | None = None,
     ) -> UVH:
         """Geostrophic operator.
@@ -545,7 +543,7 @@ class CollinearPVProjector(CollinearProjector):
             dy (float): dy.
             ds (float): ds.
             f0 (float): f0.
-            points_to_surfaces (Callable[[torch.Tensor], torch.Tensor]): Points
+            interpolate (Callable[[torch.Tensor], torch.Tensor]): Points
             to surface function.
             p_i (torch.Tensor | None, optional): Interpolated pressure.
             Defaults to None.
@@ -557,7 +555,7 @@ class CollinearPVProjector(CollinearProjector):
                 ├── v: (n_ens, nl, nx, ny+1)-shaped
                 └── h: (n_ens, nl, nx, ny)-shaped
         """
-        uvh_2l = super().G(p, A, H, dx, dy, ds, f0, points_to_surfaces, p_i)
+        uvh_2l = super().G(p, A, H, dx, dy, ds, f0, interpolate, p_i)
         return uvh_2l.parallel_slice[:, :1]
 
     def _G(self, p: torch.Tensor, p_i: torch.Tensor | None) -> UVH:  # noqa: N802
@@ -584,7 +582,7 @@ class CollinearPVProjector(CollinearProjector):
             dy=self._space.dy,
             ds=self._space.ds,
             f0=self._f0,
-            points_to_surfaces=self._points_to_surface,
+            interpolate=self._points_to_surface,
         )
 
     def to_shape(self, nx: int, ny: int) -> Self:

@@ -145,7 +145,7 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
             self.beta_plane.f0,
             self.alpha,
             self.P.filter,
-            self.points_to_surfaces,
+            self.interpolate,
             offset_p0=offset_p0 if offset_p0 is not None else self.P.offset_p0,
             offset_p1=offset_p1 if offset_p0 is not None else self.P.offset_p1,
         )
@@ -285,7 +285,7 @@ class QGCollinearFilteredPV(QGAlpha[CollinearFilteredPVProjector]):
             self._space.dy,
             self._space.ds,
             self.beta_plane.f0,
-            self.points_to_surfaces,
+            self.interpolate,
         )
         self.set_uvh(*uvh)
 

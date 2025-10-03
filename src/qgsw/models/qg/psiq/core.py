@@ -40,7 +40,7 @@ from qgsw.solver.pv_inversion import (
     HomogeneousPVInversion,
     InhomogeneousPVInversion,
 )
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE
 
 if TYPE_CHECKING:
@@ -434,11 +434,11 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """
         if optimize:
             self._grad_perp = OptimizableFunction(grad_perp)
-            self._points_to_surfaces = OptimizableFunction(points_to_surfaces)
+            self._interpolate = OptimizableFunction(interpolate)
             self._laplacian_h = OptimizableFunction(laplacian_h)
         else:
             self._grad_perp = grad_perp
-            self._points_to_surfaces = points_to_surfaces
+            self._interpolate = interpolate
             self._laplacian_h = laplacian_h
 
     def compute_auxillary_matrices(self) -> None:
@@ -485,8 +485,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             psi,
         )
         if self.with_bc:
-            return vort - self.masks.h * self._points_to_surfaces(stretching)
-        return vort - self.masks.h * self._points_to_surfaces(
+            return vort - self.masks.h * self._interpolate(stretching)
+        return vort - self.masks.h * self._interpolate(
             self.masks.psi * stretching
         )
 
@@ -506,10 +506,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             psi_with_bc = boundary.get_band(1).expand(psi)
             self.p = psi_with_bc
             lap_psi = laplacian(psi_with_bc, self.space.dx, self.space.dy)
-            return self.masks.h * self._points_to_surfaces(lap_psi)
+            return self.masks.h * self._interpolate(lap_psi)
         lap_psi = laplacian_h(psi, self.space.dx, self.space.dy)
         return self.masks.h * (
-            self._points_to_surfaces(
+            self._interpolate(
                 self.masks.psi * (lap_psi),
             )
         )
@@ -525,7 +525,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Stream function.
                 └── (n_ens, nl, nx+1, ny+1)-shaped
         """
-        return self.solver.compute_stream_function(self._points_to_surfaces(q))
+        return self.solver.compute_stream_function(self._interpolate(q))
 
     def set_wind_forcing(
         self,
@@ -692,7 +692,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Wind and bottom drag.
                 └──  (n_ens, nl, nx, ny)-shaped
         """
-        omega = self._points_to_surfaces(
+        omega = self._interpolate(
             self._laplacian_h(psi, self.space.dx, self.space.dy)
             * self.masks.psi,
         )
@@ -721,9 +721,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """
         sf_boundary = self._sf_bc_interp(self.time.item())
         sf_wide = sf_boundary.expand(psi[..., 1:-1, 1:-1])
-        omega = points_to_surfaces(
-            laplacian(sf_wide, self.space.dx, self.space.dy)
-        )
+        omega = interpolate(laplacian(sf_wide, self.space.dx, self.space.dy))
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
             fcg_drag = self._curl_tau + bottom_drag
@@ -776,7 +774,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
-        dq_i = self._points_to_surfaces(dq)
+        dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -813,7 +811,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
-        dq_i = self._points_to_surfaces(dq)
+        dq_i = self._interpolate(dq)
         self.dqi = dq_i
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -884,7 +882,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
-        dq_i = self._points_to_surfaces(dq)
+        dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -949,9 +947,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             q_anom (torch.Tensor): Potential vorticity anomaly.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        psi = self.solver.compute_stream_function(
-            self._points_to_surfaces(q_anom)
-        )
+        psi = self.solver.compute_stream_function(self._interpolate(q_anom))
         self._state.update_psiq(PSIQ(psi, q_anom + self._beta_effect))
 
     def set_psi(self, psi: torch.Tensor) -> None:

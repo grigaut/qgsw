@@ -28,7 +28,7 @@ from qgsw.solver.pv_inversion import (
     InhomogeneousPVInversionCollinear,
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
-from qgsw.spatial.core.grid_conversion import points_to_surfaces
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE, defaults
 
 
@@ -123,9 +123,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             )
 
         self.homsol = cst + sol * self.beta_plane.f0**2 * self.lambd
-        self.homsol_mean = (
-            points_to_surfaces(self.homsol) * self.masks.h
-        ).mean(
+        self.homsol_mean = (interpolate(self.homsol) * self.masks.h).mean(
             (-1, -2),
             keepdim=True,
         )
@@ -171,7 +169,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         source_term = -1 * self.beta_plane.f0**2 * psi2 / self._H1 / self._g2
         beta_effect = self.beta_plane.beta * (self._y - self._y0)
         return self.masks.h * (
-            self._points_to_surfaces(
+            self._interpolate(
                 self.masks.psi * (lap_psi + source_term - stretching),
             )
             + beta_effect
@@ -196,8 +194,8 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             psi_filt = self._filter(psi_i[0, 0])
             psi_filt = psi_filt.unsqueeze(0).unsqueeze(0)
             psi2 = self.alpha * psi_filt
-            psi2_interp = self._points_to_surfaces(
-                self._points_to_surfaces(psi2),
+            psi2_interp = self._interpolate(
+                self._interpolate(psi2),
             )
             helmholtz_rhs = torch.einsum(
                 "lm,...mxy->...lxy",
@@ -214,7 +212,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 
         # Add homogeneous solutions to ensure mass conservation
         gamma = (
-            -self._points_to_surfaces(psi_modes).mean((-1, -2), keepdim=True)
+            -self._interpolate(psi_modes).mean((-1, -2), keepdim=True)
             / self.homsol_mean
         )
         psi_modes += gamma * self.homsol
@@ -316,8 +314,8 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             self.beta_plane.f0**2 * (self._A11 + self.alpha * self._A12) * psi
         )
         if self.with_bc:
-            return vort - self.masks.h * self._points_to_surfaces(stretching)
-        return vort - self.masks.h * self._points_to_surfaces(
+            return vort - self.masks.h * self._interpolate(stretching)
+        return vort - self.masks.h * self._interpolate(
             self.masks.psi * stretching
         )
 
@@ -334,9 +332,7 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         """
         sf_boundary = self._sf_bc_interp(self.time.item())
         sf_wide = sf_boundary.expand(psi[..., 1:-1, 1:-1])
-        omega = points_to_surfaces(
-            laplacian(sf_wide, self.space.dx, self.space.dy)
-        )
+        omega = interpolate(laplacian(sf_wide, self.space.dx, self.space.dy))
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl - 1 == 1:
             fcg_drag = self._curl_tau + bottom_drag
@@ -360,7 +356,7 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             torch.Tensor: Wind and bottom drag.
                 └──  (n_ens, nl, nx, ny)-shaped
         """
-        omega = self._points_to_surfaces(
+        omega = self._interpolate(
             self._laplacian_h(psi, self.space.dx, self.space.dy)
             * self.masks.psi,
         )

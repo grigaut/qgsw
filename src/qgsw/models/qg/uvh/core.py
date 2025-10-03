@@ -240,7 +240,7 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
             self._space.dy,
             self._space.ds,
             self.beta_plane.f0,
-            self.points_to_surfaces,
+            self.interpolate,
         )
         self.set_uvh(*uvh)
 

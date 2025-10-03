@@ -479,12 +479,12 @@ class ModelUVH(
         """
         if optimize:
             self.comp_ke = OptimizableFunction(finite_diff.comp_ke)
-            self.points_to_surfaces = OptimizableFunction(
-                convert.points_to_surfaces,
+            self.interpolate = OptimizableFunction(
+                convert.interpolate,
             )
         else:
             self.comp_ke = finite_diff.comp_ke
-            self.points_to_surfaces = convert.points_to_surfaces
+            self.interpolate = convert.interpolate
 
     def _set_ref_variables(self) -> None:
         """Set reference variables values.
