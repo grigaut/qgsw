@@ -414,14 +414,15 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
     def _set_state(self) -> None:
         """Set the state."""
-        self._state = StatePSIQ.steady(
-            n_ens=self.n_ens,
-            nl=self.space.nl,
-            nx=self.space.nx,
-            ny=self.space.ny,
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
+        with torch.no_grad():
+            self._state = StatePSIQ.steady(
+                n_ens=self.n_ens,
+                nl=self.space.nl,
+                nx=self.space.nx,
+                ny=self.space.ny,
+                dtype=self.dtype,
+                device=self.device.get(),
+            )
         self._set_io(self._state)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
@@ -527,6 +528,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """
         return self.solver.compute_stream_function(self._interpolate(q))
 
+    @torch.no_grad()
     def set_wind_forcing(
         self,
         taux: torch.Tensor | float,
@@ -555,6 +557,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
         self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
 
+    @torch.no_grad()
     def set_boundary_maps(
         self,
         sf_bc_interp: LinearInterpolation[Boundaries],
@@ -575,6 +578,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         self._pv_bc_interp = pv_bc_interp
         self._set_boundaries(self.time.item())
 
+    @torch.no_grad()
     def _set_boundaries(self, time: float) -> None:
         """Set the boundaries to match given time.
 
@@ -606,6 +610,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 self._pv_bar_bc = self._pv_bar_bc_interp(time).get_band(0)
                 self._pv_bc -= self._pv_bar_bc
 
+    @torch.no_grad()
     def set_mean_flow(
         self,
         sf_bar_interp: LinearInterpolation[torch.Tensor],
@@ -780,7 +785,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             dq_i,
             ensure_mass_conservation=True,
         )
-        self.dpsi = dpsi
+        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -812,12 +817,12 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
-        self.dqi = dq_i
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
             ensure_mass_conservation=False,
         )
+        self.dpsi = dpsi
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
             self._rk3_step += 1
@@ -833,6 +838,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
+                self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -903,6 +909,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
+                self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def set_p(self, p: torch.Tensor) -> None:
