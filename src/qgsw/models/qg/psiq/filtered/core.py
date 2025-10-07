@@ -298,17 +298,7 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
-        self.compute_auxillary_matrices()
         self._set_solver()
-        if self._with_bc:
-            sf_bc = self._sf_bc_interp(self.time.item())
-            if self._with_mean_flow:
-                sf_bar_bc = self._sf_bar_bc_interp(self.time.item())
-                self._solver_inhomogeneous.set_boundaries(
-                    sf_bc.get_band(0) - sf_bar_bc.get_band(0)
-                )
-            else:
-                self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
 
     def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
         vort = self._compute_vort_from_psi(psi)
@@ -393,6 +383,15 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             self.space.dy,
             self._masks,
         )
+        if self._with_bc:
+            sf_bc = self._sf_bc_interp(self.time.item())
+            if self._with_mean_flow:
+                sf_bar_bc = self._sf_bar_bc_interp(self.time.item())
+                self._solver_inhomogeneous.set_boundaries(
+                    sf_bc.get_band(0) - sf_bar_bc.get_band(0)
+                )
+            else:
+                self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
 
     def _set_io(self, state: StatePSIQAlpha) -> None:
         self._io = IO(state.t, state.psi, state.q, state.alpha)

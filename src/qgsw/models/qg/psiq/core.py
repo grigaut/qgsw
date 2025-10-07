@@ -290,6 +290,15 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             self.space.dy,
             self._masks,
         )
+        if self._with_bc:
+            sf_bc = self._sf_bc_interp(self.time.item())
+            if self._with_mean_flow:
+                sf_bar_bc = self._sf_bar_bc_interp(self.time.item())
+                self._solver_inhomogeneous.set_boundaries(
+                    sf_bc.get_band(0) - sf_bar_bc.get_band(0)
+                )
+            else:
+                self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
 
     def _set_flux(self) -> None:
         """Set the fluxes utils."""
