@@ -290,6 +290,15 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             self.space.dy,
             self._masks,
         )
+        if self._with_bc:
+            sf_bc = self._sf_bc_interp(self.time.item())
+            if self._with_mean_flow:
+                sf_bar_bc = self._sf_bar_bc_interp(self.time.item())
+                self._solver_inhomogeneous.set_boundaries(
+                    sf_bc.get_band(0) - sf_bar_bc.get_band(0)
+                )
+            else:
+                self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
 
     def _set_flux(self) -> None:
         """Set the fluxes utils."""
@@ -414,14 +423,15 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
     def _set_state(self) -> None:
         """Set the state."""
-        self._state = StatePSIQ.steady(
-            n_ens=self.n_ens,
-            nl=self.space.nl,
-            nx=self.space.nx,
-            ny=self.space.ny,
-            dtype=self.dtype,
-            device=self.device.get(),
-        )
+        with torch.no_grad():
+            self._state = StatePSIQ.steady(
+                n_ens=self.n_ens,
+                nl=self.space.nl,
+                nx=self.space.nx,
+                ny=self.space.ny,
+                dtype=self.dtype,
+                device=self.device.get(),
+            )
         self._set_io(self._state)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
@@ -780,7 +790,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             dq_i,
             ensure_mass_conservation=True,
         )
-        self.dpsi = dpsi
+        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -812,7 +822,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
-        self.dqi = dq_i
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -833,6 +842,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
+        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -903,6 +913,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
+        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def set_p(self, p: torch.Tensor) -> None:
@@ -1081,6 +1092,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         psi_bar, q_bar = self.mean_flow
         return PSIQ(psiq_i.psi + psi_bc + psi_bar, psiq_i.q + q_bar)
 
+    @torch.enable_grad()
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.update_psiq(self.update(self._state.prognostic.psiq))

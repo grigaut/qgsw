@@ -1,0 +1,57 @@
+"""Utils."""
+
+import torch
+
+
+class EarlyStop:
+    """Early stop."""
+
+    def __init__(self, *, eps: float = 1e-8, stop_after: int = 10) -> None:
+        """INstantiate EarlyStop.
+
+        Args:
+            eps (float, optional): Precision. Defaults to 1e-8.
+            stop_after (int, optional): MAx allowed iterations on a plateau.
+                Defaults to 10.
+        """
+        self.eps = eps
+        self.stop_after = stop_after
+        self.counter = 0
+        self.previous_loss = torch.tensor(0)
+
+    def step(self, loss: torch.Tensor) -> bool:
+        """Check against loss value.
+
+        Args:
+            loss (torch.Tensor): Loss value.
+
+        Returns:
+            bool: True if loss has been stable.
+        """
+        loss_ = self.previous_loss
+        if (loss - loss_).abs() / loss_.abs() < self.eps:
+            self.counter += int((loss - loss_).abs() / loss_.abs() < self.eps)
+        else:
+            self.counter = 0
+        return self.counter >= self.stop_after
+
+
+class RegisterParams:
+    """Keep track of lower-loss parameters."""
+
+    def __init__(self) -> None:
+        """Instantiate RegisterParams."""
+        self.best_loss = torch.tensor(float("inf"))
+        self.params = None
+
+    def step(self, loss: torch.Tensor, *params: torch.Tensor) -> None:
+        """Check against new loss.
+
+        Args:
+            loss (torch.Tensor): Loss value.
+            *params (torch.Tensor): Parameters.
+        """
+        if loss > self.best_loss:
+            return
+        self.params = [torch.clone(p.detach()) for p in params]
+        self.best_loss = torch.clone(loss.detach())
