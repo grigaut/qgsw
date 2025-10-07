@@ -528,7 +528,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """
         return self.solver.compute_stream_function(self._interpolate(q))
 
-    @torch.no_grad()
     def set_wind_forcing(
         self,
         taux: torch.Tensor | float,
@@ -557,7 +556,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
         self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
 
-    @torch.no_grad()
     def set_boundary_maps(
         self,
         sf_bc_interp: LinearInterpolation[Boundaries],
@@ -578,7 +576,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         self._pv_bc_interp = pv_bc_interp
         self._set_boundaries(self.time.item())
 
-    @torch.no_grad()
     def _set_boundaries(self, time: float) -> None:
         """Set the boundaries to match given time.
 
@@ -610,7 +607,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 self._pv_bar_bc = self._pv_bar_bc_interp(time).get_band(0)
                 self._pv_bc -= self._pv_bar_bc
 
-    @torch.no_grad()
     def set_mean_flow(
         self,
         sf_bar_interp: LinearInterpolation[torch.Tensor],
@@ -1087,6 +1083,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         psi_bar, q_bar = self.mean_flow
         return PSIQ(psiq_i.psi + psi_bc + psi_bar, psiq_i.q + q_bar)
 
+    @torch.enable_grad()
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.update_psiq(self.update(self._state.prognostic.psiq))
