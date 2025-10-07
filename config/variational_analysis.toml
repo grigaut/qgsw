@@ -1,0 +1,50 @@
+[io]
+name = "Three layers SW long"
+
+[physics]
+rho = 1000.0
+slip_coef = 1.0
+f0 = 9.375e-5
+beta = 1.754e-11
+bottom_drag_coefficient = 3.60577e-8
+Ro = 0.1
+
+[simulation]
+type = "simple-run"
+duration = 31536000.0
+dt = 200.0
+
+[model]
+type = "SWFilterBarotropicSpectral"
+prefix = "results_step_"
+name = "SW-HR"
+layers = [ 400.0, 1100.0, 2600.0,]
+reduced_gravity = [ 9.81, 0.025, 0.0125,]
+
+[space]
+nx = 256
+ny = 512
+unit = "m"
+x_min = 0.0
+x_max = 2560000.0
+y_min = 0.0
+y_max = 5120000.0
+
+[windstress]
+type = "cosine"
+magnitude = 0.08
+drag_coefficient = 0.0013
+
+[perturbation]
+type = "none"
+perturbation_magnitude = 0.001
+
+[io.output]
+type = "interval"
+save = true
+interval_duration = 86400.0
+directory = "param_optim"
+
+[simulation.startup]
+file = "data/double_gyre_long_final.pt"
+config = "data/double_gyre_long_config.toml"
