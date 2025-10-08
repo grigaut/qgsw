@@ -65,7 +65,7 @@ def get_handler_rich() -> RichHandler:
         }
     )
 
-    console = Console(theme=custom_theme, force_jupyter=False)
+    console = Console(file=sys.stdout, theme=custom_theme, force_jupyter=False)
 
     return RichHandler(
         console=console,
