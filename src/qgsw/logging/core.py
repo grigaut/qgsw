@@ -71,7 +71,7 @@ def get_handler_rich() -> RichHandler:
         console=console,
         rich_tracebacks=False,
         show_time=True,
-        show_path=False,
+        show_path=True,
         markup=False,
         show_level=True,
         log_time_format="[%H:%M:%S]",
