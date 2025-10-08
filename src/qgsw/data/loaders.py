@@ -7,6 +7,8 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Generic, TypeVar, Union
 
+from qgsw.logging import getLogger
+
 try:
     from typing import Self
 except ImportError:
@@ -15,7 +17,6 @@ except ImportError:
 import numpy as np
 import torch
 
-from qgsw import verbose
 from qgsw.configs.bathymetry import BathyDataConfig
 from qgsw.configs.windstress import WindStressConfig, WindStressDataConfig
 from qgsw.data.preprocessing import (
@@ -31,6 +32,7 @@ Data = TypeVar("Data")
 Preprocess = TypeVar("Preprocess", bound=Preprocessor)
 DataConfig = Union[BathyDataConfig, WindStressDataConfig]
 Config = TypeVar("Config", bound=DataConfig)
+logger = getLogger(__name__)
 
 
 class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
@@ -104,12 +106,10 @@ class Loader(Generic[Config, Data, Preprocess], metaclass=ABCMeta):
             Self: Instantiated Loader.
         """
         if not filepath.is_file():
-            verbose.display(
-                msg=f"Downloading file {filepath} from {self.url}...",
-                trigger_level=1,
-            )
+            msg = f"Downloading file {filepath} from {self.url}..."
+            logger.info(msg)
             urllib.request.urlretrieve(self.url, filepath)
-            verbose.display(msg="..done", trigger_level=1)
+            logger.info(msg="..done")
 
     @classmethod
     @abstractmethod

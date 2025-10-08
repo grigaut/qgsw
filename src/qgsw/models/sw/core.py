@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw import verbose
 from qgsw.exceptions import InvalidLayerNumberError
 from qgsw.fields.variables.covariant import (
     KineticEnergy,
@@ -29,6 +28,7 @@ from qgsw.fields.variables.tuples import (
     BaseUVH,
     UVHTAlpha,
 )
+from qgsw.logging import getLogger
 from qgsw.models.base import ModelUVH
 from qgsw.models.core import time_steppers
 from qgsw.models.io import IO
@@ -53,6 +53,9 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.spatial.core.grid import Grid2D
+
+
+logger = getLogger(__name__)
 
 
 def inv_reverse_cumsum(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -492,10 +495,8 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
         """
         self.__instance_nb = next(self._instance_count)
         self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
-        verbose.display(
-            msg=f"Creating {self.__class__.__name__} model...",
-            trigger_level=1,
-        )
+        msg = f"Creating {self.__class__.__name__} model..."
+        logger.info(msg)
         ModelParamChecker.__init__(
             self,
             space_2d=space_2d,

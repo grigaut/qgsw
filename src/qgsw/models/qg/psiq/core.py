@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 import torch
 
-from qgsw import verbose
 from qgsw.exceptions import InvalidLayerNumberError, UnsetStencilError
 from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
 from qgsw.fields.variables.tuples import (
@@ -15,6 +14,7 @@ from qgsw.fields.variables.tuples import (
     PSIQT,
     BasePSIQ,
 )
+from qgsw.logging import getLogger
 from qgsw.masks import Masks
 from qgsw.models.base import _Model
 from qgsw.models.core import time_steppers
@@ -55,6 +55,9 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound=BasePSIQ)
 State = TypeVar("State", bound=BaseStatePSIQ)
+
+
+logger = getLogger(__name__)
 
 
 class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
@@ -133,13 +136,13 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         y = self.space.q.xyz.y[0, 0, :].unsqueeze(0)
         beta_effect = self.beta_plane.beta * (y - self.y0)
         if hasattr(self, "_state"):
-            verbose.display(
+            msg = (
                 "WARNING: The β-effect has been modified."
                 "The potential vorticity might be inconsistent with actual"
                 "β-effect value. Best would be setting y0 "
-                "right after instantiation.",
-                trigger_level=1,
+                "right after instantiation."
             )
+            logger.warning(msg)
         self._beta_effect = beta_effect
 
     @property
@@ -179,12 +182,12 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         ModelParamChecker.masks.fset(self, mask)
         # Set state
         if hasattr(self, "_state"):
-            verbose.display(
+            msg = (
                 "WARNING: The masks have been modified."
                 " The stream function and potential have"
-                " therefore been set to 0.",
-                trigger_level=1,
+                " therefore been set to 0."
             )
+            logger.warning(msg)
         self._set_state()
         self._create_diagnostic_vars(self._state)
         # Set solver
@@ -235,10 +238,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """Time stepper setter."""
         time_steppers.validate(time_stepper)
         self._time_stepper = time_stepper
-        verbose.display(
-            "Time stepper set to: " + time_stepper,
-            trigger_level=1,
-        )
+        msg = "Time stepper set to: " + time_stepper
+        logger.info(msg)
 
     @property
     def with_bc(self) -> bool:

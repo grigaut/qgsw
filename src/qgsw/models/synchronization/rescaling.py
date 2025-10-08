@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, overload
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw import verbose
 from qgsw.exceptions import RescalingShapeMismatchError
 from qgsw.fields.variables.tuples import (
     UVH,
     UVHT,
     UVHTAlpha,
 )
+from qgsw.logging import getLogger
 from qgsw.masks import Masks
 from qgsw.models.names import ModelCategory
 from qgsw.specs import defaults
@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from qgsw.fields.variables.state import StateUVH, StateUVHAlpha
     from qgsw.models.base import ModelUVH
     from qgsw.models.qg.uvh.projectors.core import QGProjector
+
+
+logger = getLogger(__name__)
 
 
 def interpolate_physical_variable(
@@ -175,13 +178,11 @@ class Rescaler:
         _, _, nx_in, ny_in = h.shape
         self._raise_if_incompatible_shapes(nxin=nx_in, nyin=ny_in)
 
-        verbose.display(
-            msg=(
-                f"Rescaling from nx={nx_in}, ny={ny_in} to "
-                f"nx={self._nx}, ny={self._ny}."
-            ),
-            trigger_level=2,
+        msg = (
+            f"Rescaling from nx={nx_in}, ny={ny_in} to "
+            f"nx={self._nx}, ny={self._ny}."
         )
+        logger.detail(msg)
 
         # INTERPOLATION ------------------------------------------------------
         ## Physical zonal velocity

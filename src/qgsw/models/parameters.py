@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw import verbose
 from qgsw.exceptions import (
     InvalidModelParameterError,
     UnsetTimestepError,
 )
+from qgsw.logging import getLogger
 from qgsw.masks import Masks
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.coordinates import Coordinates1D
@@ -24,6 +24,8 @@ if TYPE_CHECKING:
         SpaceDiscretization3D,
     )
     from qgsw.specs._utils import Device
+
+logger = getLogger(__name__)
 
 
 class ModelParamChecker:
@@ -56,14 +58,10 @@ class ModelParamChecker:
             beta_plane (Beta_Plane): Beta plane.
         """
         # Set up
-        verbose.display(
-            msg=f"dtype: {self.dtype}.",
-            trigger_level=2,
-        )
-        verbose.display(
-            msg=f"device: {self.device.get()}",
-            trigger_level=2,
-        )
+        msg = f"dtype: {self.dtype}."
+        logger.detail(msg)
+        msg = f"device: {self.device.get()}"
+        logger.detail(msg)
         ## Space
         self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
         # Beta-plane
@@ -92,10 +90,8 @@ class ModelParamChecker:
             msg = "Timestep must be greater than 0."
             raise InvalidModelParameterError(msg)
         self._dt = dt
-        verbose.display(
-            f"{self.__class__.__name__}: dt set to {self.dt}",
-            trigger_level=1,
-        )
+        msg = f"{self.__class__.__name__}: dt set to {self.dt}"
+        logger.info(msg)
 
     @property
     def slip_coef(self) -> float:
@@ -110,10 +106,8 @@ class ModelParamChecker:
             raise InvalidModelParameterError(msg)
         self._slip_coef = slip_coefficient
         name = self.__class__.__name__
-        verbose.display(
-            f"{name}: Slip coefficient set to {slip_coefficient}",
-            trigger_level=2,
-        )
+        msg = f"{name}: Slip coefficient set to {slip_coefficient}"
+        logger.detail(msg)
 
     @property
     def bottom_drag_coef(self) -> float:
@@ -124,10 +118,8 @@ class ModelParamChecker:
     def bottom_drag_coef(self, bottom_drag: float) -> None:
         self._bottom_drag = bottom_drag
         name = self.__class__.__name__
-        verbose.display(
-            f"{name}: Bottom drag set to {bottom_drag}",
-            trigger_level=2,
-        )
+        msg = f"{name}: Bottom drag set to {bottom_drag}"
+        logger.detail(msg)
 
     @property
     def n_ens(self) -> int:
@@ -145,10 +137,8 @@ class ModelParamChecker:
         self._n_ens = n_ens
         self._size_ens.set_to(self._n_ens)
         name = self.__class__.__name__
-        verbose.display(
-            f"{name}: Number of ensembles set to {n_ens}",
-            trigger_level=2,
-        )
+        msg = f"{name}: Number of ensembles set to {n_ens}"
+        logger.detail(msg)
 
     @property
     def masks(self) -> Masks:
@@ -178,13 +168,11 @@ class ModelParamChecker:
         if not all(v in [0, 1] for v in vals) or vals == [0]:
             msg = f"Invalid mask with non-binary values : {vals}"
             raise InvalidModelParameterError(msg)
-        verbose.display(
-            msg=(
-                f"{'Non-trivial' if len(vals) == 2 else 'Trivial'}"  # noqa: PLR2004
-                " mask provided"
-            ),
-            trigger_level=2,
+        msg = (
+            f"{'Non-trivial' if len(vals) == 2 else 'Trivial'}"  # noqa: PLR2004
+            " mask provided"
         )
+        logger.detail(msg)
         self._masks = Masks(mask)
 
     @property
@@ -230,10 +218,8 @@ class ModelParamChecker:
         if not isinstance(beta_plane, BetaPlane):
             msg = "beta_plane should be of type `BetaPlane`."
             raise TypeError(msg)
-        verbose.display(
-            f"{self.__class__.__name__}: Beta-plane set to {beta_plane}",
-            trigger_level=2,
-        )
+        msg = f"{self.__class__.__name__}: Beta-plane set to {beta_plane}"
+        logger.detail(msg)
         self._beta_plane = beta_plane
 
     def _set_H(  # noqa: N802
@@ -255,10 +241,8 @@ class ModelParamChecker:
             raise InvalidModelParameterError(msg)
         self._H = h
         name = self.__class__.__name__
-        verbose.display(
-            f"{name}: H set to {h}",
-            trigger_level=2,
-        )
+        msg = f"{name}: H set to {h}"
+        logger.detail(msg)
 
     def _set_g_prime(self, g_prime: torch.Tensor) -> None:
         """Set g_prime values.
@@ -274,10 +258,8 @@ class ModelParamChecker:
             raise InvalidModelParameterError(msg)
         self._g_prime = g_prime
         name = self.__class__.__name__
-        verbose.display(
-            f"{name}: g' set to {g_prime}",
-            trigger_level=2,
-        )
+        msg = f"{name}: g' set to {g_prime}"
+        logger.detail(msg)
 
     def _set_taux(self, taux: torch.Tensor | float) -> None:
         """Set taux value.

@@ -6,7 +6,7 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, TypeVar
 
-from qgsw import verbose
+from qgsw.logging import getLogger
 from qgsw.models.base import ModelUVH
 from qgsw.models.references.base import Reference
 from qgsw.models.synchronization.initial_conditions import InitialCondition
@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from qgsw.models.qg.uvh.projectors.core import QGProjector
 
 T = TypeVar("T")
+
+
+logger = getLogger(__name__)
 
 
 class _Synchronizer(Generic[T], meta=ABCMeta):
@@ -46,22 +49,18 @@ class ModelSynchronizer(_Synchronizer[ModelUVH]):
 
     def __call__(self) -> None:
         """Rescale if necessary and synchronize model to ref."""
-        verbose.display(
-            msg="Synchronizing model states...",
-            trigger_level=1,
-        )
+        msg = "Synchronizing model states..."
+        logger.info(msg)
         self._ic.set_initial_condition(
             self._ref.prognostic.uvh,
             self._ref.P,
             self._ref.get_category(),
         )
-        verbose.display(
-            msg=(
-                f"'{self._model.name}' model state now "
-                f"matches '{self._ref.name}' state."
-            ),
-            trigger_level=1,
+        msg = (
+            f"'{self._model.name}' model state now "
+            f"matches '{self._ref.name}' state."
         )
+        logger.info(msg)
 
     def sync_to_uvh(
         self,

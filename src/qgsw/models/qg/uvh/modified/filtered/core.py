@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from qgsw import verbose
 from qgsw.exceptions import InvalidLayerNumberError
+from qgsw.logging import getLogger
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.qg.uvh.modified.collinear.core import QGAlpha
@@ -35,6 +35,9 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
 
 
+logger = getLogger(__name__)
+
+
 class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
     """Modified QG Model implementing collinear sf behavior."""
 
@@ -62,10 +65,8 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        verbose.display(
-            msg=f"Creating {self.__class__.__name__} model...",
-            trigger_level=1,
-        )
+        msg = f"Creating {self.__class__.__name__} model..."
+        logger.info(msg)
         self.__instance_nb = next(self._instance_count)
         self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
         ModelParamChecker.__init__(
@@ -212,10 +213,8 @@ class QGCollinearFilteredPV(QGAlpha[CollinearFilteredPVProjector]):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        verbose.display(
-            msg=f"Creating {self.__class__.__name__} model...",
-            trigger_level=1,
-        )
+        msg = f"Creating {self.__class__.__name__} model..."
+        logger.info(msg)
         self.__instance_nb = next(self._instance_count)
         self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
         ModelParamChecker.__init__(

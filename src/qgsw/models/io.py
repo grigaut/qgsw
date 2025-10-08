@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw import verbose
 from qgsw.exceptions import InvalidSavingFileError
 from qgsw.fields.variables.prognostic import Time
+from qgsw.logging import getLogger
 from qgsw.specs import defaults
 
 if TYPE_CHECKING:
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
         BoundDiagnosticVariable,
         PrognosticVariable,
     )
+
+logger = getLogger(__name__)
 
 
 class IO:
@@ -72,10 +74,8 @@ class IO:
         }
         torch.save(to_save, f=output_file)
 
-        verbose.display(
-            msg=f"Saved {', '.join(list(to_save.keys()))} to {output_file}.",
-            trigger_level=1,
-        )
+        msg = f"Saved {', '.join(list(to_save.keys()))} to {output_file}."
+        logger.info(msg)
 
     def print_step(self) -> str:
         """Printable informations of the prognostic variables.

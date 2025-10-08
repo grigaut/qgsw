@@ -9,11 +9,11 @@ from pathlib import Path
 
 import torch
 
-from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
+from qgsw.logging import getLogger, setup_root_logger
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
@@ -38,7 +38,8 @@ torch.set_grad_enabled(False)
 args = ScriptArgs.from_cli()
 specs = defaults.get()
 
-verbose.set_level(args.verbose)
+setup_root_logger(args.verbose)
+logger = getLogger(__name__)
 
 ROOT_PATH = Path(__file__).parent.parent
 config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
@@ -240,13 +241,12 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
             q_bcs.append(q_bc)
         time = datetime.datetime.now(datetime.timezone.utc)
         time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-        verbose.display(
-            f"[{time_}] "
-            f"Area {i_}/{i_max_}: "
-            f"Cycle {c_}/{c_max_}: "
-            f"Model spin-up completed.",
-            trigger_level=1,
+        msg = (
+            f"Area {i_}/{i_max_} | "
+            f"Cycle {c_}/{c_max_} | "
+            f"Model spin-up completed."
         )
+        logger.info(msg)
 
         psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
         q_bc_interp = QuadraticInterpolation(times, q_bcs)
@@ -273,28 +273,26 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
                 for n in range(1, n_steps_per_cyle):
                     model_alpha.step()
 
-                    if (n + 1) % 1 == 0:
+                    if (n + 1) % comparison_interval == 0:
                         loss += rmse(model_alpha.psi[0, 0], psis[n][0, 0])
 
             register_params.step(loss, alpha)
             if early_stop.step(loss):
-                verbose.display(
-                    f"Convergence reached after {o + 1} iterations.",
-                    trigger_level=1,
-                )
+                msg = f"Convergence reached after {o + 1} iterations."
+                logger.info(msg)
                 break
 
             o_ = str(o + 1).zfill(str_optim_len)
             o_max_ = str(optim_max_step).zfill(str_optim_len)
             loss_ = loss.cpu().item()
 
-            verbose.display(
-                f"[{time_}] "
-                f"Area {i_}/{i_max_}: "
-                f"Cycle {c_}/{c_max_}: "
-                f"Optimizing ɑ [{o_}/{o_max_}] - Loss: {loss_:3.5f}",  # noqa: RUF001
-                trigger_level=1,
+            msg = (
+                f"Area {i_}/{i_max_} | "
+                f"Cycle {c_}/{c_max_} | "
+                f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
+                f"Loss: {loss_:3.5f}"
             )
+            logger.info(msg)
 
             loss.backward()
             optimizer.step()
@@ -303,14 +301,14 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
         best_loss = register_params.best_loss
         time = datetime.datetime.now(datetime.timezone.utc)
         time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-        verbose.display(
-            f"[{time_}] "
-            f"Area {i_}/{i_max_}: "
-            f"Cycle {c_}/{c_max_}: "
-            f"ɑ optimization completed - Loss: {best_loss:3.5f}",  # noqa: RUF001
-            trigger_level=1,
+        msg = (
+            f"Area {i_}/{i_max_} | "
+            f"Cycle {c_}/{c_max_} | "
+            f"ɑ optimization completed | "  # noqa: RUF001
+            f"Loss: {best_loss:3.5f}"
         )
-        dpsi2 = torch.ones_like(model_dpsi.psi, requires_grad=True)
+        logger.info(msg)
+        dpsi2 = (torch.ones_like(model_dpsi.psi) * 1e-2).requires_grad_()
 
         optimizer = torch.optim.Adam([dpsi2], lr=1e-1)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -337,23 +335,21 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
 
             register_params.step(loss, dpsi2)
             if early_stop.step(loss):
-                verbose.display(
-                    f"Convergence reached after {o + 1} iterations.",
-                    trigger_level=1,
-                )
+                msg = f"Convergence reached after {o + 1} iterations."
+                logger.info(msg)
                 break
 
             o_ = str(o + 1).zfill(str_optim_len)
             o_max_ = str(optim_max_step)
             loss_ = loss.cpu().item()
 
-            verbose.display(
-                f"[{time_}] "
-                f"Area {i_}/{i_max_}: "
-                f"Cycle {c_}/{c_max_}: "
-                f"Optimizing dѱ2 [{o_}/{o_max_}] - Loss: {loss_:3.5f}",
-                trigger_level=1,
+            msg = (
+                f"Area {i_}/{i_max_} | "
+                f"Cycle {c_}/{c_max_} | "
+                f"dѱ2 optimization step {o_}/{o_max_} | "
+                f"Loss: {loss_:3.5f}"
             )
+            logger.info(msg)
             loss.backward()
             optimizer.step()
             scheduler.step(loss)
@@ -361,13 +357,13 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
         best_loss = register_params.best_loss
         time = datetime.datetime.now(datetime.timezone.utc)
         time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-        verbose.display(
-            f"[{time_}] "
-            f"Area {i_}/{i_max_}: "
-            f"Cycle {c_}/{c_max_}: "
-            f"dѱ2 optimization completed - Loss: {best_loss:3.5f}",
-            trigger_level=1,
+        msg = (
+            f"Area {i_}/{i_max_} | "
+            f"Cycle {c_}/{c_max_} | "
+            f"dѱ2 optimization completed | "
+            f"Loss: {best_loss:3.5f}"
         )
+        logger.info(msg)
         output = {
             "cycle": c,
             "coords": (imin, imax, jmin, jmax),

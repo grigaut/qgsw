@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, TypeVar
 
 from torch.utils import checkpoint
 
-from qgsw import verbose
 from qgsw.exceptions import (
     InvalidLayerNumberError,
     InvalidLayersDefinitionError,
 )
 from qgsw.fields.variables.state import StateUVHAlpha
 from qgsw.fields.variables.tuples import UVH, UVHTAlpha
+from qgsw.logging import getLogger
 from qgsw.models.core import time_steppers
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
@@ -49,6 +49,8 @@ if TYPE_CHECKING:
     )
 
 Projector = TypeVar("Projector", bound=QGProjector)
+
+logger = getLogger(__name__)
 
 
 class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
@@ -163,13 +165,11 @@ class QGAlpha(QGCore[UVHTAlpha, StateUVHAlpha, Projector]):
         """
         self._requires_grad = requires_grad
         if self.requires_grad:
-            verbose.display(
-                msg=(
-                    "Model set to track gradients."
-                    " Model steps will register pytorch checkpoints."
-                ),
-                trigger_level=1,
+            msg = (
+                "Model set to track gradients."
+                " Model steps will register pytorch checkpoints."
             )
+            logger.info(msg)
 
 
 class QGCollinearSF(QGAlpha[CollinearSFProjector]):
@@ -200,10 +200,8 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        verbose.display(
-            msg=f"Creating {self.__class__.__name__} model...",
-            trigger_level=1,
-        )
+        msg = f"Creating {self.__class__.__name__} model..."
+        logger.info(msg)
         self.__instance_nb = next(self._instance_count)
         self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
         ModelParamChecker.__init__(
@@ -404,10 +402,8 @@ class QGCollinearPV(QGAlpha[CollinearPVProjector]):
             optimize (bool, optional): Whether to precompile functions or
             not. Defaults to True.
         """
-        verbose.display(
-            msg=f"Creating {self.__class__.__name__} model...",
-            trigger_level=1,
-        )
+        msg = f"Creating {self.__class__.__name__} model..."
+        logger.info(msg)
         self.__instance_nb = next(self._instance_count)
         self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
         ModelParamChecker.__init__(

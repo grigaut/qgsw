@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw import verbose
 from qgsw.configs.core import Configuration
+from qgsw.logging import getLogger
 from qgsw.models.instantiation import (
     instantiate_model_from_config,
 )
@@ -33,6 +33,9 @@ if TYPE_CHECKING:
     from qgsw.configs.core import Configuration
     from qgsw.fields.variables.tuples import BaseUVH
     from qgsw.models.base import ModelUVH
+
+
+logger = getLogger(__name__)
 
 
 class ModelReference(NamedObject[ReferenceName], Reference):
@@ -77,13 +80,11 @@ class ModelReference(NamedObject[ReferenceName], Reference):
             t_end=time,
             dt=self._core.dt,
         )
-        verbose.display(
-            msg=(
-                f"Performing {steps.n_tot} steps with "
-                f"reference model: {self._core.name}"
-            ),
-            trigger_level=2,
+        msg = (
+            f"Performing {steps.n_tot} steps with "
+            f"reference model: {self._core.name}"
         )
+        logger.detail(msg)
         for _ in steps.simulation_steps():
             self._core.step()
 
@@ -191,10 +192,8 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
         Returns:
             BaseUVH: Stored physical variables.
         """
-        verbose.display(
-            msg=f"Loading reference data from {self._data.path}",
-            trigger_level=2,
-        )
+        msg = f"Loading reference data from {self._data.path}"
+        logger.detail(msg)
         return self._data.read()
 
     def save(self, file: str | Path) -> None:
@@ -204,10 +203,8 @@ class ModelOutputReference(NamedObject[ReferenceName], Reference):
             file (str | Path): Filepath to save data into.
         """
         shutil.copy(self._data.path, Path(file))
-        verbose.display(
-            msg=f"Copied {self._data.path} to {file}.",
-            trigger_level=1,
-        )
+        msg = f"Copied {self._data.path} to {file}."
+        logger.detail(msg)
 
     def retrieve_P(self) -> QGProjector:  # noqa: N802
         """Retrieve projector associated with reference.

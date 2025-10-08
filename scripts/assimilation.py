@@ -5,10 +5,10 @@ from pathlib import Path
 import torch
 from rich.progress import Progress
 
-from qgsw import verbose
 from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.coefficients.instantiation import instantiate_coef
+from qgsw.logging import getLogger, setup_root_logger
 from qgsw.models.instantiation import (
     instantiate_model_from_config,
 )
@@ -25,7 +25,9 @@ torch.backends.cudnn.deterministic = True
 
 args = ScriptArgs.from_cli()
 
-verbose.set_level(args.verbose)
+setup_root_logger(args.verbose)
+logger = getLogger(__name__)
+
 specs = defaults.get()
 
 ROOT_PATH = Path(__file__).parent.parent
@@ -60,7 +62,7 @@ dt = model.dt
 t_end = config.simulation.duration
 
 steps = Steps(t_start=0, t_end=t_end, dt=dt)
-verbose.display(steps.__repr__(), trigger_level=1)
+logger.info(steps.__repr__())
 
 ns = steps.simulation_steps()
 syncs = steps.steps_from_interval(interval=config.simulation.fork_interval)
@@ -120,10 +122,8 @@ with Progress() as progress:
                 model.alpha = coef.get()
             synchronize()
         if save:
-            verbose.display(
-                msg=f"[n={n:05d}/{steps.n_tot:05d}]",
-                trigger_level=1,
-            )
+            msg = f"[n={n:05d}/{steps.n_tot:05d}]"
+            logger.info(msg)
             # Save Model
             model.io.save(output_dir.joinpath(f"{prefix}{n}.pt"))
             ref.at_time(model.time)
