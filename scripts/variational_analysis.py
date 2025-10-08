@@ -261,6 +261,7 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
         register_params = RegisterParams()
 
         for o in range(optim_max_step):
+            optimizer.zero_grad()
             model_alpha.reset_time()
             model_alpha.set_psiq(psi0, q0)
 
@@ -318,6 +319,7 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
         register_params = RegisterParams()
 
         for o in range(optim_max_step):
+            optimizer.zero_grad()
             model_dpsi.reset_time()
             model_dpsi.set_psiq(psi0, q0)
             model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
