@@ -84,7 +84,7 @@ def get_handler_no_rich() -> logging.StreamHandler:
     Returns:
         logging.StreamHandler: Handler.
     """
-    handler = logging.StreamHandler()
+    handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(Formatter())
     return handler
 
