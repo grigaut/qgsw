@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw import verbose
 from qgsw.fields.variables.tuples import UVH
+from qgsw.logging import getLogger
 from qgsw.models.names import ModelName
 from qgsw.models.parameters import ModelParamChecker
 from qgsw.models.sw.core import SW
@@ -22,6 +22,9 @@ from qgsw.spatial.core.discretization import SpaceDiscretization2D
 if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
+
+
+logger = getLogger(__name__)
 
 
 class BaseSWFilterBarotropic(ABC, SW):
@@ -120,10 +123,8 @@ class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
 
     def _set_solver(self) -> None:
         """Set Helmholtz Solver for barotropic and spectral."""
-        verbose.display(
-            msg="Using barotropic filter in spectral approximation.",
-            trigger_level=2,
-        )
+        msg = "Using barotropic filter in spectral approximation."
+        logger.detail(msg)
         H_tot = self.H.sum(dim=-3, keepdim=True)  # noqa: N806
         lambd = 1.0 / (self.g * self.dt * self.tau * H_tot)
         self.helm_solver = HelmholtzNeumannSolver(
@@ -202,10 +203,8 @@ class SWFilterBarotropicExact(BaseSWFilterBarotropic):
 
     def _set_solver(self) -> None:
         """Set Helmholtz Solver for barotropic and exact form."""
-        verbose.display(
-            msg="Using barotropic filter in exact form.",
-            trigger_level=2,
-        )
+        msg = "Using barotropic filter in exact form."
+        logger.detail(msg)
         # Sum h on u grid
         h_tot_ugrid = self.h_ref_ugrid + convert.h_to_u(self.h, self.masks.h)
         # Sum h on v grid

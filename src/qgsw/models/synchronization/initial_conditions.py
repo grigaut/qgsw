@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from qgsw import verbose
 from qgsw.fields.variables.tuples import (
     UVH,
 )
+from qgsw.logging import getLogger
 from qgsw.models.names import ModelCategory, get_category
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.synchronization.rescaling import Rescaler
@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
     from qgsw.models.base import ModelUVH
+
+
+logger = getLogger(__name__)
 
 
 class InitialCondition:
@@ -190,10 +193,8 @@ class InitialCondition:
                 └── h: (n_ens, nl, nx, ny)-shaped
             proj (QGProjector): QGProjector associated with input uvh.
         """
-        verbose.display(
-            msg=f"Setting initial condition for '{self._model.name}' model.",
-            trigger_level=2,
-        )
+        msg = f"Setting initial condition for '{self._model.name}' model."
+        logger.detail(msg)
         if self._model.get_category() == ModelCategory.QUASI_GEOSTROPHIC:
             # SW -> QG
             uvh_i, proj_i = self._rescale(uvh, proj)
@@ -208,10 +209,8 @@ class InitialCondition:
             # SW -> SW
             uvh_i, proj_i = self._rescale(uvh, None)
             self._model.set_physical_uvh(*uvh_i.parallel_slice[:, : self._nl])
-        verbose.display(
-            msg="Initial condition set.",
-            trigger_level=2,
-        )
+        msg = "Initial condition set."
+        logger.detail(msg)
 
     def set_initial_condition_from_qg(
         self,
@@ -227,10 +226,8 @@ class InitialCondition:
                 └── h: (n_ens, nl, nx, ny)-shaped
             proj (QGProjector): QGProjector associated with input uvh.
         """
-        verbose.display(
-            msg=f"Setting initial condition for '{self._model.name}' model.",
-            trigger_level=2,
-        )
+        msg = f"Setting initial condition for '{self._model.name}' model."
+        logger.detail(msg)
         if self._model.get_category() == ModelCategory.SHALLOW_WATER:
             # QG -> SW
             uvh_i, proj_i = self._rescale(uvh, None)
@@ -249,10 +246,8 @@ class InitialCondition:
             )
             p_qg = proj_i.compute_p(uvh_cov)[0]
             self._model.set_p(p_qg)
-        verbose.display(
-            msg="Initial condition set.",
-            trigger_level=2,
-        )
+        msg = "Initial condition set."
+        logger.detail(msg)
 
     def set_initial_condition_from_file(
         self,
@@ -305,13 +300,10 @@ class InitialCondition:
             dtype (torch.dtype | None, optional): Dtype. Defaults to None.
             device (torch.device | None, optional): Device. Defaults to None.
         """
-        verbose.display(
-            msg=(
-                f"Setting steady initial condition for '{self._model.name}' "
-                "model."
-            ),
-            trigger_level=2,
+        msg = (
+            f"Setting steady initial condition for '{self._model.name}' model."
         )
+        logger.detail(msg)
         specs = defaults.get(dtype=dtype, device=device)
         n_ens = 1
         nl = self._model.space.nl
@@ -325,7 +317,5 @@ class InitialCondition:
             **specs,
         )
         self._model.set_physical_uvh(*uvh)
-        verbose.display(
-            msg="Initial condition set.",
-            trigger_level=2,
-        )
+        msg = "Initial condition set."
+        logger.detail(msg)

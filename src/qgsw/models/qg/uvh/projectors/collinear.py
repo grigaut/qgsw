@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw import verbose
 from qgsw.fields.variables.tuples import UVH
+from qgsw.logging import getLogger
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.modified.collinear.stretching_matrix import (
     compute_A_12,
@@ -34,6 +34,9 @@ if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
+
+
+logger = getLogger(__name__)
 
 
 class CollinearProjector(QGProjector, ABC):
@@ -308,12 +311,12 @@ class CollinearSFProjector(CollinearProjector):
         )
         A_12 = compute_A_12(self.H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
 
-        verbose.display(
+        msg = (
             f"[{self.__class__.__name__}.QoG_inv]: "
             "Retrieving pressure using iterative solving "
-            f"with at most {self._MAX_ITERATIONS} iterations.",
-            trigger_level=3,
+            f"with at most {self._MAX_ITERATIONS} iterations."
         )
+        logger.debug(msg)
 
         for k in range(1, self._MAX_ITERATIONS + 1):
             # Since A.shape = (1,1) -> solving in mode space is the same
@@ -340,11 +343,11 @@ class CollinearSFProjector(CollinearProjector):
                 atol=self._ATOL,
                 rtol=self._RTOL,
             ).all():
-                verbose.display(
+                msg = (
                     f"[{self.__class__.__name__}.QoG_inv]: "
-                    f"Convergence reached after {k} iterations.",
-                    trigger_level=3,
+                    f"Convergence reached after {k} iterations."
                 )
+                logger.debug(msg)
                 break
             pi_i = pi1_i
 

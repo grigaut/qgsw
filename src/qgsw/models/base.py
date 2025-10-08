@@ -10,7 +10,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw import verbose
 from qgsw.exceptions import (
     IncoherentWithMaskError,
     UnsetTimestepError,
@@ -28,6 +27,7 @@ from qgsw.fields.variables.tuples import (
     BaseTuple,
     BaseUVH,
 )
+from qgsw.logging import getLogger
 from qgsw.models.core import flux
 from qgsw.models.core.utils import OptimizableFunction
 from qgsw.models.io import IO
@@ -57,6 +57,8 @@ AdvectedPrognostic = TypeVar("AdvectedPrognostic", bound=Union[UVH, PSIQ])
 State = TypeVar("State", bound=BaseState)
 PrognosticUVH = TypeVar("PrognosticUVH", bound=BaseUVH)
 PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePSIQ)
+
+logger = getLogger(__name__)
 
 
 class ModelCounter(type):
@@ -109,10 +111,8 @@ class _Model(
         """
         self.__instance_nb = next(self._instance_count)
         self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
-        verbose.display(
-            msg=f"Creating {self.__class__.__name__} model...",
-            trigger_level=1,
-        )
+        msg = f"Creating {self.__class__.__name__} model..."
+        logger.info(msg)
         ModelParamChecker.__init__(
             self,
             space_2d=space_2d,

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Union
 import numpy as np
 from scipy import optimize
 
-from qgsw import verbose
 from qgsw.exceptions import (
     InappropriateShapeError,
     UnmatchingShapesError,
@@ -19,6 +18,7 @@ from qgsw.exceptions import (
 )
 from qgsw.fields.scope import Scope
 from qgsw.fields.variables.coefficients.coef_names import CoefficientName
+from qgsw.logging import getLogger
 from qgsw.utils.named_object import NamedObject
 
 try:
@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from qgsw.configs.space import SpaceConfig
 
 Values = TypeVar("Values")
+logger = getLogger(__name__)
 
 
 class Coefficient(
@@ -197,11 +198,8 @@ class UniformCoefficient(Coefficient[float]):
             p,
             p_ref,
         )
-
-        verbose.display(
-            msg=f"Optimal coefficient inferred: {round(optimal, 2)}",
-            trigger_level=2,
-        )
+        msg = f"Optimal coefficient inferred: {round(optimal, 2)}"
+        logger.detail(msg)
         self.values = optimal
 
     @classmethod
@@ -244,12 +242,8 @@ class UniformCoefficient(Coefficient[float]):
             p_ref.flatten().cpu().numpy(),
             bounds=(-1, 1),
         )
-        verbose.display(
-            msg=(
-                f"Optimal coefficient inferred with a cost of {solution.cost}."
-            ),
-            trigger_level=2,
-        )
+        msg = f"Optimal coefficient inferred with a cost of {solution.cost}."
+        logger.detail(msg)
         return solution.x.item()
 
 
@@ -424,14 +418,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
                 f" = {self.sigma}."
             )
             raise np.linalg.LinAlgError(msg) from e
-
-        verbose.display(
-            msg=(
-                "Optimal coefficient inferred"
-                f": {[round(r, 2) for r in optimal]}"
-            ),
-            trigger_level=2,
-        )
+        msg = f"Optimal coefficient inferred: {[round(r, 2) for r in optimal]}"
+        logger.detail(msg)
         self.values = optimal
 
     def update(
@@ -575,12 +563,8 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
             p_ref.flatten().cpu().numpy(),
             bounds=(-1, 1),
         )
-        verbose.display(
-            msg=(
-                f"Optimal coefficient inferred with a cost of {solution.cost}."
-            ),
-            trigger_level=2,
-        )
+        msg = f"Optimal coefficient inferred with a cost of {solution.cost}."
+        logger.detail(msg)
         return solution.x.tolist()
 
 
