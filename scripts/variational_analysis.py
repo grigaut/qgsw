@@ -112,7 +112,7 @@ optim_max_step = 100
 str_optim_len = len(str(optim_max_step))
 n_steps_per_cyle = 500
 comparison_interval = 100
-n_cycles = 5
+n_cycles = 3
 str_cycles_len = len(str(n_cycles))
 
 ## Error
@@ -253,7 +253,7 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
 
         alpha = torch.tensor(0.5, requires_grad=True)
 
-        optimizer = torch.optim.Adam([alpha], lr=1e-1)
+        optimizer = torch.optim.Adam([alpha], lr=1e-2)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, factor=0.5, patience=5
         )
@@ -310,7 +310,7 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
         logger.info(msg)
         dpsi2 = (torch.ones_like(model_dpsi.psi) * 1e-2).requires_grad_()
 
-        optimizer = torch.optim.Adam([dpsi2], lr=1e-1)
+        optimizer = torch.optim.Adam([dpsi2], lr=1e-2)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, factor=0.5, patience=5
         )
