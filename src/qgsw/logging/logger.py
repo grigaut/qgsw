@@ -1,7 +1,8 @@
 """Logger class."""
 
 import logging
-from typing import ParamSpec
+
+from typing_extensions import ParamSpec
 
 P = ParamSpec("P")
 
