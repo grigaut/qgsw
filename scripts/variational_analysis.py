@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import datetime
 from pathlib import Path
 
 import torch
@@ -237,10 +238,12 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
             psi_bcs.append(psi_bc)
             qs.append(q)
             q_bcs.append(q_bc)
-
+        time = datetime.datetime.now(datetime.timezone.utc)
+        time_ = time.strftime("%d/%m/%Y %H:%M:%S")
         verbose.display(
-            f"Area [{i_}/{i_max_}]: "
-            f"Cycle [{c_}/{c_max_}]: "
+            f"[{time_}] "
+            f"Area {i_}/{i_max_}: "
+            f"Cycle {c_}/{c_max_}: "
             f"Model spin-up completed.",
             trigger_level=1,
         )
@@ -286,8 +289,9 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
             loss_ = loss.cpu().item()
 
             verbose.display(
-                f"Area [{i_}/{i_max_}]: "
-                f"Cycle [{c_}/{c_max_}]: "
+                f"[{time_}] "
+                f"Area {i_}/{i_max_}: "
+                f"Cycle {c_}/{c_max_}: "
                 f"Optimizing ɑ [{o_}/{o_max_}] - Loss: {loss_:3.5f}",  # noqa: RUF001
                 trigger_level=1,
             )
@@ -297,10 +301,12 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
             scheduler.step(loss)
 
         best_loss = register_params.best_loss
-
+        time = datetime.datetime.now(datetime.timezone.utc)
+        time_ = time.strftime("%d/%m/%Y %H:%M:%S")
         verbose.display(
-            f"Area [{i_}/{i_max_}]: "
-            f"Cycle [{c_}/{c_max_}]: "
+            f"[{time_}] "
+            f"Area {i_}/{i_max_}: "
+            f"Cycle {c_}/{c_max_}: "
             f"ɑ optimization completed - Loss: {best_loss:3.5f}",  # noqa: RUF001
             trigger_level=1,
         )
@@ -342,8 +348,9 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
             loss_ = loss.cpu().item()
 
             verbose.display(
-                f"Area [{i_}/{i_max_}]: "
-                f"Cycle [{c_}/{c_max_}]: "
+                f"[{time_}] "
+                f"Area {i_}/{i_max_}: "
+                f"Cycle {c_}/{c_max_}: "
                 f"Optimizing dѱ2 [{o_}/{o_max_}] - Loss: {loss_:3.5f}",
                 trigger_level=1,
             )
@@ -352,10 +359,12 @@ for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
             scheduler.step(loss)
 
         best_loss = register_params.best_loss
-
+        time = datetime.datetime.now(datetime.timezone.utc)
+        time_ = time.strftime("%d/%m/%Y %H:%M:%S")
         verbose.display(
-            f"Area [{i_}/{i_max_}]: "
-            f"Cycle [{c_}/{c_max_}]: "
+            f"[{time_}] "
+            f"Area {i_}/{i_max_}: "
+            f"Cycle {c_}/{c_max_}: "
             f"dѱ2 optimization completed - Loss: {best_loss:3.5f}",
             trigger_level=1,
         )
