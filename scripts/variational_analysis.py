@@ -24,10 +24,12 @@ from qgsw.models.qg.psiq.optim.utils import EarlyStop, RegisterParams
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.solver.boundary_conditions.base import Boundaries
+from qgsw.solver.finite_diff import laplacian
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     SpaceDiscretization3D,
 )
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
@@ -103,6 +105,8 @@ output_dir = config.io.output.directory
 
 H = config.model.h
 g_prime = config.model.g_prime
+H1, H2 = H[0], H[1]
+g1, g2 = g_prime[0], g_prime[1]
 beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
@@ -141,23 +145,16 @@ imin, imax, jmin, jmax = indices
 msg = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
 logger.info(msg)
 
-
-def compute_slices(
-    imin: int, imax: int, jmin: int, jmax: int
-) -> tuple[list[slice, slice], list[slice, slice]]:
-    """Compute horizontal slices."""
-    psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
-    q_slices = [slice(imin, imax), slice(jmin, jmax)]
-
-    return psi_slices, q_slices
-
+p = 4
+psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
+psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 
 ## Simulation parameters
 
-dt = 3600
+dt = 7200
 optim_max_step = 100
 str_optim_len = len(str(optim_max_step))
-n_steps_per_cyle = 500
+n_steps_per_cyle = 250
 comparison_interval = 1
 n_cycles = 3
 str_cycles_len = len(str(n_cycles))
@@ -173,6 +170,27 @@ logger.info(msg)
 def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     """RMSE."""
     return (f - f_ref).square().mean().sqrt() / f_ref.square().mean().sqrt()
+
+
+# PV computation
+
+
+def compute_q_alpha(psi: torch.Tensor, alpha: torch.Tensor) -> torch.Tensor:
+    """Compute pv using alpha."""
+    return interpolate(
+        laplacian(psi, dx, dy)
+        - beta_plane.f0**2 * (1 / H1 / g1 + 1 / H1 / g1) * psi[..., 1:-1, 1:-1]
+        + beta_plane.f0**2 * (1 / H1 / g2) * alpha * psi[..., 1:-1, 1:-1]
+    )
+
+
+def compute_q_psi2(psi: torch.Tensor, psi2: torch.Tensor) -> torch.Tensor:
+    """Compute pv using psi2."""
+    return interpolate(
+        laplacian(psi, dx, dy)
+        - beta_plane.f0**2 * (1 / H1 / g1 + 1 / H1 / g1) * psi[..., 1:-1, 1:-1]
+        + beta_plane.f0**2 * (1 / H1 / g2) * psi2[..., 1:-1, 1:-1]
+    )
 
 
 # Models
@@ -219,7 +237,6 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-psi_slices, q_slices = compute_slices(imin, imax, jmin, jmax)
 
 space_slice = SpaceDiscretization2D.from_tensors(
     x=P.space.remove_z_h().omega.xy.x[imin : imax + 1, 0],
@@ -249,18 +266,14 @@ model_dpsi.set_wind_forcing(
 )
 
 
-def extract_psi(psi: torch.Tensor) -> tuple[torch.Tensor, Boundaries]:
+def extract_psi_w(psi: torch.Tensor) -> torch.Tensor:
     """Extract psi."""
-    return psi[..., psi_slices[0], psi_slices[1]], Boundaries.extract(
-        psi, imin, imax + 1, jmin, jmax + 1, 2
-    )
+    return psi[..., psi_slices_w[0], psi_slices_w[1]]
 
 
-def extract_q(q: torch.Tensor) -> tuple[torch.Tensor, Boundaries]:
-    """Extract q."""
-    return q[..., q_slices[0], q_slices[1]], Boundaries.extract(
-        q, imin - 1, imax + 1, jmin - 1, jmax + 1, 3
-    )
+def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
+    """Extract psi."""
+    return Boundaries.extract(psi, p, -p - 1, p, -p - 1, 2)
 
 
 for c in range(n_cycles):
@@ -268,50 +281,56 @@ for c in range(n_cycles):
     c_max_ = str(n_cycles)
     times = [model_3l.time.item()]
 
-    psi0, psi_bc = extract_psi(model_3l.psi[:, :1])
-    q0, q_bc = extract_q(model_3l.q[:, :1])
+    psi0 = extract_psi_w(model_3l.psi[:, :1])
+    psi_bc = extract_psi_bc(psi0)
 
     psis = [psi0]
     psi_bcs = [psi_bc]
-    qs = [q0]
-    q_bcs = [q_bc]
 
     for _ in range(1, n_steps_per_cyle):
         model_3l.step()
 
         times.append(model_3l.time.item())
 
-        psi, psi_bc = extract_psi(model_3l.psi[:, :1])
-        q, q_bc = extract_q(model_3l.q[:, :1])
+        psi = extract_psi_w(model_3l.psi[:, :1])
+        psi_bc = extract_psi_bc(psi)
 
         psis.append(psi)
         psi_bcs.append(psi_bc)
-        qs.append(q)
-        q_bcs.append(q_bc)
+
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
     msg = f"Cycle {c_}/{c_max_} | Model spin-up completed."
     logger.info(msg)
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-    q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
     alpha = torch.tensor(0.5, requires_grad=True)
+    dalpha = torch.tensor(0.5, requires_grad=True)
 
-    optimizer = torch.optim.Adam([alpha], lr=1e-2)
+    optimizer = torch.optim.Adam([alpha, dalpha], lr=1e-2)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
     early_stop = EarlyStop()
-    register_params = RegisterParams()
+    register_params_alpha = RegisterParams()
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
         model_alpha.reset_time()
-        model_alpha.set_psiq(psi0, q0)
 
         with torch.enable_grad():
-            model_alpha.alpha = torch.ones_like(psi0) * alpha
+            q0 = compute_q_alpha(psi0, alpha)[..., 3:-3, 3:-3]
+            q_bcs = [
+                Boundaries.extract(
+                    compute_q_alpha(psi[:, :1], alpha), 2, -3, 2, -3, 3
+                )
+                for psi in psis
+            ]
+
+            model_alpha.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
+            q_bc_interp = QuadraticInterpolation(times, q_bcs)
+            model_alpha.alpha = torch.ones_like(model_alpha.psi) * dalpha
             model_alpha.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
             loss = torch.tensor(0, **defaults.get())
@@ -320,9 +339,11 @@ for c in range(n_cycles):
                 model_alpha.step()
 
                 if (n + 1) % comparison_interval == 0:
-                    loss += rmse(model_alpha.psi[0, 0], psis[n][0, 0])
+                    loss += rmse(
+                        model_alpha.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
+                    )
 
-        register_params.step(loss, alpha)
+        register_params_alpha.step(loss, alpha=alpha, dalpha=dalpha)
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
             logger.info(msg)
@@ -343,7 +364,7 @@ for c in range(n_cycles):
         optimizer.step()
         scheduler.step(loss)
 
-    best_loss = register_params.best_loss
+    best_loss = register_params_alpha.best_loss
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
     msg = (
@@ -352,22 +373,33 @@ for c in range(n_cycles):
         f"Loss: {best_loss:3.5f}"
     )
     logger.info(msg)
+
+    psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(model_dpsi.psi) * 1e-2).requires_grad_()
 
-    optimizer = torch.optim.Adam([dpsi2], lr=1e-2)
+    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-2)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
     early_stop = EarlyStop()
-    register_params = RegisterParams()
+    register_params_dpsi2 = RegisterParams()
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
         model_dpsi.reset_time()
-        model_dpsi.set_psiq(psi0, q0)
-        model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
         with torch.enable_grad():
+            q0 = compute_q_psi2(psi0, psi2)[..., 3:-3, 3:-3]
+            q_bcs = [
+                Boundaries.extract(
+                    compute_q_psi2(psi[:, :1], psi2), 2, -3, 2, -3, 3
+                )
+                for psi in psis
+            ]
+
+            model_dpsi.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
+            q_bc_interp = QuadraticInterpolation(times, q_bcs)
+            model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
             model_dpsi.dpsi2 = dpsi2
 
             loss = torch.tensor(0, **defaults.get())
@@ -376,9 +408,11 @@ for c in range(n_cycles):
                 model_dpsi.step()
 
                 if (n + 1) % comparison_interval == 0:
-                    loss += rmse(model_dpsi.psi[0, 0], psis[n][0, 0])
+                    loss += rmse(
+                        model_dpsi.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
+                    )
 
-        register_params.step(loss, dpsi2)
+        register_params_dpsi2.step(loss, psi2=psi2, dpsi2=dpsi2)
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
             logger.info(msg)
@@ -398,7 +432,7 @@ for c in range(n_cycles):
         optimizer.step()
         scheduler.step(loss)
 
-    best_loss = register_params.best_loss
+    best_loss = register_params_dpsi2.best_loss
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
     msg = (
@@ -410,8 +444,10 @@ for c in range(n_cycles):
     output = {
         "cycle": c,
         "coords": (imin, imax, jmin, jmax),
-        "alpha": alpha.detach().cpu(),
-        "dpsi2": dpsi2.detach().cpu(),
+        "alpha": register_params_alpha.params["alpha"].detach().cpu(),
+        "dalpha": register_params_alpha.params["dalpha"].detach().cpu(),
+        "psi2": register_params_dpsi2.params["psi2"].detach().cpu(),
+        "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
 torch.save(
