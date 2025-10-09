@@ -152,7 +152,7 @@ psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 ## Simulation parameters
 
 dt = 7200
-optim_max_step = 100
+optim_max_step = 200
 str_optim_len = len(str(optim_max_step))
 n_steps_per_cyle = 250
 comparison_interval = 1
