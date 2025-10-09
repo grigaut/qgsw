@@ -17,7 +17,7 @@ class EarlyStop:
         self.eps = eps
         self.stop_after = stop_after
         self.counter = 0
-        self.previous_loss = torch.tensor(0)
+        self.previous_loss = None
 
     def step(self, loss: torch.Tensor) -> bool:
         """Check against loss value.
@@ -28,9 +28,12 @@ class EarlyStop:
         Returns:
             bool: True if loss has been stable.
         """
+        if self.previous_loss is None:
+            self.previous_loss = loss
+            return False
         loss_ = self.previous_loss
-        if (loss - loss_).abs() / loss_.abs() < self.eps:
-            self.counter += int((loss - loss_).abs() / loss_.abs() < self.eps)
+        if ((loss - loss_).abs() / loss_.abs()) < self.eps:
+            self.counter += 1
         else:
             self.counter = 0
         return self.counter >= self.stop_after
