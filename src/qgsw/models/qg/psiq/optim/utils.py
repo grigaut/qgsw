@@ -47,14 +47,18 @@ class RegisterParams:
         self.best_loss = torch.tensor(float("inf"))
         self.params = None
 
-    def step(self, loss: torch.Tensor, *params: torch.Tensor) -> None:
+    def step(self, loss: torch.Tensor, **kwargs: torch.Tensor) -> None:
         """Check against new loss.
 
         Args:
             loss (torch.Tensor): Loss value.
-            *params (torch.Tensor): Parameters.
+            **kwargs (torch.Tensor): Parameters.
         """
         if loss > self.best_loss:
             return
-        self.params = [torch.clone(p.detach()) for p in params]
+        self.params = {e: kwargs[e].detach() for e in kwargs}
         self.best_loss = torch.clone(loss.detach())
+
+    def __repr__(self) -> str:
+        """Implement __repr__."""
+        return f"Best loss: {self.best_loss:.5f}, with params: \n{self.params}"
