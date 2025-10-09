@@ -571,7 +571,7 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i
-            - self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=True,
         )
         self._dpsi = dpsi
@@ -609,7 +609,7 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i
-            - self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
@@ -681,7 +681,7 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i
-            - self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
