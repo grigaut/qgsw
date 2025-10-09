@@ -157,8 +157,8 @@ def compute_slices(
 dt = 3600
 optim_max_step = 100
 str_optim_len = len(str(optim_max_step))
-n_steps_per_cyle = 5  # 00
-comparison_interval = 1  # 00
+n_steps_per_cyle = 500
+comparison_interval = 1
 n_cycles = 3
 str_cycles_len = len(str(n_cycles))
 msg = (
