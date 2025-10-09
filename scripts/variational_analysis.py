@@ -1,15 +1,15 @@
 """Variational analysis."""
 
-# ruff: noqa:B023
-
 from __future__ import annotations
 
+import argparse
 import datetime
+import pathlib
+from dataclasses import dataclass
 from pathlib import Path
 
 import torch
 
-from qgsw.cli import ScriptArgs
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
@@ -32,8 +32,61 @@ from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
 
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
+
+## Config
+
+
+@dataclass
+class ScriptArgs:
+    """Script arguments."""
+
+    config: Path
+    verbose: int
+    indices: list[int]
+
+    @classmethod
+    def from_cli(cls) -> Self:
+        """Instantiate script arguments from CLI.
+
+        Args:
+            default_config (str): Default configuration path.
+
+        Returns:
+            Self: ScriptArgs.
+        """
+        parser = argparse.ArgumentParser(
+            description="Retrieve script arguments.",
+        )
+        parser.add_argument(
+            "--config",
+            required=True,
+            type=pathlib.Path,
+            help="Configuration File Path (from qgsw root level)",
+        )
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            action="count",
+            default=0,
+            help="Verbose level.",
+        )
+        parser.add_argument(
+            "-i",
+            "--indices",
+            required=True,
+            nargs="+",
+            type=int,
+            help="Indices (imin, imax, jmin, jmax), "
+            "for example (64, 128, 128, 256).",
+        )
+        return cls(**vars(parser.parse_args()))
+
 
 args = ScriptArgs.from_cli()
 specs = defaults.get()
@@ -83,13 +136,10 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 
 ## Areas
 
-imins = [32, 32, 112, 112]
-i_len = 64
-imaxs = [i + i_len for i in imins]
-
-jmins = [64, 256, 64, 256]
-j_len = 128
-jmaxs = [j + j_len for j in jmins]
+indices = args.indices
+imin, imax, jmin, jmax = indices
+msg = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
+logger.info(msg)
 
 
 def compute_slices(
@@ -102,18 +152,20 @@ def compute_slices(
     return psi_slices, q_slices
 
 
-n_areas = len(imins)
-str_area_len = len(str(n_areas))
-
 ## Simulation parameters
 
 dt = 3600
 optim_max_step = 100
 str_optim_len = len(str(optim_max_step))
-n_steps_per_cyle = 500
-comparison_interval = 100
+n_steps_per_cyle = 5  # 00
+comparison_interval = 1  # 00
 n_cycles = 3
 str_cycles_len = len(str(n_cycles))
+msg = (
+    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
+    f"steps with up to {optim_max_step} optimization steps."
+)
+logger.info(msg)
 
 ## Error
 
@@ -163,214 +215,205 @@ def set_inhomogeneous_model(
     return model
 
 
-for i, indices in enumerate(zip(imins, imaxs, jmins, jmaxs)):
-    i_ = str(i + 1).zfill(str_area_len)
-    i_max_ = str(n_areas)
+outputs = []
+model_3l.reset_time()
+model_3l.set_psi(psi_start)
 
-    imin, imax, jmin, jmax = indices
+psi_slices, q_slices = compute_slices(imin, imax, jmin, jmax)
 
-    outputs = []
-    model_3l.reset_time()
-    model_3l.set_psi(psi_start)
+space_slice = SpaceDiscretization2D.from_tensors(
+    x=P.space.remove_z_h().omega.xy.x[imin : imax + 1, 0],
+    y=P.space.remove_z_h().omega.xy.y[0, jmin : jmax + 1],
+)
 
-    psi_slices, q_slices = compute_slices(imin, imax, jmin, jmax)
+model_alpha = QGPSIQCollinearSF(
+    space_2d=space_slice,
+    H=H[:2],
+    beta_plane=beta_plane,
+    g_prime=g_prime[:2],
+)
+model_dpsi = QGPSIQFixeddSF2(
+    space_2d=space_slice,
+    H=H[:2],
+    beta_plane=beta_plane,
+    g_prime=g_prime[:2],
+)
+model_alpha: QGPSIQCollinearSF = set_inhomogeneous_model(model_alpha)
+model_dpsi: QGPSIQFixeddSF2 = set_inhomogeneous_model(model_dpsi)
 
-    space_slice = SpaceDiscretization2D.from_tensors(
-        x=P.space.remove_z_h().omega.xy.x[imin : imax + 1, 0],
-        y=P.space.remove_z_h().omega.xy.y[0, jmin : jmax + 1],
+model_alpha.set_wind_forcing(
+    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+)
+model_dpsi.set_wind_forcing(
+    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+)
+
+
+def extract_psi(psi: torch.Tensor) -> tuple[torch.Tensor, Boundaries]:
+    """Extract psi."""
+    return psi[..., psi_slices[0], psi_slices[1]], Boundaries.extract(
+        psi, imin, imax + 1, jmin, jmax + 1, 2
     )
 
-    model_alpha = QGPSIQCollinearSF(
-        space_2d=space_slice,
-        H=H[:2],
-        beta_plane=beta_plane,
-        g_prime=g_prime[:2],
-    )
-    model_dpsi = QGPSIQFixeddSF2(
-        space_2d=space_slice,
-        H=H[:2],
-        beta_plane=beta_plane,
-        g_prime=g_prime[:2],
-    )
-    model_alpha: QGPSIQCollinearSF = set_inhomogeneous_model(model_alpha)
-    model_dpsi: QGPSIQFixeddSF2 = set_inhomogeneous_model(model_dpsi)
 
-    model_alpha.set_wind_forcing(
-        tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-    )
-    model_dpsi.set_wind_forcing(
-        tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+def extract_q(q: torch.Tensor) -> tuple[torch.Tensor, Boundaries]:
+    """Extract q."""
+    return q[..., q_slices[0], q_slices[1]], Boundaries.extract(
+        q, imin - 1, imax + 1, jmin - 1, jmax + 1, 3
     )
 
-    def extract_psi(psi: torch.Tensor) -> tuple[torch.Tensor, Boundaries]:
-        """Extract psi."""
-        return psi[..., psi_slices[0], psi_slices[1]], Boundaries.extract(
-            psi, imin, imax + 1, jmin, jmax + 1, 2
-        )
 
-    def extract_q(q: torch.Tensor) -> tuple[torch.Tensor, Boundaries]:
-        """Extract q."""
-        return q[..., q_slices[0], q_slices[1]], Boundaries.extract(
-            q, imin - 1, imax + 1, jmin - 1, jmax + 1, 3
-        )
+for c in range(n_cycles):
+    c_ = str(c + 1).zfill(str_cycles_len)
+    c_max_ = str(n_cycles)
+    times = [model_3l.time.item()]
 
-    for c in range(n_cycles):
-        c_ = str(c + 1).zfill(str_cycles_len)
-        c_max_ = str(n_cycles)
-        times = [model_3l.time.item()]
+    psi0, psi_bc = extract_psi(model_3l.psi[:, :1])
+    q0, q_bc = extract_q(model_3l.q[:, :1])
 
-        psi0, psi_bc = extract_psi(model_3l.psi[:, :1])
-        q0, q_bc = extract_q(model_3l.q[:, :1])
+    psis = [psi0]
+    psi_bcs = [psi_bc]
+    qs = [q0]
+    q_bcs = [q_bc]
 
-        psis = [psi0]
-        psi_bcs = [psi_bc]
-        qs = [q0]
-        q_bcs = [q_bc]
+    for _ in range(1, n_steps_per_cyle):
+        model_3l.step()
 
-        for _ in range(1, n_steps_per_cyle):
-            model_3l.step()
+        times.append(model_3l.time.item())
 
-            times.append(model_3l.time.item())
+        psi, psi_bc = extract_psi(model_3l.psi[:, :1])
+        q, q_bc = extract_q(model_3l.q[:, :1])
 
-            psi, psi_bc = extract_psi(model_3l.psi[:, :1])
-            q, q_bc = extract_q(model_3l.q[:, :1])
+        psis.append(psi)
+        psi_bcs.append(psi_bc)
+        qs.append(q)
+        q_bcs.append(q_bc)
+    time = datetime.datetime.now(datetime.timezone.utc)
+    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
+    msg = f"Cycle {c_}/{c_max_} | Model spin-up completed."
+    logger.info(msg)
 
-            psis.append(psi)
-            psi_bcs.append(psi_bc)
-            qs.append(q)
-            q_bcs.append(q_bc)
-        time = datetime.datetime.now(datetime.timezone.utc)
-        time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-        msg = (
-            f"Area {i_}/{i_max_} | "
-            f"Cycle {c_}/{c_max_} | "
-            f"Model spin-up completed."
-        )
-        logger.info(msg)
+    psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
+    q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
-        psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-        q_bc_interp = QuadraticInterpolation(times, q_bcs)
+    alpha = torch.tensor(0.5, requires_grad=True)
 
-        alpha = torch.tensor(0.5, requires_grad=True)
+    optimizer = torch.optim.Adam([alpha], lr=1e-2)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, factor=0.5, patience=5
+    )
+    early_stop = EarlyStop()
+    register_params = RegisterParams()
 
-        optimizer = torch.optim.Adam([alpha], lr=1e-2)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, factor=0.5, patience=5
-        )
-        early_stop = EarlyStop()
-        register_params = RegisterParams()
+    for o in range(optim_max_step):
+        optimizer.zero_grad()
+        model_alpha.reset_time()
+        model_alpha.set_psiq(psi0, q0)
 
-        for o in range(optim_max_step):
-            optimizer.zero_grad()
-            model_alpha.reset_time()
-            model_alpha.set_psiq(psi0, q0)
+        with torch.enable_grad():
+            model_alpha.alpha = torch.ones_like(psi0) * alpha
+            model_alpha.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
-            with torch.enable_grad():
-                model_alpha.alpha = torch.ones_like(psi0) * alpha
-                model_alpha.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            loss = torch.tensor(0, **defaults.get())
 
-                loss = torch.tensor(0, **defaults.get())
+            for n in range(1, n_steps_per_cyle):
+                model_alpha.step()
 
-                for n in range(1, n_steps_per_cyle):
-                    model_alpha.step()
+                if (n + 1) % comparison_interval == 0:
+                    loss += rmse(model_alpha.psi[0, 0], psis[n][0, 0])
 
-                    if (n + 1) % comparison_interval == 0:
-                        loss += rmse(model_alpha.psi[0, 0], psis[n][0, 0])
-
-            register_params.step(loss, alpha)
-            if early_stop.step(loss):
-                msg = f"Convergence reached after {o + 1} iterations."
-                logger.info(msg)
-                break
-
-            o_ = str(o + 1).zfill(str_optim_len)
-            o_max_ = str(optim_max_step).zfill(str_optim_len)
-            loss_ = loss.cpu().item()
-
-            msg = (
-                f"Area {i_}/{i_max_} | "
-                f"Cycle {c_}/{c_max_} | "
-                f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
-                f"Loss: {loss_:3.5f}"
-            )
+        register_params.step(loss, alpha)
+        if early_stop.step(loss):
+            msg = f"Convergence reached after {o + 1} iterations."
             logger.info(msg)
+            break
 
-            loss.backward()
-            optimizer.step()
-            scheduler.step(loss)
+        o_ = str(o + 1).zfill(str_optim_len)
+        o_max_ = str(optim_max_step).zfill(str_optim_len)
+        loss_ = loss.cpu().item()
 
-        best_loss = register_params.best_loss
-        time = datetime.datetime.now(datetime.timezone.utc)
-        time_ = time.strftime("%d/%m/%Y %H:%M:%S")
         msg = (
-            f"Area {i_}/{i_max_} | "
             f"Cycle {c_}/{c_max_} | "
-            f"ɑ optimization completed | "  # noqa: RUF001
-            f"Loss: {best_loss:3.5f}"
+            f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
+            f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
-        dpsi2 = (torch.ones_like(model_dpsi.psi) * 1e-2).requires_grad_()
 
-        optimizer = torch.optim.Adam([dpsi2], lr=1e-2)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, factor=0.5, patience=5
-        )
-        early_stop = EarlyStop()
-        register_params = RegisterParams()
+        loss.backward()
+        optimizer.step()
+        scheduler.step(loss)
 
-        for o in range(optim_max_step):
-            optimizer.zero_grad()
-            model_dpsi.reset_time()
-            model_dpsi.set_psiq(psi0, q0)
-            model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
+    best_loss = register_params.best_loss
+    time = datetime.datetime.now(datetime.timezone.utc)
+    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
+    msg = (
+        f"Cycle {c_}/{c_max_} | "
+        f"ɑ optimization completed | "  # noqa: RUF001
+        f"Loss: {best_loss:3.5f}"
+    )
+    logger.info(msg)
+    dpsi2 = (torch.ones_like(model_dpsi.psi) * 1e-2).requires_grad_()
 
-            with torch.enable_grad():
-                model_dpsi.dpsi2 = dpsi2
+    optimizer = torch.optim.Adam([dpsi2], lr=1e-2)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, factor=0.5, patience=5
+    )
+    early_stop = EarlyStop()
+    register_params = RegisterParams()
 
-                loss = torch.tensor(0, **defaults.get())
+    for o in range(optim_max_step):
+        optimizer.zero_grad()
+        model_dpsi.reset_time()
+        model_dpsi.set_psiq(psi0, q0)
+        model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
-                for n in range(1, n_steps_per_cyle):
-                    model_dpsi.step()
+        with torch.enable_grad():
+            model_dpsi.dpsi2 = dpsi2
 
-                    if (n + 1) % comparison_interval == 0:
-                        loss += rmse(model_dpsi.psi[0, 0], psis[n][0, 0])
+            loss = torch.tensor(0, **defaults.get())
 
-            register_params.step(loss, dpsi2)
-            if early_stop.step(loss):
-                msg = f"Convergence reached after {o + 1} iterations."
-                logger.info(msg)
-                break
+            for n in range(1, n_steps_per_cyle):
+                model_dpsi.step()
 
-            o_ = str(o + 1).zfill(str_optim_len)
-            o_max_ = str(optim_max_step)
-            loss_ = loss.cpu().item()
+                if (n + 1) % comparison_interval == 0:
+                    loss += rmse(model_dpsi.psi[0, 0], psis[n][0, 0])
 
-            msg = (
-                f"Area {i_}/{i_max_} | "
-                f"Cycle {c_}/{c_max_} | "
-                f"dѱ2 optimization step {o_}/{o_max_} | "
-                f"Loss: {loss_:3.5f}"
-            )
+        register_params.step(loss, dpsi2)
+        if early_stop.step(loss):
+            msg = f"Convergence reached after {o + 1} iterations."
             logger.info(msg)
-            loss.backward()
-            optimizer.step()
-            scheduler.step(loss)
+            break
 
-        best_loss = register_params.best_loss
-        time = datetime.datetime.now(datetime.timezone.utc)
-        time_ = time.strftime("%d/%m/%Y %H:%M:%S")
+        o_ = str(o + 1).zfill(str_optim_len)
+        o_max_ = str(optim_max_step)
+        loss_ = loss.cpu().item()
+
         msg = (
-            f"Area {i_}/{i_max_} | "
             f"Cycle {c_}/{c_max_} | "
-            f"dѱ2 optimization completed | "
-            f"Loss: {best_loss:3.5f}"
+            f"dѱ2 optimization step {o_}/{o_max_} | "
+            f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
-        output = {
-            "cycle": c,
-            "coords": (imin, imax, jmin, jmax),
-            "alpha": alpha.detach().cpu(),
-            "dpsi2": dpsi2.detach().cpu(),
-        }
-        outputs.append(output)
-    torch.save(outputs, output_dir.joinpath(f"results_area_{i + 1}.pt"))
+        loss.backward()
+        optimizer.step()
+        scheduler.step(loss)
+
+    best_loss = register_params.best_loss
+    time = datetime.datetime.now(datetime.timezone.utc)
+    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
+    msg = (
+        f"Cycle {c_}/{c_max_} | "
+        f"dѱ2 optimization completed | "
+        f"Loss: {best_loss:3.5f}"
+    )
+    logger.info(msg)
+    output = {
+        "cycle": c,
+        "coords": (imin, imax, jmin, jmax),
+        "alpha": alpha.detach().cpu(),
+        "dpsi2": dpsi2.detach().cpu(),
+    }
+    outputs.append(output)
+torch.save(
+    outputs, output_dir.joinpath(f"results_{imin}_{imax}_{jmin}_{jmax}.pt")
+)
