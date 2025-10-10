@@ -352,6 +352,7 @@ for c in range(n_cycles):
 
         torch.nn.utils.clip_grad_value_([alpha, dalpha], clip_value=1.0)
 
+        optimizer.step()
         scheduler.step(loss)
 
     best_loss = register_params_alpha.best_loss

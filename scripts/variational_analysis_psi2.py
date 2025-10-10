@@ -373,7 +373,6 @@ for c in range(n_cycles):
         torch.nn.utils.clip_grad_norm_([psi2, dpsi2], max_norm=1.0)
 
         optimizer.step()
-        optimizer.step()
         scheduler.step(loss)
 
     best_loss = register_params_dpsi2.best_loss
