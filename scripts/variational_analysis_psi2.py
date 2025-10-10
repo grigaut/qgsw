@@ -239,30 +239,19 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-
 space_slice = SpaceDiscretization2D.from_tensors(
     x=P.space.remove_z_h().omega.xy.x[imin : imax + 1, 0],
     y=P.space.remove_z_h().omega.xy.y[0, jmin : jmax + 1],
 )
 
-model_alpha = QGPSIQCollinearSF(
-    space_2d=space_slice,
-    H=H[:2],
-    beta_plane=beta_plane,
-    g_prime=g_prime[:2],
-)
 model_dpsi = QGPSIQFixeddSF2(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model_alpha: QGPSIQCollinearSF = set_inhomogeneous_model(model_alpha)
 model_dpsi: QGPSIQFixeddSF2 = set_inhomogeneous_model(model_dpsi)
 
-model_alpha.set_wind_forcing(
-    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-)
 model_dpsi.set_wind_forcing(
     tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
 )
@@ -304,83 +293,6 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-
-    alpha = torch.tensor(0.5, requires_grad=True)
-    dalpha = torch.tensor(0.5, requires_grad=True)
-
-    optimizer = torch.optim.Adam([alpha, dalpha], lr=1e-2)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=5
-    )
-    early_stop = EarlyStop()
-    register_params_alpha = RegisterParams()
-
-    for o in range(optim_max_step):
-        optimizer.zero_grad()
-        model_alpha.reset_time()
-
-        with torch.enable_grad():
-            q0 = compute_q_alpha(psi0, alpha)[..., 3:-3, 3:-3]
-            q_bcs = [
-                Boundaries.extract(
-                    compute_q_alpha(psi[:, :1], alpha), 2, -3, 2, -3, 3
-                )
-                for psi in psis
-            ]
-
-            model_alpha.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
-            q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model_alpha.alpha = torch.ones_like(model_alpha.psi) * dalpha
-            model_alpha.set_boundary_maps(psi_bc_interp, q_bc_interp)
-
-            loss = torch.tensor(0, **defaults.get())
-
-            for n in range(1, n_steps_per_cyle):
-                model_alpha.step()
-
-                if (n + 1) % comparison_interval == 0:
-                    loss += rmse(
-                        model_alpha.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
-                    )
-
-        if torch.isnan(loss.detach()):
-            msg = "Loss has diverged."
-            logger.warning(msg)
-            break
-
-        register_params_alpha.step(loss, alpha=alpha, dalpha=dalpha)
-
-        if early_stop.step(loss):
-            msg = f"Convergence reached after {o + 1} iterations."
-            logger.info(msg)
-            break
-
-        o_ = str(o + 1).zfill(str_optim_len)
-        o_max_ = str(optim_max_step).zfill(str_optim_len)
-        loss_ = loss.cpu().item()
-        msg = (
-            f"Cycle {c_}/{c_max_} | "
-            f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
-            f"Loss: {loss_:3.5f}"
-        )
-        logger.info(msg)
-
-        lr = scheduler.get_last_lr()[0]
-        msg = f"\tLearning rate {lr:.1e}"
-        logger.detail(msg)
-
-        loss.backward()
-
-        torch.nn.utils.clip_grad_value_([alpha, dalpha], clip_value=1.0)
-
-        scheduler.step(loss)
-
-    best_loss = register_params_alpha.best_loss
-    msg = (
-        f"ɑ and dɑ optimization completed with "  # noqa: RUF001
-        f"loss: {best_loss:3.5f}"
-    )
-    logger.info(box(msg, style="round"))
 
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
@@ -429,7 +341,7 @@ for c in range(n_cycles):
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
-            logger.warning(msg)
+            logger.warning(box(msg, style="="))
             break
 
         register_params_dpsi2.step(loss, psi2=psi2, dpsi2=dpsi2)
@@ -472,13 +384,11 @@ for c in range(n_cycles):
     output = {
         "cycle": c,
         "coords": (imin, imax, jmin, jmax),
-        "alpha": register_params_alpha.params["alpha"].detach().cpu(),
-        "dalpha": register_params_alpha.params["dalpha"].detach().cpu(),
         "psi2": register_params_dpsi2.params["psi2"].detach().cpu(),
         "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
-f = output_dir.joinpath(f"results_{imin}_{imax}_{jmin}_{jmax}.pt")
+f = output_dir.joinpath(f"results_psi2_{imin}_{imax}_{jmin}_{jmax}.pt")
 torch.save(outputs, f)
 msg = f"Outputs saved to {f}"
 logger.info(box(msg, style="="))
