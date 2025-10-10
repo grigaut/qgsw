@@ -1,27 +1,39 @@
 #!/bin/bash
 
-#OAR -n run-model
-#OAR -q production
-#OAR -l gpu=1,walltime=48
-###OAR --property cputype = 'Intel Xeon Silver 4214' OR cputype = 'Intel Xeon Gold 6248' OR cputype = 'Intel Xeon Silver 4114'
-#OAR -O logs/OAR.%jobid%.stdout
-#OAR -E logs/OAR.%jobid%.stderr
-#OAR --notify mail:gaetan.rigaut@inria.fr
-
-# To run with arguments use quotes: oarsub -S "./run_var_analysis.sh --config=config/variational_analysis.toml -vv"
-
-lscpu | grep 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1'
-
-echo JOB ID : $OAR_JOB_ID
 
 SRCDIR=$HOME/qgsw
 
 cd $SRCDIR
 
-date
+chmod +x scripts/bash/run_va_alpha.sh
+chmod +x scripts/bash/run_var_psi2.sh
 
-.venv/bin/python3 -u scripts/variational_analysis.py $@
+cmd="./scripts/bash/run_va_alpha.sh"
+for arg in "$@"; do
+    cmd+=" \"$arg\""
+done
+cmd1=$cmd+" --indices 32 96 64 192"
+cmd2=$cmd+" --indices 32 96 256 384"
+cmd3=$cmd+" --indices 112 176 64 192"
+cmd4=$cmd+" --indices 112 176 256 384"
+oarsub -S "$cmd1" -n "VA-psi2-[32 96 64 192]"
+oarsub -S "$cmd2" -n "VA-psi2-[32 96 256 384]"
+oarsub -S "$cmd3" -n "VA-psi2-[112 176 64 192]"
+oarsub -S "$cmd3" -n "VA-psi2-[112 176 256 384]"
 
-date
+
+cmd="./scripts/bash/run_va_psi2.sh"
+for arg in "$@"; do
+    cmd+=" \"$arg\""
+done
+cmd1=$cmd+" --indices 32 96 64 192"
+cmd2=$cmd+" --indices 32 96 256 384"
+cmd3=$cmd+" --indices 112 176 64 192"
+cmd4=$cmd+" --indices 112 176 256 384"
+oarsub -S "$cmd1" -n "VA-psi2-[32 96 64 192]"
+oarsub -S "$cmd2" -n "VA-psi2-[32 96 256 384]"
+oarsub -S "$cmd3" -n "VA-psi2-[112 176 64 192]"
+oarsub -S "$cmd3" -n "VA-psi2-[112 176 256 384]"
+
 
 exit 1

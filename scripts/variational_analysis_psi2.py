@@ -14,6 +14,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
+from qgsw.logging.msg_wrappers import box
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
@@ -101,6 +102,22 @@ config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 
 output_dir = config.io.output.directory
 
+
+# Simulation parameters
+
+dt = 7200
+optim_max_step = 200
+str_optim_len = len(str(optim_max_step))
+n_steps_per_cyle = 250
+comparison_interval = 1
+n_cycles = 3
+str_cycles_len = len(str(n_cycles))
+msg = (
+    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
+    f"steps with up to {optim_max_step} optimization steps."
+)
+logger.info(box(msg, style="="))
+
 # Parameters
 
 H = config.model.h
@@ -148,21 +165,6 @@ logger.info(msg)
 p = 4
 psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
 psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
-
-## Simulation parameters
-
-dt = 7200
-optim_max_step = 200
-str_optim_len = len(str(optim_max_step))
-n_steps_per_cyle = 250
-comparison_interval = 1
-n_cycles = 3
-str_cycles_len = len(str(n_cycles))
-msg = (
-    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
-    f"steps with up to {optim_max_step} optimization steps."
-)
-logger.info(msg)
 
 ## Error
 
@@ -237,30 +239,19 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-
 space_slice = SpaceDiscretization2D.from_tensors(
     x=P.space.remove_z_h().omega.xy.x[imin : imax + 1, 0],
     y=P.space.remove_z_h().omega.xy.y[0, jmin : jmax + 1],
 )
 
-model_alpha = QGPSIQCollinearSF(
-    space_2d=space_slice,
-    H=H[:2],
-    beta_plane=beta_plane,
-    g_prime=g_prime[:2],
-)
 model_dpsi = QGPSIQFixeddSF2(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model_alpha: QGPSIQCollinearSF = set_inhomogeneous_model(model_alpha)
 model_dpsi: QGPSIQFixeddSF2 = set_inhomogeneous_model(model_dpsi)
 
-model_alpha.set_wind_forcing(
-    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-)
 model_dpsi.set_wind_forcing(
     tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
 )
@@ -298,86 +289,15 @@ for c in range(n_cycles):
         psis.append(psi)
         psi_bcs.append(psi_bc)
 
-    time = datetime.datetime.now(datetime.timezone.utc)
-    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-    msg = f"Cycle {c_}/{c_max_} | Model spin-up completed."
-    logger.info(msg)
+    msg = f"Cycle {c_}/{c_max_}: Model spin-up completed."
+    logger.info(box(msg, style="round"))
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-
-    alpha = torch.tensor(0.5, requires_grad=True)
-    dalpha = torch.tensor(0.5, requires_grad=True)
-
-    optimizer = torch.optim.Adam([alpha, dalpha], lr=1e-2)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=5
-    )
-    early_stop = EarlyStop()
-    register_params_alpha = RegisterParams()
-
-    for o in range(optim_max_step):
-        optimizer.zero_grad()
-        model_alpha.reset_time()
-
-        with torch.enable_grad():
-            q0 = compute_q_alpha(psi0, alpha)[..., 3:-3, 3:-3]
-            q_bcs = [
-                Boundaries.extract(
-                    compute_q_alpha(psi[:, :1], alpha), 2, -3, 2, -3, 3
-                )
-                for psi in psis
-            ]
-
-            model_alpha.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
-            q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model_alpha.alpha = torch.ones_like(model_alpha.psi) * dalpha
-            model_alpha.set_boundary_maps(psi_bc_interp, q_bc_interp)
-
-            loss = torch.tensor(0, **defaults.get())
-
-            for n in range(1, n_steps_per_cyle):
-                model_alpha.step()
-
-                if (n + 1) % comparison_interval == 0:
-                    loss += rmse(
-                        model_alpha.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
-                    )
-
-        register_params_alpha.step(loss, alpha=alpha, dalpha=dalpha)
-        if early_stop.step(loss):
-            msg = f"Convergence reached after {o + 1} iterations."
-            logger.info(msg)
-            break
-
-        o_ = str(o + 1).zfill(str_optim_len)
-        o_max_ = str(optim_max_step).zfill(str_optim_len)
-        loss_ = loss.cpu().item()
-
-        msg = (
-            f"Cycle {c_}/{c_max_} | "
-            f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
-            f"Loss: {loss_:3.5f}"
-        )
-        logger.info(msg)
-
-        loss.backward()
-        optimizer.step()
-        scheduler.step(loss)
-
-    best_loss = register_params_alpha.best_loss
-    time = datetime.datetime.now(datetime.timezone.utc)
-    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-    msg = (
-        f"Cycle {c_}/{c_max_} | "
-        f"ɑ optimization completed | "  # noqa: RUF001
-        f"Loss: {best_loss:3.5f}"
-    )
-    logger.info(msg)
 
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
 
-    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3)
+    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3, weight_decay=1e-3)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -419,7 +339,13 @@ for c in range(n_cycles):
                         model_dpsi.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
                     )
 
+        if torch.isnan(loss.detach()):
+            msg = "Loss has diverged."
+            logger.warning(box(msg, style="="))
+            break
+
         register_params_dpsi2.step(loss, psi2=psi2, dpsi2=dpsi2)
+
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
             logger.info(msg)
@@ -435,28 +361,34 @@ for c in range(n_cycles):
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
+
+        lr = scheduler.get_last_lr()[0]
+        msg = f"\tLearning rate {lr:.1e}"
+        logger.detail(msg)
+
         loss.backward()
+
+        msg = f"{psi2.grad.norm().item()}"
+
+        torch.nn.utils.clip_grad_norm_([psi2, dpsi2], max_norm=1.0)
+
+        optimizer.step()
         optimizer.step()
         scheduler.step(loss)
 
     best_loss = register_params_dpsi2.best_loss
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-    msg = (
-        f"Cycle {c_}/{c_max_} | "
-        f"dѱ2 optimization completed | "
-        f"Loss: {best_loss:3.5f}"
-    )
-    logger.info(msg)
+    msg = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
+    logger.info(box(msg, style="round"))
     output = {
         "cycle": c,
         "coords": (imin, imax, jmin, jmax),
-        "alpha": register_params_alpha.params["alpha"].detach().cpu(),
-        "dalpha": register_params_alpha.params["dalpha"].detach().cpu(),
         "psi2": register_params_dpsi2.params["psi2"].detach().cpu(),
         "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
-torch.save(
-    outputs, output_dir.joinpath(f"results_{imin}_{imax}_{jmin}_{jmax}.pt")
-)
+f = output_dir.joinpath(f"results_psi2_{imin}_{imax}_{jmin}_{jmax}.pt")
+torch.save(outputs, f)
+msg = f"Outputs saved to {f}"
+logger.info(box(msg, style="="))

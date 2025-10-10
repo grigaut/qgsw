@@ -30,4 +30,9 @@ class Formatter(logging.Formatter):
         timestamp = self.formatTime(record, "%H:%M:%S")
         level_str = self.level_formats.get(record.levelno, "[LOG     ]")
         msg = record.getMessage()
-        return f"[{timestamp}] {level_str} {msg}"
+        indent = f"[{timestamp}] {level_str} "
+        blank_indent = " " * len(indent)
+        msg_parts = msg.split("\n")
+        return "\n".join(
+            [indent + msg_parts[0], *[blank_indent + p for p in msg_parts[1:]]]
+        )
