@@ -352,14 +352,16 @@ for c in range(n_cycles):
         o_ = str(o + 1).zfill(str_optim_len)
         o_max_ = str(optim_max_step).zfill(str_optim_len)
         loss_ = loss.cpu().item()
-        lr = scheduler.get_last_lr()[0]
         msg = (
             f"Cycle {c_}/{c_max_} | "
             f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
-            f"Learning rate {lr:.1e} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
+
+        lr = scheduler.get_last_lr()[0]
+        msg = f"\tLearning rate {lr:.1e}"
+        logger.detail(msg)
 
         loss.backward()
         optimizer.step()
@@ -368,10 +370,15 @@ for c in range(n_cycles):
     best_loss = register_params_alpha.best_loss
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
+    msg_ = (
+        f"ɑ and dɑ optimization completed with "  # noqa: RUF001
+        f"loss: {best_loss:3.5f}"
+    )
     msg = (
-        f"Cycle {c_}/{c_max_} | "
-        f"ɑ optimization completed | "  # noqa: RUF001
-        f"Loss: {best_loss:3.5f}"
+        f"##{''.join(['#'] * len(msg_))}##\n"
+        f"# {''.join([' '] * len(msg_))} #\n"
+        f"# {msg_} #\n# {''.join([' '] * len(msg_))} #\n#"
+        f"#{''.join(['#'] * len(msg_))}##"
     )
     logger.info(msg)
 
@@ -429,15 +436,18 @@ for c in range(n_cycles):
         o_ = str(o + 1).zfill(str_optim_len)
         o_max_ = str(optim_max_step)
         loss_ = loss.cpu().item()
-        lr = scheduler.get_last_lr()[0]
 
         msg = (
             f"Cycle {c_}/{c_max_} | "
             f"dѱ2 optimization step {o_}/{o_max_} | "
-            f"Learning rate {lr:.1e} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
+
+        lr = scheduler.get_last_lr()[0]
+        msg = f"\tLearning rate {lr:.1e}"
+        logger.detail(msg)
+
         loss.backward()
         optimizer.step()
         scheduler.step(loss)
@@ -445,10 +455,12 @@ for c in range(n_cycles):
     best_loss = register_params_dpsi2.best_loss
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
+    msg_ = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
     msg = (
-        f"Cycle {c_}/{c_max_} | "
-        f"dѱ2 optimization completed | "
-        f"Loss: {best_loss:3.5f}"
+        f"##{''.join(['#'] * len(msg_))}##\n"
+        f"# {''.join([' '] * len(msg_))} #\n"
+        f"# {msg_} #\n# {''.join([' '] * len(msg_))} #\n#"
+        f"#{''.join(['#'] * len(msg_))}##"
     )
     logger.info(msg)
     output = {
