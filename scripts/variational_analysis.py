@@ -376,7 +376,7 @@ for c in range(n_cycles):
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
 
-    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3)
+    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3, weight_decay=1e-3)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -457,6 +457,7 @@ for c in range(n_cycles):
         "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
-torch.save(
-    outputs, output_dir.joinpath(f"results_{imin}_{imax}_{jmin}_{jmax}.pt")
-)
+f = output_dir.joinpath(f"results_{imin}_{imax}_{jmin}_{jmax}.pt")
+torch.save(outputs, f)
+msg = f"Outputs saved to {f}"
+logger.info(surround(msg))
