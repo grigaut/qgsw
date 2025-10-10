@@ -14,7 +14,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
-from qgsw.logging.msg_wrappers import surround
+from qgsw.logging.msg_wrappers import box
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
@@ -102,6 +102,22 @@ config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 
 output_dir = config.io.output.directory
 
+
+# Simulation parameters
+
+dt = 7200
+optim_max_step = 200
+str_optim_len = len(str(optim_max_step))
+n_steps_per_cyle = 250
+comparison_interval = 1
+n_cycles = 3
+str_cycles_len = len(str(n_cycles))
+msg = (
+    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
+    f"steps with up to {optim_max_step} optimization steps."
+)
+logger.info(box(msg, style="="))
+
 # Parameters
 
 H = config.model.h
@@ -149,21 +165,6 @@ logger.info(msg)
 p = 4
 psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
 psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
-
-## Simulation parameters
-
-dt = 7200
-optim_max_step = 200
-str_optim_len = len(str(optim_max_step))
-n_steps_per_cyle = 250
-comparison_interval = 1
-n_cycles = 3
-str_cycles_len = len(str(n_cycles))
-msg = (
-    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
-    f"steps with up to {optim_max_step} optimization steps."
-)
-logger.info(msg)
 
 ## Error
 
@@ -300,7 +301,7 @@ for c in range(n_cycles):
         psi_bcs.append(psi_bc)
 
     msg = "Model spin-up completed."
-    logger.info(surround(msg, "#"))
+    logger.info(box(msg, style="round"))
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
@@ -371,7 +372,7 @@ for c in range(n_cycles):
         f"ɑ and dɑ optimization completed with "  # noqa: RUF001
         f"loss: {best_loss:3.5f}"
     )
-    logger.info(surround(msg, "#"))
+    logger.info(box(msg, style="round"))
 
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
@@ -447,7 +448,7 @@ for c in range(n_cycles):
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
     msg = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
-    logger.info(surround(msg, "#"))
+    logger.info(box(msg, style="round"))
     output = {
         "cycle": c,
         "coords": (imin, imax, jmin, jmax),
@@ -460,4 +461,4 @@ for c in range(n_cycles):
 f = output_dir.joinpath(f"results_{imin}_{imax}_{jmin}_{jmax}.pt")
 torch.save(outputs, f)
 msg = f"Outputs saved to {f}"
-logger.info(surround(msg))
+logger.info(box(msg, style="="))
