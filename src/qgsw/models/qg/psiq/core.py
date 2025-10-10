@@ -361,9 +361,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             msg = f"Invalid stencil value: {self.flux_stencil}"
             raise ValueError(msg)
 
-        self.div_flux = (
-            OptimizableFunction(div_flux) if self._optim else div_flux
-        )
+        with logger.section("Compiling function..."):
+            self.div_flux = (
+                OptimizableFunction(div_flux) if self._optim else div_flux
+            )
 
     def _set_flux_inhomogeneous(self) -> None:
         """Set the flux.
@@ -404,9 +405,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             msg = f"Invalid stencil value: {self.flux_stencil}"
             raise ValueError(msg)
 
-        self.div_flux = (
-            OptimizableFunction(div_flux) if self._optim else div_flux
-        )
+        with logger.section("Compiling function..."):
+            self.div_flux = (
+                OptimizableFunction(div_flux) if self._optim else div_flux
+            )
 
     def _switch_to_inhomogeneous(self) -> None:
         """Switch to an inhomogeneous solver."""
@@ -444,9 +446,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             optimize (bool): Whether to optimize or not.
         """
         if optimize:
-            self._grad_perp = OptimizableFunction(grad_perp)
-            self._interpolate = OptimizableFunction(interpolate)
-            self._laplacian_h = OptimizableFunction(laplacian_h)
+            with logger.section("Compiling functions..."):
+                self._grad_perp = OptimizableFunction(grad_perp)
+                self._interpolate = OptimizableFunction(interpolate)
+                self._laplacian_h = OptimizableFunction(laplacian_h)
         else:
             self._grad_perp = grad_perp
             self._interpolate = interpolate

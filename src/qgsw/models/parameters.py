@@ -65,11 +65,12 @@ class ModelParamChecker:
         ## Space
         self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
         # Beta-plane
-        self._set_beta_plane(beta_plane)
-        # h
-        self._set_H(self._space.h.xyh.h)
-        ## gravity
-        self._set_g_prime(g_prime.unsqueeze(1).unsqueeze(1))
+        with logger.section("Setting model parameters..."):
+            self._set_beta_plane(beta_plane)
+            # h
+            self._set_H(self._space.h.xyh.h)
+            ## gravity
+            self._set_g_prime(g_prime.unsqueeze(1).unsqueeze(1))
 
     @property
     def space(self) -> SpaceDiscretization3D:

@@ -9,9 +9,12 @@ from typing import Callable
 import torch
 import torch.nn.functional as F
 
+from qgsw.logging import getLogger
 from qgsw.masks import Masks
 from qgsw.models.core import reconstruction
 from qgsw.models.core.utils import OptimizableFunction
+
+logger = getLogger(__name__)
 
 
 def stencil_2pts(
@@ -1065,10 +1068,11 @@ class Fluxes:
             )
 
         if optimize:
-            self.h_x = OptimizableFunction(h_flux_x)
-            self.h_y = OptimizableFunction(h_flux_y)
-            self.w_x = OptimizableFunction(omega_flux_x)
-            self.w_y = OptimizableFunction(omega_flux_y)
+            with logger.section("Compiling function..."):
+                self.h_x = OptimizableFunction(h_flux_x)
+                self.h_y = OptimizableFunction(h_flux_y)
+                self.w_x = OptimizableFunction(omega_flux_x)
+                self.w_y = OptimizableFunction(omega_flux_y)
         else:
             self.h_x = h_flux_x
             self.h_y = h_flux_y
