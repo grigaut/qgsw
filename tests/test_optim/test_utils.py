@@ -27,3 +27,6 @@ def test_register_params() -> None:
     assert "n" in register_params.params
     assert register_params.params["n"] == 250  # noqa: PLR2004
     assert register_params.best_loss == 0
+    assert param.item() == 499  # noqa: PLR2004
+    register_params.restore(n=param)
+    assert param.item() == 250  # noqa: PLR2004
