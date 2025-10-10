@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class EarlyStop:
     """Early stop."""
 
-    def __init__(self, *, eps: float = 1e-8, stop_after: int = 10) -> None:
+    def __init__(self, *, eps: float = 1e-5, stop_after: int = 10) -> None:
         """INstantiate EarlyStop.
 
         Args:
