@@ -29,13 +29,14 @@ class EarlyStop:
             bool: True if loss has been stable.
         """
         if self.previous_loss is None:
-            self.previous_loss = loss
+            self.previous_loss = loss.detach()
             return False
         loss_ = self.previous_loss
         if ((loss - loss_).abs() / loss_.abs()) < self.eps:
             self.counter += 1
         else:
             self.counter = 0
+            self.previous_loss = loss.detach()
         return self.counter >= self.stop_after
 
 
