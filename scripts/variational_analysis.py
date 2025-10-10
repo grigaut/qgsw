@@ -14,6 +14,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
+from qgsw.logging.msg_wrappers import surround
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
@@ -298,10 +299,8 @@ for c in range(n_cycles):
         psis.append(psi)
         psi_bcs.append(psi_bc)
 
-    time = datetime.datetime.now(datetime.timezone.utc)
-    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-    msg = f"Cycle {c_}/{c_max_} | Model spin-up completed."
-    logger.info(msg)
+    msg = "Model spin-up completed."
+    logger.info(surround(msg, "#"))
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
@@ -368,19 +367,11 @@ for c in range(n_cycles):
         scheduler.step(loss)
 
     best_loss = register_params_alpha.best_loss
-    time = datetime.datetime.now(datetime.timezone.utc)
-    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-    msg_ = (
+    msg = (
         f"ɑ and dɑ optimization completed with "  # noqa: RUF001
         f"loss: {best_loss:3.5f}"
     )
-    msg = (
-        f"##{''.join(['#'] * len(msg_))}##\n"
-        f"# {''.join([' '] * len(msg_))} #\n"
-        f"# {msg_} #\n# {''.join([' '] * len(msg_))} #\n#"
-        f"#{''.join(['#'] * len(msg_))}##"
-    )
-    logger.info(msg)
+    logger.info(surround(msg, "#"))
 
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
@@ -455,14 +446,8 @@ for c in range(n_cycles):
     best_loss = register_params_dpsi2.best_loss
     time = datetime.datetime.now(datetime.timezone.utc)
     time_ = time.strftime("%d/%m/%Y %H:%M:%S")
-    msg_ = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
-    msg = (
-        f"##{''.join(['#'] * len(msg_))}##\n"
-        f"# {''.join([' '] * len(msg_))} #\n"
-        f"# {msg_} #\n# {''.join([' '] * len(msg_))} #\n#"
-        f"#{''.join(['#'] * len(msg_))}##"
-    )
-    logger.info(msg)
+    msg = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
+    logger.info(surround(msg, "#"))
     output = {
         "cycle": c,
         "coords": (imin, imax, jmin, jmax),
