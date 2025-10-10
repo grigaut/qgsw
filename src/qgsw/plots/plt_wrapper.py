@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import ParamSpec
-
 import numpy as np
 import torch
 from matplotlib import figure
 from matplotlib import pyplot as plt
+from typing_extensions import ParamSpec
 
 Param = ParamSpec("Param")
 
