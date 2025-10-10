@@ -362,7 +362,7 @@ for c in range(n_cycles):
         )
         logger.info(msg)
 
-        lr = scheduler.get_last_lr()[0]
+        lr = optimizer.param_groups[0]["lr"]
         msg = f"\tLearning rate {lr:.1e}"
         logger.detail(msg)
 
