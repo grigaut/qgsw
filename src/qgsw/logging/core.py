@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import sys
 
+from qgsw.logging.log_records import make_log_record
+
 try:
     from rich.console import Console
     from rich.logging import RichHandler
@@ -15,13 +17,14 @@ except ImportError:
     WITH_RICH = False
 
 from qgsw.logging.environments import in_notebook, in_oar
-from qgsw.logging.formatters import Formatter
+from qgsw.logging.formatters import Formatter, RichFormatter
 from qgsw.logging.logger import DETAIL_LEVEL, Logger
 
 
 def setup_root_logger(verbose_level: int = 1) -> None:
     """Setup root logger."""
     logging.setLoggerClass(Logger)
+    logging.setLogRecordFactory(make_log_record)
     logging.addLevelName(DETAIL_LEVEL, "DETAIL")
     level_map = {
         0: logging.WARNING,
@@ -67,7 +70,7 @@ def get_handler_rich() -> RichHandler:
 
     console = Console(file=sys.stdout, theme=custom_theme, force_jupyter=False)
 
-    return RichHandler(
+    handler = RichHandler(
         console=console,
         rich_tracebacks=False,
         show_time=True,
@@ -76,6 +79,8 @@ def get_handler_rich() -> RichHandler:
         show_level=True,
         log_time_format="[%H:%M:%S]",
     )
+    handler.setFormatter(RichFormatter())
+    return handler
 
 
 def get_handler_no_rich() -> logging.StreamHandler:
