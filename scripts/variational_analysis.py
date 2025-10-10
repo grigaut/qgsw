@@ -352,10 +352,11 @@ for c in range(n_cycles):
         o_ = str(o + 1).zfill(str_optim_len)
         o_max_ = str(optim_max_step).zfill(str_optim_len)
         loss_ = loss.cpu().item()
-
+        lr = scheduler.get_last_lr()[0]
         msg = (
             f"Cycle {c_}/{c_max_} | "
             f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
+            f"Learning rate {lr:.1e} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
@@ -428,10 +429,12 @@ for c in range(n_cycles):
         o_ = str(o + 1).zfill(str_optim_len)
         o_max_ = str(optim_max_step)
         loss_ = loss.cpu().item()
+        lr = scheduler.get_last_lr()[0]
 
         msg = (
             f"Cycle {c_}/{c_max_} | "
             f"dѱ2 optimization step {o_}/{o_max_} | "
+            f"Learning rate {lr:.1e} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
