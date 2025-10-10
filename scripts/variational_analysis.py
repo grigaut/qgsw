@@ -300,7 +300,7 @@ for c in range(n_cycles):
         psis.append(psi)
         psi_bcs.append(psi_bc)
 
-    msg = "Model spin-up completed."
+    msg = f"Cycle {c_}/{c_max_}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
@@ -343,7 +343,13 @@ for c in range(n_cycles):
                         model_alpha.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
                     )
 
+        if torch.isnan(loss.detach()):
+            msg = "Loss has diverged."
+            logger.warning(msg)
+            break
+
         register_params_alpha.step(loss, alpha=alpha, dalpha=dalpha)
+
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
             logger.info(msg)
@@ -364,7 +370,9 @@ for c in range(n_cycles):
         logger.detail(msg)
 
         loss.backward()
-        optimizer.step()
+
+        torch.nn.utils.clip_grad_value_([alpha, dalpha], clip_value=1.0)
+
         scheduler.step(loss)
 
     best_loss = register_params_alpha.best_loss
@@ -419,7 +427,13 @@ for c in range(n_cycles):
                         model_dpsi.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
                     )
 
+        if torch.isnan(loss.detach()):
+            msg = "Loss has diverged."
+            logger.warning(msg)
+            break
+
         register_params_dpsi2.step(loss, psi2=psi2, dpsi2=dpsi2)
+
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
             logger.info(msg)
@@ -441,6 +455,12 @@ for c in range(n_cycles):
         logger.detail(msg)
 
         loss.backward()
+
+        msg = f"{psi2.grad.norm().item()}"
+
+        torch.nn.utils.clip_grad_norm_([psi2, dpsi2], max_norm=1.0)
+
+        optimizer.step()
         optimizer.step()
         scheduler.step(loss)
 
