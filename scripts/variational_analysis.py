@@ -375,9 +375,9 @@ for c in range(n_cycles):
     logger.info(msg)
 
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
-    dpsi2 = (torch.ones_like(model_dpsi.psi) * 1e-2).requires_grad_()
+    dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
 
-    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-2)
+    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -389,18 +389,25 @@ for c in range(n_cycles):
         model_dpsi.reset_time()
 
         with torch.enable_grad():
-            q0 = compute_q_psi2(psi0, psi2)[..., 3:-3, 3:-3]
+            q0 = compute_q_psi2(psi0, psi2)[
+                ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
+            ]
             q_bcs = [
                 Boundaries.extract(
-                    compute_q_psi2(psi[:, :1], psi2), 2, -3, 2, -3, 3
+                    compute_q_psi2(psi[:, :1], psi2 + n * dt * dpsi2),
+                    p - 2,
+                    -(p - 1),
+                    p - 2,
+                    -(p - 1),
+                    3,
                 )
-                for psi in psis
+                for n, psi in enumerate(psis)
             ]
 
             model_dpsi.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
             model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
-            model_dpsi.dpsi2 = dpsi2
+            model_dpsi.dpsi2 = dpsi2[..., p:-p, p:-p]
 
             loss = torch.tensor(0, **defaults.get())
 
