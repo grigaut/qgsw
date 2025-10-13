@@ -1,8 +1,9 @@
 """Logger class."""
 
+from __future__ import annotations
+
 import logging
 import time
-from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
@@ -10,6 +11,8 @@ from typing import TYPE_CHECKING
 from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+
     from qgsw.logging.log_records import LogRecord
 
 P = ParamSpec("P")
@@ -61,16 +64,21 @@ class Logger(logging.Logger):
         self.info(f"{message} done in {time.perf_counter() - start:.2f}s")
 
     @contextmanager
-    def section(self, message: str) -> Generator[None, None, None]:
+    def section(
+        self,
+        message: str | None = None,
+    ) -> Generator[None, None, None]:
         """Create a section and indent all messages within.
 
         Args:
-            message (str): Firs message of the section (unindented)
+            message (str|None, optional): First message of the section
+                (unindented). Defaults to None.
 
         Yields:
             Generator[None, None, None]: Context manager.
         """
-        self.info(message)
+        if message is not None:
+            self.info(message)
         token = _indent_level.set(_indent_level.get() + 1)
         try:
             yield
