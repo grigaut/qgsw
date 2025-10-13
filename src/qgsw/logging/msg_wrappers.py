@@ -103,3 +103,18 @@ def box(
     bot = bl + "".join([h] * max_len) + br
     msg_pad_ = pad(msg_pad, v)
     return "\n".join([top, *msg_pad_.split("\n"), bot])
+
+
+def step(current: int, total: int | None = None) -> str:
+    """Create a string representing a step.
+
+    Args:
+        current (int): Current step.
+        total (int | None, optional): Total steps. Defaults to None.
+
+    Returns:
+        str: current / total.
+    """
+    c_str = str(current)
+    t_str = "?" * max(3, len(c_str)) if total is None else str(total)
+    return c_str.zfill(len(t_str)) + "/" + t_str
