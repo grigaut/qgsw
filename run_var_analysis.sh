@@ -19,7 +19,7 @@ cmd4="${cmd} --indices 112 176 256 384"
 oarsub -S "$cmd1" -n "VA-alpha-[32 96 64 192]"
 oarsub -S "$cmd2" -n "VA-alpha-[32 96 256 384]"
 oarsub -S "$cmd3" -n "VA-alpha-[112 176 64 192]"
-oarsub -S "$cmd3" -n "VA-alpha-[112 176 256 384]"
+oarsub -S "$cmd4" -n "VA-alpha-[112 176 256 384]"
 
 
 cmd="./scripts/bash/run_va_psi2.sh"
@@ -33,7 +33,7 @@ cmd4="${cmd} --indices 112 176 256 384"
 oarsub -S "$cmd1" -n "VA-psi2-[32 96 64 192]"
 oarsub -S "$cmd2" -n "VA-psi2-[32 96 256 384]"
 oarsub -S "$cmd3" -n "VA-psi2-[112 176 64 192]"
-oarsub -S "$cmd3" -n "VA-psi2-[112 176 256 384]"
+oarsub -S "$cmd4" -n "VA-psi2-[112 176 256 384]"
 
 
 exit 1
