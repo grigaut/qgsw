@@ -3,20 +3,27 @@
 import logging
 from typing import ClassVar
 
+from qgsw.logging._levels import (
+    CRITICAL,
+    DEBUG,
+    DETAIL,
+    ERROR,
+    INFO,
+    WARNING,
+)
 from qgsw.logging.log_records import LogRecord
-from qgsw.logging.logger import DETAIL_LEVEL
 
 
 class Formatter(logging.Formatter):
     """Custom formatter."""
 
     level_formats: ClassVar[dict[int, str]] = {
-        logging.CRITICAL: "[CRITICAL]",
-        logging.ERROR: "[ERROR   ]",
-        logging.WARNING: "[WARNING ]",
-        logging.INFO: "[INFO    ]",
-        DETAIL_LEVEL: "[DETAIL  ]",
-        logging.DEBUG: "[DEBUG   ]",
+        CRITICAL: "[CRITICAL]",
+        ERROR: "[ERROR   ]",
+        WARNING: "[WARNING ]",
+        INFO: "[INFO    ]",
+        DETAIL: "[DETAIL  ]",
+        DEBUG: "[DEBUG   ]",
     }
 
     def format(self, record: LogRecord) -> str:
