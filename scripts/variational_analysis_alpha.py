@@ -287,7 +287,9 @@ for c in range(n_cycles):
     alpha = torch.tensor(0.5, requires_grad=True)
     dalpha = torch.tensor(0.5, requires_grad=True)
 
-    optimizer = torch.optim.Adam([alpha, dalpha], lr=1e-2)
+    optimizer = torch.optim.Adam(
+        [{"params": [alpha], "lr": 1e-2}, {"params": [dalpha], "lr": 1e-2}],
+    )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -344,13 +346,31 @@ for c in range(n_cycles):
         )
         logger.info(msg)
 
-        lr = optimizer.param_groups[0]["lr"]
-        msg = f"\tLearning rate {lr:.1e}"
-        logger.detail(msg)
-
         loss.backward()
 
-        torch.nn.utils.clip_grad_value_([alpha, dalpha], clip_value=1.0)
+        lr_alpha = optimizer.param_groups[0]["lr"]
+        grad_alpha = alpha.grad.item()
+        torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
+        grad_alpha_ = alpha.grad.item()
+
+        lr_dalpha = optimizer.param_groups[1]["lr"]
+        grad_dalpha = dalpha.grad.item()
+        torch.nn.utils.clip_grad_value_([dalpha], clip_value=1.0)
+        grad_dalpha_ = dalpha.grad.item()
+
+        with logger.section():
+            msg = (
+                f"ɑ | Learning rate {lr_alpha:.1e} | "  # noqa: RUF001
+                f"Gradient value clipping: {grad_alpha:.1e} -> "
+                f"{grad_alpha_:.1e}"
+            )
+            logger.detail(msg)
+            msg = (
+                f"dɑ | Learning rate {lr_dalpha:.1e} | "  # noqa: RUF001
+                f"Gradient value clipping: {grad_dalpha:.1e} -> "
+                f"{grad_dalpha_:.1e}"
+            )
+            logger.detail(msg)
 
         optimizer.step()
         scheduler.step(loss)

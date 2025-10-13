@@ -293,10 +293,12 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
+    psi2 = torch.ones_like(psis[0], requires_grad=True)
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
 
-    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3)
+    optimizer = torch.optim.Adam(
+        [{"params": [psi2], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
+    )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -308,12 +310,14 @@ for c in range(n_cycles):
         model_dpsi.reset_time()
 
         with torch.enable_grad():
-            q0 = compute_q_psi2(psi0, psi2)[
+            q0 = compute_q_psi2(psi0, psi2 * psis[0].mean())[
                 ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
             ]
             q_bcs = [
                 Boundaries.extract(
-                    compute_q_psi2(psi[:, :1], psi2 + n * dt * dpsi2),
+                    compute_q_psi2(
+                        psi[:, :1], psi2 * psis[0].mean() + n * dt * dpsi2
+                    ),
                     p - 2,
                     -(p - 1),
                     p - 2,
@@ -356,25 +360,42 @@ for c in range(n_cycles):
 
         msg = (
             f"Cycle {c_}/{c_max_} | "
-            f"dѱ2 optimization step {o_}/{o_max_} | "
+            f"dѱ₂ optimization step {o_}/{o_max_} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
 
-        lr = optimizer.param_groups[0]["lr"]
-        msg = f"\tLearning rate {lr:.1e}"
-        logger.detail(msg)
-
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e4)
+        lr_psi2 = optimizer.param_groups[0]["lr"]
+        norm_grad_psi2 = psi2.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e-1)
+        norm_grad_psi2_ = psi2.grad.norm().item()
+
+        lr_dpsi2 = optimizer.param_groups[1]["lr"]
+        norm_grad_dpsi2 = dpsi2.grad.norm().item()
         torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
+        norm_grad_dpsi2_ = dpsi2.grad.norm().item()
+
+        with logger.section():
+            msg = (
+                f"ѱ₂ | Learning rate {lr_psi2:.1e} | "
+                f"Gradient norm clipping: {norm_grad_psi2:.1e} -> "
+                f"{norm_grad_psi2_:.1e}"
+            )
+            logger.detail(msg)
+            msg = (
+                f"dѱ₂ | Learning rate {lr_dpsi2:.1e} | "
+                f"Gradient norm clipping: {norm_grad_dpsi2:.1e} -> "
+                f"{norm_grad_dpsi2_:.1e}"
+            )
+            logger.detail(msg)
 
         optimizer.step()
         scheduler.step(loss)
 
     best_loss = register_params_dpsi2.best_loss
-    msg = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
+    msg = f"ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:3.5f}"
     logger.info(box(msg, style="round"))
     output = {
         "cycle": c,
