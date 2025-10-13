@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import ParamSpec
 
+from qgsw.logging._levels import CRITICAL, DEBUG, DETAIL, ERROR, INFO, WARNING
+
 if TYPE_CHECKING:
     from collections.abc import Generator
 
@@ -17,7 +19,6 @@ if TYPE_CHECKING:
 
 P = ParamSpec("P")
 
-DETAIL_LEVEL = 15
 
 _indent_level: ContextVar[int] = ContextVar("_indent_level", default=0)
 
@@ -37,8 +38,8 @@ class Logger(logging.Logger):
             *args (P.args): Arguments.
             **kwargs (P.kwargs): Keyword arguments.
         """
-        if self.isEnabledFor(DETAIL_LEVEL):
-            self._log(DETAIL_LEVEL, msg, args, **kwargs)
+        if self.isEnabledFor(DETAIL):
+            self._log(DETAIL, msg, args, **kwargs)
 
     def makeRecord(  # noqa: N802
         self, *args: P.args, **kwargs: P.kwargs
@@ -67,18 +68,29 @@ class Logger(logging.Logger):
     def section(
         self,
         message: str | None = None,
+        level: int = INFO,
     ) -> Generator[None, None, None]:
         """Create a section and indent all messages within.
 
         Args:
             message (str|None, optional): First message of the section
                 (unindented). Defaults to None.
+            level (int, optional): Level at which to print the section header.
+                Defaults to INFO.
 
         Yields:
             Generator[None, None, None]: Context manager.
         """
         if message is not None:
-            self.info(message)
+            level_map = {
+                CRITICAL: self.critical,
+                ERROR: self.error,
+                WARNING: self.warning,
+                INFO: self.info,
+                DETAIL: self.detail,
+                DEBUG: self.debug,
+            }
+            level_map[level](message)
         token = _indent_level.set(_indent_level.get() + 1)
         try:
             yield

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import sys
 
+from qgsw.logging._levels import DEBUG, DETAIL, INFO, WARNING
 from qgsw.logging.log_records import make_log_record
 
 try:
@@ -18,21 +19,21 @@ except ImportError:
 
 from qgsw.logging.environments import in_notebook, in_oar
 from qgsw.logging.formatters import Formatter, RichFormatter
-from qgsw.logging.logger import DETAIL_LEVEL, Logger
+from qgsw.logging.logger import Logger
 
 
 def setup_root_logger(verbose_level: int = 1) -> None:
     """Setup root logger."""
     logging.setLoggerClass(Logger)
     logging.setLogRecordFactory(make_log_record)
-    logging.addLevelName(DETAIL_LEVEL, "DETAIL")
+    logging.addLevelName(DETAIL, "DETAIL")
     level_map = {
-        0: logging.WARNING,
-        1: logging.INFO,
-        2: DETAIL_LEVEL,
-        3: logging.DEBUG,
+        0: WARNING,
+        1: INFO,
+        2: DETAIL,
+        3: DEBUG,
     }
-    level = level_map.get(verbose_level, logging.INFO)
+    level = level_map.get(verbose_level, INFO)
     logger = logging.getLogger()
     logger.setLevel(level)
     logger.handlers.clear()
