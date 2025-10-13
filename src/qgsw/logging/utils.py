@@ -58,51 +58,54 @@ def banner(msg: str, char: str = "=") -> str:
 
 
 box_styles = {
-    "-": ("─", "│", "┌", "┐", "└", "┘"),
-    "round": ("─", "│", "╭", "╮", "╰", "╯"),
-    "=": ("═", "║", "╔", "╗", "╚", "╝"),
+    "=": ("═", "║", "╔", "╗", "╚", "╝", "╠", "╣"),
+    "-": ("─", "│", "┌", "┐", "└", "┘", "├", "┤"),
+    "round": ("─", "│", "╭", "╮", "╰", "╯", "├", "┤"),
+    "bold": ("━", "┃", "┏", "┓", "┗", "┛", "┣", "┫"),
 }
 
-BoxStyles = Literal["-", "round", "="]
+BoxStyles = Literal["-", "round", "=", "bold"]
 
 
 def box(
-    msg: str,
-    *,
+    *msgs: str,
     style: BoxStyles = "=",
     char: str | None = None,
 ) -> str:
     """Draw a box around a message.
 
     Args:
-        msg (str): Message to draw a box around.
+        *msgs (str): Messages to draw a box around.
         style (BoxStyles, optional): Box style. Ignored if char is not None.
             Defaults to "=".
         char (str | None, optional): Char to use to draw the border.
             Take precedence over 'style'.Defaults to None.
 
     Raises:
-        ValueError: _description_
+        ValueError: If wrong style is passed.
 
     Returns:
-        str: _description_
+        str: BOxed messages.
     """
     if char is None and style not in box_styles:
         msg = f"Available styles are {', '.join(list(box_styles.keys()))}"
         raise ValueError(msg)
     if char is not None:
         assert_char(char)
-        h = v = tl = tr = bl = br = char
+        h = v = tl = tr = bl = br = ml = mr = char
     else:
-        h, v, tl, tr, bl, br = box_styles[style]
-    blank_banner = banner(msg, " ")
-    msg_pad = pad(blank_banner, " ")
-    msg_parts = msg_pad.split("\n")
-    max_len = max(len(p) for p in msg_parts)
-    top = tl + "".join([h] * max_len) + tr
-    bot = bl + "".join([h] * max_len) + br
-    msg_pad_ = pad(msg_pad, v)
-    return "\n".join([top, *msg_pad_.split("\n"), bot])
+        h, v, tl, tr, bl, br, ml, mr = box_styles[style]
+    max_len = max(max(len(m) for m in msg.split("\n")) for msg in msgs)
+    msgs_ = [tl + "".join([h] * (max_len + 2)) + tr]
+    for msg in msgs:
+        msg_c = "\n".join([m.center(max_len) for m in msg.split("\n")])
+        blank_banner = banner(msg_c, " ")
+        msg_pad = pad(blank_banner, " ")
+        msg_pad_ = pad(msg_pad, v)
+        msgs_ += msg_pad_.split("\n")
+        msgs_ += [ml + "".join([h] * (max_len + 2)) + mr]
+    msgs_[-1] = bl + "".join([h] * (max_len + 2)) + br
+    return "\n".join(msgs_)
 
 
 def step(current: int, total: int | None = None) -> str:
