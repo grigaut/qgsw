@@ -356,12 +356,12 @@ for c in range(n_cycles):
         with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
             msg = f"Learning rate {lr_alpha:.1e}"
             logger.detail(msg)
-            msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha:.1e}"
+            msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
             logger.detail(msg)
         with logger.section("dɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
             msg = f"Learning rate {lr_dalpha:.1e}"
             logger.detail(msg)
-            msg = f"Gradient: {grad_dalpha:.1e} -> {grad_dalpha:.1e}"
+            msg = f"Gradient: {grad_dalpha:.1e} -> {grad_dalpha_:.1e}"
             logger.detail(msg)
 
         optimizer.step()
