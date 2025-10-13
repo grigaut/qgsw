@@ -1068,7 +1068,7 @@ class Fluxes:
             )
 
         if optimize:
-            with logger.section("Compiling function..."):
+            with logger.section("Compiling functions..."):
                 self.h_x = OptimizableFunction(h_flux_x)
                 self.h_y = OptimizableFunction(h_flux_y)
                 self.w_x = OptimizableFunction(omega_flux_x)

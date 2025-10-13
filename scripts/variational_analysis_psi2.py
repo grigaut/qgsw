@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import datetime
 import pathlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -297,7 +296,7 @@ for c in range(n_cycles):
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
 
-    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3, weight_decay=1e-3)
+    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -368,16 +367,13 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        msg = f"{psi2.grad.norm().item()}"
-
-        torch.nn.utils.clip_grad_norm_([psi2, dpsi2], max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e4)
+        torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
 
         optimizer.step()
         scheduler.step(loss)
 
     best_loss = register_params_dpsi2.best_loss
-    time = datetime.datetime.now(datetime.timezone.utc)
-    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
     msg = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
     logger.info(box(msg, style="round"))
     output = {
