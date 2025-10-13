@@ -14,7 +14,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
-from qgsw.logging.msg_wrappers import box
+from qgsw.logging.msg_wrappers import box, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
@@ -107,11 +107,9 @@ output_dir = config.io.output.directory
 
 dt = 7200
 optim_max_step = 200
-str_optim_len = len(str(optim_max_step))
 n_steps_per_cyle = 250
 comparison_interval = 1
 n_cycles = 3
-str_cycles_len = len(str(n_cycles))
 msg = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
@@ -259,8 +257,6 @@ def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
 
 
 for c in range(n_cycles):
-    c_ = str(c + 1).zfill(str_cycles_len)
-    c_max_ = str(n_cycles)
     times = [model_3l.time.item()]
 
     psi0 = extract_psi_w(model_3l.psi[:, :1])
@@ -280,7 +276,7 @@ for c in range(n_cycles):
         psis.append(psi)
         psi_bcs.append(psi_bc)
 
-    msg = f"Cycle {c_}/{c_max_}: Model spin-up completed."
+    msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
@@ -337,12 +333,10 @@ for c in range(n_cycles):
             logger.info(msg)
             break
 
-        o_ = str(o + 1).zfill(str_optim_len)
-        o_max_ = str(optim_max_step).zfill(str_optim_len)
         loss_ = loss.cpu().item()
         msg = (
-            f"Cycle {c_}/{c_max_} | "
-            f"ɑ optimization step {o_}/{o_max_} | "  # noqa: RUF001
+            f"Cycle {step(c + 1, n_cycles)} | "
+            f"ɑ optimization step {step(o + 1, optim_max_step)} | "  # noqa: RUF001
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
