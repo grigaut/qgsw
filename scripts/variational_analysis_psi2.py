@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import datetime
 import pathlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -375,8 +374,6 @@ for c in range(n_cycles):
         scheduler.step(loss)
 
     best_loss = register_params_dpsi2.best_loss
-    time = datetime.datetime.now(datetime.timezone.utc)
-    time_ = time.strftime("%d/%m/%Y %H:%M:%S")
     msg = f"ѱ2 and dѱ2 optimization completed with loss: {best_loss:3.5f}"
     logger.info(box(msg, style="round"))
     output = {
