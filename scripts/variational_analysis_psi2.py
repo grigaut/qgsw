@@ -297,7 +297,7 @@ for c in range(n_cycles):
     psi2 = (torch.ones_like(psis[0]) * psis[0].mean()).requires_grad_()
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
 
-    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3, weight_decay=1e-3)
+    optimizer = torch.optim.Adam([psi2, dpsi2], lr=1e-3)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -368,9 +368,8 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        msg = f"{psi2.grad.norm().item()}"
-
-        torch.nn.utils.clip_grad_norm_([psi2, dpsi2], max_norm=1.0)
+        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e4)
+        torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
 
         optimizer.step()
         scheduler.step(loss)

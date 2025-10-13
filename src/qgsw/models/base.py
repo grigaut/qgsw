@@ -478,7 +478,7 @@ class ModelUVH(
             optimize (bool): Whether to optimize the function.
         """
         if optimize:
-            with logger.section("Compiling function..."):
+            with logger.section("Compiling functions..."):
                 self.comp_ke = OptimizableFunction(finite_diff.comp_ke)
                 self.interpolate = OptimizableFunction(
                     convert.interpolate,
