@@ -269,6 +269,7 @@ for c in range(n_cycles):
     times = [model_3l.time.item()]
 
     psi0 = extract_psi_w(model_3l.psi[:, :1])
+    psi0_mean = psi0[:, :1].mean()
     psi_bc = extract_psi_bc(psi0)
 
     psis = [psi0]
@@ -290,7 +291,7 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    psi2 = torch.ones_like(psis[0], requires_grad=True)
+    psi2 = torch.ones_like(psi0, requires_grad=True)
     dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
 
     optimizer = torch.optim.Adam(
@@ -307,13 +308,13 @@ for c in range(n_cycles):
         model_dpsi.reset_time()
 
         with torch.enable_grad():
-            q0 = compute_q_psi2(psi0, psi2 * psis[0].mean())[
+            q0 = compute_q_psi2(psi0, psi2 * psi0_mean)[
                 ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
             ]
             q_bcs = [
                 Boundaries.extract(
                     compute_q_psi2(
-                        psi[:, :1], psi2 * psis[0].mean() + n * dt * dpsi2
+                        psi[:, :1], psi2 * psi0_mean + n * dt * dpsi2
                     ),
                     p - 2,
                     -(p - 1),
@@ -344,7 +345,11 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_dpsi2.step(loss, psi2=psi2, dpsi2=dpsi2)
+        register_params_dpsi2.step(
+            loss,
+            psi2=psi2 * psi0_mean,
+            dpsi2=dpsi2,
+        )
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
