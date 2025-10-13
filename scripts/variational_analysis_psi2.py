@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 
+from qgsw import logging
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
@@ -377,17 +378,19 @@ for c in range(n_cycles):
         torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
         norm_grad_dpsi2_ = dpsi2.grad.norm().item()
 
-        with logger.section():
-            msg = (
-                f"ѱ₂ | Learning rate {lr_psi2:.1e} | "
-                f"Gradient norm clipping: {norm_grad_psi2:.1e} -> "
-                f"{norm_grad_psi2_:.1e}"
-            )
+        with logger.section("ѱ₂ parameters:", level=logging.DETAIL):
+            msg = f"Learning rate {lr_psi2:.1e}"
             logger.detail(msg)
             msg = (
-                f"dѱ₂ | Learning rate {lr_dpsi2:.1e} | "
-                f"Gradient norm clipping: {norm_grad_dpsi2:.1e} -> "
-                f"{norm_grad_dpsi2_:.1e}"
+                f"Gradient norm: {norm_grad_psi2:.1e} -> {norm_grad_psi2_:.1e}"
+            )
+            logger.detail(msg)
+        with logger.section("dѱ₂ parameters:", level=logging.DETAIL):
+            msg = f"Learning rate {lr_dpsi2:.1e}"
+            logger.detail(msg)
+            msg = (
+                f"Gradient norm: {norm_grad_dpsi2:.1e} ->"
+                f" {norm_grad_dpsi2_:.1e}"
             )
             logger.detail(msg)
 

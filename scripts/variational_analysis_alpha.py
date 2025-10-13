@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 
+from qgsw import logging
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
@@ -358,18 +359,15 @@ for c in range(n_cycles):
         torch.nn.utils.clip_grad_value_([dalpha], clip_value=1.0)
         grad_dalpha_ = dalpha.grad.item()
 
-        with logger.section():
-            msg = (
-                f"ɑ | Learning rate {lr_alpha:.1e} | "  # noqa: RUF001
-                f"Gradient value clipping: {grad_alpha:.1e} -> "
-                f"{grad_alpha_:.1e}"
-            )
+        with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
+            msg = f"Learning rate {lr_alpha:.1e}"
             logger.detail(msg)
-            msg = (
-                f"dɑ | Learning rate {lr_dalpha:.1e} | "  # noqa: RUF001
-                f"Gradient value clipping: {grad_dalpha:.1e} -> "
-                f"{grad_dalpha_:.1e}"
-            )
+            msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha:.1e}"
+            logger.detail(msg)
+        with logger.section("dɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
+            msg = f"Learning rate {lr_dalpha:.1e}"
+            logger.detail(msg)
+            msg = f"Gradient: {grad_dalpha:.1e} -> {grad_dalpha:.1e}"
             logger.detail(msg)
 
         optimizer.step()
