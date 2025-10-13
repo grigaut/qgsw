@@ -14,7 +14,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
-from qgsw.logging.msg_wrappers import box, step
+from qgsw.logging.utils import box, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
