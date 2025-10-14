@@ -205,10 +205,10 @@ def regularization(
     v2 /= dy
 
     dq_2 = div_flux_5pts_only(interpolate(q2), u2, v2, dx, dy)
-    return (dtq2 + dq_2).square().mean()
+    return (dtq2 + dq_2).square().sum()
 
 
-gamma = 1e21
+gamma = 1e17
 
 # PV computation
 
