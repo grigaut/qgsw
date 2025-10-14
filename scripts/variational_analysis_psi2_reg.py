@@ -378,7 +378,10 @@ for c in range(n_cycles):
                         model_dpsi.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
                     )
                     reg = gamma * regularization(
-                        psis[n - 1], psi2, (psis[n] - psis[n - 1]) / dt, dpsi2
+                        psis[n - 1],
+                        psi2 + n * dt * dpsi2,
+                        (psis[n] - psis[n - 1]) / dt,
+                        dpsi2,
                     )
                     loss += reg
 
