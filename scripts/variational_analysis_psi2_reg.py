@@ -205,10 +205,10 @@ def regularization(
     v2 /= dy
 
     dq_2 = div_flux_5pts_only(interpolate(q2), u2, v2, dx, dy)
-    return (dtq2 + dq_2).norm(p=2)
+    return (dtq2 + dq_2).square().mean()
 
 
-gamma = 5e8
+gamma = 1e21
 
 # PV computation
 
@@ -329,8 +329,8 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    psi2 = torch.ones_like(psi0, requires_grad=True)
-    dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
+    psi2 = (torch.rand_like(psi0) * 1e-1).requires_grad_()
+    dpsi2 = (torch.rand_like(psi2) * 1e-3).requires_grad_()
 
     optimizer = torch.optim.Adam(
         [{"params": [psi2], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
