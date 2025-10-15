@@ -523,7 +523,7 @@ for c in range(n_cycles):
     }
     outputs.append(output)
 f = output_dir.joinpath(
-    f"results_psi2_reg_energy_{imin}_{imax}_{jmin}_{jmax}.pt"
+    f"results_psi2_reg_energy_no_rmse_{imin}_{imax}_{jmin}_{jmax}.pt"
 )
 torch.save(outputs, f)
 msg = f"Outputs saved to {f}"
