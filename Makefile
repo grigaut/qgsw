@@ -22,13 +22,14 @@ PYTHON:= ${BIN}/python
 PIP:=${BIN}/pip
 # Important Files
 DEV_REQUIREMENTS:=requirements-dev.txt
-RUN_SCRIPT := run.sh
 
 # Logs
 LOGS:=logs
 
 all:
 	@${MAKE} install-dev
+	@chmod +x scripts/oar/*.sh
+	@chmod +x scripts/bash/*.sh
 
 clean:
 	@${MAKE} clean-venv
@@ -50,7 +51,6 @@ ${LOGS}:
 	@mkdir -p ${LOGS}
 
 install: ${VENV} ${LOGS}
-	@chmod +x ${RUN_SCRIPT}
 	@${PIP} install -e .
 
 install-dev:
