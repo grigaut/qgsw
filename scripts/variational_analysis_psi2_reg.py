@@ -192,12 +192,12 @@ def regularization(
     """
     dtq2 = (
         laplacian(dpsi2, dx, dy)
-        - beta_plane.f0**2 / H1 / g2 * (dpsi2 - dpsi1[:, :1])[..., 1:-1, 1:-1]
+        - beta_plane.f0**2 / H2 / g2 * (dpsi2 - dpsi1[:, :1])[..., 1:-1, 1:-1]
     )
     dtq2 = interpolate(dtq2[..., 3:-3, 3:-3])
     q2 = (
         laplacian(psi2, dx, dy)
-        - beta_plane.f0**2 / H1 / g2 * (psi2 - psi1[:, :1])[..., 1:-1, 1:-1]
+        - beta_plane.f0**2 / H2 / g2 * (psi2 - psi1[:, :1])[..., 1:-1, 1:-1]
     )
 
     u2, v2 = grad_perp(psi2[..., 4:-4, 4:-4])
