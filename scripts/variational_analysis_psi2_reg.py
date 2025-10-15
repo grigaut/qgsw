@@ -208,7 +208,7 @@ def regularization(
     return (dtq2 + dq_2).square().sum()
 
 
-gamma = 1e17
+gamma = 2e17
 
 # PV computation
 
