@@ -152,6 +152,11 @@ wind = WindForcing.from_config(
 tx, ty = wind.compute()
 
 uvh0 = UVH.from_file(config.simulation.startup.file)
+
+U: float = (uvh0.u[0, 0].max() ** 2 + uvh0.v[0, 0].max() ** 2).sqrt().item()
+L: float = dx.item()
+T: float = L / U
+
 psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 
 ## Areas
@@ -188,7 +193,7 @@ def regularization(
         dpsi2 (torch.Tensor): Bottom layer stream function derivative
 
     Returns:
-        torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||
+        torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
     """
     dtq2 = (
         laplacian(dpsi2, dx, dy)
@@ -205,10 +210,10 @@ def regularization(
     v2 /= dy
 
     dq_2 = div_flux_5pts_only(interpolate(q2), u2, v2, dx, dy)
-    return (dtq2 + dq_2).square().sum()
+    return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
-gamma = 2e17
+gamma = 200
 
 # PV computation
 
