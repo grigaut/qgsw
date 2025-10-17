@@ -173,9 +173,9 @@ psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 ## Error
 
 
-def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
+def rmse(psi: torch.Tensor, psi_ref: torch.Tensor) -> float:
     """RMSE."""
-    return (f - f_ref).square().mean().sqrt() / f_ref.square().mean().sqrt()
+    return ((psi - psi_ref) / U / L).square().mean()
 
 
 def regularization(
