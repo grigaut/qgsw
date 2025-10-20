@@ -270,7 +270,7 @@ def regularization(
     return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
-gamma = 200
+gamma = 20
 
 mu = 0.75
 
@@ -394,7 +394,7 @@ for c in range(n_cycles):
                     )
                     reg = gamma * regularization(
                         psis[n - 1],
-                        psi2 + n * dt * dpsi2,
+                        psi2 * psi0_mean + n * dt * dpsi2,
                         (psis[n] - psis[n - 1]) / dt,
                         dpsi2,
                     )
