@@ -107,13 +107,14 @@ output_dir = config.io.output.directory
 # Simulation parameters
 
 dt = 7200
-optim_max_step = 200
+optim_max_step1 = 100
+optim_max_step2 = 100
 n_steps_per_cyle = 250
 comparison_interval = 1
 n_cycles = 3
 msg = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
-    f"steps with up to {optim_max_step} optimization steps."
+    f"steps with up to {optim_max_step1 + optim_max_step2} optimization steps."
 )
 logger.info(box(msg, style="="))
 
@@ -270,7 +271,7 @@ def regularization(
     return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
-gamma = 10
+gamma = 5
 
 # PV computation
 
@@ -345,12 +346,127 @@ for c in range(n_cycles):
         [{"params": [psi2], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        factor=0.5,
+        patience=10,
+    )
+    register_params_dpsi2 = RegisterParams()
+
+    for o in range(optim_max_step1):
+        optimizer.zero_grad()
+        model_dpsi.reset_time()
+
+        with torch.enable_grad():
+            q0 = compute_q_psi2(psi0, psi2 * psi0_mean)[
+                ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
+            ]
+            q_bcs = [
+                Boundaries.extract(
+                    compute_q_psi2(
+                        psi[:, :1], psi2 * psi0_mean + n * dt * dpsi2
+                    ),
+                    p - 2,
+                    -(p - 1),
+                    p - 2,
+                    -(p - 1),
+                    3,
+                )
+                for n, psi in enumerate(psis)
+            ]
+
+            model_dpsi.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
+            q_bc_interp = QuadraticInterpolation(times, q_bcs)
+            model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            model_dpsi.dpsi2 = dpsi2[..., p:-p, p:-p]
+
+            loss = torch.tensor(0, **defaults.get())
+
+            for n in range(1, n_steps_per_cyle):
+                model_dpsi.step()
+
+                if (n + 1) % comparison_interval == 0:
+                    loss += rmse(
+                        model_dpsi.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
+                    )
+                    reg = regularization(
+                        psis[n - 1],
+                        psi2 * psi0_mean + (n - 1) * dt * dpsi2,
+                        (psis[n] - psis[n - 1]) / dt,
+                        dpsi2,
+                    )
+                    loss += reg
+
+        if torch.isnan(loss.detach()):
+            msg = "Loss has diverged."
+            logger.warning(box(msg, style="="))
+            break
+
+        register_params_dpsi2.step(
+            loss,
+            psi2=psi2,
+            dpsi2=dpsi2,
+        )
+
+        loss_ = loss.cpu().item()
+
+        msg = (
+            f"Cycle {step(c + 1, n_cycles)} | "
+            f"ѱ₂ optimization phase 1 step {step(o + 1, optim_max_step1)} | "
+            f"Loss: {loss_:3.5f}"
+        )
+        logger.info(msg)
+
+        loss.backward()
+
+        lr_psi2 = optimizer.param_groups[0]["lr"]
+        norm_grad_psi2 = psi2.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e-1)
+        norm_grad_psi2_ = psi2.grad.norm().item()
+
+        lr_dpsi2 = optimizer.param_groups[1]["lr"]
+        norm_grad_dpsi2 = dpsi2.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
+        norm_grad_dpsi2_ = dpsi2.grad.norm().item()
+
+        with logger.section("ѱ₂ parameters:", level=logging.DETAIL):
+            msg = f"Learning rate {lr_psi2:.1e}"
+            logger.detail(msg)
+            msg = (
+                f"Gradient norm: {norm_grad_psi2:.1e} -> {norm_grad_psi2_:.1e}"
+            )
+            logger.detail(msg)
+        with logger.section("dѱ₂ parameters:", level=logging.DETAIL):
+            msg = f"Learning rate {lr_dpsi2:.1e}"
+            logger.detail(msg)
+            msg = (
+                f"Gradient norm: {norm_grad_dpsi2:.1e} ->"
+                f" {norm_grad_dpsi2_:.1e}"
+            )
+            logger.detail(msg)
+
+        optimizer.step()
+        scheduler.step(loss)
+
+    best_loss = register_params_dpsi2.best_loss
+    msg = (
+        f"ѱ₂ and dѱ₂ optimization phase 1 "
+        f"completed with loss: {best_loss:3.5f}"
+    )
+    logger.info(box(msg, style="round"))
+
+    register_params_dpsi2.restore(psi2=psi2, dpsi2=dpsi2)
+    psi2.requires_grad_()
+    dpsi2.requires_grad_()
+
+    optimizer = torch.optim.Adam(
+        [{"params": [psi2], "lr": 1e-2}, {"params": [dpsi2], "lr": 1e-4}],
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
     early_stop = EarlyStop()
-    register_params_dpsi2 = RegisterParams()
 
-    for o in range(optim_max_step):
+    for o in range(optim_max_step2):
         optimizer.zero_grad()
         model_dpsi.reset_time()
 
@@ -401,7 +517,7 @@ for c in range(n_cycles):
 
         register_params_dpsi2.step(
             loss,
-            psi2=psi2 * psi0_mean,
+            psi2=psi2,
             dpsi2=dpsi2,
         )
 
@@ -414,7 +530,7 @@ for c in range(n_cycles):
 
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"dѱ₂ optimization step {step(o + 1, optim_max_step)} | "
+            f"ѱ₂ optimization phase 2 step {step(o + 1, optim_max_step2)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
@@ -456,11 +572,14 @@ for c in range(n_cycles):
     output = {
         "cycle": c,
         "coords": (imin, imax, jmin, jmax),
-        "psi2": register_params_dpsi2.params["psi2"].detach().cpu(),
+        "psi2": register_params_dpsi2.params["psi2"].detach().cpu()
+        * psi0_mean.detach().cpu(),
         "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
-f = output_dir.joinpath(f"results_psi2_reg_{imin}_{imax}_{jmin}_{jmax}.pt")
+f = output_dir.joinpath(
+    f"results_psi2_reg_two_steps_{imin}_{imax}_{jmin}_{jmax}.pt"
+)
 torch.save(outputs, f)
 msg = f"Outputs saved to {f}"
 logger.info(box(msg, style="="))
