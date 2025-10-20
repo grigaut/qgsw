@@ -172,18 +172,6 @@ def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     return (f - f_ref).square().mean().sqrt() / f_ref.square().mean().sqrt()
 
 
-# PV computation
-
-
-def compute_q_alpha(psi: torch.Tensor, alpha: torch.Tensor) -> torch.Tensor:
-    """Compute pv using alpha."""
-    return interpolate(
-        laplacian(psi, dx, dy)
-        - beta_plane.f0**2 * (1 / H1 / g1 + 1 / H1 / g1) * psi[..., 1:-1, 1:-1]
-        + beta_plane.f0**2 * (1 / H1 / g2) * alpha * psi[..., 1:-1, 1:-1]
-    )
-
-
 # Models
 ## Three Layer model
 
@@ -232,6 +220,30 @@ space_slice = SpaceDiscretization2D.from_tensors(
     x=P.space.remove_z_h().omega.xy.x[imin : imax + 1, 0],
     y=P.space.remove_z_h().omega.xy.y[0, jmin : jmax + 1],
 )
+
+space_slice_w = SpaceDiscretization2D.from_tensors(
+    x=P.space.remove_z_h().omega.xy.x[imin - p + 1 : imax + p, 0],
+    y=P.space.remove_z_h().omega.xy.y[0, jmin - p + 1 : jmax + p],
+)
+y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
+beta_effect_w = beta_plane.beta * (y_w - y0)
+
+# PV computation
+
+
+def compute_q_alpha(psi: torch.Tensor, alpha: torch.Tensor) -> torch.Tensor:
+    """Compute pv using alpha."""
+    return (
+        interpolate(
+            laplacian(psi, dx, dy)
+            - beta_plane.f0**2
+            * (1 / H1 / g1 + 1 / H1 / g1)
+            * psi[..., 1:-1, 1:-1]
+            + beta_plane.f0**2 * (1 / H1 / g2) * alpha * psi[..., 1:-1, 1:-1]
+        )
+        + beta_effect_w
+    )
+
 
 model_alpha = QGPSIQCollinearSF(
     space_2d=space_slice,
