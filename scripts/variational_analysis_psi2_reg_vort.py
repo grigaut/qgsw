@@ -394,7 +394,7 @@ for c in range(n_cycles):
                     )
                     reg = gamma * regularization(
                         psis[n - 1],
-                        psi2 * psi0_mean + n * dt * dpsi2,
+                        psi2 * psi0_mean + (n - 1) * dt * dpsi2,
                         (psis[n] - psis[n - 1]) / dt,
                         dpsi2,
                     )
