@@ -27,6 +27,7 @@ from qgsw.models.qg.psiq.filtered.core import (
 from qgsw.models.qg.psiq.optim.utils import EarlyStop, RegisterParams
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import grad_perp, laplacian
 from qgsw.spatial.core.discretization import (
@@ -279,19 +280,17 @@ gamma = 10
 
 # PV computation
 
-
-def compute_q_psi2(psi: torch.Tensor, psi2: torch.Tensor) -> torch.Tensor:
-    """Compute pv using psi2."""
-    return (
-        interpolate(
-            laplacian(psi, dx, dy)
-            - beta_plane.f0**2
-            * (1 / H1 / g1 + 1 / H1 / g1)
-            * psi[..., 1:-1, 1:-1]
-            + beta_plane.f0**2 * (1 / H1 / g2) * psi2[..., 1:-1, 1:-1]
-        )
-        + beta_effect_w
-    )
+compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
+    psi1,
+    psi2,
+    H1,
+    g1,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    beta_effect_w,
+)
 
 
 model_dpsi = QGPSIQFixeddSF2(
