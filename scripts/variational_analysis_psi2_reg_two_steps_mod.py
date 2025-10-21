@@ -244,7 +244,7 @@ compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
     dx,
     dy,
     beta_plane.f0,
-    torch.zeros_like(beta_effect[..., 1:-1]),
+    torch.zeros_like(beta_effect),
 )
 compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
     psi1,
@@ -254,7 +254,7 @@ compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
     dx,
     dy,
     beta_plane.f0,
-    beta_effect[..., 1:-1],
+    beta_effect,
 )
 
 
