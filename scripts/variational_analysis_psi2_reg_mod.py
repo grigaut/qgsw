@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 
 from qgsw import logging
 from qgsw.configs.core import Configuration
@@ -17,7 +18,7 @@ from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, step
 from qgsw.masks import Masks
 from qgsw.models.core.flux import (
-    div_flux_5pts,
+    div_flux_5pts_replicate_q_boundaries,
 )
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
@@ -242,7 +243,7 @@ compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
     dx,
     dy,
     beta_plane.f0,
-    torch.zeros_like(beta_effect[..., 1:-1]),
+    torch.zeros_like(beta_effect),
 )
 compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
     psi1,
@@ -252,7 +253,7 @@ compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
     dx,
     dy,
     beta_plane.f0,
-    beta_effect[..., 1:-1],
+    beta_effect,
 )
 
 
@@ -273,20 +274,15 @@ def regularization(
     Returns:
         torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
     """
-    dtq2 = compute_dtq2(dpsi1, dpsi2)
-    q2 = compute_q2(psi1, psi2)
+    # padding psi and dpsi but the boundary is removed while computing q2.
+    dtq2 = compute_dtq2(F(dpsi1, (1, 1, 1, 1)), dpsi2)
+    q2 = compute_q2(F(psi1, (1, 1, 1, 1)), psi2)
 
     u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
     u2 /= dx
     v2 /= dy
 
-    dq_2 = div_flux_5pts(
-        q2,
-        u2[..., 1:-1, :],
-        v2[..., :, 1:-1],
-        dx,
-        dy,
-    )
+    dq_2 = div_flux_5pts_replicate_q_boundaries(q2, u2, v2, dx, dy)
     return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
@@ -408,10 +404,10 @@ for c in range(n_cycles):
                     reg = gamma * regularization(
                         psi_,
                         (psi2 * psi0_mean + (n - 1) * dt * dpsi2)[
-                            ..., p:-p, p:-p
+                            ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
                         ],
                         (model_dpsi.psi - psi_) / dt,
-                        dpsi2[..., p:-p, p:-p],
+                        dpsi2[..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)],
                     )
                     loss += reg
 
