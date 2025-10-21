@@ -639,6 +639,28 @@ class SpaceDiscretization2D:
             v_grid=self.v.to_shape(nx, ny + 1),
         )
 
+    def slice(
+        self, imin: int, imax: int, jmin: int, jmax: int
+    ) -> SpaceDiscretization2D:
+        """Slice the space.
+
+        Args:
+            imin (int): Lower bound for x indexes.
+            imax (int): Upper bound for x indexes.
+            jmin (int): Lower bound for y indexes..
+            jmax (int): Upper bound for y indexes..
+
+        Returns:
+            SpaceDiscretization2D: Slice space, such that
+                x -> X[imin:imax,:] and y -> Y[:,jmin:jmax].
+        """
+        return self.from_tensors(
+            x=self.omega.xy.x[imin:imax, 0],
+            y=self.omega.xy.y[0, jmin:jmax],
+            x_unit=self.xy_unit,
+            y_unit=self.xy_unit,
+        )
+
     @classmethod
     def from_config(cls, grid_config: SpaceConfig) -> Self:
         """Construct the SpaceDiscretization2D given a SpaceConfig object.

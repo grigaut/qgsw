@@ -28,7 +28,6 @@ from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import grad_perp, laplacian
 from qgsw.spatial.core.discretization import (
-    SpaceDiscretization2D,
     SpaceDiscretization3D,
 )
 from qgsw.spatial.core.grid_conversion import interpolate
@@ -222,14 +221,10 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-space_slice = SpaceDiscretization2D.from_tensors(
-    x=P.space.remove_z_h().omega.xy.x[imin : imax + 1, 0],
-    y=P.space.remove_z_h().omega.xy.y[0, jmin : jmax + 1],
-)
+space_slice = P.space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
 
-space_slice_w = SpaceDiscretization2D.from_tensors(
-    x=P.space.remove_z_h().omega.xy.x[imin - p + 1 : imax + p, 0],
-    y=P.space.remove_z_h().omega.xy.y[0, jmin - p + 1 : jmax + p],
+space_slice_w = P.space.remove_z_h().slice(
+    imin - p + 1, imax + p, jmin - p + 1, jmax + p
 )
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
