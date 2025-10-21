@@ -95,6 +95,24 @@ def interpolate(corners: torch.Tensor) -> torch.Tensor:
     return 0.25 * (top_right + top_left + bottom_left + bottom_right)
 
 
+def interpolate1D(corners: torch.Tensor) -> torch.Tensor:  # noqa: N802
+    """Convert cell corners values to cell centers values.
+
+           Cells corners                            Cells Centers
+
+    x-------x-------x-------x..               ---X--- ---X--- ---X--- ..
+
+    Args:
+        corners (torch.Tensor): Cells corners values
+
+    Returns:
+    torch.Tensor: Cells centers values
+    """
+    left = corners[..., :, :-1]
+    right = corners[..., :, :-1]
+    return 0.5 * (left + right)
+
+
 def omega_to_h(omega_grid: torch.Tensor) -> torch.Tensor:
     """Convert omega grid to h grid.
 
