@@ -21,9 +21,9 @@ from qgsw.models.qg.psiq.filtered.core import (
     QGPSIQCollinearSF,
     QGPSIQFixeddSF2,
 )
-from qgsw.models.qg.psiq.optim.utils import EarlyStop, RegisterParams
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.spatial.core.discretization import (

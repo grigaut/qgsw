@@ -10,6 +10,7 @@ from qgsw.fields.variables.tuples import (
 )
 from qgsw.filters.base import _Filter
 from qgsw.filters.high_pass import GaussianHighPass2D
+from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.stretching_matrix import (
@@ -32,6 +33,8 @@ from qgsw.solver.pv_inversion import (
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE, defaults
+
+logger = getLogger(__name__)
 
 
 class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
@@ -413,7 +416,9 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 
 
 class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
-    """Collinear QGPSIQ model."""
+    """QGPSIQ model with given dpsi2 value."""
+
+    _psi2 = None
 
     def __init__(
         self,
@@ -457,17 +462,32 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 
     @property
     def dpsi2(self) -> torch.Tensor:
-        """Collinearity coefficient."""
+        """Time increment for psi2."""
         return self._dpsi2
 
     @dpsi2.setter
     def dpsi2(self, dpsi2: torch.Tensor) -> None:
         self._dpsi2 = dpsi2
 
+    @property
+    def psi2(self) -> torch.Tensor:
+        """Psi2 in the bottom layer."""
+        if self._psi2 is None:
+            msg = "No psi2 field, using zeros instead."
+            logger.warning(msg)
+            return torch.zeros_like(self.psi)
+        return self._psi2
+
+    @psi2.setter
+    def psi2(self, psi2: torch.Tensor) -> None:
+        self._psi2 = psi2
+
     def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
+        msg = "The value of psi2 is used although not updated by the model."
+        logger.warning(msg)
         vort = self._compute_vort_from_psi(psi)
         stretching = self.beta_plane.f0**2 * (
-            self._A11 * psi + self._A12 * self.dpsi2
+            self._A11 * psi + self._A12 * self.psi2
         )
         if self.with_bc:
             return vort - self.masks.h * self._interpolate(stretching)
@@ -719,3 +739,300 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self.dpsi2 = torch.zeros_like(self.psi)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
+
+
+class QGPSIQMixed(QGPSIQCollinearSF):
+    """Mixed model using both alpha and psi2."""
+
+    _psi2 = None
+
+    @property
+    def dpsi2(self) -> torch.Tensor:
+        """Time increment for psi2."""
+        return self._dpsi2
+
+    @dpsi2.setter
+    def dpsi2(self, dpsi2: torch.Tensor) -> None:
+        self._dpsi2 = dpsi2
+
+    @property
+    def psi2(self) -> torch.Tensor:
+        """Psi2 in the bottom layer."""
+        if self._psi2 is None:
+            msg = "No psi2 field, using zeros instead."
+            logger.warning(msg)
+            return torch.zeros_like(self.psi)
+        return self._psi2
+
+    @psi2.setter
+    def psi2(self, psi2: torch.Tensor) -> None:
+        self._psi2 = psi2
+
+    def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
+        msg = "The value of psi2 is used although not updated by the model."
+        logger.warning(msg)
+        vort = self._compute_vort_from_psi(psi)
+        stretching = self.beta_plane.f0**2 * (
+            self._A11 * psi + self._A12 * (self.psi2 + self.alpha * psi)
+        )
+        if self.with_bc:
+            return vort - self.masks.h * self._interpolate(stretching)
+        return vort - self.masks.h * self._interpolate(
+            self.masks.psi * stretching
+        )
+
+    def _compute_drag_inhomogeneous(self, psi: torch.Tensor) -> torch.Tensor:
+        """Compute wind and bottom drag contribution.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+                └──  psi: (n_ens, nl, nx+1, ny+1)-shaped
+
+        Returns:
+            torch.Tensor: Wind and bottom drag.
+                └──  (n_ens, nl, nx, ny)-shaped
+        """
+        sf_boundary = self._sf_bc_interp(self.time.item())
+        sf_wide = sf_boundary.expand(psi[..., 1:-1, 1:-1])
+        omega = interpolate(laplacian(sf_wide, self.space.dx, self.space.dy))
+        bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
+        if self.space.nl - 1 == 1:
+            fcg_drag = self._curl_tau + bottom_drag
+        elif self.space.nl - 1 == 2:  # noqa: PLR2004
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
+        else:
+            fcg_drag = torch.cat(
+                [self._curl_tau, self.zeros_inside, bottom_drag],
+                dim=-3,
+            )
+        return fcg_drag
+
+    def _compute_drag_homogeneous(self, psi: torch.Tensor) -> torch.Tensor:
+        """Compute wind and bottom drag contribution.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+                └──  psi: (n_ens, nl, nx+1, ny+1)-shaped
+
+        Returns:
+            torch.Tensor: Wind and bottom drag.
+                └──  (n_ens, nl, nx, ny)-shaped
+        """
+        omega = self._interpolate(
+            self._laplacian_h(psi, self.space.dx, self.space.dy)
+            * self.masks.psi,
+        )
+        bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
+        if self.space.nl - 1 == 1:
+            fcg_drag = self._curl_tau + bottom_drag
+        elif self.space.nl - 1 == 2:  # noqa: PLR2004
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
+        else:
+            fcg_drag = torch.cat(
+                [self._curl_tau, self.zeros_inside, bottom_drag],
+                dim=-3,
+            )
+        return fcg_drag
+
+    def _set_solver(self) -> None:
+        """Set Helmholtz equation solver."""
+        # PV equation solver
+        self._solver_homogeneous = HomogeneousPVInversionCollinear(
+            self.A,
+            self.alpha,
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+        self._solver_inhomogeneous = InhomogeneousPVInversionCollinear(
+            self.A,
+            self.alpha,
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+        if self._with_bc:
+            sf_bc = self._sf_bc_interp(self.time.item())
+            if self._with_mean_flow:
+                sf_bar_bc = self._sf_bar_bc_interp(self.time.item())
+                self._solver_inhomogeneous.set_boundaries(
+                    sf_bc.get_band(0) - sf_bar_bc.get_band(0)
+                )
+            else:
+                self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
+
+    def _set_io(self, state: StatePSIQAlpha) -> None:
+        self._io = IO(state.t, state.psi, state.q, state.alpha)
+
+    def _set_state(self) -> None:
+        """Set the state."""
+        self._state = StatePSIQAlpha.steady(
+            n_ens=self.n_ens,
+            nl=self.space.nl - 1,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
+        self.alpha = torch.zeros_like(self.psi)
+        self._set_io(self._state)
+        q = self._compute_q_from_psi(self.psi)
+        self._state.update_psiq(PSIQ(self.psi, q))
+
+    def _compute_time_derivatives_homogeneous(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute time derivatives for homogeneous problem.
+
+        Args:
+            prognostic (PSIQ): prognostic tuple.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi, q = prognostic
+        div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_homogeneous(psi)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dq_i = self._interpolate(dq)
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i
+            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            ensure_mass_conservation=True,
+        )
+        self._dpsi = dpsi
+        return PSIQ(dpsi, dq)
+
+    def _compute_time_derivatives_inhomogeneous(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute time derivatives for inhomogeneous problem.
+
+        Args:
+            prognostic (PSIQ): Homogeneous contribution
+                of prognostic variables.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi_i, q_i = prognostic
+        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
+        psi = psi_i + psi_bc
+        q = q_i + q_bc
+        advection_psi_q = self._compute_advection_inhomogeneous(
+            PSIQ(psi, q), self._pv_bc
+        )
+        div_flux = advection_psi_q
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dq_i = self._interpolate(dq)
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i
+            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            ensure_mass_conservation=False,
+        )
+        if self.time_stepper == "rk3":
+            # Boundary condition interpolation
+            self._rk3_step += 1
+            if self._rk3_step == 1:
+                coef = 1
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 2:  # noqa: PLR2004
+                coef = 1 / 2
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 3:  # noqa: PLR2004
+                # There won't be any additional step.
+                ...
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+        self._dpsi = dpsi
+        return PSIQ(dpsi, dq)
+
+    def _compute_time_derivatives_mean_flow(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute time derivatives for inhomogeneous problem.
+
+        Args:
+            prognostic (PSIQ): Homogeneous contribution
+                of prognostic variables.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi_pert_i, q_pert_i = prognostic
+        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
+        psi = psi_pert_i + psi_bc + self._sf_bar
+        q = q_pert_i + q_bc + self._pv_bar
+        advection_psi_q = self._compute_advection_inhomogeneous(
+            PSIQ(psi, q), self._pv_bc + self._pv_bar_bc
+        )
+        div_flux = advection_psi_q
+        if self.time_stepper == "rk3":
+            if self._rk3_step == 0:
+                coef = 0
+            elif self._rk3_step == 1:
+                coef = 1
+            elif self._rk3_step == 2:  # noqa: PLR2004
+                coef = 1 / 2
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+            dt = self.dt
+            t = self.time.item() + coef * dt
+            q_bar_t_dt = self._pv_bar_interp(t + dt)
+            q_bar_t = self._pv_bar_interp(t)
+            dt_q_bar = (q_bar_t_dt - q_bar_t) / dt
+        else:
+            dt = self.dt
+            t = self.time.item()
+            dt_q_bar = (self._pv_bar_interp(t + dt) - self._pv_bar) / dt
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
+        dq_i = self._interpolate(dq)
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i
+            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            ensure_mass_conservation=False,
+        )
+        if self.time_stepper == "rk3":
+            # Boundary condition interpolation
+            self._rk3_step += 1
+            if self._rk3_step == 1:
+                coef = 1
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 2:  # noqa: PLR2004
+                coef = 1 / 2
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 3:  # noqa: PLR2004
+                # There won't be any additional step.
+                ...
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+        self._dpsi = dpsi
+        return PSIQ(dpsi, dq)

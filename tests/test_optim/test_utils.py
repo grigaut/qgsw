@@ -2,7 +2,7 @@
 
 import torch
 
-from qgsw.models.qg.psiq.optim.utils import EarlyStop, RegisterParams
+from qgsw.optim.utils import EarlyStop, RegisterParams
 
 
 def test_early_stop() -> None:
