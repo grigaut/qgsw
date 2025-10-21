@@ -25,13 +25,12 @@ from qgsw.models.qg.psiq.filtered.core import (
 from qgsw.models.qg.psiq.optim.utils import EarlyStop, RegisterParams
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
-from qgsw.pv import compute_q1_interior
+from qgsw.pv import compute_q1_interior, compute_q2_2l_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad_perp, laplacian
+from qgsw.solver.finite_diff import grad_perp
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
-from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
@@ -230,6 +229,27 @@ space_slice_w = P.space.remove_z_h().slice(
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
+compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
+    dpsi1,
+    dpsi2,
+    H2,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    torch.zeros_like(beta_effect_w),
+)
+compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
+    psi1,
+    psi2,
+    H2,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    beta_effect_w,
+)
+
 
 def regularization(
     psi1: torch.Tensor,
@@ -248,22 +268,15 @@ def regularization(
     Returns:
         torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
     """
-    dtq2 = (
-        laplacian(dpsi2, dx, dy)
-        - beta_plane.f0**2 / H2 / g2 * (dpsi2 - dpsi1[:, :1])[..., 1:-1, 1:-1]
-    )
-    dtq2 = interpolate(dtq2[..., 3:-3, 3:-3])
-    q2 = (
-        laplacian(psi2, dx, dy)
-        - beta_plane.f0**2 / H2 / g2 * (psi2 - psi1[:, :1])[..., 1:-1, 1:-1]
-    )
+    dtq2 = compute_dtq2(dpsi1[:, :1], dpsi2)
+    q2 = compute_q2(psi1, psi2)
 
     u2, v2 = grad_perp(psi2[..., 4:-4, 4:-4])
     u2 /= dx
     v2 /= dy
 
-    dq_2 = div_flux_5pts_only(interpolate(q2) + beta_effect_w, u2, v2, dx, dy)
-    return ((dtq2 + dq_2) / U * L * T).square().sum()
+    dq_2 = div_flux_5pts_only(q2, u2, v2, dx, dy)
+    return ((dtq2[..., 3:-3, 3:-3] + dq_2) / U * L * T).square().sum()
 
 
 gamma = 10
