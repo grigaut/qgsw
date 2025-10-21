@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import ParamSpec
 
-from qgsw.logging._levels import CRITICAL, DEBUG, DETAIL, ERROR, INFO, WARNING
+from qgsw.logging._levels import DETAIL, INFO
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -82,15 +82,7 @@ class Logger(logging.Logger):
             Generator[None, None, None]: Context manager.
         """
         if message is not None:
-            level_map = {
-                CRITICAL: self.critical,
-                ERROR: self.error,
-                WARNING: self.warning,
-                INFO: self.info,
-                DETAIL: self.detail,
-                DEBUG: self.debug,
-            }
-            level_map[level](message)
+            self.log(level, message)
         token = _indent_level.set(_indent_level.get() + 1)
         try:
             yield

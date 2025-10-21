@@ -105,3 +105,33 @@ def test_2D_and_3D_horizontal(  # noqa: N802
     assert (space_2d.v.xy.y == space_ref.v.xyh.y).all()
     assert (space_2d.h.xy.x == space_ref.h.xyh.x).all()
     assert (space_2d.h.xy.y == space_ref.h.xyh.y).all()
+
+
+def test_slicing(
+    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],  # noqa: N803
+) -> None:
+    """Test 2D space slicing."""
+    X, Y, _ = X_Y_H  # noqa: N806
+    space_2d = SpaceDiscretization2D.from_tensors(
+        x=X,
+        y=Y,
+        x_unit=Unit.M,
+        y_unit=Unit.M,
+    )
+    imin, imax = 64, 128
+    jmin, jmax = 32, 132
+    space_sliced = space_2d.slice(imin, imax + 1, jmin, jmax + 1)
+    space_ref = SpaceDiscretization2D.from_tensors(
+        x=space_2d.omega.xy.x[imin : imax + 1, 0],
+        y=space_2d.omega.xy.y[0, jmin : jmax + 1],
+        x_unit=Unit.M,
+        y_unit=Unit.M,
+    )
+    assert (space_sliced.omega.xy.x == space_ref.omega.xy.x).all()
+    assert (space_sliced.omega.xy.y == space_ref.omega.xy.y).all()
+    assert (space_sliced.u.xy.x == space_ref.u.xy.x).all()
+    assert (space_sliced.u.xy.y == space_ref.u.xy.y).all()
+    assert (space_sliced.v.xy.x == space_ref.v.xy.x).all()
+    assert (space_sliced.v.xy.y == space_ref.v.xy.y).all()
+    assert (space_sliced.h.xy.x == space_ref.h.xy.x).all()
+    assert (space_sliced.h.xy.y == space_ref.h.xy.y).all()
