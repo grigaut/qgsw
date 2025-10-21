@@ -275,8 +275,8 @@ def regularization(
         torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
     """
     # padding psi and dpsi but the boundary is removed while computing q2.
-    dtq2 = compute_dtq2(F(dpsi1, (1, 1, 1, 1)), dpsi2)
-    q2 = compute_q2(F(psi1, (1, 1, 1, 1)), psi2)
+    dtq2 = compute_dtq2(F.pad(dpsi1, (1, 1, 1, 1)), dpsi2)
+    q2 = compute_q2(F.pad(psi1, (1, 1, 1, 1)), psi2)
 
     u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
     u2 /= dx
