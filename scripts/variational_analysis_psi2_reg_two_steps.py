@@ -39,7 +39,7 @@ torch.set_grad_enabled(False)
 ## Config
 
 
-args = ScriptArgsVA.from_cli()
+args = ScriptArgsVA.from_cli(comparison_default=1, cycles_default=3)
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -58,7 +58,7 @@ optim_max_step1 = 100
 optim_max_step2 = 100
 n_steps_per_cyle = 250
 comparison_interval = 1
-n_cycles = 3
+n_cycles = args.cycles
 msg = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step1 + optim_max_step2} optimization steps."

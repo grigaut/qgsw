@@ -67,9 +67,16 @@ class ScriptArgsVA(ScriptArgs):
     """Script arguments."""
 
     indices: list[int]
+    comparison: int
+    cycles: int
 
     @classmethod
-    def from_cli(cls) -> Self:
+    def from_cli(
+        cls,
+        *,
+        comparison_default: int = 1,
+        cycles_default: int = 3,
+    ) -> Self:
         """Instantiate script arguments from CLI.
 
         Returns:
@@ -81,6 +88,8 @@ class ScriptArgsVA(ScriptArgs):
         cls._add_config(parser)
         cls._add_verbose(parser)
         cls._add_indices(parser)
+        cls._add_comparison_interval(parser, comparison_default)
+        cls._add_cycles(parser, cycles_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -98,4 +107,39 @@ class ScriptArgsVA(ScriptArgs):
             type=int,
             help="Indices (imin, imax, jmin, jmax), "
             "for example (64, 128, 128, 256).",
+        )
+
+    @classmethod
+    def _add_comparison_interval(
+        cls, parser: argparse.ArgumentParser, default: int
+    ) -> None:
+        """Add comparison interval to parser.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (int): Default value for for the comparison interval.
+        """
+        parser.add_argument(
+            "-c",
+            "--comparison",
+            type=int,
+            default=default,
+            help="Comparison interval value.",
+        )
+
+    @classmethod
+    def _add_cycles(
+        cls, parser: argparse.ArgumentParser, default: int
+    ) -> None:
+        """Add number of cycles to parser.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (int): Default value for for the comparison interval.
+        """
+        parser.add_argument(
+            "--cycles",
+            type=int,
+            default=default,
+            help="Number of cycles.",
         )
