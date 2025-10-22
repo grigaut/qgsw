@@ -82,6 +82,8 @@ prefix = args.prefix
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
 output_file = output_dir.joinpath(filename)
 
+## Logs
+
 msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps and optimized in two phases with up to {optim_max_step1}"

@@ -73,6 +73,8 @@ prefix = args.prefix
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
 output_file = output_dir.joinpath(filename)
 
+## Logs
+
 msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
@@ -83,6 +85,7 @@ msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
 msg_output = f"Output will be saved to {output_file}."
 
 logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
+
 # Parameters
 
 H = config.model.h
