@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import argparse
-import pathlib
-from dataclasses import dataclass
 from pathlib import Path
 
 import torch
 
 from qgsw import logging
+from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
@@ -35,63 +33,13 @@ from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
 
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
 ## Config
 
 
-@dataclass
-class ScriptArgs:
-    """Script arguments."""
-
-    config: Path
-    verbose: int
-    indices: list[int]
-
-    @classmethod
-    def from_cli(cls) -> Self:
-        """Instantiate script arguments from CLI.
-
-        Args:
-            default_config (str): Default configuration path.
-
-        Returns:
-            Self: ScriptArgs.
-        """
-        parser = argparse.ArgumentParser(
-            description="Retrieve script arguments.",
-        )
-        parser.add_argument(
-            "--config",
-            required=True,
-            type=pathlib.Path,
-            help="Configuration File Path (from qgsw root level)",
-        )
-        parser.add_argument(
-            "-v",
-            "--verbose",
-            action="count",
-            default=0,
-            help="Verbose level.",
-        )
-        parser.add_argument(
-            "-i",
-            "--indices",
-            required=True,
-            nargs="+",
-            type=int,
-            help="Indices (imin, imax, jmin, jmax), "
-            "for example (64, 128, 128, 256).",
-        )
-        return cls(**vars(parser.parse_args()))
-
-
-args = ScriptArgs.from_cli()
+args = ScriptArgsVA.from_cli()
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
