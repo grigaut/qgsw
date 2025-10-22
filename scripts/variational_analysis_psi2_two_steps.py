@@ -372,11 +372,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_dpsi2.step(
-            loss,
-            psi2=psi2_adim,
-            dpsi2=dpsi2,
-        )
+        register_params_dpsi2.step(loss, psi2=psi2_adim, dpsi2=dpsi2)
 
         loss_ = loss.cpu().item()
 
@@ -480,11 +476,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_dpsi2.step(
-            loss,
-            psi2=psi2,
-            dpsi2=dpsi2,
-        )
+        register_params_dpsi2.step(loss, psi2=psi2, dpsi2=dpsi2)
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
