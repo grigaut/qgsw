@@ -13,7 +13,7 @@ from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
-from qgsw.logging.utils import box, step
+from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.core.flux import (
     div_flux_5pts_replicate_q_boundaries,
@@ -65,18 +65,11 @@ optim_max_step = 200
 n_steps_per_cyle = 250
 comparison_interval = args.comparison
 n_cycles = args.cycles
-msg = (
-    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
-    f"steps with up to {optim_max_step} optimization steps."
-)
-logger.info(box(msg, style="="))
 
 ## Areas
 
 indices = args.indices
 imin, imax, jmin, jmax = indices
-msg = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
-logger.info(msg)
 
 p = 4
 psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
@@ -87,6 +80,17 @@ psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 prefix = args.prefix
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
 output_file = output_dir.joinpath(filename)
+
+msg_simu = (
+    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
+    f"steps with up to {optim_max_step} optimization steps."
+)
+comp_dt = sec2text(comparison_interval * dt)
+msg_loss = f"RMSE will be evaluated every {comp_dt}."
+msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
+msg_output = f"Output will be saved to {output_file}."
+
+logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
 
 # Parameters
 

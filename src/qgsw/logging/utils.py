@@ -121,3 +121,61 @@ def step(current: int, total: int | None = None) -> str:
     c_str = str(current)
     t_str = "?" * max(3, len(c_str)) if total is None else str(total)
     return c_str.zfill(len(t_str)) + "/" + t_str
+
+
+def sec2text(time: float) -> str:
+    """Convert time in seconds to text.
+
+    Args:
+        time (float): Time in seconds.
+
+    Returns:
+        str: Text.
+    """
+    if time < 60:  # noqa: PLR2004
+        s = "s" if time >= 2 else ""  # noqa: PLR2004
+        return f"{time:.1f} second{s}"
+    return min2text(time / 60)
+
+
+def min2text(time: float) -> str:
+    """Convert time in minutes to text.
+
+    Args:
+        time (float): Time in minutes.
+
+    Returns:
+        str: Text.
+    """
+    if time < 60:  # noqa: PLR2004
+        s = "s" if time >= 2 else ""  # noqa: PLR2004
+        return f"{time:.1f} minutes{s}"
+    return hours2text(time / 60)
+
+
+def hours2text(time: float) -> str:
+    """Convert time in hours to text.
+
+    Args:
+        time (float): Time in hours.
+
+    Returns:
+        str: Text.
+    """
+    if time < 24:  # noqa: PLR2004
+        s = "s" if time >= 2 else ""  # noqa: PLR2004
+        return f"{time:.1f} hour{s}"
+    return days2text(time / 24)
+
+
+def days2text(time: float) -> str:
+    """Convert time in days to text.
+
+    Args:
+        time (float): Time in days.
+
+    Returns:
+        str: Text.
+    """
+    s = "s" if time >= 2 else ""  # noqa: PLR2004
+    return f"{time:.1f} day{s}"
