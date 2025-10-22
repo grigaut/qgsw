@@ -36,7 +36,11 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVA.from_cli(comparison_default=1, cycles_default=3)
+args = ScriptArgsVA.from_cli(
+    comparison_default=1,
+    cycles_default=3,
+    prefix_default="results_alpha",
+)
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -60,6 +64,21 @@ msg = (
     f"steps with up to {optim_max_step} optimization steps."
 )
 logger.info(box(msg, style="="))
+
+## Areas
+
+indices = args.indices
+imin, imax, jmin, jmax = indices
+msg = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
+logger.info(msg)
+p = 4
+psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
+psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
+
+## Output
+prefix = args.prefix
+filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
+output_file = output_dir.joinpath(filename)
 
 # Parameters
 
@@ -98,16 +117,6 @@ tx, ty = wind.compute()
 uvh0 = UVH.from_file(config.simulation.startup.file)
 psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 
-## Areas
-
-indices = args.indices
-imin, imax, jmin, jmax = indices
-msg = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
-logger.info(msg)
-
-p = 4
-psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
-psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 
 ## Error
 
@@ -335,7 +344,7 @@ for c in range(n_cycles):
         "dalpha": register_params_alpha.params["dalpha"].detach().cpu(),
     }
     outputs.append(output)
-f = output_dir.joinpath(f"results_alpha_{imin}_{imax}_{jmin}_{jmax}.pt")
-torch.save(outputs, f)
-msg = f"Outputs saved to {f}"
+
+torch.save(outputs, output_file)
+msg = f"Outputs saved to {output_file}"
 logger.info(box(msg, style="="))

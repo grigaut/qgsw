@@ -69,6 +69,7 @@ class ScriptArgsVA(ScriptArgs):
     indices: list[int]
     comparison: int
     cycles: int
+    prefix: str
 
     @classmethod
     def from_cli(
@@ -76,11 +77,20 @@ class ScriptArgsVA(ScriptArgs):
         *,
         comparison_default: int = 1,
         cycles_default: int = 3,
+        prefix_default: str = "results",
     ) -> Self:
         """Instantiate script arguments from CLI.
 
+        Args:
+            comparison_default (int, optional): Default value
+                for comparison interval. Defaults to 1.
+            cycles_default (int, optional): Default value
+                for number of cycles. Defaults to 3.
+            prefix_default (str, optional): Default value for
+                output file prefix. Defaults to "results".
+
         Returns:
-            Self: ScriptArgs.
+            Self: ScriptArgsVA.
         """
         parser = argparse.ArgumentParser(
             description="Retrieve script arguments.",
@@ -90,6 +100,7 @@ class ScriptArgsVA(ScriptArgs):
         cls._add_indices(parser)
         cls._add_comparison_interval(parser, comparison_default)
         cls._add_cycles(parser, cycles_default)
+        cls._add_prefix(parser, prefix_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -142,4 +153,22 @@ class ScriptArgsVA(ScriptArgs):
             type=int,
             default=default,
             help="Number of cycles.",
+        )
+
+    @classmethod
+    def _add_prefix(
+        cls, parser: argparse.ArgumentParser, default: int
+    ) -> None:
+        """Add output file prefix to parser.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (int): Default value for for the prefix.
+        """
+        parser.add_argument(
+            "-p",
+            "--prefix",
+            type=str,
+            default=default,
+            help="File saving prefix prefix.",
         )
