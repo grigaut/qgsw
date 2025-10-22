@@ -34,6 +34,7 @@ from qgsw.spatial.core.discretization import (
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
+from qgsw.utils.reshaping import crop
 
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
@@ -232,7 +233,7 @@ def regularization(
     return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
-gamma = 1
+gamma = 1 / comparison_interval
 
 # PV computation
 
@@ -300,14 +301,14 @@ for c in range(n_cycles):
 
     alpha = torch.tensor(0.5, requires_grad=True)
     dalpha = torch.tensor(0.5, requires_grad=True)
-    psi2 = (torch.rand_like(psi0) * 1e-1).requires_grad_()
-    dpsi2 = (torch.rand_like(psi2) * 1e-3).requires_grad_()
+    psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
+    dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
 
     optimizer = torch.optim.Adam(
         [
             {"params": [alpha], "lr": 1e-3},
             {"params": [dalpha], "lr": 1e-3},
-            {"params": [psi2], "lr": 1e-1},
+            {"params": [psi2_adim], "lr": 1e-1},
             {"params": [dpsi2], "lr": 1e-3},
         ],
     )
@@ -322,14 +323,13 @@ for c in range(n_cycles):
         model_mixed.reset_time()
 
         with torch.enable_grad():
-            q0 = compute_q_psi2(psi0, psi2 * psi0_mean + alpha * psi0)[
-                ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
-            ]
+            psi2 = psi2_adim * psi0_mean
+            q0 = crop(compute_q_psi2(psi0, psi2 + alpha * psi0), p - 1)
             q_bcs = [
                 Boundaries.extract(
                     compute_q_psi2(
                         psi[:, :1],
-                        psi2 * psi0_mean + n * dt * dpsi2 + alpha * psi[:, :1],
+                        psi2 + n * dt * dpsi2 + alpha * psi[:, :1],
                     ),
                     p - 2,
                     -(p - 1),
@@ -340,33 +340,28 @@ for c in range(n_cycles):
                 for n, psi in enumerate(psis)
             ]
 
-            model_mixed.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
+            model_mixed.set_psiq(crop(psi0[:, :1], p), q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
             model_mixed.alpha = torch.ones_like(model_mixed.psi) * dalpha
             model_mixed.set_boundary_maps(psi_bc_interp, q_bc_interp)
-            model_mixed.dpsi2 = dpsi2[..., p:-p, p:-p]
+            model_mixed.dpsi2 = crop(dpsi2, p)
 
             loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
-                psi_ = model_mixed.psi
+                psi1_ = model_mixed.psi
+                psi2_ = crop(psi2 + (n - 1) * dt * dpsi2, p) + alpha * psi1_
+
                 model_mixed.step()
 
+                psi1 = model_mixed.psi
+                dpsi1_ = (psi1 - psi1_) / dt
+                dpsi2_ = crop(dpsi2, p) + dalpha * (psi1 - psi1_) / dt
+                reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
+                loss += reg
+
                 if (n + 1) % comparison_interval == 0:
-                    loss += rmse(
-                        model_mixed.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
-                    )
-                    reg = gamma * regularization(
-                        psi_,
-                        (psi2 * psi0_mean + (n - 1) * dt * dpsi2)[
-                            ..., p:-p, p:-p
-                        ]
-                        + alpha * psi_,
-                        (model_mixed.psi - psi_) / dt,
-                        dpsi2[..., p:-p, p:-p]
-                        + dalpha * (model_mixed.psi - psi_) / dt,
-                    )
-                    loss += reg
+                    loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
@@ -377,7 +372,7 @@ for c in range(n_cycles):
             loss,
             alpha=alpha,
             dalpha=dalpha,
-            psi2=psi2 * psi0_mean,
+            psi2=psi2,
             dpsi2=dpsi2,
         )
 
@@ -408,9 +403,9 @@ for c in range(n_cycles):
         grad_dalpha_ = dalpha.grad.item()
 
         lr_psi2 = optimizer.param_groups[2]["lr"]
-        norm_grad_psi2 = psi2.grad.norm().item()
-        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e-1)
-        norm_grad_psi2_ = psi2.grad.norm().item()
+        norm_grad_psi2 = psi2_adim.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([psi2_adim], max_norm=1e-1)
+        norm_grad_psi2_ = psi2_adim.grad.norm().item()
 
         lr_dpsi2 = optimizer.param_groups[3]["lr"]
         norm_grad_dpsi2 = dpsi2.grad.norm().item()
