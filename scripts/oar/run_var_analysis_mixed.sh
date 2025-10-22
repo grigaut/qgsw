@@ -5,9 +5,9 @@ SRCDIR=$HOME/qgsw
 
 cd $SRCDIR
 
-chmod +x scripts/bash/run_va_psi2_mixed.sh
+chmod +x scripts/bash/run_va_mixed.sh
 
-cmd="./scripts/bash/run_va_psi2_mixed.sh"
+cmd="./scripts/bash/run_va_mixed.sh"
 for arg in "$@"; do
     cmd+=" \"$arg\""
 done
