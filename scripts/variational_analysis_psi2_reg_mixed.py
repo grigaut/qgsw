@@ -449,6 +449,10 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
     output = {
         "cycle": c,
+        "config": {
+            "comparison_interval": comparison_interval,
+            "optimization_steps": [optim_max_step],
+        },
         "coords": (imin, imax, jmin, jmax),
         "alpha": register_params_mixed.params["alpha"].detach().cpu(),
         "dalpha": register_params_mixed.params["dalpha"].detach().cpu(),

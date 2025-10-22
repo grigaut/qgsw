@@ -407,6 +407,10 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
     output = {
         "cycle": c,
+        "config": {
+            "comparison_interval": comparison_interval,
+            "optimization_steps": [optim_max_step],
+        },
         "coords": (imin, imax, jmin, jmax),
         "psi2": register_params_dpsi2.params["psi2"].detach().cpu(),
         "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
