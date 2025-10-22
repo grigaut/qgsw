@@ -19,7 +19,7 @@ cd $SRCDIR
 
 date
 
-.venv/bin/python3 -u scripts/variational_analysis_psi2_reg_vort.py $@
+.venv/bin/python3 -u scripts/variational_analysis_psi2_two_steps.py $@
 
 date
 

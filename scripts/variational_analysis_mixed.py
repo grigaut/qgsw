@@ -2,96 +2,50 @@
 
 from __future__ import annotations
 
-import argparse
-import pathlib
-from dataclasses import dataclass
 from pathlib import Path
 
 import torch
 
 from qgsw import logging
+from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
-from qgsw.logging.utils import box, step
+from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
-from qgsw.models.core.flux import div_flux_5pts_only
+from qgsw.models.core.flux import (
+    div_flux_5pts,
+)
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
     QGPSIQCollinearSF,
-    QGPSIQFixeddSF2,
+    QGPSIQMixed,
 )
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior, compute_q2_2l_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad_perp, laplacian
+from qgsw.solver.finite_diff import grad_perp
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
+from qgsw.utils.reshaping import crop
 
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
 ## Config
 
-
-@dataclass
-class ScriptArgs:
-    """Script arguments."""
-
-    config: Path
-    verbose: int
-    indices: list[int]
-
-    @classmethod
-    def from_cli(cls) -> Self:
-        """Instantiate script arguments from CLI.
-
-        Args:
-            default_config (str): Default configuration path.
-
-        Returns:
-            Self: ScriptArgs.
-        """
-        parser = argparse.ArgumentParser(
-            description="Retrieve script arguments.",
-        )
-        parser.add_argument(
-            "--config",
-            required=True,
-            type=pathlib.Path,
-            help="Configuration File Path (from qgsw root level)",
-        )
-        parser.add_argument(
-            "-v",
-            "--verbose",
-            action="count",
-            default=0,
-            help="Verbose level.",
-        )
-        parser.add_argument(
-            "-i",
-            "--indices",
-            required=True,
-            nargs="+",
-            type=int,
-            help="Indices (imin, imax, jmin, jmax), "
-            "for example (64, 128, 128, 256).",
-        )
-        return cls(**vars(parser.parse_args()))
-
-
-args = ScriptArgs.from_cli()
+args = ScriptArgsVA.from_cli(
+    comparison_default=1,
+    cycles_default=3,
+    prefix_default="results_mixed",
+)
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -108,13 +62,35 @@ output_dir = config.io.output.directory
 dt = 7200
 optim_max_step = 200
 n_steps_per_cyle = 250
-comparison_interval = 1
-n_cycles = 3
-msg = (
+comparison_interval = args.comparison
+n_cycles = args.cycles
+
+## Areas
+
+indices = args.indices
+imin, imax, jmin, jmax = indices
+
+p = 4
+psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
+psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
+
+## Output
+prefix = args.prefix
+filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
+output_file = output_dir.joinpath(filename)
+
+## Logs
+
+msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
-logger.info(box(msg, style="="))
+comp_dt = sec2text(comparison_interval * dt)
+msg_loss = f"RMSE will be evaluated every {comp_dt}."
+msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
+msg_output = f"Output will be saved to {output_file}."
+
+logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
 
 # Parameters
 
@@ -158,17 +134,6 @@ T: float = L / U
 
 psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 
-## Areas
-
-indices = args.indices
-imin, imax, jmin, jmax = indices
-msg = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
-logger.info(msg)
-
-p = 4
-psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
-psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
-
 ## Error
 
 
@@ -200,8 +165,8 @@ y0 = model_3l.y0
 
 ## Inhomogeneous models
 def set_inhomogeneous_model(
-    model: QGPSIQ | QGPSIQCollinearSF | QGPSIQFixeddSF2,
-) -> QGPSIQ | QGPSIQCollinearSF | QGPSIQFixeddSF2:
+    model: QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed,
+) -> QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0
@@ -222,12 +187,15 @@ model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
 space_slice = P.space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
+y = space_slice.q.xy.y[0, :].unsqueeze(0)
+beta_effect = beta_plane.beta * (y - y0)
 
 space_slice_w = P.space.remove_z_h().slice(
     imin - p + 1, imax + p, jmin - p + 1, jmax + p
 )
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
+
 
 compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
     dpsi1,
@@ -237,7 +205,7 @@ compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
     dx,
     dy,
     beta_plane.f0,
-    torch.zeros_like(beta_effect_w),
+    torch.zeros_like(beta_effect[..., 1:-1]),
 )
 compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
     psi1,
@@ -247,7 +215,7 @@ compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
     dx,
     dy,
     beta_plane.f0,
-    beta_effect_w,
+    beta_effect[..., 1:-1],
 )
 
 
@@ -268,23 +236,21 @@ def regularization(
     Returns:
         torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
     """
-    dtq2 = compute_dtq2(dpsi1[:, :1], dpsi2)
+    # padding psi and dpsi but the boundary is removed while computing q2.
+    dtq2 = compute_dtq2(dpsi1, dpsi2)
     q2 = compute_q2(psi1, psi2)
 
-    u2, v2 = grad_perp(psi2[..., 4:-4, 4:-4])
+    u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
     u2 /= dx
     v2 /= dy
 
-    dq_2 = div_flux_5pts_only(q2, u2, v2, dx, dy)
-    return ((dtq2[..., 3:-3, 3:-3] + dq_2) / U * L * T).square().sum()
+    dq_2 = div_flux_5pts(q2, u2[..., 1:-1, :], v2[..., :, 1:-1], dx, dy)
+    return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
-gamma = 20
-
-mu = 0.75
+gamma = 1 / comparison_interval
 
 # PV computation
-
 
 compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
     psi1,
@@ -299,15 +265,15 @@ compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
 )
 
 
-model_dpsi = QGPSIQFixeddSF2(
+model_mixed = QGPSIQMixed(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model_dpsi: QGPSIQFixeddSF2 = set_inhomogeneous_model(model_dpsi)
+model_mixed: QGPSIQMixed = set_inhomogeneous_model(model_mixed)
 
-model_dpsi.set_wind_forcing(
+model_mixed.set_wind_forcing(
     tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
 )
 
@@ -348,30 +314,37 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    psi2 = (torch.rand_like(psi0) * 1e-1).requires_grad_()
-    dpsi2 = (torch.rand_like(psi2) * 1e-3).requires_grad_()
+    alpha = torch.tensor(0.5, requires_grad=True)
+    dalpha = torch.tensor(0.5, requires_grad=True)
+    psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
+    dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
 
     optimizer = torch.optim.Adam(
-        [{"params": [psi2], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
+        [
+            {"params": [alpha], "lr": 1e-1},
+            {"params": [dalpha], "lr": 1e-1},
+            {"params": [psi2_adim], "lr": 1e-1},
+            {"params": [dpsi2], "lr": 1e-3},
+        ],
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
     early_stop = EarlyStop()
-    register_params_dpsi2 = RegisterParams()
+    register_params_mixed = RegisterParams()
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
-        model_dpsi.reset_time()
+        model_mixed.reset_time()
 
         with torch.enable_grad():
-            q0 = compute_q_psi2(psi0, psi2 * psi0_mean)[
-                ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
-            ]
+            psi2 = psi2_adim * psi0_mean
+            q0 = crop(compute_q_psi2(psi0, psi2 + alpha * psi0), p - 1)
             q_bcs = [
                 Boundaries.extract(
                     compute_q_psi2(
-                        psi[:, :1], psi2 * psi0_mean + n * dt * dpsi2
+                        psi[:, :1],
+                        psi2 + n * dt * dpsi2 + alpha * psi[:, :1],
                     ),
                     p - 2,
                     -(p - 1),
@@ -382,40 +355,39 @@ for c in range(n_cycles):
                 for n, psi in enumerate(psis)
             ]
 
-            model_dpsi.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
+            model_mixed.set_psiq(crop(psi0[:, :1], p), q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
-            model_dpsi.dpsi2 = dpsi2[..., p:-p, p:-p]
+            model_mixed.alpha = torch.ones_like(model_mixed.psi) * dalpha
+            model_mixed.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            model_mixed.dpsi2 = crop(dpsi2, p)
 
             loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
-                model_dpsi.step()
+                psi1_ = model_mixed.psi
+                psi2_ = crop(psi2 + (n - 1) * dt * dpsi2, p) + alpha * psi1_
+
+                model_mixed.step()
+
+                psi1 = model_mixed.psi
+                dpsi1_ = (psi1 - psi1_) / dt
+                dpsi2_ = crop(dpsi2, p) + dalpha * (psi1 - psi1_) / dt
+                reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
+                loss += reg
 
                 if (n + 1) % comparison_interval == 0:
-                    loss += rmse(
-                        model_dpsi.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
-                    )
-                    loss += mu * rmse(
-                        laplacian(model_dpsi.psi[0, 0], dx, dy),
-                        laplacian(psis[n][0, 0, p:-p, p:-p], dx, dy),
-                    )
-                    reg = gamma * regularization(
-                        psis[n - 1],
-                        psi2 * psi0_mean + (n - 1) * dt * dpsi2,
-                        (psis[n] - psis[n - 1]) / dt,
-                        dpsi2,
-                    )
-                    loss += reg
+                    loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
             logger.warning(box(msg, style="="))
             break
 
-        register_params_dpsi2.step(
+        register_params_mixed.step(
             loss,
-            psi2=psi2 * psi0_mean,
+            alpha=alpha,
+            dalpha=dalpha,
+            psi2=psi2,
             dpsi2=dpsi2,
         )
 
@@ -428,22 +400,43 @@ for c in range(n_cycles):
 
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"dѱ₂ optimization step {step(o + 1, optim_max_step)} | "
+            f"Mixed optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
 
         loss.backward()
 
-        lr_psi2 = optimizer.param_groups[0]["lr"]
-        norm_grad_psi2 = psi2.grad.norm().item()
-        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e-1)
-        norm_grad_psi2_ = psi2.grad.norm().item()
+        lr_alpha = optimizer.param_groups[0]["lr"]
+        grad_alpha = alpha.grad.item()
+        torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
+        grad_alpha_ = alpha.grad.item()
 
-        lr_dpsi2 = optimizer.param_groups[1]["lr"]
+        lr_dalpha = optimizer.param_groups[1]["lr"]
+        grad_dalpha = dalpha.grad.item()
+        torch.nn.utils.clip_grad_value_([dalpha], clip_value=1.0)
+        grad_dalpha_ = dalpha.grad.item()
+
+        lr_psi2 = optimizer.param_groups[2]["lr"]
+        norm_grad_psi2 = psi2_adim.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([psi2_adim], max_norm=1e-1)
+        norm_grad_psi2_ = psi2_adim.grad.norm().item()
+
+        lr_dpsi2 = optimizer.param_groups[3]["lr"]
         norm_grad_dpsi2 = dpsi2.grad.norm().item()
         torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
         norm_grad_dpsi2_ = dpsi2.grad.norm().item()
+
+        with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
+            msg = f"Learning rate {lr_alpha:.1e}"
+            logger.detail(msg)
+            msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
+            logger.detail(msg)
+        with logger.section("dɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
+            msg = f"Learning rate {lr_dalpha:.1e}"
+            logger.detail(msg)
+            msg = f"Gradient: {grad_dalpha:.1e} -> {grad_dalpha_:.1e}"
+            logger.detail(msg)
 
         with logger.section("ѱ₂ parameters:", level=logging.DETAIL):
             msg = f"Learning rate {lr_psi2:.1e}"
@@ -464,19 +457,25 @@ for c in range(n_cycles):
         optimizer.step()
         scheduler.step(loss)
 
-    best_loss = register_params_dpsi2.best_loss
-    msg = f"ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:3.5f}"
+    best_loss = register_params_mixed.best_loss
+    msg = (
+        f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:3.5f}"  # noqa: RUF001
+    )
     logger.info(box(msg, style="round"))
     output = {
         "cycle": c,
+        "config": {
+            "comparison_interval": comparison_interval,
+            "optimization_steps": [optim_max_step],
+        },
         "coords": (imin, imax, jmin, jmax),
-        "psi2": register_params_dpsi2.params["psi2"].detach().cpu(),
-        "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
+        "alpha": register_params_mixed.params["alpha"].detach().cpu(),
+        "dalpha": register_params_mixed.params["dalpha"].detach().cpu(),
+        "psi2": register_params_mixed.params["psi2"].detach().cpu(),
+        "dpsi2": register_params_mixed.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
-f = output_dir.joinpath(
-    f"results_psi2_reg_vort_{imin}_{imax}_{jmin}_{jmax}.pt"
-)
-torch.save(outputs, f)
-msg = f"Outputs saved to {f}"
+
+torch.save(outputs, output_file)
+msg = f"Outputs saved to {output_file}"
 logger.info(box(msg, style="="))

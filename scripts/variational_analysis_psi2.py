@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-import argparse
-import pathlib
-from dataclasses import dataclass
 from pathlib import Path
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 
 from qgsw import logging
+from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
-from qgsw.logging.utils import box, step
+from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
+from qgsw.models.core.flux import (
+    div_flux_5pts_replicate_q_boundaries,
+)
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
     QGPSIQCollinearSF,
@@ -24,72 +26,27 @@ from qgsw.models.qg.psiq.filtered.core import (
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.utils import EarlyStop, RegisterParams
-from qgsw.pv import compute_q1_interior
+from qgsw.pv import compute_q1_interior, compute_q2_2l_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
+from qgsw.solver.finite_diff import grad_perp
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
+from qgsw.utils.reshaping import crop
 
-try:
-    from typing import Self
-except ImportError:
-    from typing_extensions import Self
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
 ## Config
 
-
-@dataclass
-class ScriptArgs:
-    """Script arguments."""
-
-    config: Path
-    verbose: int
-    indices: list[int]
-
-    @classmethod
-    def from_cli(cls) -> Self:
-        """Instantiate script arguments from CLI.
-
-        Args:
-            default_config (str): Default configuration path.
-
-        Returns:
-            Self: ScriptArgs.
-        """
-        parser = argparse.ArgumentParser(
-            description="Retrieve script arguments.",
-        )
-        parser.add_argument(
-            "--config",
-            required=True,
-            type=pathlib.Path,
-            help="Configuration File Path (from qgsw root level)",
-        )
-        parser.add_argument(
-            "-v",
-            "--verbose",
-            action="count",
-            default=0,
-            help="Verbose level.",
-        )
-        parser.add_argument(
-            "-i",
-            "--indices",
-            required=True,
-            nargs="+",
-            type=int,
-            help="Indices (imin, imax, jmin, jmax), "
-            "for example (64, 128, 128, 256).",
-        )
-        return cls(**vars(parser.parse_args()))
-
-
-args = ScriptArgs.from_cli()
+args = ScriptArgsVA.from_cli(
+    comparison_default=1,
+    cycles_default=3,
+    prefix_default="results_psi2",
+)
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -106,13 +63,36 @@ output_dir = config.io.output.directory
 dt = 7200
 optim_max_step = 200
 n_steps_per_cyle = 250
-comparison_interval = 1
-n_cycles = 3
-msg = (
+comparison_interval = args.comparison
+n_cycles = args.cycles
+
+## Areas
+
+indices = args.indices
+imin, imax, jmin, jmax = indices
+
+p = 4
+psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
+psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
+
+## Output
+
+prefix = args.prefix
+filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
+output_file = output_dir.joinpath(filename)
+
+## Logs
+
+msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
-logger.info(box(msg, style="="))
+comp_dt = sec2text(comparison_interval * dt)
+msg_loss = f"RMSE will be evaluated every {comp_dt}."
+msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
+msg_output = f"Output will be saved to {output_file}."
+
+logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
 
 # Parameters
 
@@ -149,18 +129,12 @@ wind = WindForcing.from_config(
 tx, ty = wind.compute()
 
 uvh0 = UVH.from_file(config.simulation.startup.file)
+
+U: float = (uvh0.u[0, 0].max() ** 2 + uvh0.v[0, 0].max() ** 2).sqrt().item()
+L: float = dx.item()
+T: float = L / U
+
 psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
-
-## Areas
-
-indices = args.indices
-imin, imax, jmin, jmax = indices
-msg = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
-logger.info(msg)
-
-p = 4
-psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
-psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 
 ## Error
 
@@ -215,12 +189,68 @@ model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
 space_slice = P.space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
+y = space_slice.q.xy.y[0, :].unsqueeze(0)
+beta_effect = beta_plane.beta * (y - y0)
 
 space_slice_w = P.space.remove_z_h().slice(
     imin - p + 1, imax + p, jmin - p + 1, jmax + p
 )
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
+
+
+compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
+    dpsi1,
+    dpsi2,
+    H2,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    torch.zeros_like(beta_effect),
+)
+compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
+    psi1,
+    psi2,
+    H2,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    beta_effect,
+)
+
+
+def regularization(
+    psi1: torch.Tensor,
+    psi2: torch.Tensor,
+    dpsi1: torch.Tensor,
+    dpsi2: torch.Tensor,
+) -> torch.Tensor:
+    """Compute regularization.
+
+    Args:
+        psi1 (torch.Tensor): Top layer stream function.
+        psi2 (torch.Tensor): Bottom layer stream function.
+        dpsi1 (torch.Tensor): Top layer stream function derivative.
+        dpsi2 (torch.Tensor): Bottom layer stream function derivative
+
+    Returns:
+        torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
+    """
+    # padding psi and dpsi but the boundary is removed while computing q2.
+    dtq2 = compute_dtq2(F.pad(dpsi1, (1, 1, 1, 1)), dpsi2)
+    q2 = compute_q2(F.pad(psi1, (1, 1, 1, 1)), psi2)
+
+    u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
+    u2 /= dx
+    v2 /= dy
+
+    dq_2 = div_flux_5pts_replicate_q_boundaries(q2, u2, v2, dx, dy)
+    return ((dtq2 + dq_2) / U * L * T).square().sum()
+
+
+gamma = 10 / comparison_interval
 
 # PV computation
 
@@ -286,11 +316,11 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    psi2 = torch.ones_like(psi0, requires_grad=True)
-    dpsi2 = (torch.ones_like(psi2) * 1e-3).requires_grad_()
+    psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
+    dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
 
     optimizer = torch.optim.Adam(
-        [{"params": [psi2], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
+        [{"params": [psi2_adim], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
@@ -303,14 +333,11 @@ for c in range(n_cycles):
         model_dpsi.reset_time()
 
         with torch.enable_grad():
-            q0 = compute_q_psi2(psi0, psi2 * psi0_mean)[
-                ..., (p - 1) : -(p - 1), (p - 1) : -(p - 1)
-            ]
+            psi2 = psi2_adim * psi0_mean
+            q0 = crop(compute_q_psi2(psi0, psi2), p - 1)
             q_bcs = [
                 Boundaries.extract(
-                    compute_q_psi2(
-                        psi[:, :1], psi2 * psi0_mean + n * dt * dpsi2
-                    ),
+                    compute_q_psi2(psi[:, :1], psi2 + n * dt * dpsi2),
                     p - 2,
                     -(p - 1),
                     p - 2,
@@ -320,31 +347,31 @@ for c in range(n_cycles):
                 for n, psi in enumerate(psis)
             ]
 
-            model_dpsi.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
+            model_dpsi.set_psiq(crop(psi0[:, :1], p), q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
             model_dpsi.set_boundary_maps(psi_bc_interp, q_bc_interp)
-            model_dpsi.dpsi2 = dpsi2[..., p:-p, p:-p]
+            model_dpsi.dpsi2 = crop(dpsi2, p)
 
             loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
+                psi1_ = model_dpsi.psi
+                psi2_ = crop(psi2 + (n - 1) * dt * dpsi2, p - 1)
                 model_dpsi.step()
+                dpsi1_ = (model_dpsi.psi - psi1_) / dt
+                dpsi2_ = crop(dpsi2, p - 1)
+                reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
+                loss += reg
 
                 if (n + 1) % comparison_interval == 0:
-                    loss += rmse(
-                        model_dpsi.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
-                    )
+                    loss += rmse(model_dpsi.psi[0, 0], crop(psis[n][0, 0], p))
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
             logger.warning(box(msg, style="="))
             break
 
-        register_params_dpsi2.step(
-            loss,
-            psi2=psi2 * psi0_mean,
-            dpsi2=dpsi2,
-        )
+        register_params_dpsi2.step(loss, psi2=psi2, dpsi2=dpsi2)
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
@@ -363,9 +390,9 @@ for c in range(n_cycles):
         loss.backward()
 
         lr_psi2 = optimizer.param_groups[0]["lr"]
-        norm_grad_psi2 = psi2.grad.norm().item()
-        torch.nn.utils.clip_grad_norm_([psi2], max_norm=1e-1)
-        norm_grad_psi2_ = psi2.grad.norm().item()
+        norm_grad_psi2 = psi2_adim.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([psi2_adim], max_norm=1e-1)
+        norm_grad_psi2_ = psi2_adim.grad.norm().item()
 
         lr_dpsi2 = optimizer.param_groups[1]["lr"]
         norm_grad_dpsi2 = dpsi2.grad.norm().item()
@@ -396,12 +423,16 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
     output = {
         "cycle": c,
+        "config": {
+            "comparison_interval": comparison_interval,
+            "optimization_steps": [optim_max_step],
+        },
         "coords": (imin, imax, jmin, jmax),
         "psi2": register_params_dpsi2.params["psi2"].detach().cpu(),
         "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
-f = output_dir.joinpath(f"results_psi2_{imin}_{imax}_{jmin}_{jmax}.pt")
-torch.save(outputs, f)
-msg = f"Outputs saved to {f}"
+
+torch.save(outputs, output_file)
+msg = f"Outputs saved to {output_file}"
 logger.info(box(msg, style="="))
