@@ -318,8 +318,8 @@ for c in range(n_cycles):
 
     optimizer = torch.optim.Adam(
         [
-            {"params": [alpha], "lr": 1e-3},
-            {"params": [dalpha], "lr": 1e-3},
+            {"params": [alpha], "lr": 1e-2},
+            {"params": [dalpha], "lr": 1e-2},
             {"params": [psi2_adim], "lr": 1e-1},
             {"params": [dpsi2], "lr": 1e-3},
         ],
