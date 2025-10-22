@@ -416,7 +416,7 @@ for c in range(n_cycles):
         "dpsi2": register_params_dpsi2.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
-f = output_dir.joinpath(f"results_psi2_reg_{imin}_{imax}_{jmin}_{jmax}.pt")
+f = output_dir.joinpath(f"results_psi2_{imin}_{imax}_{jmin}_{jmax}.pt")
 torch.save(outputs, f)
 msg = f"Outputs saved to {f}"
 logger.info(box(msg, style="="))
