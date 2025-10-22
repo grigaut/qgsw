@@ -340,19 +340,14 @@ for c in range(n_cycles):
         with torch.enable_grad():
             psi2 = psi2_adim * psi0_mean
             q0 = crop(compute_q_psi2(psi0, psi2 + alpha * psi0), p - 1)
+            psis_ = (
+                (p[:, :1], psi2 + n * dt * dpsi2 + alpha * p[:, :1])
+                for n, p in enumerate(psis)
+            )
+            qs = (compute_q_psi2(p1, p2) for p1, p2 in psis_)
             q_bcs = [
-                Boundaries.extract(
-                    compute_q_psi2(
-                        psi[:, :1],
-                        psi2 + n * dt * dpsi2 + alpha * psi[:, :1],
-                    ),
-                    p - 2,
-                    -(p - 1),
-                    p - 2,
-                    -(p - 1),
-                    3,
-                )
-                for n, psi in enumerate(psis)
+                Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
+                for q in qs
             ]
 
             model_mixed.set_psiq(crop(psi0[:, :1], p), q0)
