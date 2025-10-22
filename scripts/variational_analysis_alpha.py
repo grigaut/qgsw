@@ -265,11 +265,10 @@ for c in range(n_cycles):
 
         with torch.enable_grad():
             q0 = compute_q_alpha(psi0, alpha)[..., 3:-3, 3:-3]
+            qs = (compute_q_alpha(psi[:, :1], alpha) for psi in psis)
             q_bcs = [
-                Boundaries.extract(
-                    compute_q_alpha(psi[:, :1], alpha), 2, -3, 2, -3, 3
-                )
-                for psi in psis
+                Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
+                for q in qs
             ]
 
             model_alpha.set_psiq(psi0[:, :1, p:-p, p:-p], q0)
