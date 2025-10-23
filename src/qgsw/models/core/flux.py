@@ -391,6 +391,38 @@ def div_flux_5pts(
     )
 
 
+def div_flux_5pts_no_pad(
+    q: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dx: float,
+    dy: float,
+) -> torch.Tensor:
+    """Compute the divergence [uq, vq], assuming 0 on the boundary for q.
+
+    Args:
+        q (torch.Tensor): Tracer field to compute the div flux of.
+                └── (n_ens, nl, nx, ny)-shaped
+        u (torch.Tensor): Velocity in the zonal direction.
+                └── (n_ens, nl, nx+1, ny)-shaped
+        v (torch.Tensor): Velocity in the meridional direction.
+                └── (n_ens, nl, nx, ny+1)-shaped
+        dx (float): Infinitesimal distance in the x direction.
+        dy (float): Infinitesimal distance in the x direction.
+
+    Returns:
+        torch.Tensor: ∇ · ([u v] q)
+            └── (n_ens, nl, nx-2, ny-2)-shaped
+    """
+    q_flux_y = flux_5pts(q, v, dim=-1)
+    q_flux_x = flux_5pts(q, u, dim=-2)
+
+    return (
+        torch.diff(q_flux_x, dim=-2)[..., :, 1:-1] / dx
+        + torch.diff(q_flux_y, dim=-1)[..., 1:-1, :] / dy
+    )
+
+
 def flux_5pts_only(q: torch.Tensor, u: torch.Tensor, dim: int) -> torch.Tensor:
     """
     Flux computation for staggerded variables q and u, with solid boundaries.

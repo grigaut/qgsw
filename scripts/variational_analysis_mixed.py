@@ -14,9 +14,7 @@ from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
-from qgsw.models.core.flux import (
-    div_flux_5pts,
-)
+from qgsw.models.core.flux import div_flux_5pts_no_pad
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import (
     QGPSIQCollinearSF,
@@ -236,15 +234,14 @@ def regularization(
     Returns:
         torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
     """
-    # padding psi and dpsi but the boundary is removed while computing q2.
-    dtq2 = compute_dtq2(dpsi1, dpsi2)
+    dtq2 = compute_dtq2(dpsi1, dpsi2)[..., 1:-1, 1:-1]
     q2 = compute_q2(psi1, psi2)
 
     u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
     u2 /= dy
     v2 /= dx
 
-    dq_2 = div_flux_5pts(q2, u2[..., 1:-1, :], v2[..., :, 1:-1], dx, dy)
+    dq_2 = div_flux_5pts_no_pad(q2, u2[..., 1:-1, :], v2[..., :, 1:-1], dx, dy)
     return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
