@@ -243,8 +243,8 @@ def regularization(
     q2 = compute_q2(F.pad(psi1, (1, 1, 1, 1)), psi2)
 
     u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
-    u2 /= dx
-    v2 /= dy
+    u2 /= dy
+    v2 /= dx
 
     dq_2 = div_flux_5pts_replicate_q_boundaries(q2, u2, v2, dx, dy)
     return ((dtq2 + dq_2) / U * L * T).square().sum()
