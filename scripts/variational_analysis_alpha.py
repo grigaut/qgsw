@@ -281,7 +281,7 @@ for c in range(n_cycles):
             for n in range(1, n_steps_per_cyle):
                 model_alpha.step()
 
-                if (n + 1) % comparison_interval == 0:
+                if n % comparison_interval == 0:
                     loss += rmse(
                         model_alpha.psi[0, 0], psis[n][0, 0, p:-p, p:-p]
                     )

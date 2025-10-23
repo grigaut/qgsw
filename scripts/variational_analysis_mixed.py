@@ -370,7 +370,7 @@ for c in range(n_cycles):
                 reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
                 loss += reg
 
-                if (n + 1) % comparison_interval == 0:
+                if n % comparison_interval == 0:
                     loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
 
         if torch.isnan(loss.detach()):
