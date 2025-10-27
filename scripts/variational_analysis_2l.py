@@ -210,11 +210,12 @@ model_2l.set_wind_forcing(
 # Compute PV
 
 
-def compute_q(psi: torch.Tensor) -> torch.Tensor:
+def compute_q(psi: torch.Tensor, beta_effect: torch.Tensor) -> torch.Tensor:
     """Compute PV.
 
     Args:
         psi (torch.Tensor): Stream function.
+        beta_effect (torch.Tensor): Beta effect
 
     Returns:
         torch.Tensor: Potential vorticity.
@@ -227,7 +228,7 @@ def compute_q(psi: torch.Tensor) -> torch.Tensor:
                 "lm,...mxy->...lxy", model_2l.A, psi[..., 1:-1, 1:-1]
             )
         )
-        + beta_effect_w
+        + beta_effect
     )
 
 
@@ -267,7 +268,7 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-    qs = (compute_q(p) for p in psis)
+    qs = (compute_q(p, beta_effect_w) for p in psis)
     q_bcs = [
         Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3) for q in qs
     ]
@@ -291,7 +292,7 @@ for c in range(n_cycles):
         with torch.enable_grad():
             psi2 = crop(psi0[:, 1:2], p - 1) + psi2_adim * psi0_mean
             psi0_ = torch.cat([crop(psi0[:, :1], p - 1), psi2], dim=1)
-            q0 = compute_q(psi0_)
+            q0 = compute_q(psi0_, beta_effect_w[..., 3:-3])
 
             model_2l.set_psiq(crop(psi0_, 1), q0)
 
