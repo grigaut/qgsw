@@ -380,7 +380,7 @@ for c in range(n_cycles):
 
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"dѱ₂ optimization step {step(o + 1, optim_max_step)} | "
+            f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)

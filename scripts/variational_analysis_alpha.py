@@ -302,7 +302,7 @@ for c in range(n_cycles):
         loss_ = loss.cpu().item()
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"ɑ optimization step {step(o + 1, optim_max_step)} | "  # noqa: RUF001
+            f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)

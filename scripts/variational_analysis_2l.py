@@ -320,7 +320,7 @@ for c in range(n_cycles):
 
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"Mixed optimization step {step(o + 1, optim_max_step)} | "
+            f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
@@ -344,7 +344,7 @@ for c in range(n_cycles):
         scheduler.step(loss)
 
     best_loss = register_params_mixed.best_loss
-    msg = f"ѱ₂optimization completed with loss: {best_loss:3.5f}"
+    msg = f"ѱ₂ optimization completed with loss: {best_loss:3.5f}"
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
     logger.info(box(msg, msg_mem, style="round"))
