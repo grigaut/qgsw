@@ -13,7 +13,7 @@ from qgsw.filters.base import _Filter
 from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
-from qgsw.models.qg.psiq.core import QGPSIQ, QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
@@ -1039,7 +1039,7 @@ class QGPSIQMixed(QGPSIQCollinearSF):
         return PSIQ(dpsi, dq)
 
 
-class QGPSIQForced(QGPSIQ[PSIQT, StatePSIQ]):
+class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
     """Specify and additional forcing term."""
 
     _forcing: torch.Tensor = None
@@ -1052,7 +1052,7 @@ class QGPSIQForced(QGPSIQ[PSIQT, StatePSIQ]):
         """
         if self._forcing is None:
             return torch.zeros_like(self.q)
-        return self.forcing
+        return self._forcing
 
     @forcing.setter
     def forcing(self, forcing: torch.Tensor) -> None:
@@ -1082,8 +1082,7 @@ class QGPSIQForced(QGPSIQ[PSIQT, StatePSIQ]):
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
-            dq_i
-            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            dq_i,
             ensure_mass_conservation=True,
         )
         self._dpsi = dpsi
@@ -1120,8 +1119,7 @@ class QGPSIQForced(QGPSIQ[PSIQT, StatePSIQ]):
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
-            dq_i
-            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            dq_i,
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
@@ -1192,8 +1190,7 @@ class QGPSIQForced(QGPSIQ[PSIQT, StatePSIQ]):
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
-            dq_i
-            + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
+            dq_i,
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
