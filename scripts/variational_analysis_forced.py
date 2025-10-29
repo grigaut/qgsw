@@ -361,6 +361,7 @@ for c in range(n_cycles):
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
+            "order": basis.order,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
