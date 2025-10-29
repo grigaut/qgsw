@@ -251,6 +251,10 @@ for c in range(n_cycles):
     alpha = torch.tensor(0.5, requires_grad=True)
     dalpha = torch.tensor(0.5, requires_grad=True)
 
+    numel = alpha.numel() + dalpha.numel()
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
+
     optimizer = torch.optim.Adam(
         [{"params": [alpha], "lr": 1e-2}, {"params": [dalpha], "lr": 1e-2}],
     )

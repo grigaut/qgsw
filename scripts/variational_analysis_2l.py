@@ -278,6 +278,10 @@ for c in range(n_cycles):
         torch.rand_like(crop(psi0[:, 1:2], p - 1)) * 1e-2
     ).requires_grad_()
 
+    numel = psi2_adim.numel()
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
+
     optimizer = torch.optim.Adam([{"params": [psi2_adim], "lr": 1e-2}])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5

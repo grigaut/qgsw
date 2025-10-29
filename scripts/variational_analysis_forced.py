@@ -275,8 +275,6 @@ for c in range(n_cycles):
         torch.stack([torch.tensor(t, **specs) for t in times]),
         order=5,
     )
-    msg = f"Control vector contains {basis.numel} elements."
-    logger.info(box(msg, style="round"))
     basis.normalize = True
     coefs = basis.generate_random_coefs(**specs)
     coefs = {k: (v * 1e-10).requires_grad_() for k, v in coefs.items()}
@@ -284,6 +282,10 @@ for c in range(n_cycles):
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
     q_bc_interp = QuadraticInterpolation(times, q_bcs)
+
+    numel = basis.numel()
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [{"params": list(coefs.values()), "lr": 1e-11}]

@@ -320,6 +320,10 @@ for c in range(n_cycles):
     psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
     dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
 
+    numel = psi2_adim.numel() + dpsi2.numel()
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
+
     optimizer = torch.optim.Adam(
         [{"params": [psi2_adim], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
     )
