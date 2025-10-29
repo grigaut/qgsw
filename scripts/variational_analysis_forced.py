@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw import logging
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.sine import STSineBasis
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
@@ -269,12 +269,25 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
+    basis = STSineBasis(
+        space_slice.q.xy.x - space_slice.q.xy.x[:1, :],
+        space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
+        torch.stack([torch.tensor(t, **specs) for t in times]),
+        order=5,
+    )
+    msg = f"Control vector contains {basis.numel} elements."
+    logger.info(box(msg, style="round"))
+    basis.normalize = True
+    coefs = basis.generate_random_coefs(**specs)
+    coefs = {k: (v * 1e-10).requires_grad_() for k, v in coefs.items()}
+
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
     q_bc_interp = QuadraticInterpolation(times, q_bcs)
-    forcing = (torch.rand_like(crop(q0, p - 1)) * 1e-11).requires_grad_()
 
-    optimizer = torch.optim.Adam([{"params": [forcing], "lr": 1e-11}])
+    optimizer = torch.optim.Adam(
+        [{"params": list(coefs.values()), "lr": 1e-11}]
+    )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -285,18 +298,21 @@ for c in range(n_cycles):
         optimizer.zero_grad()
         model_forced.reset_time()
         model_forced.set_boundary_maps(psi_bc_interp, q_bc_interp)
+
         with torch.enable_grad():
             model_forced.set_psiq(crop(psi0, p), crop(q0, p - 1))
-            model_forced.forcing = forcing
 
             loss = torch.tensor(0, **defaults.get())
+            basis.set_coefs(coefs)
 
             for n in range(1, n_steps_per_cyle):
+                model_forced.forcing = basis.at_time(model_forced.time)
                 model_forced.step()
 
                 if n % comparison_interval == 0:
                     loss += rmse(
-                        model_forced.psi[0, 0], crop(psis[n][0, 0], p)
+                        model_forced.psi[0, 0],
+                        crop(psis[n][0, 0], p),
                     )
 
         if torch.isnan(loss.detach()):
@@ -304,7 +320,9 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_mixed.step(loss, forcing=forcing)
+        register_params_mixed.step(
+            loss, **{f"coefs_{k}": v for k, v in coefs.items()}
+        )
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
@@ -323,18 +341,8 @@ for c in range(n_cycles):
         loss.backward()
 
         lr_forcing = optimizer.param_groups[0]["lr"]
-        norm_grad_forcing = forcing.grad.norm().item()
-        torch.nn.utils.clip_grad_norm_([forcing], max_norm=1e-1)
-        norm_grad_forcing_ = forcing.grad.norm().item()
-
-        with logger.section("Forcing parameters:", level=logging.DETAIL):
-            msg = f"Learning rate {lr_forcing:.1e}"
-            logger.detail(msg)
-            msg = (
-                f"Gradient norm: {norm_grad_forcing:.1e} "
-                f"-> {norm_grad_forcing_:.1e}"
-            )
-            logger.detail(msg)
+        for v in coefs.values():
+            torch.nn.utils.clip_grad_norm_([v], max_norm=1e-1)
 
         optimizer.step()
         scheduler.step(loss)
@@ -352,7 +360,10 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        "forcing": register_params_mixed.params["forcing"].detach().cpu(),
+        **{
+            f"coefs_{k}": register_params_mixed.params[f"coefs_{k}"]
+            for k in coefs
+        },
     }
     outputs.append(output)
 
