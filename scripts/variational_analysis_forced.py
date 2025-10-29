@@ -282,7 +282,7 @@ for c in range(n_cycles):
     logger.info(msg)
 
     coefs = basis.generate_random_coefs(**specs)
-    coefs = {k: (v * 1e-10).requires_grad_() for k, v in coefs.items()}
+    coefs = {k: (v * 1e-11).requires_grad_() for k, v in coefs.items()}
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
