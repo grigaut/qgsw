@@ -277,6 +277,10 @@ for c in range(n_cycles):
         order=5,
     )
     basis.normalize = True
+
+    msg = f"Using basis of order {basis.order}"
+    logger.info(msg)
+
     coefs = basis.generate_random_coefs(**specs)
     coefs = {k: (v * 1e-10).requires_grad_() for k, v in coefs.items()}
 
