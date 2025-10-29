@@ -75,11 +75,6 @@ class STSineBasis:
         self._generate_time_basis(order)
 
     @property
-    def numel(self) -> int:
-        """Total number of elements."""
-        return sum((2**i) ** 3 for i in range(self._order))
-
-    @property
     def normalize(self) -> bool:
         """Whether to normalize the output."""
         return self._normalize
@@ -95,6 +90,10 @@ class STSineBasis:
     def order(self) -> int:
         """Decomposition order."""
         return self._order
+
+    def numel(self) -> int:
+        """Total number of elements."""
+        return sum((2**i) ** 3 for i in range(self._order))
 
     def __repr__(self) -> str:
         """Strin representation."""
