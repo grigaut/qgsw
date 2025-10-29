@@ -203,9 +203,10 @@ model_2l = QGPSIQ(
 )
 model_2l: QGPSIQ = set_inhomogeneous_model(model_2l)
 
-model_2l.set_wind_forcing(
-    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-)
+if not args.no_wind:
+    model_2l.set_wind_forcing(
+        tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+    )
 
 # Compute PV
 
@@ -278,6 +279,10 @@ for c in range(n_cycles):
         torch.rand_like(crop(psi0[:, 1:2], p - 1)) * 1e-2
     ).requires_grad_()
 
+    numel = psi2_adim.numel()
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
+
     optimizer = torch.optim.Adam([{"params": [psi2_adim], "lr": 1e-2}])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
@@ -320,7 +325,7 @@ for c in range(n_cycles):
 
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"Mixed optimization step {step(o + 1, optim_max_step)} | "
+            f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
@@ -344,7 +349,7 @@ for c in range(n_cycles):
         scheduler.step(loss)
 
     best_loss = register_params_mixed.best_loss
-    msg = f"ѱ₂optimization completed with loss: {best_loss:3.5f}"
+    msg = f"ѱ₂ optimization completed with loss: {best_loss:3.5f}"
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
     logger.info(box(msg, msg_mem, style="round"))
@@ -353,6 +358,7 @@ for c in range(n_cycles):
         "config": {
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
+            "no-wind": args.no_wind,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),

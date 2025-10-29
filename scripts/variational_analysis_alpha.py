@@ -207,9 +207,10 @@ model_alpha = QGPSIQCollinearSF(
 )
 model_alpha: QGPSIQCollinearSF = set_inhomogeneous_model(model_alpha)
 
-model_alpha.set_wind_forcing(
-    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-)
+if not args.no_wind:
+    model_alpha.set_wind_forcing(
+        tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+    )
 
 
 def extract_psi_w(psi: torch.Tensor) -> torch.Tensor:
@@ -250,6 +251,10 @@ for c in range(n_cycles):
 
     alpha = torch.tensor(0.5, requires_grad=True)
     dalpha = torch.tensor(0.5, requires_grad=True)
+
+    numel = alpha.numel() + dalpha.numel()
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [{"params": [alpha], "lr": 1e-2}, {"params": [dalpha], "lr": 1e-2}],
@@ -302,7 +307,7 @@ for c in range(n_cycles):
         loss_ = loss.cpu().item()
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"ɑ optimization step {step(o + 1, optim_max_step)} | "  # noqa: RUF001
+            f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
@@ -346,6 +351,7 @@ for c in range(n_cycles):
         "config": {
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
+            "no-wind": args.no_wind,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),

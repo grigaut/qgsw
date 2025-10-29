@@ -275,9 +275,10 @@ model_dpsi = QGPSIQFixeddSF2(
 )
 model_dpsi: QGPSIQFixeddSF2 = set_inhomogeneous_model(model_dpsi)
 
-model_dpsi.set_wind_forcing(
-    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-)
+if not args.no_wind:
+    model_dpsi.set_wind_forcing(
+        tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+    )
 
 
 def extract_psi_w(psi: torch.Tensor) -> torch.Tensor:
@@ -319,6 +320,10 @@ for c in range(n_cycles):
 
     psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
     dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
+
+    numel = psi2_adim.numel() + dpsi2.numel()
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [{"params": [psi2_adim], "lr": 1e-1}, {"params": [dpsi2], "lr": 1e-3}],
@@ -380,7 +385,7 @@ for c in range(n_cycles):
 
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
-            f"dѱ₂ optimization step {step(o + 1, optim_max_step)} | "
+            f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:3.5f}"
         )
         logger.info(msg)
@@ -426,6 +431,7 @@ for c in range(n_cycles):
         "config": {
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
+            "no-wind": args.no_wind,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
