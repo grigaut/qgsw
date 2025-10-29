@@ -70,6 +70,7 @@ class ScriptArgsVA(ScriptArgs):
     comparison: int
     cycles: int
     prefix: str
+    no_wind: bool = False
 
     @classmethod
     def from_cli(
@@ -101,6 +102,7 @@ class ScriptArgsVA(ScriptArgs):
         cls._add_comparison_interval(parser, comparison_default)
         cls._add_cycles(parser, cycles_default)
         cls._add_prefix(parser, prefix_default)
+        cls._add_wind(parser)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -171,4 +173,17 @@ class ScriptArgsVA(ScriptArgs):
             type=str,
             default=default,
             help="File saving prefix prefix.",
+        )
+
+    @classmethod
+    def _add_wind(cls, parser: argparse.ArgumentParser) -> None:
+        """Specify whether to use wind or not.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+        """
+        parser.add_argument(
+            "--no-wind",
+            action="store_true",
+            help="Disable wind forcing.",
         )

@@ -207,9 +207,10 @@ model_forced = QGPSIQForced(
 )
 model_forced: QGPSIQForced = set_inhomogeneous_model(model_forced)
 
-model_forced.set_wind_forcing(
-    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-)
+if not args.no_wind:
+    model_forced.set_wind_forcing(
+        tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+    )
 
 # Compute PV
 
@@ -359,6 +360,7 @@ for c in range(n_cycles):
         "config": {
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
+            "no-wind": args.no_wind,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),

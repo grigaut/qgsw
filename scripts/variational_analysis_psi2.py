@@ -275,9 +275,10 @@ model_dpsi = QGPSIQFixeddSF2(
 )
 model_dpsi: QGPSIQFixeddSF2 = set_inhomogeneous_model(model_dpsi)
 
-model_dpsi.set_wind_forcing(
-    tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
-)
+if not args.no_wind:
+    model_dpsi.set_wind_forcing(
+        tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
+    )
 
 
 def extract_psi_w(psi: torch.Tensor) -> torch.Tensor:
@@ -430,6 +431,7 @@ for c in range(n_cycles):
         "config": {
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
+            "no-wind": args.no_wind,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
