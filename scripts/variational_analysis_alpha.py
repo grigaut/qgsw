@@ -249,8 +249,8 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    alpha = torch.tensor(0, **specs, requires_grad=True)
-    dalpha = torch.tensor(0, **specs, requires_grad=True)
+    alpha = torch.tensor(0.5, **specs, requires_grad=True)
+    dalpha = torch.tensor(0.5, **specs, requires_grad=True)
 
     numel = alpha.numel() + dalpha.numel()
     msg = f"Control vector contains {numel} elements."
