@@ -217,7 +217,6 @@ class STSineBasis:
             torch.Tensor: Build field.
         """
         field = torch.zeros_like(self._x)
-        norm = 0
         for lvl, base_elements in self.time_basis.items():
             centers = base_elements["centers"]
             st = base_elements["sigma_t"]
@@ -227,9 +226,10 @@ class STSineBasis:
                 dim=0,
             )
             field += (exp[:, None, None] * self._fields[lvl]).sum(dim=0)
-            norm += exp.sum(dim=0)
+            if self.normalize:
+                field /= exp.sum(dim=0)
         if self.normalize:
-            field /= norm
+            field /= self.order + 1
         return field
 
     def set_coefs(
