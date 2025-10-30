@@ -340,6 +340,12 @@ for c in range(n_cycles):
         psi2=psi2_adim * psi0_mean,
         dpsi2=dpsi2,
     )
+    register_params_mixed = RegisterParams(
+        alpha=alpha,
+        dalpha=dalpha,
+        psi2=psi2_adim * psi0_mean,
+        dpsi2=dpsi2,
+    )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()

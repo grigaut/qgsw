@@ -318,8 +318,8 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
-    dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
+    psi2_adim = torch.zeros_like(psi0, requires_grad=True)
+    dpsi2 = torch.zeros_like(psi2_adim, requires_grad=True)
 
     numel = psi2_adim.numel() + dpsi2.numel()
     msg = f"Control vector contains {numel} elements."
