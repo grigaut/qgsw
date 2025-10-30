@@ -313,10 +313,10 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    alpha = torch.tensor(0.5, requires_grad=True)
-    dalpha = torch.tensor(0.5, requires_grad=True)
-    psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
-    dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
+    alpha = torch.tensor(0, **specs, requires_grad=True)
+    dalpha = torch.tensor(0, **specs, requires_grad=True)
+    psi2_adim = torch.zeros_like(psi0, requires_grad=True)
+    dpsi2 = torch.zeros_like(psi2_adim, requires_grad=True)
 
     numel = alpha.numel() + dalpha.numel() + psi2_adim.numel() + dpsi2.numel()
     msg = f"Control vector contains {numel} elements."
@@ -334,7 +334,12 @@ for c in range(n_cycles):
         optimizer, factor=0.5, patience=5
     )
     early_stop = EarlyStop()
-    register_params_mixed = RegisterParams()
+    register_params_mixed = RegisterParams(
+        alpha=alpha,
+        dalpha=dalpha,
+        psi2=psi2_adim * psi0_mean,
+        dpsi2=dpsi2,
+    )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
