@@ -273,7 +273,7 @@ for c in range(n_cycles):
     basis = STSineBasis(
         space_slice.q.xy.x - space_slice.q.xy.x[:1, :],
         space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
-        torch.stack([torch.tensor(t, **specs) for t in times]),
+        torch.stack([torch.tensor(t - times[0], **specs) for t in times]),
         order=5,
     )
     basis.normalize = True
