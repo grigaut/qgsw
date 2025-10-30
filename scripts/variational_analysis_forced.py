@@ -301,7 +301,9 @@ for c in range(n_cycles):
         optimizer, factor=0.5, patience=5
     )
     early_stop = EarlyStop()
-    register_params_mixed = RegisterParams()
+    register_params_mixed = RegisterParams(
+        **{f"coefs_{k}": v for k, v in coefs.items()}
+    )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
