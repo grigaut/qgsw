@@ -794,7 +794,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             dq_i,
             ensure_mass_conservation=True,
         )
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -846,7 +845,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -917,7 +915,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def set_p(self, p: torch.Tensor) -> None:
