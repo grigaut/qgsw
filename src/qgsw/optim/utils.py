@@ -47,10 +47,14 @@ class EarlyStop:
 class RegisterParams:
     """Keep track of lower-loss parameters."""
 
-    def __init__(self) -> None:
-        """Instantiate RegisterParams."""
+    def __init__(self, **kwargs: torch.Tensor) -> None:
+        """Instantiate RegisterParams.
+
+        Args:
+            **kwargs (torch.Tensor): Initial parameters.
+        """
         self.best_loss = torch.tensor(float("inf"))
-        self.params = None
+        self.params = {k: v.detach().clone() for k, v in kwargs.items()}
 
     def step(self, loss: torch.Tensor, **kwargs: torch.Tensor) -> None:
         """Check against new loss.
