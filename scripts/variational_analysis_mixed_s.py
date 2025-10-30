@@ -42,7 +42,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_mixed",
+    prefix_default="results_mixed_s",
 )
 specs = defaults.get()
 
@@ -314,18 +314,16 @@ for c in range(n_cycles):
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
     alpha = torch.tensor(0.5, **specs, requires_grad=True)
-    dalpha = torch.tensor(0.5, **specs, requires_grad=True)
     psi2_adim = (torch.rand_like(psi0) * 1e-1).requires_grad_()
     dpsi2 = (torch.rand_like(psi2_adim) * 1e-3).requires_grad_()
 
-    numel = alpha.numel() + dalpha.numel() + psi2_adim.numel() + dpsi2.numel()
+    numel = alpha.numel() + psi2_adim.numel() + dpsi2.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [
             {"params": [alpha], "lr": 1e-1},
-            {"params": [dalpha], "lr": 1e-1},
             {"params": [psi2_adim], "lr": 1e-1},
             {"params": [dpsi2], "lr": 1e-3},
         ],
@@ -336,7 +334,6 @@ for c in range(n_cycles):
     early_stop = EarlyStop()
     register_params_mixed = RegisterParams(
         alpha=alpha,
-        dalpha=dalpha,
         psi2=psi2_adim * psi0_mean,
         dpsi2=dpsi2,
     )
@@ -360,7 +357,7 @@ for c in range(n_cycles):
 
             model_mixed.set_psiq(crop(psi0[:, :1], p), q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model_mixed.alpha = torch.ones_like(model_mixed.psi) * dalpha
+            model_mixed.alpha = torch.ones_like(model_mixed.psi) * alpha
             model_mixed.set_boundary_maps(psi_bc_interp, q_bc_interp)
             model_mixed.dpsi2 = crop(dpsi2, p)
 
@@ -374,7 +371,7 @@ for c in range(n_cycles):
 
                 psi1 = model_mixed.psi
                 dpsi1_ = (psi1 - psi1_) / dt
-                dpsi2_ = crop(dpsi2, p) + dalpha * (psi1 - psi1_) / dt
+                dpsi2_ = crop(dpsi2, p) + alpha * (psi1 - psi1_) / dt
                 reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
                 loss += reg
 
@@ -389,7 +386,6 @@ for c in range(n_cycles):
         register_params_mixed.step(
             loss,
             alpha=alpha,
-            dalpha=dalpha,
             psi2=psi2,
             dpsi2=dpsi2,
         )
@@ -415,17 +411,12 @@ for c in range(n_cycles):
         torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
         grad_alpha_ = alpha.grad.item()
 
-        lr_dalpha = optimizer.param_groups[1]["lr"]
-        grad_dalpha = dalpha.grad.item()
-        torch.nn.utils.clip_grad_value_([dalpha], clip_value=1.0)
-        grad_dalpha_ = dalpha.grad.item()
-
-        lr_psi2 = optimizer.param_groups[2]["lr"]
+        lr_psi2 = optimizer.param_groups[1]["lr"]
         norm_grad_psi2 = psi2_adim.grad.norm().item()
         torch.nn.utils.clip_grad_norm_([psi2_adim], max_norm=1e-1)
         norm_grad_psi2_ = psi2_adim.grad.norm().item()
 
-        lr_dpsi2 = optimizer.param_groups[3]["lr"]
+        lr_dpsi2 = optimizer.param_groups[2]["lr"]
         norm_grad_dpsi2 = dpsi2.grad.norm().item()
         torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
         norm_grad_dpsi2_ = dpsi2.grad.norm().item()
@@ -434,11 +425,6 @@ for c in range(n_cycles):
             msg = f"Learning rate {lr_alpha:.1e}"
             logger.detail(msg)
             msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
-            logger.detail(msg)
-        with logger.section("dɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
-            msg = f"Learning rate {lr_dalpha:.1e}"
-            logger.detail(msg)
-            msg = f"Gradient: {grad_dalpha:.1e} -> {grad_dalpha_:.1e}"
             logger.detail(msg)
 
         with logger.section("ѱ₂ parameters:", level=logging.DETAIL):
@@ -477,7 +463,6 @@ for c in range(n_cycles):
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
         "alpha": register_params_mixed.params["alpha"].detach().cpu(),
-        "dalpha": register_params_mixed.params["dalpha"].detach().cpu(),
         "psi2": register_params_mixed.params["psi2"].detach().cpu(),
         "dpsi2": register_params_mixed.params["dpsi2"].detach().cpu(),
     }
