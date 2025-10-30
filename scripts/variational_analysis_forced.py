@@ -282,7 +282,9 @@ for c in range(n_cycles):
     logger.info(msg)
 
     coefs = basis.generate_random_coefs(**specs)
-    coefs = {k: (v * 1e-11).requires_grad_() for k, v in coefs.items()}
+    coefs = {
+        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
+    }
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
