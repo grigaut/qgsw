@@ -275,7 +275,9 @@ for c in range(n_cycles):
     ]
 
     q_bc_interp = QuadraticInterpolation(times, q_bcs)
-    psi2_adim = torch.zeros_like(crop(psi0[:, 1:2], p - 1), requires_grad=True)
+    psi2_adim = (
+        torch.rand_like(crop(psi0[:, 1:2], p - 1)) * 1e-2
+    ).requires_grad_()
 
     numel = psi2_adim.numel()
     msg = f"Control vector contains {numel} elements."
