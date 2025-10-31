@@ -595,7 +595,6 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=True,
         )
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -648,7 +647,6 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -720,7 +718,6 @@ class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _set_io(self, state: StatePSIQAlpha) -> None:
@@ -910,7 +907,6 @@ class QGPSIQMixed(QGPSIQCollinearSF):
             + self.beta_plane.f0**2 * self._A12 * self.dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=True,
         )
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -963,7 +959,6 @@ class QGPSIQMixed(QGPSIQCollinearSF):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -1035,7 +1030,6 @@ class QGPSIQMixed(QGPSIQCollinearSF):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
 
@@ -1085,7 +1079,6 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
             dq_i,
             ensure_mass_conservation=True,
         )
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -1137,7 +1130,6 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -1208,5 +1200,4 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        self._dpsi = dpsi
         return PSIQ(dpsi, dq)
