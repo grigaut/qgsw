@@ -67,3 +67,71 @@ def subplots(
 def show(**kwargs: Param.kwargs) -> None:
     """Wrapper for plt.show."""
     return plt.show(**kwargs)
+
+
+def set_coltitles(
+    colnames: list[str],
+    axs: np.ndarray,
+    *,
+    pad: int = 5,
+    **kwargs: Param.kwargs,
+) -> None:
+    """Set column titles.
+
+    Args:
+        colnames (list[str]): Column names.
+        axs (np.ndarray): Axes array.
+        pad (int, optional): Padding below text. Defaults to 5.
+        **kwargs (Param.kwargs): Keywords arguments to pass to ax.annotate
+
+    Raises:
+        ValueError: If length mismatch between colnames and axs.
+    """
+    if len(colnames) != (n := axs.shape[1]):
+        msg = f"There must be exactly {n} column names."
+        raise ValueError(msg)
+    kwargs.setdefault("xy", (0.5, 1))
+    kwargs.setdefault("xycoords", "axes fraction")
+    kwargs.setdefault("textcoords", "offset points")
+    kwargs.setdefault("ha", "center")
+    kwargs.setdefault("va", "baseline")
+
+    for ax, col in zip(axs[0], colnames):
+        ax.annotate(col, xytext=(0, pad), **kwargs)
+
+
+def set_rowtitles(
+    rownames: list[str],
+    axs: np.ndarray,
+    *,
+    pad: int = 5,
+    **kwargs: Param.kwargs,
+) -> None:
+    """Set row titles.
+
+    Args:
+        rownames (list[str]): Row names.
+        axs (np.ndarray): Axes array.
+        pad (int, optional): Padding below text. Defaults to 5.
+        **kwargs (Param.kwargs): Keywords arguments to pass to ax.annotate
+
+    Raises:
+        ValueError: If length mismatch between rownames and axs.
+    """
+    if len(rownames) != (n := axs.shape[0]):
+        msg = f"There must be exactly {n} row names."
+        raise ValueError(msg)
+
+    kwargs.setdefault("xy", (0, 0.5))
+    kwargs.setdefault("textcoords", "offset points")
+    kwargs.setdefault("ha", "right")
+    kwargs.setdefault("va", "center")
+    kwargs.setdefault("rotation", 90)
+
+    for ax, row in zip(axs[:, 0], rownames):
+        ax.annotate(
+            row,
+            xytext=(-ax.yaxis.labelpad - pad, 0),
+            xycoords=ax.yaxis.label,
+            **kwargs,
+        )
