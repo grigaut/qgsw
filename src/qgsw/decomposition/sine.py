@@ -34,6 +34,7 @@ class STSineBasis:
     """
 
     _normalize = True
+    _coefs: torch.Tensor = None
 
     def __init__(
         self,
@@ -84,7 +85,8 @@ class STSineBasis:
         if normalize == self._normalize:
             return
         self._normalize = normalize
-        self.set_coefs(self._coefs)
+        if self._coefs is not None:
+            self.set_coefs(self._coefs)
 
     @property
     def order(self) -> int:
@@ -200,7 +202,7 @@ class STSineBasis:
             field += exp * (torch.sin(x * kx_p) + torch.sin(y * ky_p)) * coef
             norm += exp
         if self.normalize:
-            field /= norm
+            field = field / norm
         return field
 
     def at_time(
@@ -217,6 +219,7 @@ class STSineBasis:
             torch.Tensor: Build field.
         """
         field = torch.zeros_like(self._x)
+        norm = torch.tensor(0, device=self._x.device, dtype=self._x.dtype)
         for lvl, base_elements in self.time_basis.items():
             centers = base_elements["centers"]
             st = base_elements["sigma_t"]
@@ -227,9 +230,9 @@ class STSineBasis:
             )
             field += (exp[:, None, None] * self._fields[lvl]).sum(dim=0)
             if self.normalize:
-                field /= exp.sum(dim=0)
+                norm += exp.sum(dim=0)
         if self.normalize:
-            field /= self.order + 1
+            field = field / ((self.order + 1) * norm)
         return field
 
     def set_coefs(
