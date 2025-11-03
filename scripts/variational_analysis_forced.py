@@ -275,6 +275,8 @@ for c in range(n_cycles):
         space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
         torch.stack([torch.tensor(t - times[0], **specs) for t in times]),
         order=5,
+        Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
+        Ly_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
     )
     basis.normalize = True
 
@@ -295,7 +297,7 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
-        [{"params": list(coefs.values()), "lr": 1e-11}]
+        [{"params": list(coefs.values()), "lr": 1e-10}]
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
