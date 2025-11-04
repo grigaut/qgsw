@@ -62,4 +62,6 @@ install-dev:
 # GRID 5000 -----------------------------------------
 g5k-import-%:
 	rsync -avzP ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${G5K_IMPORT_STORAGE}
+oar-stop-all:
+	oarstat -u | awk 'NR>2 {print $1}' | xargs -r oardel
 # ---------------------------------------------------
