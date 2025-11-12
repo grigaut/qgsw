@@ -274,7 +274,7 @@ for c in range(n_cycles):
         space_slice.q.xy.x - space_slice.q.xy.x[:1, :],
         space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
         torch.stack([torch.tensor(t - times[0], **specs) for t in times]),
-        order=5,
+        order=3,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
         Ly_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
     )
