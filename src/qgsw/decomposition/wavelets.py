@@ -14,7 +14,7 @@ from qgsw.specs import defaults
 logger = getLogger(__name__)
 
 
-class STSineBasis:
+class WaveletBasis:
     """Space-Time sine basis.
 
     Space is subdivided in patches of size Lx_max / 2**p x Ly_max / 2**p
@@ -107,11 +107,11 @@ class STSineBasis:
 
     def numel(self) -> int:
         """Total number of elements."""
-        return sum((2**i) ** 3 for i in range(self._order)) * self.n_theta**2
+        return sum((2**i) ** 3 for i in range(self._order)) * 2 * self.n_theta
 
     def __repr__(self) -> str:
         """Strin representation."""
-        return f"STSineBasis(order={self.order}, normalize={self.normalize})"
+        return f"WaveletBasis(order={self.order}, normalize={self.normalize})"
 
     def _generate_spatial_basis(self, order: int) -> None:
         """Generate spatial basis.
@@ -206,10 +206,8 @@ class STSineBasis:
         yy = self._y
 
         tspecs = qgsw.specs.from_tensor(xx)
-        theta = torch.linspace(0, 2 * torch.pi, self.n_theta + 1, **tspecs)[
-            :-1
-        ]
-        theta_x, theta_y = torch.meshgrid(theta, theta, indexing="ij")
+        theta = torch.linspace(0, torch.pi, self.n_theta, **tspecs)
+        phase = torch.tensor([0, torch.pi / 2], **tspecs)
 
         for i, xy in enumerate(centers):
             xc, yc = xy
@@ -217,16 +215,26 @@ class STSineBasis:
             y = yy - yc
             coef = coefs[i]
             exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            field += exp * (
-                (
-                    torch.sin(
-                        kx_p * x[..., None, None] * torch.cos(theta_x)
-                        + ky_p * y[..., None, None] * torch.sin(theta_y)
-                    )
-                    * coef
-                ).sum(dim=[-1, -2])
-                / self.n_theta**2
-            )
+            x_ = x[..., None, None]  # (nx, ny, 1, 1)
+            y_ = y[..., None, None]  # (nx, ny, 1, 1)
+
+            cos_t = torch.cos(theta)  # (n_theta)
+            ct = cos_t[None, None, :, None]  # (1, 1, n_theta,1)
+            sine_t = torch.sin(theta)  # (n_theta)
+            st = sine_t[None, None, :, None]  # (1, 1, n_theta,1)
+
+            p = phase[None, None, None, :]  # (1, 1, 1, 2)
+
+            kx_cos = kx_p * x_ * ct  # (nx, ny, n_theta, 1)
+            ky_sin = ky_p * y_ * st  # (nx, ny, n_theta, 1)
+
+            cos_xy = torch.cos(kx_cos + ky_sin + p)  # (nx, ny, n_theta, 2)
+
+            coef_cos = cos_xy * coef  # (nx, ny, n_theta, 2)
+
+            mean_coef_cos = (coef_cos).mean(dim=[-1, -2])  # (nx, ny)
+
+            field += exp * mean_coef_cos
             norm += exp
         if self.normalize:
             field = field / norm
@@ -319,7 +327,7 @@ class STSineBasis:
                     self.time_basis[o]["numel"],
                     self.space_basis[o]["numel"],
                     self.n_theta,
-                    self.n_theta,
+                    2,
                 ),
                 **defaults.get(dtype=dtype, device=device),
             )

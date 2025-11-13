@@ -9,7 +9,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
-from qgsw.decomposition.sine import STSineBasis
+from qgsw.decomposition.wavelets import WaveletBasis
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
@@ -264,7 +264,7 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    basis = STSineBasis(
+    basis = WaveletBasis(
         space_slice.q.xy.x - space_slice.q.xy.x[:1, :],
         space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
         torch.stack([torch.tensor(t - times[0], **specs) for t in times]),
