@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_cs",
+    prefix_default="results_forced_f",
 )
 specs = defaults.get()
 
