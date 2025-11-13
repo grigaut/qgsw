@@ -37,7 +37,7 @@ class STSineBasis:
 
     _normalize = True
     _coefs: torch.Tensor = None
-    n_theta = 15
+    _n_theta = 10
 
     def __init__(
         self,
@@ -95,6 +95,15 @@ class STSineBasis:
     def order(self) -> int:
         """Decomposition order."""
         return self._order
+
+    @property
+    def n_theta(self) -> int:
+        """Number of directions."""
+        return self._n_theta
+
+    @n_theta.setter
+    def n_theta(self, n_theta: int) -> None:
+        self._n_theta = n_theta
 
     def numel(self) -> int:
         """Total number of elements."""
