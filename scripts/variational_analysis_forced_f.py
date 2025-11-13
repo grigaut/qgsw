@@ -9,7 +9,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
-from qgsw.decomposition.sine import STSineBasis
+from qgsw.decomposition.fourier import FourierBasis
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
@@ -20,7 +20,6 @@ from qgsw.models.qg.psiq.filtered.core import QGPSIQForced
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.utils import EarlyStop, RegisterParams
-from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
@@ -44,7 +43,7 @@ if TYPE_CHECKING:
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_rg",
+    prefix_default="results_forced_cs",
 )
 specs = defaults.get()
 
@@ -221,22 +220,19 @@ def extract_psi_w(psi: torch.Tensor) -> torch.Tensor:
     return psi[..., psi_slices_w[0], psi_slices_w[1]]
 
 
+def extract_q_w(q: torch.Tensor) -> torch.Tensor:
+    """Extract q."""
+    return q[..., q_slices_w[0], q_slices_w[1]]
+
+
 def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
     """Extract psi."""
     return Boundaries.extract(psi, p, -p - 1, p, -p - 1, 2)
 
 
-compute_q_rg = lambda psi1: compute_q1_interior(
-    psi1,
-    torch.zeros_like(psi1),
-    H1,
-    g1,
-    g2,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect_w,
-)
+def extract_q_bc(q: torch.Tensor) -> Boundaries:
+    """Extract q."""
+    return Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
 
 
 for c in range(n_cycles):
@@ -244,11 +240,15 @@ for c in range(n_cycles):
     times = [model_3l.time.item()]
 
     psi0 = extract_psi_w(model_3l.psi[:, :1])
+    q0 = extract_q_w(model_3l.q[:, :1])
     psi0_mean = psi0[:, :1].mean()
     psi_bc = extract_psi_bc(psi0)
+    q_bc = extract_q_bc(q0)
 
     psis = [psi0]
+    qs = [q0]
     psi_bcs = [psi_bc]
+    q_bcs = [q_bc]
 
     for _ in range(1, n_steps_per_cyle):
         model_3l.step()
@@ -261,49 +261,43 @@ for c in range(n_cycles):
         psis.append(psi)
         psi_bcs.append(psi_bc)
 
+        q = extract_q_w(model_3l.q[:, :1])
+        q_bc = extract_q_bc(q)
+
+        qs.append(q)
+        q_bcs.append(q_bc)
+
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    basis = STSineBasis(
+    basis = FourierBasis(
         space_slice.q.xy.x - space_slice.q.xy.x[:1, :],
         space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
-        torch.stack([torch.tensor(t - times[0], **specs) for t in times]),
-        order=3,
+        order=20,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
         Ly_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
     )
-    basis.normalize = True
-    basis.n_theta = 15
 
     msg = f"Using basis of order {basis.order}"
     logger.info(msg)
 
-    coefs = basis.generate_random_coefs(**specs)
-    coefs = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
-    }
+    coefs = basis.generate_random_coefs()
+    coefs = torch.zeros_like(coefs, requires_grad=True)
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-    qs = (compute_q_rg(p1) for p1 in psis)
-    q_bcs = [
-        Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3) for q in qs
-    ]
+
     q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
     numel = basis.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
-    optimizer = torch.optim.Adam(
-        [{"params": list(coefs.values()), "lr": 1e-10}]
-    )
+    optimizer = torch.optim.Adam([{"params": coefs, "lr": 1e-12}])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
     early_stop = EarlyStop()
-    register_params_mixed = RegisterParams(
-        **{f"coefs_{k}": v for k, v in coefs.items()}
-    )
+    register_params_mixed = RegisterParams(coefs=coefs)
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
@@ -311,9 +305,7 @@ for c in range(n_cycles):
         model_forced.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
         with torch.enable_grad():
-            model_forced.set_psiq(
-                crop(psi0, p), crop(compute_q_rg(psi0), p - 1)
-            )
+            model_forced.set_psiq(crop(psi0, p), crop(q0, p - 1))
 
             loss = torch.tensor(0, **defaults.get())
             basis.set_coefs(coefs)
@@ -333,9 +325,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_mixed.step(
-            loss, **{f"coefs_{k}": v for k, v in coefs.items()}
-        )
+        register_params_mixed.step(loss, coefs=coefs)
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
@@ -354,8 +344,7 @@ for c in range(n_cycles):
         loss.backward()
 
         lr_forcing = optimizer.param_groups[0]["lr"]
-        for v in coefs.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1e-1)
+        torch.nn.utils.clip_grad_norm_([coefs], max_norm=1e-1)
 
         optimizer.step()
         scheduler.step(loss)
@@ -372,14 +361,10 @@ for c in range(n_cycles):
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
             "order": basis.order,
-            "n_theta": basis.n_theta,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        **{
-            f"coefs_{k}": register_params_mixed.params[f"coefs_{k}"]
-            for k in coefs
-        },
+        "coefs": coefs,
     }
     outputs.append(output)
 

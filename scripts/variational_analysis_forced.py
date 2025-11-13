@@ -274,11 +274,12 @@ for c in range(n_cycles):
         space_slice.q.xy.x - space_slice.q.xy.x[:1, :],
         space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
         torch.stack([torch.tensor(t - times[0], **specs) for t in times]),
-        order=5,
+        order=3,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
         Ly_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
     )
     basis.normalize = True
+    basis.n_theta = 15
 
     msg = f"Using basis of order {basis.order}"
     logger.info(msg)
@@ -372,6 +373,7 @@ for c in range(n_cycles):
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
             "order": basis.order,
+            "n_theta": basis.n_theta,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),

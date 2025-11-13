@@ -6,6 +6,8 @@ import itertools
 
 import torch
 
+import qgsw
+import qgsw.specs
 from qgsw.logging import getLogger
 from qgsw.specs import defaults
 
@@ -35,6 +37,7 @@ class STSineBasis:
 
     _normalize = True
     _coefs: torch.Tensor = None
+    _n_theta = 10
 
     def __init__(
         self,
@@ -93,9 +96,18 @@ class STSineBasis:
         """Decomposition order."""
         return self._order
 
+    @property
+    def n_theta(self) -> int:
+        """Number of directions."""
+        return self._n_theta
+
+    @n_theta.setter
+    def n_theta(self, n_theta: int) -> None:
+        self._n_theta = n_theta
+
     def numel(self) -> int:
         """Total number of elements."""
-        return sum((2**i) ** 3 for i in range(self._order))
+        return sum((2**i) ** 3 for i in range(self._order)) * self.n_theta**2
 
     def __repr__(self) -> str:
         """Strin representation."""
@@ -169,13 +181,13 @@ class STSineBasis:
 
         Args:
             coefs (torch.Tensor): Coefficients.
-                ├── 0: (1, 1)-shaped
-                ├── 1: (2, 4)-shaped
-                ├── 2: (4, 16)-shaped
+                ├── 0: (1, 1, n_theta, n_theta)-shaped
+                ├── 1: (2, 4, n_theta, n_theta)-shaped
+                ├── 2: (4, 16, n_theta, n_theta)-shaped
                 ├── ...
-                ├── p: (2**p, (2**p)**2)-shaped
+                ├── p: (2**p, (2**p)**2, n_theta, n_theta)-shaped
                 ├── ...
-                └── order: (2**order, (2**order)**2)-shaped
+                └── order: (2**order, (2**order)**2, n_theta, n_theta)-shaped
             level (int): level to build.
 
         Returns:
@@ -193,13 +205,28 @@ class STSineBasis:
         xx = self._x
         yy = self._y
 
+        tspecs = qgsw.specs.from_tensor(xx)
+        theta = torch.linspace(0, 2 * torch.pi, self.n_theta + 1, **tspecs)[
+            :-1
+        ]
+        theta_x, theta_y = torch.meshgrid(theta, theta, indexing="ij")
+
         for i, xy in enumerate(centers):
             xc, yc = xy
             x = xx - xc
             y = yy - yc
             coef = coefs[i]
             exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            field += exp * (torch.sin(x * kx_p) + torch.sin(y * ky_p)) * coef
+            field += exp * (
+                (
+                    torch.sin(
+                        kx_p * x[..., None, None] * torch.cos(theta_x)
+                        + ky_p * y[..., None, None] * torch.sin(theta_y)
+                    )
+                    * coef
+                ).sum(dim=[-1, -2])
+                / self.n_theta**2
+            )
             norm += exp
         if self.normalize:
             field = field / norm
@@ -288,7 +315,12 @@ class STSineBasis:
         coefs = {}
         for o in range(self._order):
             coefs[o] = torch.randn(
-                (self.time_basis[o]["numel"], self.space_basis[o]["numel"]),
+                (
+                    self.time_basis[o]["numel"],
+                    self.space_basis[o]["numel"],
+                    self.n_theta,
+                    self.n_theta,
+                ),
                 **defaults.get(dtype=dtype, device=device),
             )
         return coefs
