@@ -14,7 +14,7 @@ from qgsw.specs import defaults
 logger = getLogger(__name__)
 
 
-class STSineBasis:
+class WaveletBasis:
     """Space-Time sine basis.
 
     Space is subdivided in patches of size Lx_max / 2**p x Ly_max / 2**p
@@ -111,7 +111,7 @@ class STSineBasis:
 
     def __repr__(self) -> str:
         """Strin representation."""
-        return f"STSineBasis(order={self.order}, normalize={self.normalize})"
+        return f"WaveletBasis(order={self.order}, normalize={self.normalize})"
 
     def _generate_spatial_basis(self, order: int) -> None:
         """Generate spatial basis.
