@@ -37,7 +37,7 @@ class STSineBasis:
 
     _normalize = True
     _coefs: torch.Tensor = None
-    n_theta = 10
+    n_theta = 15
 
     def __init__(
         self,
@@ -197,7 +197,9 @@ class STSineBasis:
         yy = self._y
 
         tspecs = qgsw.specs.from_tensor(xx)
-        theta = torch.linspace(0, 2 * torch.pi, self.n_theta, **tspecs)
+        theta = torch.linspace(0, 2 * torch.pi, self.n_theta + 1, **tspecs)[
+            :-1
+        ]
         theta_x, theta_y = torch.meshgrid(theta, theta, indexing="ij")
 
         for i, xy in enumerate(centers):
