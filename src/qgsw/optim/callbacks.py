@@ -45,18 +45,27 @@ class LRChangeCallback:
 
     def initial_log(self) -> None:
         """Initial log."""
-        for k, v in self._lrs.items():
-            msg = f"[{k}] Learning rate set to {v}."
-            logger.log(self.level, msg)
+        with logger.section("Learning Rate:", level=self.level):
+            for k, v in self._lrs.items():
+                msg = f"[{k}] Set to {v}."
+                logger.log(self.level, msg)
 
     def step(self) -> None:
         """Log a message if the learning rate changes."""
         lrs = self._create_lr_dict()
+        to_log = []
         for k, v in lrs.items():
-            if v == (v_ := self._lrs[k]):
+            if v == self._lrs[k]:
                 continue
-            action = "decreased" if v < v_ else "increased"
+            to_log.append(k)
+        if not to_log:
+            return
+        with logger.section("Learning Rate:", level=self.level):
+            for k in to_log:
+                v = lrs[k]
+                v_ = self._lrs[k]
+                action = "Decreased" if v < v_ else "Increased"
 
-            msg = f"[{k}] Learning rate {action} from {v_} to {v}."
-            logger.log(self.level, msg)
+                msg = f"[{k}] {action} from {v_} to {v}."
+                logger.log(self.level, msg)
         self._lrs = lrs
