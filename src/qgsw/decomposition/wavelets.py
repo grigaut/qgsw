@@ -267,7 +267,7 @@ class WaveletBasis:
                 field_at_lvl /= exp.sum(dim=0)
             field += field_at_lvl
         if self.normalize:
-            field = field / (self.order + 1)
+            field = field / (self.order)
         return field
 
     def set_coefs(
