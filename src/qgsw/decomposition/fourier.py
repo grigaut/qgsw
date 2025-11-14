@@ -11,7 +11,7 @@ logger = getLogger(__name__)
 
 
 class FourierBasis:
-    """Cos / Sine basis."""
+    """Fourier space / time decomosition basis."""
 
     _coefs: torch.Tensor = None
     _c = 0.5
