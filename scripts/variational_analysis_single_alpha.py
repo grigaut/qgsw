@@ -21,6 +21,7 @@ from qgsw.models.qg.psiq.filtered.core import (
 )
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
@@ -256,11 +257,12 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
-        [{"params": [alpha], "lr": 1e-2}],
+        [{"params": [alpha], "lr": 1e-2, "name": "ɑ"}],  # noqa: RUF001
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
+    lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
     register_params_alpha = RegisterParams(alpha=alpha)
 
@@ -313,19 +315,17 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        lr_alpha = optimizer.param_groups[0]["lr"]
         grad_alpha = alpha.grad.item()
         torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
         grad_alpha_ = alpha.grad.item()
 
         with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
-            msg = f"Learning rate {lr_alpha:.1e}"
-            logger.detail(msg)
             msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
             logger.detail(msg)
 
         optimizer.step()
         scheduler.step(loss)
+        lr_callback.step()
 
     best_loss = register_params_alpha.best_loss
     msg = (

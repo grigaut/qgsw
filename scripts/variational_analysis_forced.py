@@ -19,6 +19,7 @@ from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.filtered.core import QGPSIQForced
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.spatial.core.discretization import (
@@ -298,11 +299,18 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
-        [{"params": list(coefs.values()), "lr": 1e-10}]
+        [
+            {
+                "params": list(coefs.values()),
+                "lr": 1e-10,
+                "name": "Wavelet coefs",
+            }
+        ]
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
+    lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
     register_params_mixed = RegisterParams(
         **{f"coefs_{k}": v for k, v in coefs.items()}
@@ -360,6 +368,7 @@ for c in range(n_cycles):
 
         optimizer.step()
         scheduler.step(loss)
+        lr_callback.step()
 
     best_loss = register_params_mixed.best_loss
     msg = f"Forcing optimization completed with loss: {best_loss:3.5f}"

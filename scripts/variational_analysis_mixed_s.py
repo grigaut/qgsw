@@ -22,6 +22,7 @@ from qgsw.models.qg.psiq.filtered.core import (
 )
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior, compute_q2_2l_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
@@ -323,14 +324,15 @@ for c in range(n_cycles):
 
     optimizer = torch.optim.Adam(
         [
-            {"params": [alpha], "lr": 1e-1},
-            {"params": [psi2_adim], "lr": 1e-1},
-            {"params": [dpsi2], "lr": 1e-3},
+            {"params": [alpha], "lr": 1e-1, "name": "ɑ"},  # noqa: RUF001
+            {"params": [psi2_adim], "lr": 1e-1, "name": "ѱ₂"},
+            {"params": [dpsi2], "lr": 1e-3, "name": "dѱ₂"},
         ],
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
+    lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
     register_params_mixed = RegisterParams(
         alpha=alpha,
@@ -406,37 +408,28 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        lr_alpha = optimizer.param_groups[0]["lr"]
         grad_alpha = alpha.grad.item()
         torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
         grad_alpha_ = alpha.grad.item()
 
-        lr_psi2 = optimizer.param_groups[1]["lr"]
         norm_grad_psi2 = psi2_adim.grad.norm().item()
         torch.nn.utils.clip_grad_norm_([psi2_adim], max_norm=1e-1)
         norm_grad_psi2_ = psi2_adim.grad.norm().item()
 
-        lr_dpsi2 = optimizer.param_groups[2]["lr"]
         norm_grad_dpsi2 = dpsi2.grad.norm().item()
         torch.nn.utils.clip_grad_norm_([dpsi2], max_norm=1e-1)
         norm_grad_dpsi2_ = dpsi2.grad.norm().item()
 
         with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
-            msg = f"Learning rate {lr_alpha:.1e}"
-            logger.detail(msg)
             msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
             logger.detail(msg)
 
         with logger.section("ѱ₂ parameters:", level=logging.DETAIL):
-            msg = f"Learning rate {lr_psi2:.1e}"
-            logger.detail(msg)
             msg = (
                 f"Gradient norm: {norm_grad_psi2:.1e} -> {norm_grad_psi2_:.1e}"
             )
             logger.detail(msg)
         with logger.section("dѱ₂ parameters:", level=logging.DETAIL):
-            msg = f"Learning rate {lr_dpsi2:.1e}"
-            logger.detail(msg)
             msg = (
                 f"Gradient norm: {norm_grad_dpsi2:.1e} ->"
                 f" {norm_grad_dpsi2_:.1e}"
@@ -445,6 +438,7 @@ for c in range(n_cycles):
 
         optimizer.step()
         scheduler.step(loss)
+        lr_callback.step()
 
     best_loss = register_params_mixed.best_loss
     msg = (
