@@ -38,6 +38,8 @@ class WaveletBasis:
     _normalize = True
     _coefs: torch.Tensor = None
     _n_theta = 10
+    _dx_fields = None
+    _dy_fields = None
 
     def __init__(
         self,
@@ -194,7 +196,6 @@ class WaveletBasis:
             torch.Tensor: Space field at the given level.
         """
         field = torch.zeros_like(self._x)
-        norm = torch.zeros_like(self._x)
 
         centers = self.space_basis[level]["centers"]
         kx_p = self.space_basis[level]["kx"]
@@ -209,35 +210,186 @@ class WaveletBasis:
         theta = torch.linspace(0, torch.pi, self.n_theta, **tspecs)
         phase = torch.tensor([0, torch.pi / 2], **tspecs)
 
-        for i, xy in enumerate(centers):
-            xc, yc = xy
-            x = xx - xc
-            y = yy - yc
-            coef = coefs[i]
-            exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            x_ = x[..., None, None]  # (nx, ny, 1, 1)
-            y_ = y[..., None, None]  # (nx, ny, 1, 1)
+        xc = torch.tensor([c[0] for c in centers], **tspecs)
+        yc = torch.tensor([c[1] for c in centers], **tspecs)
 
-            cos_t = torch.cos(theta)  # (n_theta)
-            ct = cos_t[None, None, :, None]  # (1, 1, n_theta,1)
-            sine_t = torch.sin(theta)  # (n_theta)
-            st = sine_t[None, None, :, None]  # (1, 1, n_theta,1)
+        x = xx[None, :, :] - xc[:, None, None]
+        y = yy[None, :, :] - yc[:, None, None]
 
-            p = phase[None, None, None, :]  # (1, 1, 1, 2)
+        exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
 
-            kx_cos = kx_p * x_ * ct  # (nx, ny, n_theta, 1)
-            ky_sin = ky_p * y_ * st  # (nx, ny, n_theta, 1)
+        cos_t = torch.cos(theta)
+        ct = cos_t[None, None, None, :, None]
+        sine_t = torch.sin(theta)
+        st = sine_t[None, None, None, :, None]
 
-            cos_xy = torch.cos(kx_cos + ky_sin + p)  # (nx, ny, n_theta, 2)
+        p = phase[None, None, None, None, :]
 
-            coef_cos = cos_xy * coef  # (nx, ny, n_theta, 2)
+        kx_cos = kx_p * x[..., None, None] * ct
+        ky_sin = ky_p * y[..., None, None] * st
 
-            mean_coef_cos = (coef_cos).mean(dim=[-1, -2])  # (nx, ny)
+        cos_xy = torch.cos(kx_cos + ky_sin + p)
 
-            field += exp * mean_coef_cos
-            norm += exp
+        coef_cos = cos_xy * coefs[:, None, None, :, :]
+
+        mean_coef_cos = (coef_cos).mean(dim=[-1, -2])
+
         if self.normalize:
-            field = field / norm
+            field = (exp * mean_coef_cos).sum(dim=0) / (exp.sum(dim=0))
+        else:
+            field = (exp * mean_coef_cos).sum(dim=0)
+        return field
+
+    def _build_dx_field(
+        self,
+        coefs: torch.Tensor,
+        level: int,
+    ) -> torch.Tensor:
+        """Build space field x-derivative given coefficients.
+
+        Args:
+            coefs (torch.Tensor): Coefficients.
+                ├── 0: (1, 1, n_theta, n_theta)-shaped
+                ├── 1: (2, 4, n_theta, n_theta)-shaped
+                ├── 2: (4, 16, n_theta, n_theta)-shaped
+                ├── ...
+                ├── p: (2**p, (2**p)**2, n_theta, n_theta)-shaped
+                ├── ...
+                └── order: (2**order, (2**order)**2, n_theta, n_theta)-shaped
+            level (int): level to build.
+
+        Returns:
+            torch.Tensor: Space field x derivative at the given level.
+        """
+        field = torch.zeros_like(self._x)
+
+        centers = self.space_basis[level]["centers"]
+        kx_p = self.space_basis[level]["kx"]
+        ky_p = self.space_basis[level]["ky"]
+        sx = self.space_basis[level]["sigma_x"]
+        sy = self.space_basis[level]["sigma_y"]
+
+        xx = self._x
+        yy = self._y
+
+        tspecs = qgsw.specs.from_tensor(xx)
+        theta = torch.linspace(0, torch.pi, self.n_theta, **tspecs)
+        phase = torch.tensor([0, torch.pi / 2], **tspecs)
+
+        xc = torch.tensor([c[0] for c in centers], **tspecs)
+        yc = torch.tensor([c[1] for c in centers], **tspecs)
+
+        x = xx[None, :, :] - xc[:, None, None]
+        y = yy[None, :, :] - yc[:, None, None]
+
+        exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
+        dx_exp = -2 * x / sx**2 * exp
+
+        cos_t = torch.cos(theta)
+        ct = cos_t[None, None, None, :, None]
+        sine_t = torch.sin(theta)
+        st = sine_t[None, None, None, :, None]
+
+        p = phase[None, None, None, None, :]
+
+        kx_cos = kx_p * x[..., None, None] * ct
+        ky_sin = ky_p * y[..., None, None] * st
+
+        cos_xy = torch.cos(kx_cos + ky_sin + p)
+        dx_cos_xy = -kx_p * ct * torch.sin(kx_cos + ky_sin + p)
+
+        coef_cos = cos_xy * coefs[:, None, None, :, :]
+        dx_coef_cos = dx_cos_xy * coefs[:, None, None, :, :]
+
+        mean_coef_cos = (coef_cos).mean(dim=[-1, -2])
+        dx_mean_coef_cos = (dx_coef_cos).mean(dim=[-1, -2])
+
+        if self.normalize:
+            field = (
+                (dx_exp * mean_coef_cos + exp * dx_mean_coef_cos).sum(dim=0)
+                * exp.sum(dim=0)
+                - (exp * mean_coef_cos).sum(dim=0) * dx_exp.sum(dim=0)
+            ) / (exp.sum(dim=0) ** 2)
+        else:
+            field = (dx_exp * mean_coef_cos + exp * dx_mean_coef_cos).sum(
+                dim=0
+            )
+        return field
+
+    def _build_dy_field(
+        self,
+        coefs: torch.Tensor,
+        level: int,
+    ) -> torch.Tensor:
+        """Build space field y-derivative given coefficients.
+
+        Args:
+            coefs (torch.Tensor): Coefficients.
+                ├── 0: (1, 1, n_theta, n_theta)-shaped
+                ├── 1: (2, 4, n_theta, n_theta)-shaped
+                ├── 2: (4, 16, n_theta, n_theta)-shaped
+                ├── ...
+                ├── p: (2**p, (2**p)**2, n_theta, n_theta)-shaped
+                ├── ...
+                └── order: (2**order, (2**order)**2, n_theta, n_theta)-shaped
+            level (int): level to build.
+
+        Returns:
+            torch.Tensor: Space field y derivative at the given level.
+        """
+        field = torch.zeros_like(self._x)
+
+        centers = self.space_basis[level]["centers"]
+        kx_p = self.space_basis[level]["kx"]
+        ky_p = self.space_basis[level]["ky"]
+        sx = self.space_basis[level]["sigma_x"]
+        sy = self.space_basis[level]["sigma_y"]
+
+        xx = self._x
+        yy = self._y
+
+        tspecs = qgsw.specs.from_tensor(xx)
+        theta = torch.linspace(0, torch.pi, self.n_theta, **tspecs)
+        phase = torch.tensor([0, torch.pi / 2], **tspecs)
+
+        xc = torch.tensor([c[0] for c in centers], **tspecs)
+        yc = torch.tensor([c[1] for c in centers], **tspecs)
+
+        x = xx[None, :, :] - xc[:, None, None]
+        y = yy[None, :, :] - yc[:, None, None]
+
+        exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
+        dy_exp = -2 * y / sy**2 * exp
+
+        cos_t = torch.cos(theta)
+        ct = cos_t[None, None, None, :, None]
+        sine_t = torch.sin(theta)
+        st = sine_t[None, None, None, :, None]
+
+        p = phase[None, None, None, None, :]
+
+        kx_cos = kx_p * x[..., None, None] * ct
+        ky_sin = ky_p * y[..., None, None] * st
+
+        cos_xy = torch.cos(kx_cos + ky_sin + p)
+        dy_cos_xy = -ky_p * st * torch.sin(kx_cos + ky_sin + p)
+
+        coef_cos = cos_xy * coefs[:, None, None, :, :]
+        dy_coef_cos = dy_cos_xy * coefs[:, None, None, :, :]
+
+        mean_coef_cos = (coef_cos).mean(dim=[-1, -2])
+        dy_mean_coef_cos = (dy_coef_cos).mean(dim=[-1, -2])
+
+        if self.normalize:
+            field = (
+                (dy_exp * mean_coef_cos + exp * dy_mean_coef_cos).sum(dim=0)
+                * exp.sum(dim=0)
+                - (exp * mean_coef_cos).sum(dim=0) * dy_exp.sum(dim=0)
+            ) / (exp.sum(dim=0) ** 2)
+        else:
+            field = (dy_exp * mean_coef_cos + exp * dy_mean_coef_cos).sum(
+                dim=0
+            )
         return field
 
     def at_time(
@@ -299,6 +451,8 @@ class WaveletBasis:
                 ],
                 dim=0,
             )
+        self._dx_fields = None
+        self._dy_fields = None
 
     def generate_random_coefs(
         self,
@@ -371,6 +525,90 @@ class WaveletBasis:
             ) * dt_exp.sum(dim=0)
             if self.normalize:
                 field_at_lvl /= (exp.sum(dim=0)) ** 2
+            field += field_at_lvl
+        if self.normalize:
+            field = field / (self.order)
+        return field
+
+    def dx_at_time(
+        self,
+        t: torch.Tensor,
+    ) -> torch.Tensor:
+        """Build the field at a given time.
+
+        Args:
+            t (torch.Tensor): Time.
+                └── (1,)-shaped
+
+        Returns:
+            torch.Tensor: Build field.
+        """
+        if self._dx_fields is None:
+            self._dx_fields: dict[int, torch.Tensor] = {}
+            for lvl in self._coefs:
+                self._dx_fields[lvl] = torch.stack(
+                    [
+                        self._build_dx_field(self._coefs[lvl][i], level=lvl)
+                        for i in range(self._coefs[lvl].shape[0])
+                    ],
+                    dim=0,
+                )
+        field = torch.zeros_like(self._x)
+        for lvl, base_elements in self.time_basis.items():
+            centers = base_elements["centers"]
+            st = base_elements["sigma_t"]
+
+            exp = torch.cat(
+                [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
+                dim=0,
+            )
+            field_at_lvl = (exp[:, None, None] * self._dx_fields[lvl]).sum(
+                dim=0
+            )
+            if self.normalize:
+                field_at_lvl /= exp.sum(dim=0)
+            field += field_at_lvl
+        if self.normalize:
+            field = field / (self.order)
+        return field
+
+    def dy_at_time(
+        self,
+        t: torch.Tensor,
+    ) -> torch.Tensor:
+        """Build the field at a given time.
+
+        Args:
+            t (torch.Tensor): Time.
+                └── (1,)-shaped
+
+        Returns:
+            torch.Tensor: Build field.
+        """
+        if self._dy_fields is None:
+            self._dy_fields: dict[int, torch.Tensor] = {}
+            for lvl in self._coefs:
+                self._dy_fields[lvl] = torch.stack(
+                    [
+                        self._build_dy_field(self._coefs[lvl][i], level=lvl)
+                        for i in range(self._coefs[lvl].shape[0])
+                    ],
+                    dim=0,
+                )
+        field = torch.zeros_like(self._x)
+        for lvl, base_elements in self.time_basis.items():
+            centers = base_elements["centers"]
+            st = base_elements["sigma_t"]
+
+            exp = torch.cat(
+                [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
+                dim=0,
+            )
+            field_at_lvl = (exp[:, None, None] * self._dy_fields[lvl]).sum(
+                dim=0
+            )
+            if self.normalize:
+                field_at_lvl /= exp.sum(dim=0)
             field += field_at_lvl
         if self.normalize:
             field = field / (self.order)
