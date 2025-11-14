@@ -254,7 +254,6 @@ class WaveletBasis:
             torch.Tensor: Build field.
         """
         field = torch.zeros_like(self._x)
-        norm = torch.tensor(0, device=self._x.device, dtype=self._x.dtype)
         for lvl, base_elements in self.time_basis.items():
             centers = base_elements["centers"]
             st = base_elements["sigma_t"]
@@ -263,11 +262,12 @@ class WaveletBasis:
                 [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
                 dim=0,
             )
-            field += (exp[:, None, None] * self._fields[lvl]).sum(dim=0)
+            field_at_lvl = (exp[:, None, None] * self._fields[lvl]).sum(dim=0)
             if self.normalize:
-                norm += exp.sum(dim=0)
+                field_at_lvl /= exp.sum(dim=0)
+            field += field_at_lvl
         if self.normalize:
-            field = field / ((self.order + 1) * norm)
+            field = field / (self.order + 1)
         return field
 
     def set_coefs(
