@@ -40,6 +40,7 @@ class WaveletBasis:
     _n_theta = 10
     _dx_fields = None
     _dy_fields = None
+    _sigma_ratio = torch.sqrt(torch.log(torch.tensor(2.0))).item()
 
     def __init__(
         self,
@@ -138,8 +139,8 @@ class WaveletBasis:
                 for x, y in itertools.product(xs, ys)
             ]
 
-            sigma_x = lx * 0.5  # For the gaussian enveloppe
-            sigma_y = ly * 0.5  # For the gaussian enveloppe
+            sigma_x = lx / self._sigma_ratio  # For the gaussian enveloppe
+            sigma_y = ly / self._sigma_ratio  # For the gaussian enveloppe
 
             basis[p] = {
                 "centers": centers,
@@ -165,7 +166,7 @@ class WaveletBasis:
 
             centers = [t.cpu().item() for t in ts]
 
-            sigma_t = lt * 0.5  # For the gaussian enveloppe
+            sigma_t = lt / self._sigma_ratio  # For the gaussian enveloppe
 
             basis[p] = {
                 "centers": centers,
