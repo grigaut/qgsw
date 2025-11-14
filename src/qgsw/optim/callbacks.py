@@ -2,9 +2,9 @@
 
 import torch
 
-from qgsw.logging import getLogger
+from qgsw import logging
 
-logger = getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class LRChangeCallback:
@@ -16,15 +16,20 @@ class LRChangeCallback:
 
     name_key = "name"
 
-    def __init__(self, optimizer: torch.optim.Optimizer) -> None:
+    def __init__(
+        self, optimizer: torch.optim.Optimizer, level: int = logging.INFO
+    ) -> None:
         """Instantiate the callback.
 
         Args:
-            optimizer (torch.optim.Optimizer): optimizer to track.
+            optimizer (torch.optim.Optimizer): Optimizer to track.
+            level (int): Logging level.
         """
         self._optimizer = optimizer
+        self.level = level
 
         self._lrs = self._create_lr_dict()
+        self.initial_log()
 
     def _create_lr_dict(self) -> dict[str, float]:
         """Create learning rate dictionnary.
@@ -38,6 +43,12 @@ class LRChangeCallback:
             for i, param in enumerate(self._optimizer.param_groups)
         }
 
+    def initial_log(self) -> None:
+        """Initial log."""
+        for k, v in self._lrs.items():
+            msg = f"[{k}] Learning rate set to {v}."
+            logger.log(self.level, msg)
+
     def step(self) -> None:
         """Log a message if the learning rate changes."""
         lrs = self._create_lr_dict()
@@ -47,5 +58,5 @@ class LRChangeCallback:
             action = "decreased" if v < v_ else "increased"
 
             msg = f"[{k}] Learning rate {action} from {v_} to {v}."
-            logger.info(msg)
+            logger.log(self.level, msg)
         self._lrs = lrs
