@@ -332,3 +332,46 @@ class WaveletBasis:
                 **defaults.get(dtype=dtype, device=device),
             )
         return coefs
+
+    def dt_at_time(
+        self,
+        t: torch.Tensor,
+    ) -> torch.Tensor:
+        """Build the time derivative of the field at a given time.
+
+        Args:
+            t (torch.Tensor): Time.
+                └── (1,)-shaped
+
+        Returns:
+            torch.Tensor: Time derivative field.
+        """
+        field = torch.zeros_like(self._x)
+        for lvl, base_elements in self.time_basis.items():
+            centers = base_elements["centers"]
+            st = base_elements["sigma_t"]
+
+            exp = torch.cat(
+                [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
+                dim=0,
+            )
+            dt_exp = torch.cat(
+                [
+                    -2
+                    * ((t - tc) / st**2)
+                    * torch.exp(-((t - tc) ** 2) / (st) ** 2)
+                    for tc in centers
+                ],
+                dim=0,
+            )
+            field_at_lvl = (dt_exp[:, None, None] * self._fields[lvl]).sum(
+                dim=0
+            ) * exp.sum(dim=0) - (exp[:, None, None] * self._fields[lvl]).sum(
+                dim=0
+            ) * dt_exp.sum(dim=0)
+            if self.normalize:
+                field_at_lvl /= (exp.sum(dim=0)) ** 2
+            field += field_at_lvl
+        if self.normalize:
+            field = field / (self.order)
+        return field
