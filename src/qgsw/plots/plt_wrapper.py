@@ -31,7 +31,7 @@ def imshow(
     if isinstance(data, torch.Tensor):
         if data.dtype == torch.bool:
             data = data.to(torch.int8)
-        data = data.cpu().numpy()
+        data = data.detach().cpu().numpy()
     kwargs.setdefault("vmax", np.max(np.abs(data)))
     kwargs.setdefault("vmin", -kwargs["vmax"])
     kwargs.setdefault("cmap", DEFAULT_CMAP)
