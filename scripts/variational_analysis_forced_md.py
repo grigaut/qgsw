@@ -18,7 +18,10 @@ from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.modified.core import QGPSIQForcedMDWV
+from qgsw.models.qg.psiq.modified.forced import (
+    QGPSIQForcedMDWV,
+    QGPSIQForcedRGMDWV,
+)
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.callbacks import LRChangeCallback
@@ -203,16 +206,16 @@ y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-model_forced = QGPSIQForcedMDWV(
+model = QGPSIQForcedRGMDWV(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model_forced: QGPSIQForcedMDWV = set_inhomogeneous_model(model_forced)
+model: QGPSIQForcedMDWV = set_inhomogeneous_model(model)
 
 if not args.no_wind:
-    model_forced.set_wind_forcing(
+    model.set_wind_forcing(
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
@@ -271,7 +274,7 @@ for c in range(n_cycles):
         xx=space_slice.q.xy.x,
         yy=space_slice.q.xy.y,
         tt=torch.tensor(times, **specs) - times[0],
-        order=3,
+        order=4,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
         Ly_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
     )
@@ -282,7 +285,7 @@ for c in range(n_cycles):
 
     coefs = basis.generate_random_coefs()
     coefs_adim = {
-        k: torch.randn_like(v, requires_grad=True) for k, v in coefs.items()
+        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
     }
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
@@ -302,7 +305,7 @@ for c in range(n_cycles):
                 "params": list(coefs_adim.values()),
                 "lr": 1e1,
                 "name": "Wavelet coefs",
-            }
+            },
         ]
     )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -310,31 +313,30 @@ for c in range(n_cycles):
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    register_params_mixed = RegisterParams(
+    register_params = RegisterParams(
         **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()}
     )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
-        model_forced.reset_time()
-        model_forced.set_boundary_maps(psi_bc_interp, q_bc_interp)
+        model.reset_time()
+        model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+        model.alpha = torch.zeros_like(model.psi)
 
         with torch.enable_grad():
-            model_forced.set_psiq(
-                crop(psi0, p), crop(compute_q_rg(psi0), p - 1)
-            )
+            model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
 
             loss = torch.tensor(0, **defaults.get())
             coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
             basis.set_coefs(coefs)
-            model_forced.wavelets = basis
+            model.wavelets = basis
 
             for n in range(1, n_steps_per_cyle):
-                model_forced.step()
+                model.step()
 
                 if n % comparison_interval == 0:
                     loss += rmse(
-                        model_forced.psi[0, 0],
+                        model.psi[0, 0],
                         crop(psis[n][0, 0], p),
                     )
 
@@ -343,7 +345,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_mixed.step(
+        register_params.step(
             loss, **{f"coefs_{k}": v for k, v in coefs.items()}
         )
 
@@ -363,7 +365,6 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        lr_forcing = optimizer.param_groups[0]["lr"]
         for v in coefs_adim.values():
             torch.nn.utils.clip_grad_norm_([v], max_norm=1)
 
@@ -371,7 +372,7 @@ for c in range(n_cycles):
         scheduler.step(loss)
         lr_callback.step()
 
-    best_loss = register_params_mixed.best_loss
+    best_loss = register_params.best_loss
     msg = f"Forcing optimization completed with loss: {best_loss:3.5f}"
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
@@ -387,10 +388,7 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        **{
-            f"coefs_{k}": register_params_mixed.params[f"coefs_{k}"]
-            for k in coefs
-        },
+        **{f"coefs_{k}": register_params.params[f"coefs_{k}"] for k in coefs},
     }
     outputs.append(output)
 
