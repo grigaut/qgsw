@@ -328,17 +328,21 @@ class WaveletBasis:
             ).mean(dim=[-1, -2])
 
             exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
+            exp_s = exp.sum(dim=0)
             dx_exp = -2 * x / sx**2 * exp
+            dx_exp_s = dx_exp.sum(dim=0)
 
-            u = torch.einsum("cxy,tcxy->txy", exp, coef_cos)
-            v = exp.sum(dim=0)
+            e1 = (
+                torch.einsum("cxy,xy->cxy", dx_exp, exp_s)
+                - torch.einsum("cxy,xy->cxy", exp, dx_exp_s)
+            ) / exp_s**2
 
-            dx_u = torch.einsum(
-                "cxy,tcxy->txy", dx_exp, coef_cos
-            ) + torch.einsum("cxy,tcxy->txy", exp, dx_coef_cos)
-            dx_v = dx_exp.sum(dim=0)
+            e2 = (torch.einsum("cxy,xy->cxy", exp, dx_exp_s)) / exp_s**2
 
-            fields[lvl] = (dx_u * v - u * dx_v) / v**2
+            fields[lvl] = torch.einsum(
+                "cxy,tcxy->txy", e1, coef_cos
+            ) + torch.einsum("cxy,tcxy->txy", e2, dx_coef_cos)
+
         return fields
 
     def _build_space_dy(
@@ -383,17 +387,20 @@ class WaveletBasis:
             ).mean(dim=[-1, -2])
 
             exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
+            exp_s = exp.sum(dim=0)
             dy_exp = -2 * y / sy**2 * exp
+            dy_exp_s = dy_exp.sum(dim=0)
 
-            u = torch.einsum("cxy,tcxy->txy", exp, coef_cos)
-            v = exp.sum(dim=0)
+            e1 = (
+                torch.einsum("cxy,xy->cxy", dy_exp, exp_s)
+                - torch.einsum("cxy,xy->cxy", exp, dy_exp_s)
+            ) / exp_s**2
 
-            dy_u = torch.einsum(
-                "cxy,tcxy->txy", dy_exp, coef_cos
-            ) + torch.einsum("cxy,tcxy->txy", exp, dy_coef_cos)
-            dy_v = dy_exp.sum(dim=0)
+            e2 = (torch.einsum("cxy,xy->cxy", exp, dy_exp_s)) / exp_s**2
 
-            fields[lvl] = (dy_u * v - u * dy_v) / v**2
+            fields[lvl] = torch.einsum(
+                "cxy,tcxy->txy", e1, coef_cos
+            ) + torch.einsum("cxy,tcxy->txy", e2, dy_coef_cos)
         return fields
 
     @staticmethod
