@@ -26,17 +26,21 @@ def test_dt(order: int) -> None:
     yy = y - y[:, :1]
     tt = torch.arange(0, 250, dtype=torch.float64)
 
-    basis = WaveletBasis(xx, yy, tt, order=order)
+    basis = WaveletBasis.from_xyt(xx, yy, tt, order=order)
     coefs = basis.generate_random_coefs()
     basis.set_coefs(coefs)
 
-    dt_discrete = basis.at_time(torch.tensor([1], **specs)) - basis.at_time(
+    wv = basis.localize(xx, yy)
+    wv_dt = basis.localize_dt(xx, yy)
+
+    dt_discrete = wv(torch.tensor([1], **specs)) - wv(
         torch.tensor([0], **specs)
     )
-    dt_analytic = basis.dt_at_time(torch.tensor([0.5], **specs))
+    dt_analytic = wv_dt(torch.tensor([0.5], **specs))
 
     torch.testing.assert_close(dt_discrete, dt_analytic)
 
     basis.set_coefs({k: torch.ones_like(v) for k, v in coefs.items()})
-    dt_analytic = basis.dt_at_time(torch.tensor([1.5], **specs))
+    wv_dt = basis.localize_dt(xx, yy)
+    dt_analytic = wv_dt(torch.tensor([1.5], **specs))
     torch.testing.assert_close(torch.zeros_like(dt_analytic), dt_analytic)
