@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import torch
 
@@ -19,7 +18,6 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
-    QGPSIQForcedMDWV,
     QGPSIQForcedRGMDWV,
 )
 from qgsw.models.qg.stretching_matrix import compute_A
@@ -39,18 +37,12 @@ from qgsw.utils.reshaping import crop
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
-if TYPE_CHECKING:
-    from qgsw.models.qg.psiq.modified.core import (
-        QGPSIQCollinearSF,
-        QGPSIQMixed,
-    )
-
 ## Config
 
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_md",
+    prefix_default="results_forced_rgmd",
 )
 specs = defaults.get()
 
@@ -176,8 +168,8 @@ y0 = model_3l.y0
 
 ## Inhomogeneous models
 def set_inhomogeneous_model(
-    model: QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed | QGPSIQForcedMDWV,
-) -> QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed | QGPSIQForcedMDWV:
+    model: QGPSIQForcedRGMDWV,
+) -> QGPSIQForcedRGMDWV:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0
@@ -212,7 +204,7 @@ model = QGPSIQForcedRGMDWV(
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model: QGPSIQForcedMDWV = set_inhomogeneous_model(model)
+model: QGPSIQForcedRGMDWV = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
