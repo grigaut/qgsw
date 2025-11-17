@@ -115,7 +115,7 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         self,
         *,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,
@@ -228,8 +228,8 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         """
         super()._create_diagnostic_vars(state)
 
-        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
-        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
+        U = ZonalVelocityFlux(dx=self.space.dx)
+        V = MeridionalVelocityFlux(dy=self.space.dy)
         omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
         h_phys = self._state[PhysicalLayerDepthAnomaly.get_name()]
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)
@@ -331,12 +331,12 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         """
         # Zonal velocity -> corresponds to the v grid
         # Has no value on the boundary of the v grid
-        U = self._state[ZonalVelocityFlux.get_name()].get()  # noqa: N806
-        U_m = self.interpolate(U)  # noqa: N806
+        U = self._state[ZonalVelocityFlux.get_name()].get()
+        U_m = self.interpolate(U)
         # Meridional velocity -> corresponds to the u grid
         # Has no value on the boundary of the u grid
-        V = self._state[MeridionalVelocityFlux.get_name()].get()  # noqa: N806
-        V_m = self.interpolate(V)  # noqa: N806
+        V = self._state[MeridionalVelocityFlux.get_name()].get()
+        V_m = self.interpolate(V)
 
         # Vortex-force + Coriolis
         omega = self._state[MaskedVorticity.get_name()].get()
@@ -380,10 +380,10 @@ class SWCore(ModelUVH[T, State], Generic[T, State]):
         """
         h_tot = self.h_ref + h
         # Compute (h_tot x V)
-        V = self._state[MeridionalVelocityFlux.get_name()].get()  # noqa: N806
+        V = self._state[MeridionalVelocityFlux.get_name()].get()
         h_tot_flux_y = self._fluxes.h_y(h_tot, V[..., 1:-1])
         # Compute (h_tot x U)
-        U = self._state[ZonalVelocityFlux.get_name()].get()  # noqa: N806
+        U = self._state[ZonalVelocityFlux.get_name()].get()
         h_tot_flux_x = self._fluxes.h_x(h_tot, U[..., 1:-1, :])
         # Compute -∇⋅(h_tot u) = ∂_x (h_tot x U) + ∂_y (h_tot x V)
         div_no_flux = -finite_diff.div_nofluxbc(h_tot_flux_x, h_tot_flux_y)
@@ -478,7 +478,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
         self,
         *,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,
@@ -536,8 +536,8 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
         self._state.unbind()
         self._create_physical_variables(state)
 
-        U = ZonalVelocityFlux(dx=self.space.dx)  # noqa: N806
-        V = MeridionalVelocityFlux(dy=self.space.dy)  # noqa: N806
+        U = ZonalVelocityFlux(dx=self.space.dx)
+        V = MeridionalVelocityFlux(dy=self.space.dy)
         omega = MaskedVorticity(masks=self.masks, slip_coef=self.slip_coef)
         h_phys = self._state[PhysicalLayerDepthAnomaly.get_name()]
         eta_phys = PhysicalSurfaceHeightAnomaly(h_phys=h_phys)

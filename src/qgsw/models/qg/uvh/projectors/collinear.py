@@ -103,8 +103,8 @@ class CollinearSFProjector(CollinearProjector):
     )
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         space: SpaceDiscretization3D,
         f0: float,
@@ -131,7 +131,7 @@ class CollinearSFProjector(CollinearProjector):
 
     @QGProjector.A.setter
     @with_shapes(A=(1, 1))
-    def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803
+    def A(self, A: torch.Tensor) -> None:  # noqa: N802
         """Set the stretching matrix."""
         # A.shape = (1,1) -> Cm2L = [[1]], lambd = A_11,  Cl2M = [[1]]
         QGProjector.A.fset(self, A)
@@ -145,8 +145,8 @@ class CollinearSFProjector(CollinearProjector):
     def G(  # noqa: N802
         cls,
         p: torch.Tensor,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         dx: float,
         dy: float,
@@ -191,7 +191,7 @@ class CollinearSFProjector(CollinearProjector):
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
         v = torch.diff(p, dim=-2) / dx / f0 * dy
         # h = diag(H)Ap
-        A_12 = compute_A_12(H[:, 0, 0], g_prime[:, 0, 0])  # noqa: N806
+        A_12 = compute_A_12(H[:, 0, 0], g_prime[:, 0, 0])
         h = (
             H[0, 0, 0]
             * (torch.einsum("lm,...mxy->...lxy", A, p_i) + A_12 * alpha * p_i)
@@ -236,7 +236,7 @@ class CollinearSFProjector(CollinearProjector):
     def Q(  # noqa: N802
         cls,
         uvh: UVH,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         f0: float,
         ds: float,
         interpolate: Callable[[torch.Tensor], torch.Tensor],
@@ -309,7 +309,7 @@ class CollinearSFProjector(CollinearProjector):
             dtype=elliptic_rhs.dtype,
             device=elliptic_rhs.device,
         )
-        A_12 = compute_A_12(self.H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
+        A_12 = compute_A_12(self.H[:, 0, 0], self._g_prime[:, 0, 0])
 
         msg = (
             f"[{self.__class__.__name__}.QoG_inv]: "
@@ -433,8 +433,8 @@ class CollinearPVProjector(CollinearProjector):
     )
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         space: SpaceDiscretization3D,
         f0: float,
         masks: Masks,
@@ -459,7 +459,7 @@ class CollinearPVProjector(CollinearProjector):
     def Q(  # noqa: N802
         cls,
         uvh: UVH,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         alpha: torch.Tensor,
         f0: float,
         ds: float,
@@ -524,8 +524,8 @@ class CollinearPVProjector(CollinearProjector):
     def G(  # noqa: N802
         cls,
         p: torch.Tensor,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         dx: float,
         dy: float,
         ds: float,

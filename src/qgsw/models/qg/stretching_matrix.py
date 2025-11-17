@@ -8,7 +8,7 @@ from qgsw.specs import defaults
 
 
 def compute_A(  # noqa: N802
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
     dtype: torch.dtype | None = None,
     device: torch.device | None = None,
@@ -32,9 +32,7 @@ def compute_A(  # noqa: N802
         return torch.tensor(
             [[1.0 / (H * g_prime)]], **defaults.get(dtype=dtype, device=device)
         )
-    A = torch.zeros(  # noqa: N806
-        (nl, nl), **defaults.get(dtype=dtype, device=device)
-    )
+    A = torch.zeros((nl, nl), **defaults.get(dtype=dtype, device=device))
     A[0, 0] = 1.0 / (H[0] * g_prime[0]) + 1.0 / (H[0] * g_prime[1])
     A[0, 1] = -1.0 / (H[0] * g_prime[1])
     for i in range(1, nl - 1):
@@ -47,7 +45,7 @@ def compute_A(  # noqa: N802
 
 
 def compute_layers_to_mode_decomposition(
-    A: torch.Tensor,  # noqa: N803
+    A: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Compute Layers to mode decomposition.
 
@@ -69,20 +67,20 @@ def compute_layers_to_mode_decomposition(
             └── Cl2m: (nl, nl)-shaped
     """
     # layer-to-mode and mode-to-layer matrices
-    lambd_r, R = torch.linalg.eig(A)  # noqa: N806
-    _, L = torch.linalg.eig(A.T)  # noqa: N806
+    lambd_r, R = torch.linalg.eig(A)
+    _, L = torch.linalg.eig(A.T)
     lambd: torch.Tensor = lambd_r.real
-    R, L = R.real, L.real  # noqa: N806
+    R, L = R.real, L.real
     # Diagonalization of A: A = Cm2l @ Λ @ Cl2m
     # layer to mode
-    Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T  # noqa: N806
+    Cl2m = torch.diag(1.0 / torch.diag(L.T @ R)) @ L.T
     # mode to layer
-    Cm2l = R  # noqa: N806
+    Cm2l = R
     return Cm2l, lambd, Cl2m
 
 
 def compute_deformation_radii(
-    A: torch.Tensor,  # noqa: N803
+    A: torch.Tensor,
     f0: float,
 ) -> torch.Tensor:
     """Compute deformation radii.
@@ -101,5 +99,5 @@ def compute_deformation_radii(
         torch.Tensor: Deformation radii.
             └── (nl,)-shaped
     """
-    _, Lambda, _ = compute_layers_to_mode_decomposition(A)  # noqa: N806
+    _, Lambda, _ = compute_layers_to_mode_decomposition(A)
     return 1 / f0 / Lambda.sqrt()

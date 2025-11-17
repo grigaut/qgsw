@@ -427,7 +427,7 @@ class PressureTilde(Pressure):
             eta_phys (PhysicalSurfaceHeightAnomaly): Surface height anomaly
             variable.
         """
-        if not g_prime.squeeze().shape[0] == 2:  # noqa: PLR2004
+        if not g_prime.squeeze().shape[0] == 2:
             raise ValueError
         self._g1 = g_prime.squeeze()[0]
         self._g2 = g_prime.squeeze()[1]
@@ -481,8 +481,8 @@ class KineticEnergy(DiagnosticVariable):
     def __init__(
         self,
         masks: Masks,
-        U: ZonalVelocityFlux,  # noqa: N803
-        V: MeridionalVelocityFlux,  # noqa:N803
+        U: ZonalVelocityFlux,
+        V: MeridionalVelocityFlux,
     ) -> None:
         """Instantiate Kinetic Energy variable.
 
@@ -518,8 +518,8 @@ class KineticEnergy(DiagnosticVariable):
         """
         u = vars_tuple.u
         v = vars_tuple.v
-        U = self._U.compute_no_slice(vars_tuple)  # noqa: N806
-        V = self._V.compute_no_slice(vars_tuple)  # noqa: N806
+        U = self._U.compute_no_slice(vars_tuple)
+        V = self._V.compute_no_slice(vars_tuple)
         return self._comp_ke(u, U, v, V) * self._h_mask
 
     def bind(

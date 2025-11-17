@@ -101,7 +101,7 @@ class _Perturbation(NamedObject[PertubationName], metaclass=ABCMeta):
         psi: torch.Tensor,
         grid_3d: Grid3D,
         f0: float,
-        Ro: float,  # noqa: N803
+        Ro: float,
     ) -> torch.Tensor:
         """Adjust stream function values to match Rossby's number.
 
@@ -147,7 +147,7 @@ class _Perturbation(NamedObject[PertubationName], metaclass=ABCMeta):
         self,
         grid_3d: Grid3D,
         f0: float,
-        Ro: float,  # noqa: N803
+        Ro: float,
     ) -> torch.Tensor:
         """Compute the initial pressure values.
 

@@ -180,7 +180,7 @@ class BaroclinicVortex:
         self,
         psi: torch.Tensor,
         f0: float,
-        Ro: float,  # noqa: N803
+        Ro: float,
     ) -> torch.Tensor:
         """Adjust stream function values to match Rossby's number.
 
@@ -216,7 +216,7 @@ class BaroclinicVortex:
     def compute_initial_pressure(
         self,
         f0: float,
-        Ro: float,  # noqa: N803
+        Ro: float,
     ) -> torch.Tensor:
         """Compute the initial pressure values.
 

@@ -27,8 +27,8 @@ class FourierBasis:
         yy: torch.Tensor,
         *,
         order: int = 4,
-        Lx_max: float | None = None,  # noqa: N803
-        Ly_max: float | None = None,  # noqa: N803
+        Lx_max: float | None = None,
+        Ly_max: float | None = None,
     ) -> None:
         """Instantiate the Basis.
 
@@ -155,8 +155,8 @@ class SpaceOnlyFourierBasis:
         yy: torch.Tensor,
         *,
         order: int = 4,
-        Lx_max: float | None = None,  # noqa: N803
-        Ly_max: float | None = None,  # noqa: N803
+        Lx_max: float | None = None,
+        Ly_max: float | None = None,
     ) -> None:
         """Instantiate the Basis.
 
@@ -207,8 +207,8 @@ class SpaceOnlyFourierBasis:
 
         self._K, self._L = torch.meshgrid(ks, ls, indexing="ij")
 
-        K = self._K[..., None, None]  # noqa: N806
-        L = self._L[..., None, None]  # noqa: N806
+        K = self._K[..., None, None]
+        L = self._L[..., None, None]
 
         x = self._x[None, None, ...]
         y = self._y[None, None, ...]

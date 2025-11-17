@@ -45,7 +45,7 @@ class ModelParamChecker:
         self,
         *,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
     ) -> None:
@@ -169,10 +169,7 @@ class ModelParamChecker:
         if not all(v in [0, 1] for v in vals) or vals == [0]:
             msg = f"Invalid mask with non-binary values : {vals}"
             raise InvalidModelParameterError(msg)
-        msg = (
-            f"{'Non-trivial' if len(vals) == 2 else 'Trivial'}"  # noqa: PLR2004
-            " mask provided"
-        )
+        msg = f"{'Non-trivial' if len(vals) == 2 else 'Trivial'} mask provided"
         logger.detail(msg)
         self._masks = Masks(mask)
 
@@ -233,7 +230,7 @@ class ModelParamChecker:
             h (torch.Tensor): Layers Thickness.
                 └── (nl, 1, 1)-shaped
         """
-        if len(h.shape) < 3:  # noqa: PLR2004
+        if len(h.shape) < 3:
             msg = (
                 "H must be a nz x ny x nx tensor "
                 "with nx=1 or ny=1 if H does not vary "

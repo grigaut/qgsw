@@ -34,7 +34,7 @@ class BaseSWFilterBarotropic(ABC, SW):
         self,
         *,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,
@@ -125,7 +125,7 @@ class SWFilterBarotropicSpectral(BaseSWFilterBarotropic):
         """Set Helmholtz Solver for barotropic and spectral."""
         msg = "Using barotropic filter in spectral approximation."
         logger.detail(msg)
-        H_tot = self.H.sum(dim=-3, keepdim=True)  # noqa: N806
+        H_tot = self.H.sum(dim=-3, keepdim=True)
         lambd = 1.0 / (self.g * self.dt * self.tau * H_tot)
         self.helm_solver = HelmholtzNeumannSolver(
             self.space.nx,

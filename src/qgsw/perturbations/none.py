@@ -57,7 +57,7 @@ class NoPerturbation(BarotropicPerturbation):
         self,
         grid_3d: Grid3D,
         f0: float,  # noqa: ARG002
-        Ro: float,  # noqa: N803, ARG002
+        Ro: float,  # noqa: ARG002
     ) -> torch.Tensor:
         """Compute the initial pressure values.
 

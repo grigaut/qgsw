@@ -1,6 +1,5 @@
 """Wavelets implementation."""
 
-# ruff: noqa: N803,N806
 from __future__ import annotations
 
 import itertools

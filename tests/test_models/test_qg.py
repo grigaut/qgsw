@@ -41,12 +41,12 @@ testdata = [
 
 @pytest.mark.parametrize(("H", "g_prime", "reference"), testdata)
 def test_stretching_matrix(
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
     reference: torch.Tensor,
 ) -> None:
     """Test streching matrix computation."""
-    A = compute_A(  # noqa: N806
+    A = compute_A(
         H,
         g_prime,
         torch.float64,
@@ -58,7 +58,7 @@ def test_stretching_matrix(
 @pytest.mark.parametrize(("H", "g_prime", "reference"), testdata)
 def test_model_stretching_matrix(
     space_2d: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
     reference: torch.Tensor,
 ) -> None:
@@ -84,12 +84,12 @@ def test_model_stretching_matrix(
     ],
 )
 def test_layer_to_mode_decomposition(
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> None:
     """Test layer to mode decomposition shapes."""
-    A = compute_A(H, g_prime, torch.float64, DEVICE.get())  # noqa: N806
-    Cm2l, lambd, Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
+    A = compute_A(H, g_prime, torch.float64, DEVICE.get())
+    Cm2l, lambd, Cl2m = compute_layers_to_mode_decomposition(A)
     assert Cm2l.shape == (H.shape[0], H.shape[0])
     assert lambd.shape == H.shape
     assert Cl2m.shape == (H.shape[0], H.shape[0])

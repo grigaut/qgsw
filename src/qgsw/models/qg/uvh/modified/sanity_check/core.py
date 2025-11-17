@@ -46,7 +46,7 @@ class QGSanityCheck(
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT001, FBT002
@@ -268,8 +268,8 @@ class QGSanityCheckProjector(QGProjector):
     )
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         space: SpaceDiscretization3D,
         f0: float,
@@ -308,7 +308,7 @@ class QGSanityCheckProjector(QGProjector):
                 └── p_i: (n_ens, nl, nx, ny)-shaped
         """
         p2 = self.p2_baseline[..., 1:-1, 1:-1]
-        H_1 = self._H[0, 0, 0]  # noqa: N806
+        H_1 = self._H[0, 0, 0]
         # source_term = f_0^2 / H_1 / g'_2 * p_2
         source_term = self._f0**2 / H_1 / self._g2 * p2
         helmholtz_rhs: torch.Tensor = torch.einsum(
@@ -340,8 +340,8 @@ class QGSanityCheckProjector(QGProjector):
     def G(  # noqa: N802
         cls,
         p: torch.Tensor,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         dx: float,
         dy: float,
         ds: float,

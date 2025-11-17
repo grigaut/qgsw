@@ -9,7 +9,7 @@ from qgsw.spatial.core.grid_conversion import interpolate
 def compute_q1_interior(
     psi1: torch.Tensor,
     psi2: torch.Tensor,
-    H1: torch.Tensor,  # noqa: N803
+    H1: torch.Tensor,
     g1: torch.Tensor,
     g2: torch.Tensor,
     dx: float,
@@ -53,7 +53,7 @@ def compute_q1_interior(
 def compute_q2_2l_interior(
     psi1: torch.Tensor,
     psi2: torch.Tensor,
-    H2: torch.Tensor,  # noqa: N803
+    H2: torch.Tensor,
     g2: torch.Tensor,
     dx: float,
     dy: float,

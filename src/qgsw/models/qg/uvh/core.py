@@ -52,7 +52,7 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT002, FBT001
@@ -195,7 +195,7 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
 
     def compute_A(  # noqa: N802
         self,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
     ) -> torch.Tensor:
         """Compute the stretching operator matrix A.
@@ -280,7 +280,7 @@ class QGCore(ModelUVH[T, State], Generic[T, State, Projector]):
     def _init_core_model(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool,  # noqa: FBT001

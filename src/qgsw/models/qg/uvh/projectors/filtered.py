@@ -96,8 +96,8 @@ class CollinearFilteredSFProjector(
     )
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         space: SpaceDiscretization3D,
         f0: float,
@@ -184,8 +184,8 @@ class CollinearFilteredSFProjector(
     def G(  # noqa: N802
         cls,
         p: torch.Tensor,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         dx: float,
         dy: float,
@@ -238,7 +238,7 @@ class CollinearFilteredSFProjector(
         u = -torch.diff(p, dim=-1) / dy / f0 * dx
         v = torch.diff(p, dim=-2) / dx / f0 * dy
         # h = diag(H)Ap
-        A_12 = compute_A_12(H[:, 0, 0], g_prime[:, 0, 0])  # noqa: N806
+        A_12 = compute_A_12(H[:, 0, 0], g_prime[:, 0, 0])
         p_i_filt = filt(p_i[0, 0] - offset_p0[0, 0]).unsqueeze(0).unsqueeze(0)
         h = (
             H[0, 0, 0]
@@ -304,7 +304,7 @@ class CollinearFilteredSFProjector(
             dtype=elliptic_rhs.dtype,
             device=elliptic_rhs.device,
         )
-        A_12 = compute_A_12(self.H[:, 0, 0], self._g_prime[:, 0, 0])  # noqa: N806
+        A_12 = compute_A_12(self.H[:, 0, 0], self._g_prime[:, 0, 0])
 
         msg = (
             f"[{self.__class__.__name__}.QoG_inv]: "
@@ -429,7 +429,7 @@ class CollinearFilteredSFProjector(
         """
         specs = defaults.get(dtype=dtype, device=device)
         g_tilde = compute_g_tilde(model_config.g_prime)
-        P = cls(  # noqa: N806
+        P = cls(
             compute_A(model_config.h[:1], g_tilde, **specs),
             model_config.h.unsqueeze(-1).unsqueeze(-1),
             model_config.g_prime.unsqueeze(-1).unsqueeze(-1),
@@ -457,8 +457,8 @@ class CollinearFilteredPVProjector(
     )
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         space: SpaceDiscretization3D,
         f0: float,
         masks: Masks,
@@ -483,7 +483,7 @@ class CollinearFilteredPVProjector(
     def Q(  # noqa: N802
         cls,
         uvh: UVH,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         alpha: torch.Tensor,
         f0: float,
         ds: float,
@@ -584,7 +584,7 @@ class CollinearFilteredPVProjector(
             Self: CollinearPVProjector.
         """
         specs = defaults.get(dtype=dtype, device=device)
-        P = cls(  # noqa: N806
+        P = cls(
             compute_A(model_config.h[:1], model_config.g_prime, **specs),
             model_config.h.unsqueeze(-1).unsqueeze(-1),
             SpaceDiscretization3D.from_config(space_config, model_config),

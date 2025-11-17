@@ -30,7 +30,7 @@ def compute_g_tilde(g_prime: torch.Tensor) -> torch.Tensor:
 )
 def compute_source_term_factor(
     alpha: torch.Tensor,
-    H1: torch.Tensor,  # noqa: N803
+    H1: torch.Tensor,
     g2: torch.Tensor,
     f0: float,
 ) -> torch.Tensor:

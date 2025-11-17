@@ -25,8 +25,8 @@ def test_register_params() -> None:
         loss = (param / 250 - 1) ** 2
         register_params.step(loss, n=param)
     assert "n" in register_params.params
-    assert register_params.params["n"] == 250  # noqa: PLR2004
+    assert register_params.params["n"] == 250
     assert register_params.best_loss == 0
-    assert param.item() == 499  # noqa: PLR2004
+    assert param.item() == 499
     register_params.restore(n=param)
-    assert param.item() == 250  # noqa: PLR2004
+    assert param.item() == 250

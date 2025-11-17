@@ -42,8 +42,8 @@ class QGProjector:
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         space: SpaceDiscretization3D,
         f0: float,
         masks: Masks,
@@ -87,7 +87,7 @@ class QGProjector:
             raise UnsetAError from e
 
     @A.setter
-    def A(self, A: torch.Tensor) -> None:  # noqa: N802, N803
+    def A(self, A: torch.Tensor) -> None:  # noqa: N802
         self._A = A
         decomposition = compute_layers_to_mode_decomposition(A)
         self.Cm2l, lambd, self.Cl2m = decomposition
@@ -131,7 +131,7 @@ class QGProjector:
         # For Helmholtz equations
         nl, nx, ny = self._space.nl, self._space.nx, self._space.ny
         dx, dy = self._space.dx, self._space.dy
-        laplace_dstI = (  # noqa: N806
+        laplace_dstI = (
             compute_laplace_dstI(
                 nx,
                 ny,
@@ -144,7 +144,7 @@ class QGProjector:
             .unsqueeze(0)
         )
         # Compute "(∆ - (f_0)² Λ)" in Fourier Space
-        helmholtz_dstI = laplace_dstI - f0**2 * lambd  # noqa: N806
+        helmholtz_dstI = laplace_dstI - f0**2 * lambd
         # Constant Omega grid
         cst_wgrid = torch.ones(
             (1, nl, nx + 1, ny + 1),
@@ -194,8 +194,8 @@ class QGProjector:
     def G(  # noqa: N802
         cls,
         p: torch.Tensor,
-        A: torch.Tensor,  # noqa: N803
-        H: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
+        H: torch.Tensor,
         dx: float,
         dy: float,
         ds: float,
@@ -269,7 +269,7 @@ class QGProjector:
     def Q(  # noqa: N802
         cls,
         uvh: UVH,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         f0: float,
         ds: float,
         interpolate: Callable[[torch.Tensor], torch.Tensor],

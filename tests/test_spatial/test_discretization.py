@@ -20,18 +20,18 @@ def X_Y_H() -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:  # noqa: N802
     ly = 5120.0e3
     ny = 256
 
-    X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device=DEVICE.get())  # noqa: N806
-    Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device=DEVICE.get())  # noqa:N806
-    H = torch.tensor([1, 3, 1], dtype=torch.float64, device=DEVICE.get())  # noqa:N806
+    X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device=DEVICE.get())
+    Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device=DEVICE.get())
+    H = torch.tensor([1, 3, 1], dtype=torch.float64, device=DEVICE.get())
 
     return X, Y, H
 
 
 def test_omega_grid(
-    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],  # noqa: N803
+    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> None:
     """Verify that omega grid corresponds to the xy grid."""
-    X, Y, _ = X_Y_H  # noqa: N806
+    X, Y, _ = X_Y_H
     x, y = torch.meshgrid(X, Y, indexing="ij")
     space = SpaceDiscretization2D.from_tensors(
         x=X,
@@ -44,10 +44,10 @@ def test_omega_grid(
 
 
 def test_2D_to_3D(  # noqa: N802
-    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],  # noqa: N803
+    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> None:
     """Test 2D to 3D space conversion."""
-    X, Y, H = X_Y_H  # noqa: N806
+    X, Y, H = X_Y_H
     space_2d = SpaceDiscretization2D.from_tensors(
         x=X,
         y=Y,
@@ -79,10 +79,10 @@ def test_2D_to_3D(  # noqa: N802
 
 
 def test_2D_and_3D_horizontal(  # noqa: N802
-    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],  # noqa: N803
+    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> None:
     """Test 2D to 3D space conversion."""
-    X, Y, H = X_Y_H  # noqa: N806
+    X, Y, H = X_Y_H
     space_2d = SpaceDiscretization2D.from_tensors(
         x=X,
         y=Y,
@@ -108,10 +108,10 @@ def test_2D_and_3D_horizontal(  # noqa: N802
 
 
 def test_slicing(
-    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],  # noqa: N803
+    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> None:
     """Test 2D space slicing."""
-    X, Y, _ = X_Y_H  # noqa: N806
+    X, Y, _ = X_Y_H
     space_2d = SpaceDiscretization2D.from_tensors(
         x=X,
         y=Y,

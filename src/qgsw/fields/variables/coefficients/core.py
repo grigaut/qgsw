@@ -485,7 +485,7 @@ class SmoothNonUniformCoefficient(Coefficient[Iterable[float]]):
                 └── (nx*ny, n)-shaped (n is the number of centers)
         """
         specs = defaults.get(dtype=dtype, device=device)
-        X, Y = torch.meshgrid(  # noqa: N806
+        X, Y = torch.meshgrid(
             torch.arange(nx, **specs),
             torch.arange(ny, **specs),
             indexing="ij",

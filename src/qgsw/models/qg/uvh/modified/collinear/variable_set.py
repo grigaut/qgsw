@@ -71,7 +71,7 @@ class QGCollinearSFVariableSet(QGVariableSet):
             physics (PhysicsConfig): Physics configuration.
         """
         var_dict[SurfaceHeightAnomaly.get_name()] = SurfaceHeightAnomaly()
-        P = CollinearSFProjector.from_config(space, model, physics)  # noqa: N806
+        P = CollinearSFProjector.from_config(space, model, physics)
         var_dict[QGPressure.get_name()] = QGPressure(P, space.dx, space.dy)
 
     @classmethod

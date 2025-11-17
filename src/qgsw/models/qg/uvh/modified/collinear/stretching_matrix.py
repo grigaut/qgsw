@@ -33,7 +33,7 @@ def compute_g_tilde(
     g_prime=1,
 )
 def compute_A_11(  # noqa: N802
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> torch.Tensor:
     """Compute A_12 coefficient of a multilayer A.
@@ -56,7 +56,7 @@ def compute_A_11(  # noqa: N802
     g_prime=1,
 )
 def compute_A_12(  # noqa: N802
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> torch.Tensor:
     """Compute A_12 coefficient of A.
@@ -74,7 +74,7 @@ def compute_A_12(  # noqa: N802
 
 
 def compute_A_collinear_sf(  # noqa: N802
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
     alpha: float,
     dtype: torch.dtype,
@@ -97,7 +97,7 @@ def compute_A_collinear_sf(  # noqa: N802
         torch.Tensor: Stretching Operator.
                 └── (2, 2) shaped
     """
-    A = compute_A(H=H, g_prime=g_prime, dtype=dtype, device=device)  # noqa: N806
+    A = compute_A(H=H, g_prime=g_prime, dtype=dtype, device=device)
     # Create layers coefficients vector [1, α]
     layers_coefs = torch.tensor(
         [1, alpha],

@@ -50,7 +50,7 @@ def boundaries(shape: tuple[int, int, int, int]) -> Boundaries:
 
 def test_solver_boundaries(pv: torch.Tensor, boundaries: Boundaries) -> None:
     """Test solver behavior by checking bioundaries."""
-    A = torch.diag(  # noqa: N806
+    A = torch.diag(
         torch.tensor([i + 1 for i in range(pv.shape[0])], **defaults.get())
     )
     solver = InhomogeneousPVInversion(A, 1, 1, 1)
@@ -65,13 +65,13 @@ def test_solver_boundaries(pv: torch.Tensor, boundaries: Boundaries) -> None:
 
 def test_solver() -> None:
     """Test the inhomoegensous solver."""
-    H = torch.tensor([400, 1100], **defaults.get())  # noqa: N806
+    H = torch.tensor([400, 1100], **defaults.get())
     g_prime = torch.tensor([9.81, 0.025], **defaults.get())
     f0 = 1e-4
     dx = 1e4
     dy = 1e4
 
-    A = compute_A(H, g_prime, **defaults.get())  # noqa: N806
+    A = compute_A(H, g_prime, **defaults.get())
 
     psi = torch.rand((2, 2, 50, 75), **defaults.get())
 
@@ -89,16 +89,16 @@ def test_solver() -> None:
 
 def test_collinear_solver() -> None:
     """Test the inhomogeneous solver."""
-    H = torch.tensor([400, 1100], **defaults.get())  # noqa: N806
+    H = torch.tensor([400, 1100], **defaults.get())
     g_prime = torch.tensor([9.81, 0.025], **defaults.get())
     f0 = 1e-4
     dx = 1e4
     dy = 1e4
 
-    A = compute_A(H, g_prime, **defaults.get())  # noqa: N806
+    A = compute_A(H, g_prime, **defaults.get())
 
-    A_11 = A[0, 0]  # noqa: N806
-    A_12 = A[0, 1]  # noqa: N806
+    A_11 = A[0, 0]
+    A_12 = A[0, 1]
 
     psi = torch.rand((2, 1, 50, 75), **defaults.get())
     alpha = torch.ones_like(psi) * 0.5

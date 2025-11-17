@@ -48,7 +48,7 @@ class QGCollinearFilteredSF(QGAlpha[CollinearFilteredSFProjector]):
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT001, FBT002
@@ -196,7 +196,7 @@ class QGCollinearFilteredPV(QGAlpha[CollinearFilteredPVProjector]):
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT001, FBT002

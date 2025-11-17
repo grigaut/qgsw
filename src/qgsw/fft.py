@@ -66,7 +66,7 @@ def dctII(x: torch.Tensor, exp_vec: torch.Tensor) -> torch.Tensor:  # noqa: N802
     Using fft and precomputed auxillary vector exp_vec.
     """
     v = torch.cat([x[..., ::2], torch.flip(x, dims=(-1,))[..., ::2]], dim=-1)
-    V = torch.fft.fft(v)  # noqa: N806
+    V = torch.fft.fft(v)
     return (V * exp_vec).real
 
 
@@ -75,7 +75,7 @@ def idctII(x: torch.Tensor, iexp_vec: torch.Tensor) -> torch.Tensor:  # noqa: N8
 
     Using fft and precomputed auxillary vector iexp_vec.
     """
-    N = x.shape[-1]  # noqa: N806
+    N = x.shape[-1]
     x_rev = torch.flip(x, dims=(-1,))[..., :-1]
     v = (
         torch.cat(
@@ -84,7 +84,7 @@ def idctII(x: torch.Tensor, iexp_vec: torch.Tensor) -> torch.Tensor:  # noqa: N8
         )
         / 2
     )
-    V = torch.fft.ifft(v)  # noqa: N806
+    V = torch.fft.ifft(v)
     y = torch.zeros_like(x)
     y[..., ::2] = V[..., : N // 2].real
     y[..., 1::2] = torch.flip(V, dims=(-1,))[..., : N // 2].real
@@ -116,7 +116,7 @@ def idctII2D(  # noqa: N802
 
 
 def compute_dctII_exp_vecs(  # noqa: N802
-    N: int,  # noqa: N803
+    N: int,
     dtype: torch.dtype,
     device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -124,7 +124,7 @@ def compute_dctII_exp_vecs(  # noqa: N802
 
     Used in fast DCT-II computations with FFTs.
     """
-    N_range = torch.arange(N, dtype=dtype, device=device)  # noqa: N806
+    N_range = torch.arange(N, dtype=dtype, device=device)
     exp_vec = 2 * torch.exp(-1j * torch.pi * N_range / (2 * N))
     iexp_vec = torch.exp(1j * torch.pi * N_range / (2 * N))
     return exp_vec, iexp_vec

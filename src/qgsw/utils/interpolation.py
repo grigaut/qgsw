@@ -154,7 +154,7 @@ class QuadraticInterpolation(_Interpolation[T], Generic[T]):
             return self._ys[-1]
         x0, x1 = self._xs[i - 1].item(), self._xs[i].item()
         alpha = (x - x0) / (x1 - x0)
-        if i < 2 or i > len(self._xs) - 2:  # noqa: PLR2004
+        if i < 2 or i > len(self._xs) - 2:
             y0, y1 = self._ys[i - 1], self._ys[i]
             # Linear interpolation
             return y0 * (1 - alpha) + y1 * alpha

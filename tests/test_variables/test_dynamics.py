@@ -97,8 +97,8 @@ def test_velocity_flux(state: StateUVH) -> None:
     u_flux = ZonalVelocityFlux(dx=dx)
     v_flux = MeridionalVelocityFlux(dy=dy)
     # Compute momentum
-    U = u_flux.compute(state.prognostic)  # noqa: N806
-    V = v_flux.compute(state.prognostic)  # noqa: N806
+    U = u_flux.compute(state.prognostic)
+    V = v_flux.compute(state.prognostic)
     # Assert values equality
     assert (state.prognostic.u / dx**2 == U).all()
     assert (state.prognostic.v / dy**2 == V).all()

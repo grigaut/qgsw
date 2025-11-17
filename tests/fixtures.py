@@ -31,8 +31,8 @@ def space_2d() -> SpaceDiscretization2D:
     ly = 5120.0e3
     ny = 100
 
-    X = torch.linspace(0, lx, nx + 1, **defaults.get())  # noqa:N806
-    Y = torch.linspace(0, ly, ny + 1, **defaults.get())  # noqa:N806
+    X = torch.linspace(0, lx, nx + 1, **defaults.get())
+    Y = torch.linspace(0, ly, ny + 1, **defaults.get())
     return SpaceDiscretization2D.from_tensors(
         x=X,
         y=Y,
@@ -44,7 +44,7 @@ def space_2d() -> SpaceDiscretization2D:
 @pytest.fixture
 def QG_model(  # noqa: N802
     space_2d: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> QG:
     """QG model fixture."""
@@ -65,7 +65,7 @@ def QG_model(  # noqa: N802
 @pytest.fixture
 def SW_model(  # noqa: N802
     space_2d: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> SW:
     """SW model fixture."""

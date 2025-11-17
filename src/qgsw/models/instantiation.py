@@ -65,7 +65,7 @@ def instantiate_model(
     beta_plane: BetaPlane,
     space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
-    Ro: float,  # noqa: N803
+    Ro: float,
 ) -> Model:
     """Instantiate the model, given the configuration and the perturbation.
 
@@ -106,7 +106,7 @@ def _instantiate_model(
     space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
     beta_plane: BetaPlane,
-    Ro: float,  # noqa: N803
+    Ro: float,
 ) -> (
     QG
     | QGCollinearFilteredSF
@@ -157,7 +157,7 @@ def _instantiate_modified(
     space_2d: SpaceDiscretization2D,
     perturbation: Perturbation,
     beta_plane: BetaPlane,
-    Ro: float,  # noqa: N803
+    Ro: float,
 ) -> QGCollinearFilteredSF | QGCollinearSF:
     """Instantiate Modified QG Models.
 

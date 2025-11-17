@@ -183,7 +183,7 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT001, FBT002
@@ -261,7 +261,7 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
     def _init_core_model(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool,  # noqa: FBT001
@@ -291,7 +291,7 @@ class QGCollinearSF(QGAlpha[CollinearSFProjector]):
 
     def compute_A(  # noqa: N802
         self,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
     ) -> torch.Tensor:
         """Compute new Stretching operator.
@@ -385,7 +385,7 @@ class QGCollinearPV(QGAlpha[CollinearPVProjector]):
     def __init__(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool = True,  # noqa: FBT001, FBT002
@@ -463,7 +463,7 @@ class QGCollinearPV(QGAlpha[CollinearPVProjector]):
     def _init_core_model(
         self,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         g_prime: torch.Tensor,
         beta_plane: BetaPlane,
         optimize: bool,  # noqa: FBT001

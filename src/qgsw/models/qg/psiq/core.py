@@ -73,7 +73,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         self,
         *,
         space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         beta_plane: BetaPlane,
         g_prime: torch.Tensor,
         optimize=True,  # noqa: ANN001
@@ -313,7 +313,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         Raises:
             ValueError: If invalid stencil.
         """
-        if self.flux_stencil == 5:  # noqa: PLR2004
+        if self.flux_stencil == 5:
             if len(self.masks.psi_irrbound_xids) > 0:
                 div_flux = lambda q, u, v: div_flux_5pts_mask(
                     q,
@@ -336,7 +336,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                     self.space.dx,
                     self.space.dy,
                 )
-        elif self.flux_stencil == 3:  # noqa: PLR2004
+        elif self.flux_stencil == 3:
             if len(self.masks.psi_irrbound_xids) > 0:
                 div_flux = lambda q, u, v: div_flux_3pts_mask(
                     q,
@@ -372,7 +372,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         Raises:
             ValueError: If invalid stencil.
         """
-        if self.flux_stencil == 5:  # noqa: PLR2004
+        if self.flux_stencil == 5:
             if len(self.masks.psi_irrbound_xids) > 0:
                 msg = (
                     "Inhomogeneous pv reconstruction not "
@@ -395,7 +395,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                     self.space.dx,
                     self.space.dy,
                 )
-        elif self.flux_stencil == 3:  # noqa: PLR2004
+        elif self.flux_stencil == 3:
             msg = (
                 "Inhomogeneous pv reconstruction not "
                 "implemented for 3 pts stencil."
@@ -604,7 +604,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         pv_bc = self._pv_bc_interp(time)
         if self.wide:
-            if pv_bc.width != 3:  # noqa: PLR2004
+            if pv_bc.width != 3:
                 msg = "For wide boundary, pv_bc must be 3 points wide."
                 raise ValueError(msg)
             self._pv_bc = pv_bc
@@ -713,7 +713,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
             fcg_drag = self._curl_tau + bottom_drag
-        elif self.space.nl == 2:  # noqa: PLR2004
+        elif self.space.nl == 2:
             fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
         else:
             fcg_drag = torch.cat(
@@ -739,7 +739,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
             fcg_drag = self._curl_tau + bottom_drag
-        elif self.space.nl == 2:  # noqa: PLR2004
+        elif self.space.nl == 2:
             fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
         else:
             fcg_drag = torch.cat(
@@ -836,10 +836,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             if self._rk3_step == 1:
                 coef = 1
                 self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:  # noqa: PLR2004
+            elif self._rk3_step == 2:
                 coef = 1 / 2
                 self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:  # noqa: PLR2004
+            elif self._rk3_step == 3:
                 # There won't be any additional step.
                 ...
             else:
@@ -877,7 +877,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 coef = 0
             elif self._rk3_step == 1:
                 coef = 1
-            elif self._rk3_step == 2:  # noqa: PLR2004
+            elif self._rk3_step == 2:
                 coef = 1 / 2
             else:
                 msg = "SSPRK3 should only perform 3 steps."
@@ -906,10 +906,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             if self._rk3_step == 1:
                 coef = 1
                 self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:  # noqa: PLR2004
+            elif self._rk3_step == 2:
                 coef = 1 / 2
                 self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:  # noqa: PLR2004
+            elif self._rk3_step == 3:
                 # There won't be any additional step.
                 ...
             else:

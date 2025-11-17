@@ -149,7 +149,7 @@ class QGPressure(DiagnosticVariable):
 
     def __init__(
         self,
-        P: QGProjector,  # noqa: N803
+        P: QGProjector,
         dx: float,
         dy: float,
     ) -> None:
@@ -277,7 +277,7 @@ class PressureTilde(Pressure):
             eta_phys (SurfaceHeightAnomaly): Surface height anomaly
             variable.
         """
-        if not g_prime.squeeze().shape[0] == 2:  # noqa: PLR2004
+        if not g_prime.squeeze().shape[0] == 2:
             raise ValueError
         self._g1 = g_prime.squeeze()[0]
         self._g2 = g_prime.squeeze()[1]
@@ -330,7 +330,7 @@ class PotentialVorticity(DiagnosticVariable):
 
     def __init__(
         self,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         f0: float,
         dx: float,
         dy: float,
@@ -1069,7 +1069,7 @@ class LayerDepthAnomaly(DiagnosticVariable):
         return vars_tuple.h
 
 
-def compute_W(H: torch.Tensor) -> torch.Tensor:  # noqa: N802, N803
+def compute_W(H: torch.Tensor) -> torch.Tensor:  # noqa: N802
     """Compute the weight matrix.
 
     Args:
@@ -1096,9 +1096,9 @@ class ModalKineticEnergy(DiagnosticVariable):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         stream_function: StreamFunction,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         dx: float,
         dy: float,
     ) -> None:
@@ -1121,12 +1121,12 @@ class ModalKineticEnergy(DiagnosticVariable):
         self._dx = dx
         self._dy = dy
         # Decomposition of A
-        Cm2l, _, self._Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
+        Cm2l, _, self._Cl2m = compute_layers_to_mode_decomposition(A)
         # Compute W = Diag(H) / h_{tot}
-        W = compute_W(H)  # noqa: N806
+        W = compute_W(H)
         # Compute Cl2m^{-T} @ W @ Cl2m⁻¹
-        Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
-        Cm2lT_W_Cm2l = Cm2l_T @ W @ Cm2l  # noqa: N806
+        Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)
+        Cm2lT_W_Cm2l = Cm2l_T @ W @ Cm2l
         # Since Cm2lT_W_Cm2l is diagonal
         self._Cm2lT_W_Cm2l = torch.diag(Cm2lT_W_Cm2l)  # Vector
 
@@ -1155,7 +1155,7 @@ class ModalKineticEnergy(DiagnosticVariable):
         # Differentiate
         psi_hat_dx = torch.diff(psi_hat_pad_x, dim=-2) / self._dx
         psi_hat_dy = torch.diff(psi_hat_pad_y, dim=-1) / self._dy
-        psiT_CT_W_C_psi = torch.einsum(  # noqa: N806
+        psiT_CT_W_C_psi = torch.einsum(
             "l,...lxy->...lxy",
             self._Cm2lT_W_Cm2l,
             (psi_hat_dx**2 + psi_hat_dy**2),
@@ -1192,9 +1192,9 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         stream_function: StreamFunction,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         f0: float,
     ) -> None:
         """Instantiate the variable.
@@ -1214,11 +1214,11 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
 
         self._f0 = f0
         # Decomposition of A
-        Cm2l, lambd, self._Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
+        Cm2l, lambd, self._Cl2m = compute_layers_to_mode_decomposition(A)
         # Compute weight matrix
-        W = compute_W(H)  # noqa: N806
+        W = compute_W(H)
         # Compute Cl2m^{-T} @ W @ Cl2m⁻¹ @ Λ
-        Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)  # noqa: N806
+        Cm2l_T = Cm2l.transpose(dim0=0, dim1=1)
         self._Cm2lT_W_Cm2l_lambda = Cm2l_T @ W @ Cm2l @ lambd  # Vector
 
     def _compute(self, vars_tuple: BaseUVH) -> torch.Tensor:
@@ -1239,7 +1239,7 @@ class ModalAvailablePotentialEnergy(DiagnosticVariable):
         """
         psi = self._psi.compute_no_slice(vars_tuple)
         psi_hat = torch.einsum("lm,...mxy->...lxy", self._Cl2m, psi)
-        psiT_CT_W_C_lambda_psi = torch.einsum(  # noqa: N806
+        psiT_CT_W_C_lambda_psi = torch.einsum(
             "l,...lxy->...lxy",
             self._Cm2lT_W_Cm2l_lambda,
             psi_hat**2,
@@ -1345,7 +1345,7 @@ class TotalKineticEnergy(DiagnosticVariable):
     def __init__(
         self,
         stream_function: StreamFunction,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         dx: float,
         dy: float,
     ) -> None:
@@ -1394,7 +1394,7 @@ class TotalKineticEnergy(DiagnosticVariable):
         # Differentiate
         psi_dx = torch.diff(psi_pad_x, dim=-2) / self._dx
         psi_dy = torch.diff(psi_pad_y, dim=-1) / self._dy
-        psiT_W_psi = torch.einsum(  # noqa: N806
+        psiT_W_psi = torch.einsum(
             "l,...lxy->...lxy",
             self._W,
             (psi_dx**2 + psi_dy**2),
@@ -1431,9 +1431,9 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         stream_function: StreamFunction,
-        H: torch.Tensor,  # noqa: N803
+        H: torch.Tensor,
         f0: float,
     ) -> None:
         """Instantiate the variable.
@@ -1473,12 +1473,12 @@ class TotalAvailablePotentialEnergy(DiagnosticVariable):
                 └── (n_ens,)-shaped
         """
         psi = self._psi.compute_no_slice(vars_tuple)
-        W_A_psi = torch.einsum(  # noqa: N806
+        W_A_psi = torch.einsum(
             "lm,...mxy->...lxy",
             self._W @ self._A,
             psi,
         )
-        psiT_W_A_psi = torch.einsum(  # noqa: N806
+        psiT_W_A_psi = torch.einsum(
             "...lxy,...lxy->...lxy",
             psi,
             W_A_psi,

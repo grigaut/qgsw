@@ -42,7 +42,7 @@ class BasePVInversion(ABC):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         f0: float,
         dx: float,
         dy: float,
@@ -63,7 +63,7 @@ class BasePVInversion(ABC):
         self._dx = dx
         self._dy = dy
 
-        Cm2l, lambd, Cl2m = compute_layers_to_mode_decomposition(A)  # noqa: N806
+        Cm2l, lambd, Cl2m = compute_layers_to_mode_decomposition(A)
         self._Cm2l = Cm2l
         self._lambd = lambd.reshape((1, lambd.shape[0], 1, 1))
         self._Cl2m = Cl2m
@@ -87,7 +87,7 @@ class HomogeneousPVInversion(BasePVInversion):
     def _compute_homsol(
         self,
         cst: torch.Tensor,
-        helmholtz_dstI: torch.Tensor,  # noqa: N803
+        helmholtz_dstI: torch.Tensor,
     ) -> torch.Tensor:
         """Compute homogeneous solution to use for mass conservation.
 
@@ -97,7 +97,7 @@ class HomogeneousPVInversion(BasePVInversion):
     def _solve_modespace(
         self,
         rhs: torch.Tensor,
-        helmholtz_dstI: torch.Tensor,  # noqa: N803
+        helmholtz_dstI: torch.Tensor,
     ) -> torch.Tensor:
         """Solve the equation in modal space.
 
@@ -115,7 +115,7 @@ class HomogeneousPVInversion(BasePVInversion):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         f0: float,
         dx: float,
         dy: float,
@@ -248,7 +248,7 @@ class HomogeneousPVInversion(BasePVInversion):
     def _homsol_irregular_geometry(
         self,
         cst: torch.Tensor,
-        helmholtz_dstI: torch.Tensor,  # noqa: N803
+        helmholtz_dstI: torch.Tensor,
     ) -> torch.Tensor:
         """Compute homogeneous solution on irregular geometry.
 
@@ -279,7 +279,7 @@ class HomogeneousPVInversion(BasePVInversion):
     def _homsol_regular_geometry(
         self,
         cst: torch.Tensor,
-        helmholtz_dstI: torch.Tensor,  # noqa: N803
+        helmholtz_dstI: torch.Tensor,
     ) -> torch.Tensor:
         """Compute homogeneous solution on regular geometry.
 
@@ -301,7 +301,7 @@ class HomogeneousPVInversion(BasePVInversion):
     def _solve_irregular_geometry(
         self,
         rhs: torch.Tensor,
-        helmholtz_dstI: torch.Tensor,  # noqa: N803
+        helmholtz_dstI: torch.Tensor,
     ) -> torch.Tensor:
         """Solve the equation in modal space.
 
@@ -328,7 +328,7 @@ class HomogeneousPVInversion(BasePVInversion):
     def _solve_regular_geometry(
         self,
         rhs: torch.Tensor,
-        helmholtz_dstI: torch.Tensor,  # noqa: N803
+        helmholtz_dstI: torch.Tensor,
     ) -> torch.Tensor:
         """Solve the equation in modal space.
 
@@ -400,7 +400,7 @@ class InhomogeneousPVInversion(BasePVInversion):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         f0: float,
         dx: float,
         dy: float,
@@ -539,7 +539,7 @@ class HomogeneousPVInversionCollinear(HomogeneousPVInversion):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         alpha: torch.Tensor,
         f0: float,
         dx: float,
@@ -641,7 +641,7 @@ class InhomogeneousPVInversionCollinear(InhomogeneousPVInversion):
 
     def __init__(
         self,
-        A: torch.Tensor,  # noqa: N803
+        A: torch.Tensor,
         alpha: torch.Tensor,
         f0: float,
         dx: float,

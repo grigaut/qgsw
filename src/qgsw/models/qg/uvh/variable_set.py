@@ -183,7 +183,7 @@ class QGVariableSet:
             model (ModelConfig): Model Configuration.
             physics (PhysicsConfig): Physics Configuration.
         """
-        A = compute_A(  # noqa: N806
+        A = compute_A(
             model.h,
             model.g_prime,
             torch.float64,

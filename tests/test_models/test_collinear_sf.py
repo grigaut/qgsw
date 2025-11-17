@@ -19,8 +19,8 @@ def space_2d() -> SpaceDiscretization2D:
     ly = 5120.0e3
     ny = 256
 
-    X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device=DEVICE.get())  # noqa: N806
-    Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device=DEVICE.get())  # noqa:N806
+    X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device=DEVICE.get())
+    Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device=DEVICE.get())
     return SpaceDiscretization2D.from_tensors(
         x=X,
         y=Y,
@@ -43,7 +43,7 @@ def g_prime() -> torch.Tensor:
 
 def test_H_shape(  # noqa: N802
     space_2d: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> None:
     """Check H shape."""
@@ -58,7 +58,7 @@ def test_H_shape(  # noqa: N802
 
 def test_g_prime_shape(
     space_2d: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> None:
     """Check g' shape."""
@@ -73,7 +73,7 @@ def test_g_prime_shape(
 
 def test_UVH_shape(  # noqa: N802
     space_2d: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> None:
     """Check UVH shape."""
@@ -90,7 +90,7 @@ def test_UVH_shape(  # noqa: N802
 
 def test_stretching_matrix_shape(
     space_2d: SpaceDiscretization2D,
-    H: torch.Tensor,  # noqa: N803
+    H: torch.Tensor,
     g_prime: torch.Tensor,
 ) -> None:
     """Check A shape."""

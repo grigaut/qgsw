@@ -132,8 +132,8 @@ def sec2text(time: float) -> str:
     Returns:
         str: Text.
     """
-    if time < 60:  # noqa: PLR2004
-        s = "s" if time >= 2 else ""  # noqa: PLR2004
+    if time < 60:
+        s = "s" if time >= 2 else ""
         return f"{time:.1f} second{s}"
     return min2text(time / 60)
 
@@ -147,8 +147,8 @@ def min2text(time: float) -> str:
     Returns:
         str: Text.
     """
-    if time < 60:  # noqa: PLR2004
-        s = "s" if time >= 2 else ""  # noqa: PLR2004
+    if time < 60:
+        s = "s" if time >= 2 else ""
         return f"{time:.1f} minutes{s}"
     return hours2text(time / 60)
 
@@ -162,8 +162,8 @@ def hours2text(time: float) -> str:
     Returns:
         str: Text.
     """
-    if time < 24:  # noqa: PLR2004
-        s = "s" if time >= 2 else ""  # noqa: PLR2004
+    if time < 24:
+        s = "s" if time >= 2 else ""
         return f"{time:.1f} hour{s}"
     return days2text(time / 24)
 
@@ -177,5 +177,5 @@ def days2text(time: float) -> str:
     Returns:
         str: Text.
     """
-    s = "s" if time >= 2 else ""  # noqa: PLR2004
+    s = "s" if time >= 2 else ""
     return f"{time:.1f} day{s}"

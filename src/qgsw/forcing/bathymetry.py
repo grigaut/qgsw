@@ -161,12 +161,12 @@ class Bathymetry:
             land_right = ocean_mask[1:-1, 2:]
             # Number of ocean cells surrounding land
             nb_ocean_neigh = land_top + land_below + land_left + land_right
-            has_3_neigh = nb_ocean_neigh > 2.5  # noqa: PLR2004
+            has_3_neigh = nb_ocean_neigh > 2.5
             # Land cells
             is_land = 1 - ocean_mask[1:-1, 1:-1]
             # Land cells with more than 3 ocean cells around
             ocean_mask[1:-1, 1:-1] += is_land * has_3_neigh
-        return (ocean_mask > 0.5).astype("float64")  # noqa: PLR2004
+        return (ocean_mask > 0.5).astype("float64")
 
     def compute_bottom_topography(
         self,
@@ -200,7 +200,7 @@ class Bathymetry:
         unsqueezed = land.unsqueeze(0).unsqueeze(0)
         padded = F.pad(unsqueezed, (1, 1, 1, 1), value=1.0)
         avg_2d = F.avg_pool2d(padded, (2, 2), stride=(1, 1))[0, 0]
-        return avg_2d > 0.5  # noqa: PLR2004
+        return avg_2d > 0.5
 
     @classmethod
     def from_config(cls, bathy_config: BathyConfig) -> Self:

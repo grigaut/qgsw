@@ -54,7 +54,7 @@ def g_prime() -> torch.Tensor:
 
 
 @pytest.fixture
-def A(H: torch.Tensor, g_prime: torch.Tensor) -> torch.Tensor:  # noqa: N802, N803
+def A(H: torch.Tensor, g_prime: torch.Tensor) -> torch.Tensor:  # noqa: N802
     """Strecthing matrix."""
     return compute_A(H, g_prime, dtype=torch.float64, device=DEVICE.get())
 
@@ -72,8 +72,8 @@ def psi(
 
 def test_energy_equality(
     psi: StreamFunction,
-    A: torch.Tensor,  # noqa: N803
-    H: torch.Tensor,  # noqa: N803
+    A: torch.Tensor,
+    H: torch.Tensor,
     dx: float,
     dy: float,
     f0: float,
@@ -123,8 +123,8 @@ def test_energy_equality(
         ),
     ],
 )
-def test_W_shape(H: torch.Tensor) -> None:  # noqa: N802, N803
+def test_W_shape(H: torch.Tensor) -> None:  # noqa: N802
     """Test W shape."""
-    W = compute_W(H)  # noqa: N806
+    W = compute_W(H)
     assert W.shape == (H.shape[0], H.shape[0])
     assert torch.diag(W).shape == H.shape

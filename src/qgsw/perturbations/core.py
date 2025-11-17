@@ -56,7 +56,7 @@ class Perturbation:
         self,
         grid_3d: Grid3D,
         f0: float,
-        Ro: float,  # noqa: N803
+        Ro: float,
     ) -> torch.Tensor:
         """Compute the initial pressure values.
 

@@ -194,7 +194,7 @@ class Boundaries:
             while s[-1] is ...:
                 s = s[:-1]
             invalid_1 = s[-1] != slice(None)
-            invalid_2 = len(s) > 2 and s[-2] != slice(None)  # noqa: PLR2004
+            invalid_2 = len(s) > 2 and s[-2] != slice(None)
             invalid_end = invalid_1 or invalid_2
             if invalid_end and (... in s or len(s) > d):
                 msg = f"Slicing is only allowed on the {d} first dimensions."
