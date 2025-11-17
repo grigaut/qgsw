@@ -9,7 +9,9 @@ import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
-from qgsw.decomposition.wavelets import WaveletBasis
+from qgsw.decomposition.wavelets import (
+    WaveletBasis,
+)
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
@@ -265,21 +267,20 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    basis = WaveletBasis(
-        space_slice.q.xy.x - space_slice.q.xy.x[:1, :],
-        space_slice.q.xy.y - space_slice.q.xy.y[:, :1],
-        torch.stack([torch.tensor(t - times[0], **specs) for t in times]),
+    basis = WaveletBasis.from_xyt(
+        xx=space_slice.q.xy.x,
+        yy=space_slice.q.xy.y,
+        tt=torch.tensor(times, **specs) - times[0],
         order=4,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
         Ly_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
     )
-    basis.normalize = True
     basis.n_theta = 15
 
     msg = f"Using basis of order {basis.order}"
     logger.info(msg)
 
-    coefs = basis.generate_random_coefs(**specs)
+    coefs = basis.generate_random_coefs()
     coefs = {
         k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
     }
@@ -325,9 +326,10 @@ for c in range(n_cycles):
 
             loss = torch.tensor(0, **defaults.get())
             basis.set_coefs(coefs)
+            wv = basis.localize(space_slice.q.xy.x, space_slice.q.xy.y)
 
             for n in range(1, n_steps_per_cyle):
-                model_forced.forcing = basis.at_time(model_forced.time)
+                model_forced.forcing = wv(model_forced.time)
                 model_forced.step()
 
                 if n % comparison_interval == 0:

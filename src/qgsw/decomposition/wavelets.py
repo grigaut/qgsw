@@ -1,466 +1,201 @@
-"""Sine decomposition."""
+"""Wavelets implementation."""
 
+# ruff: noqa: N803,N806
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable
+from typing import Any
+
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import torch
 
-import qgsw
-import qgsw.specs
-from qgsw.logging import getLogger
+from qgsw import specs
+from qgsw.models.core.utils import OptimizableFunction
 from qgsw.specs import defaults
 
-logger = getLogger(__name__)
+WVFunc = Callable[[torch.Tensor], torch.Tensor]
+
+
+def generate_space_params(
+    order: int,
+    xx: torch.Tensor,
+    yy: torch.Tensor,
+    *,
+    Lx_max: float | None = None,
+    Ly_max: float | None = None,
+    sigma_ratio: float | None = None,
+) -> dict[str, Any]:
+    """Generate space parameters for the Wavelet basis.
+
+    Args:
+        order (int): Order of decomposition.
+        xx (torch.Tensor): X locations.
+        yy (torch.Tensor): Y locations.
+        Lx_max (float | None, optional): Largest dimension along X,
+            total width if set to None. Defaults to None.
+        Ly_max (float | None, optional): Largest dimension along Y,
+            total width if set to None. Defaults to None.
+        sigma_ratio (float | None, optional): Ratio to use to compute sigma,
+            if None, set to 1/sqrt(log(2)). Defaults to None.
+
+    Returns:
+        dict[str, Any]: Space basis dictionnary.
+    """
+    basis = {}
+    lx = (xx[-1, 0] - xx[0, 0]).cpu().item()
+    ly = (yy[0, -1] - yy[0, 0]).cpu().item()
+    Lx = lx if Lx_max is None else Lx_max
+    Ly = ly if Ly_max is None else Ly_max
+    tspecs = specs.from_tensor(xx)
+    ratio = (
+        1 / torch.sqrt(torch.log(torch.tensor(2, **tspecs))).cpu().item()
+        if sigma_ratio is None
+        else sigma_ratio
+    )
+    for p in range(order):
+        Lx_p = Lx / 2**p
+        Ly_p = Ly / 2**p
+        kx_p = 2 * torch.pi / Lx_p
+        ky_p = 2 * torch.pi / Ly_p
+
+        lx_p = lx / 2**p
+        xs = [xx[0, 0] + (2 * k + 1) / 2 * lx_p for k in range(2**p)]
+        ly_p = ly / 2**p
+        ys = [yy[0, 0] + (2 * k + 1) / 2 * ly_p for k in range(2**p)]
+
+        centers = [
+            (x.cpu().item(), y.cpu().item())
+            for x, y in itertools.product(xs, ys)
+        ]
+
+        sigma_x = lx_p * ratio  # For the gaussian enveloppe
+        sigma_y = ly_p * ratio  # For the gaussian enveloppe
+
+        basis[p] = {
+            "centers": centers,
+            "kx": kx_p,
+            "ky": ky_p,
+            "sigma_x": sigma_x,
+            "sigma_y": sigma_y,
+            "numel": len(centers),
+        }
+
+    return basis
+
+
+def generate_time_params(
+    order: int,
+    tt: torch.Tensor,
+    *,
+    Lt_max: float | None = None,
+    sigma_ratio: float | None = None,
+) -> dict[str, Any]:
+    """Generate time parameters for the Wavelet basis.
+
+    Args:
+        order (int): Order of decomposition.
+        tt (torch.Tensor): Times.
+        Lt_max (float | None, optional): Largest dimension along time,
+            total width if set to None. Defaults to None.
+        sigma_ratio (float | None, optional): Ratio to use to compute sigma,
+            if None, set to 1/sqrt(log(2)). Defaults to None.
+
+    Returns:
+        dict[str, Any]: Time basis dictionnary.
+    """
+    basis = {}
+    lt = (tt[-1] - tt[0]).cpu().item()
+    Lt = lt if Lt_max is None else Lt_max
+    tspecs = specs.from_tensor(tt)
+    ratio = (
+        1 / torch.sqrt(torch.log(torch.tensor(2, **tspecs))).cpu().item()
+        if sigma_ratio is None
+        else sigma_ratio
+    )
+    for p in range(order):
+        lt_p = Lt / 2**p
+        tc = [tt[0] + (2 * k + 1) / 2 * lt_p for k in range(2**p)]
+
+        centers = [t.cpu().item() for t in tc]
+
+        sigma_t = lt_p * ratio  # For the gaussian enveloppe
+
+        basis[p] = {
+            "centers": centers,
+            "sigma_t": sigma_t,
+            "numel": len(centers),
+        }
+    return basis
 
 
 class WaveletBasis:
-    """Space-Time sine basis.
+    """Wavelet decomposition."""
 
-    Space is subdivided in patches of size Lx_max / 2**p x Ly_max / 2**p
-    for p in [0, order-1]. Each patch is associated with a temporal Gaussian
-    enveloppe centered on the middle of time patches of size Lt_max / 2**p.
-
-    The patches are not stricly confined to their domain, but have a gaussian
-    enveloppe that decays away from the center of the patch.
-
-    Hence, at order 0, there is one patch covering the whole domain, associated
-    with a gaussian centered in the middle of the time domain. At order 1,
-    there are 4 patches associated with a gaussian centered a 1/4 of the time
-    domain, and 4 other patches associated with a gaussian centered at 3/4 of
-    the time domain, etc.
-
-    Hence, at order 'p', there are (2**p)x(2**p) spatial patches, each
-    associated with 2**p temporal gaussian enveloppes, for a total of (2**p)**3
-    basis elements at order p.
-    """
-
-    _normalize = True
-    _coefs: torch.Tensor = None
     _n_theta = 10
-    _dx_fields = None
-    _dy_fields = None
-    _sigma_ratio = torch.sqrt(torch.log(torch.tensor(2.0))).item()
-
-    def __init__(
-        self,
-        xx: torch.Tensor,
-        yy: torch.Tensor,
-        tt: torch.Tensor,
-        *,
-        order: int = 4,
-        Lx_max: float | None = None,  # noqa: N803
-        Ly_max: float | None = None,  # noqa: N803
-        Lt_max: float | None = None,  # noqa: N803
-    ) -> None:
-        """Instantiate the Basis.
-
-        Args:
-            xx (torch.Tensor): Xs.
-            yy (torch.Tensor): Ys.
-            tt (torch.Tensor): Times.
-            order (int, optional): Decomposition order. Defaults to 4.
-            Lx_max (float | None, optional): Largest dimension along X,
-                total width if set to None. Defaults to None.
-            Ly_max (float | None, optional): Largest dimension along Y,
-                total width if set to None. Defaults to None.
-            Lt_max (float | None, optional): Largest dimension along time,
-                total width if set to None. Defaults to None.
-        """
-        self._order = order
-        self._x = xx
-        self._lx = xx[-1, 0] - xx[0, 0]
-        self._y = yy
-        self._ly = yy[0, -1] - yy[0, 0]
-        self._t = tt
-        self._lt = tt[-1] - tt[0]
-        self._order = order
-        self._Lx = Lx_max if Lx_max is not None else self._lx
-        self._Ly = Ly_max if Ly_max is not None else self._ly
-        self._Lt = Lt_max if Lt_max is not None else self._lt
-        self._generate_spatial_basis(order)
-        self._generate_time_basis(order)
 
     @property
-    def normalize(self) -> bool:
-        """Whether to normalize the output."""
-        return self._normalize
+    def n_theta(self) -> int:
+        """Number of orientations to consider."""
+        return self._n_theta
 
-    @normalize.setter
-    def normalize(self, normalize: bool) -> None:
-        if normalize == self._normalize:
-            return
-        self._normalize = normalize
-        if self._coefs is not None:
-            self.set_coefs(self._coefs)
+    @n_theta.setter
+    def n_theta(self, n_theta: int) -> None:
+        self._n_theta = n_theta
+        theta = torch.linspace(0, torch.pi, self.n_theta, **self._specs)
+        self._cos_t = torch.cos(theta)
+        self._sin_t = torch.sin(theta)
 
     @property
     def order(self) -> int:
         """Decomposition order."""
         return self._order
 
-    @property
-    def n_theta(self) -> int:
-        """Number of directions."""
-        return self._n_theta
+    def __init__(
+        self,
+        space_params: dict[int, dict[str, Any]],
+        time_params: dict[int, dict[str, Any]],
+        *,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> None:
+        """Instantiate the Wavelet basis.
 
-    @n_theta.setter
-    def n_theta(self, n_theta: int) -> None:
-        self._n_theta = n_theta
+        Args:
+            space_params (dict[int, dict[str, Any]]): Space parameters.
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+            dtype (torch.dtype | None, optional): Data type.
+                Defaults to None.
+            device (torch.device | None, optional): Ddevice.
+                Defaults to None.
+        """
+        self._check_validity(space_params, time_params)
+        self._order = len(space_params.keys())
+        self._specs = defaults.get(dtype=dtype, device=device)
+        self._space = space_params
+        self._time = time_params
+        self.n_theta = self._n_theta
+        self.phase = torch.tensor([0, torch.pi / 2], **self._specs)
+
+    def _check_validity(
+        self,
+        space_params: dict[str, Any],
+        time_params: dict[str, Any],
+    ) -> None:
+        """Check parameters validity."""
+        if space_params.keys() != time_params.keys():
+            msg = "Mismatching keys between space and time parameters."
+            raise ValueError(msg)
 
     def numel(self) -> int:
         """Total number of elements."""
         return sum((2**i) ** 3 for i in range(self._order)) * 2 * self.n_theta
 
-    def __repr__(self) -> str:
-        """Strin representation."""
-        return f"WaveletBasis(order={self.order}, normalize={self.normalize})"
-
-    def _generate_spatial_basis(self, order: int) -> None:
-        """Generate spatial basis.
-
-        Args:
-            order (int): Decomposition order.
-        """
-        basis = {}
-        for p in range(order):
-            Lx_p = self._Lx / 2**p  # noqa: N806
-            Ly_p = self._Ly / 2**p  # noqa: N806
-            kx_p = 2 * torch.pi / Lx_p
-            ky_p = 2 * torch.pi / Ly_p
-
-            lx = (self._lx) / 2**p
-            xs = [self._x[0, 0] + (2 * k + 1) / 2 * lx for k in range(2**p)]
-            ly = (self._ly) / 2**p
-            ys = [self._y[0, 0] + (2 * k + 1) / 2 * ly for k in range(2**p)]
-
-            centers = [
-                (x.cpu().item(), y.cpu().item())
-                for x, y in itertools.product(xs, ys)
-            ]
-
-            sigma_x = lx / self._sigma_ratio  # For the gaussian enveloppe
-            sigma_y = ly / self._sigma_ratio  # For the gaussian enveloppe
-
-            basis[p] = {
-                "centers": centers,
-                "kx": kx_p,
-                "ky": ky_p,
-                "sigma_x": sigma_x,
-                "sigma_y": sigma_y,
-                "numel": len(centers),
-            }
-
-        self.space_basis = basis
-
-    def _generate_time_basis(self, order: int) -> None:
-        """Generate time basis.
-
-        Args:
-            order (int): Decomposition order.
-        """
-        basis = {}
-        for p in range(order):
-            lt = (self._lt) / 2**p
-            ts = [self._t[0] + (2 * k + 1) / 2 * lt for k in range(2**p)]
-
-            centers = [t.cpu().item() for t in ts]
-
-            sigma_t = lt / self._sigma_ratio  # For the gaussian enveloppe
-
-            basis[p] = {
-                "centers": centers,
-                "sigma_t": sigma_t,
-                "numel": len(centers),
-            }
-        self.time_basis = basis
-
-    def _build_field(
-        self,
-        coefs: torch.Tensor,
-        level: int,
-    ) -> torch.Tensor:
-        """Builds space field given coefficients.
-
-        Args:
-            coefs (torch.Tensor): Coefficients.
-                ├── 0: (1, 1, n_theta, n_theta)-shaped
-                ├── 1: (2, 4, n_theta, n_theta)-shaped
-                ├── 2: (4, 16, n_theta, n_theta)-shaped
-                ├── ...
-                ├── p: (2**p, (2**p)**2, n_theta, n_theta)-shaped
-                ├── ...
-                └── order: (2**order, (2**order)**2, n_theta, n_theta)-shaped
-            level (int): level to build.
-
-        Returns:
-            torch.Tensor: Space field at the given level.
-        """
-        field = torch.zeros_like(self._x)
-
-        centers = self.space_basis[level]["centers"]
-        kx_p = self.space_basis[level]["kx"]
-        ky_p = self.space_basis[level]["ky"]
-        sx = self.space_basis[level]["sigma_x"]
-        sy = self.space_basis[level]["sigma_y"]
-
-        xx = self._x
-        yy = self._y
-
-        tspecs = qgsw.specs.from_tensor(xx)
-        theta = torch.linspace(0, torch.pi, self.n_theta, **tspecs)
-        phase = torch.tensor([0, torch.pi / 2], **tspecs)
-
-        xc = torch.tensor([c[0] for c in centers], **tspecs)
-        yc = torch.tensor([c[1] for c in centers], **tspecs)
-
-        x = xx[None, :, :] - xc[:, None, None]
-        y = yy[None, :, :] - yc[:, None, None]
-
-        exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-
-        cos_t = torch.cos(theta)
-        ct = cos_t[None, None, None, :, None]
-        sine_t = torch.sin(theta)
-        st = sine_t[None, None, None, :, None]
-
-        p = phase[None, None, None, None, :]
-
-        kx_cos = kx_p * x[..., None, None] * ct
-        ky_sin = ky_p * y[..., None, None] * st
-
-        cos_xy = torch.cos(kx_cos + ky_sin + p)
-
-        coef_cos = cos_xy * coefs[:, None, None, :, :]
-
-        mean_coef_cos = (coef_cos).mean(dim=[-1, -2])
-
-        if self.normalize:
-            field = (exp * mean_coef_cos).sum(dim=0) / (exp.sum(dim=0))
-        else:
-            field = (exp * mean_coef_cos).sum(dim=0)
-        return field
-
-    def _build_dx_field(
-        self,
-        coefs: torch.Tensor,
-        level: int,
-    ) -> torch.Tensor:
-        """Build space field x-derivative given coefficients.
-
-        Args:
-            coefs (torch.Tensor): Coefficients.
-                ├── 0: (1, 1, n_theta, n_theta)-shaped
-                ├── 1: (2, 4, n_theta, n_theta)-shaped
-                ├── 2: (4, 16, n_theta, n_theta)-shaped
-                ├── ...
-                ├── p: (2**p, (2**p)**2, n_theta, n_theta)-shaped
-                ├── ...
-                └── order: (2**order, (2**order)**2, n_theta, n_theta)-shaped
-            level (int): level to build.
-
-        Returns:
-            torch.Tensor: Space field x derivative at the given level.
-        """
-        field = torch.zeros_like(self._x)
-
-        centers = self.space_basis[level]["centers"]
-        kx_p = self.space_basis[level]["kx"]
-        ky_p = self.space_basis[level]["ky"]
-        sx = self.space_basis[level]["sigma_x"]
-        sy = self.space_basis[level]["sigma_y"]
-
-        xx = self._x
-        yy = self._y
-
-        tspecs = qgsw.specs.from_tensor(xx)
-        theta = torch.linspace(0, torch.pi, self.n_theta, **tspecs)
-        phase = torch.tensor([0, torch.pi / 2], **tspecs)
-
-        xc = torch.tensor([c[0] for c in centers], **tspecs)
-        yc = torch.tensor([c[1] for c in centers], **tspecs)
-
-        x = xx[None, :, :] - xc[:, None, None]
-        y = yy[None, :, :] - yc[:, None, None]
-
-        exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-        dx_exp = -2 * x / sx**2 * exp
-
-        cos_t = torch.cos(theta)
-        ct = cos_t[None, None, None, :, None]
-        sine_t = torch.sin(theta)
-        st = sine_t[None, None, None, :, None]
-
-        p = phase[None, None, None, None, :]
-
-        kx_cos = kx_p * x[..., None, None] * ct
-        ky_sin = ky_p * y[..., None, None] * st
-
-        cos_xy = torch.cos(kx_cos + ky_sin + p)
-        dx_cos_xy = -kx_p * ct * torch.sin(kx_cos + ky_sin + p)
-
-        coef_cos = cos_xy * coefs[:, None, None, :, :]
-        dx_coef_cos = dx_cos_xy * coefs[:, None, None, :, :]
-
-        mean_coef_cos = (coef_cos).mean(dim=[-1, -2])
-        dx_mean_coef_cos = (dx_coef_cos).mean(dim=[-1, -2])
-
-        if self.normalize:
-            field = (
-                (dx_exp * mean_coef_cos + exp * dx_mean_coef_cos).sum(dim=0)
-                * exp.sum(dim=0)
-                - (exp * mean_coef_cos).sum(dim=0) * dx_exp.sum(dim=0)
-            ) / (exp.sum(dim=0) ** 2)
-        else:
-            field = (dx_exp * mean_coef_cos + exp * dx_mean_coef_cos).sum(
-                dim=0
-            )
-        return field
-
-    def _build_dy_field(
-        self,
-        coefs: torch.Tensor,
-        level: int,
-    ) -> torch.Tensor:
-        """Build space field y-derivative given coefficients.
-
-        Args:
-            coefs (torch.Tensor): Coefficients.
-                ├── 0: (1, 1, n_theta, n_theta)-shaped
-                ├── 1: (2, 4, n_theta, n_theta)-shaped
-                ├── 2: (4, 16, n_theta, n_theta)-shaped
-                ├── ...
-                ├── p: (2**p, (2**p)**2, n_theta, n_theta)-shaped
-                ├── ...
-                └── order: (2**order, (2**order)**2, n_theta, n_theta)-shaped
-            level (int): level to build.
-
-        Returns:
-            torch.Tensor: Space field y derivative at the given level.
-        """
-        field = torch.zeros_like(self._x)
-
-        centers = self.space_basis[level]["centers"]
-        kx_p = self.space_basis[level]["kx"]
-        ky_p = self.space_basis[level]["ky"]
-        sx = self.space_basis[level]["sigma_x"]
-        sy = self.space_basis[level]["sigma_y"]
-
-        xx = self._x
-        yy = self._y
-
-        tspecs = qgsw.specs.from_tensor(xx)
-        theta = torch.linspace(0, torch.pi, self.n_theta, **tspecs)
-        phase = torch.tensor([0, torch.pi / 2], **tspecs)
-
-        xc = torch.tensor([c[0] for c in centers], **tspecs)
-        yc = torch.tensor([c[1] for c in centers], **tspecs)
-
-        x = xx[None, :, :] - xc[:, None, None]
-        y = yy[None, :, :] - yc[:, None, None]
-
-        exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-        dy_exp = -2 * y / sy**2 * exp
-
-        cos_t = torch.cos(theta)
-        ct = cos_t[None, None, None, :, None]
-        sine_t = torch.sin(theta)
-        st = sine_t[None, None, None, :, None]
-
-        p = phase[None, None, None, None, :]
-
-        kx_cos = kx_p * x[..., None, None] * ct
-        ky_sin = ky_p * y[..., None, None] * st
-
-        cos_xy = torch.cos(kx_cos + ky_sin + p)
-        dy_cos_xy = -ky_p * st * torch.sin(kx_cos + ky_sin + p)
-
-        coef_cos = cos_xy * coefs[:, None, None, :, :]
-        dy_coef_cos = dy_cos_xy * coefs[:, None, None, :, :]
-
-        mean_coef_cos = (coef_cos).mean(dim=[-1, -2])
-        dy_mean_coef_cos = (dy_coef_cos).mean(dim=[-1, -2])
-
-        if self.normalize:
-            field = (
-                (dy_exp * mean_coef_cos + exp * dy_mean_coef_cos).sum(dim=0)
-                * exp.sum(dim=0)
-                - (exp * mean_coef_cos).sum(dim=0) * dy_exp.sum(dim=0)
-            ) / (exp.sum(dim=0) ** 2)
-        else:
-            field = (dy_exp * mean_coef_cos + exp * dy_mean_coef_cos).sum(
-                dim=0
-            )
-        return field
-
-    def at_time(
-        self,
-        t: torch.Tensor,
-    ) -> torch.Tensor:
-        """Build the field at a given time.
-
-        Args:
-            t (torch.Tensor): Time.
-                └── (1,)-shaped
-
-        Returns:
-            torch.Tensor: Build field.
-        """
-        field = torch.zeros_like(self._x)
-        for lvl, base_elements in self.time_basis.items():
-            centers = base_elements["centers"]
-            st = base_elements["sigma_t"]
-
-            exp = torch.cat(
-                [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
-                dim=0,
-            )
-            field_at_lvl = (exp[:, None, None] * self._fields[lvl]).sum(dim=0)
-            if self.normalize:
-                field_at_lvl /= exp.sum(dim=0)
-            field += field_at_lvl
-        if self.normalize:
-            field = field / (self.order)
-        return field
-
-    def set_coefs(
-        self,
-        coefs: dict[int, torch.Tensor],
-    ) -> None:
-        """Set coefficients values.
-
-        To ensure proper coefficients shapes, best is to use
-        self.generate_random_coefs().
-
-        Args:
-            coefs (torch.Tensor): Coefficients.
-                ├── 0: (1, 1)-shaped
-                ├── 1: (2, 4)-shaped
-                ├── 2: (4, 16)-shaped
-                ├── ...
-                ├── p: (2**p, (2**p)**2)-shaped
-                ├── ...
-                └── order: (2**order, (2**order)**2)-shaped
-        """
-        self._coefs = coefs
-        self._fields: dict[int, torch.Tensor] = {}
-        for lvl in coefs:
-            self._fields[lvl] = torch.stack(
-                [
-                    self._build_field(coefs[lvl][i], level=lvl)
-                    for i in range(coefs[lvl].shape[0])
-                ],
-                dim=0,
-            )
-        self._dx_fields = None
-        self._dy_fields = None
-
-    def generate_random_coefs(
-        self,
-        *,
-        dtype: torch.dtype | None = None,
-        device: torch.device | None = None,
-    ) -> dict[int, torch.Tensor]:
+    def generate_random_coefs(self) -> dict[int, torch.Tensor]:
         """Generate random coefficient.
 
         Useful to properly instantiate coefs.
@@ -479,138 +214,368 @@ class WaveletBasis:
         for o in range(self._order):
             coefs[o] = torch.randn(
                 (
-                    self.time_basis[o]["numel"],
-                    self.space_basis[o]["numel"],
+                    self._time[o]["numel"],
+                    self._space[o]["numel"],
                     self.n_theta,
                     2,
                 ),
-                **defaults.get(dtype=dtype, device=device),
+                **self._specs,
             )
         return coefs
 
-    def dt_at_time(
-        self,
-        t: torch.Tensor,
-    ) -> torch.Tensor:
-        """Build the time derivative of the field at a given time.
+    def set_coefs(self, coefs: dict[int, torch.Tensor]) -> None:
+        """Set coefficients values.
+
+        To ensure consistent coefficients shapes, best is to use
+        self.generate_random_coefs().
 
         Args:
-            t (torch.Tensor): Time.
-                └── (1,)-shaped
-
-        Returns:
-            torch.Tensor: Time derivative field.
+            coefs (torch.Tensor): Coefficients.
+                ├── 0: (1, 1)-shaped
+                ├── 1: (2, 4)-shaped
+                ├── 2: (4, 16)-shaped
+                ├── ...
+                ├── p: (2**p, (2**p)**2)-shaped
+                ├── ...
+                └── order: (2**order, (2**order)**2)-shaped
         """
-        field = torch.zeros_like(self._x)
-        for lvl, base_elements in self.time_basis.items():
-            centers = base_elements["centers"]
-            st = base_elements["sigma_t"]
+        self._coefs = coefs
 
-            exp = torch.cat(
-                [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
-                dim=0,
-            )
-            dt_exp = torch.cat(
-                [
-                    -2
-                    * ((t - tc) / st**2)
-                    * torch.exp(-((t - tc) ** 2) / (st) ** 2)
-                    for tc in centers
-                ],
-                dim=0,
-            )
-            field_at_lvl = (dt_exp[:, None, None] * self._fields[lvl]).sum(
-                dim=0
-            ) * exp.sum(dim=0) - (exp[:, None, None] * self._fields[lvl]).sum(
-                dim=0
-            ) * dt_exp.sum(dim=0)
-            if self.normalize:
-                field_at_lvl /= (exp.sum(dim=0)) ** 2
-            field += field_at_lvl
-        if self.normalize:
-            field = field / (self.order)
-        return field
-
-    def dx_at_time(
-        self,
-        t: torch.Tensor,
-    ) -> torch.Tensor:
-        """Build the field at a given time.
+    def _build_space(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        """Build space-related fields.
 
         Args:
-            t (torch.Tensor): Time.
-                └── (1,)-shaped
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
 
         Returns:
-            torch.Tensor: Build field.
+            dict[int, torch.Tensor]: Level -> field
         """
-        if self._dx_fields is None:
-            self._dx_fields: dict[int, torch.Tensor] = {}
-            for lvl in self._coefs:
-                self._dx_fields[lvl] = torch.stack(
-                    [
-                        self._build_dx_field(self._coefs[lvl][i], level=lvl)
-                        for i in range(self._coefs[lvl].shape[0])
-                    ],
-                    dim=0,
-                )
-        field = torch.zeros_like(self._x)
-        for lvl, base_elements in self.time_basis.items():
-            centers = base_elements["centers"]
-            st = base_elements["sigma_t"]
+        fields = {}
 
-            exp = torch.cat(
-                [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
-                dim=0,
-            )
-            field_at_lvl = (exp[:, None, None] * self._dx_fields[lvl]).sum(
-                dim=0
-            )
-            if self.normalize:
-                field_at_lvl /= exp.sum(dim=0)
-            field += field_at_lvl
-        if self.normalize:
-            field = field / (self.order)
-        return field
+        for lvl, coefs in self._coefs.items():
+            params = self._space[lvl]
 
-    def dy_at_time(
-        self,
-        t: torch.Tensor,
+            centers = params["centers"]
+            kx = params["kx"]
+            ky = params["ky"]
+            sx = params["sigma_x"]
+            sy = params["sigma_y"]
+            xc = torch.tensor([c[0] for c in centers], **self._specs)
+            yc = torch.tensor([c[1] for c in centers], **self._specs)
+
+            x = xx[None, :, :] - xc[:, None, None]
+            y = yy[None, :, :] - yc[:, None, None]
+
+            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
+            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
+
+            cos_xy = torch.cos(
+                (kx_cos + ky_sin)[..., None]
+                + self.phase[None, None, None, None, :]
+            )
+
+            coef_cos = torch.einsum("tcop,cxyop->tcxyop", coefs, cos_xy).mean(
+                dim=[-1, -2]
+            )
+
+            exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
+            exp_ = exp / exp.sum(dim=0)
+
+            fields[lvl] = torch.einsum("cxy,tcxy->txy", exp_, coef_cos)
+        return fields
+
+    def _build_space_dx(
+        self, xx: torch.Tensor, yy: torch.Tensor
     ) -> torch.Tensor:
-        """Build the field at a given time.
+        fields = {}
+
+        for lvl, coefs in self._coefs.items():
+            params = self._space[lvl]
+
+            centers = params["centers"]
+            kx = params["kx"]
+            ky = params["ky"]
+            sx = params["sigma_x"]
+            sy = params["sigma_y"]
+            xc = torch.tensor([c[0] for c in centers], **self._specs)
+            yc = torch.tensor([c[1] for c in centers], **self._specs)
+
+            x = xx[None, :, :] - xc[:, None, None]
+            y = yy[None, :, :] - yc[:, None, None]
+
+            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
+            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
+
+            cos_xy = torch.cos(
+                (kx_cos + ky_sin)[..., None]
+                + self.phase[None, None, None, None, :]
+            )
+            sin_xy = torch.sin(
+                (kx_cos + ky_sin)[..., None]
+                + self.phase[None, None, None, None, :]
+            )
+            dx_cos_xy = -kx * torch.einsum(
+                "o,cxyop->cxyop", self._cos_t, sin_xy
+            )
+
+            coef_cos = torch.einsum("tcop,cxyop->tcxyop", coefs, cos_xy).mean(
+                dim=[-1, -2]
+            )
+            dx_coef_cos = torch.einsum(
+                "tcop,cxyop->tcxyop", coefs, dx_cos_xy
+            ).mean(dim=[-1, -2])
+
+            exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
+            dx_exp = -2 * x / sx**2 * exp
+
+            u = torch.einsum("cxy,tcxy->txy", exp, coef_cos)
+            v = exp.sum(dim=0)
+
+            dx_u = torch.einsum(
+                "cxy,tcxy->txy", dx_exp, coef_cos
+            ) + torch.einsum("cxy,tcxy->txy", exp, dx_coef_cos)
+            dx_v = dx_exp.sum(dim=0)
+
+            fields[lvl] = (dx_u * v - u * dx_v) / v**2
+        return fields
+
+    def _build_space_dy(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> torch.Tensor:
+        fields = {}
+
+        for lvl, coefs in self._coefs.items():
+            params = self._space[lvl]
+
+            centers = params["centers"]
+            kx = params["kx"]
+            ky = params["ky"]
+            sx = params["sigma_x"]
+            sy = params["sigma_y"]
+            xc = torch.tensor([c[0] for c in centers], **self._specs)
+            yc = torch.tensor([c[1] for c in centers], **self._specs)
+
+            x = xx[None, :, :] - xc[:, None, None]
+            y = yy[None, :, :] - yc[:, None, None]
+
+            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
+            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
+
+            cos_xy = torch.cos(
+                (kx_cos + ky_sin)[..., None]
+                + self.phase[None, None, None, None, :]
+            )
+            sin_xy = torch.sin(
+                (kx_cos + ky_sin)[..., None]
+                + self.phase[None, None, None, None, :]
+            )
+            dy_cos_xy = -ky * torch.einsum(
+                "o,cxyop->cxyop", self._sin_t, sin_xy
+            )
+
+            coef_cos = torch.einsum("tcop,cxyop->tcxyop", coefs, cos_xy).mean(
+                dim=[-1, -2]
+            )
+            dy_coef_cos = torch.einsum(
+                "tcop,cxyop->tcxyop", coefs, dy_cos_xy
+            ).mean(dim=[-1, -2])
+
+            exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
+            dy_exp = -2 * y / sy**2 * exp
+
+            u = torch.einsum("cxy,tcxy->txy", exp, coef_cos)
+            v = exp.sum(dim=0)
+
+            dy_u = torch.einsum(
+                "cxy,tcxy->txy", dy_exp, coef_cos
+            ) + torch.einsum("cxy,tcxy->txy", exp, dy_coef_cos)
+            dy_v = dy_exp.sum(dim=0)
+
+            fields[lvl] = (dy_u * v - u * dy_v) / v**2
+        return fields
+
+    @staticmethod
+    def _at_time(
+        t: torch.Tensor,
+        space_fields: dict[int, torch.Tensor],
+        time_params: dict[int, dict[str, Any]],
+    ) -> torch.Tensor:
+        """Compute the total field value at a given time.
 
         Args:
-            t (torch.Tensor): Time.
-                └── (1,)-shaped
+            t (torch.Tensor): Time to compute field at.
+            space_fields (dict[int, torch.Tensor]): Space-only fields.
+            time_params (dict[int, dict[str, Any]]): Time parameters.
 
         Returns:
-            torch.Tensor: Build field.
+            torch.Tensor: Resulting field.
         """
-        if self._dy_fields is None:
-            self._dy_fields: dict[int, torch.Tensor] = {}
-            for lvl in self._coefs:
-                self._dy_fields[lvl] = torch.stack(
-                    [
-                        self._build_dy_field(self._coefs[lvl][i], level=lvl)
-                        for i in range(self._coefs[lvl].shape[0])
-                    ],
-                    dim=0,
-                )
-        field = torch.zeros_like(self._x)
-        for lvl, base_elements in self.time_basis.items():
-            centers = base_elements["centers"]
-            st = base_elements["sigma_t"]
+        field = torch.zeros_like(space_fields[0][0])
+        tspecs = specs.from_tensor(t)
+        for lvl, params in time_params.items():
+            centers = params["centers"]
+            st = params["sigma_t"]
 
-            exp = torch.cat(
-                [torch.exp(-((t - tc) ** 2) / (st) ** 2) for tc in centers],
-                dim=0,
-            )
-            field_at_lvl = (exp[:, None, None] * self._dy_fields[lvl]).sum(
-                dim=0
-            )
-            if self.normalize:
-                field_at_lvl /= exp.sum(dim=0)
+            tc = torch.tensor(centers, **tspecs)
+
+            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
+            exp_ = exp / exp.sum(dim=0)
+
+            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
+
             field += field_at_lvl
-        if self.normalize:
-            field = field / (self.order)
-        return field
+        return field / len(time_params)
+
+    @staticmethod
+    def _dt_at_time(
+        t: torch.Tensor,
+        space_fields: torch.Tensor,
+        time_params: dict[int, dict[str, Any]],
+    ) -> torch.Tensor:
+        """Compute the total time-derivated field value at a given time.
+
+        Args:
+            t (torch.Tensor): Time to compute field at.
+            space_fields (dict[int, torch.Tensor]): Space-only fields.
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+
+        Returns:
+            torch.Tensor: Resulting field.
+        """
+        field = torch.zeros_like(space_fields[0][0])
+        tspecs = specs.from_tensor(t)
+        for lvl, params in time_params.items():
+            centers = params["centers"]
+            st = params["sigma_t"]
+            space = space_fields[lvl]
+
+            tc = torch.tensor(centers, **tspecs)
+
+            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
+            exp_s = exp.sum(dim=0)
+            dt_exp = -2 * (t - tc) / st**2 * exp
+
+            field_at_lvl = (
+                torch.einsum("t,txy->xy", dt_exp, space) * exp_s
+                - torch.einsum("t,txy->xy", exp, space) * dt_exp.sum(dim=0)
+            ) / exp_s**2
+
+            field += field_at_lvl
+        return field / len(time_params)
+
+    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+        """Localize wavelets.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            WVFunc: Function computing the wavelet field at a given time.
+        """
+        space_fields = self._build_space(xx=xx, yy=yy)
+
+        def at_time(t: torch.Tensor) -> torch.Tensor:
+            return WaveletBasis._at_time(t, space_fields, self._time)
+
+        return OptimizableFunction(at_time)
+
+    def localize_dt(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+        """Localize wavelets time derivative.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            WVFunc: Function computing the wavelet field at a given time.
+        """
+        space_fields = self._build_space(xx=xx, yy=yy)
+
+        def at_time(t: torch.Tensor) -> torch.Tensor:
+            return WaveletBasis._dt_at_time(t, space_fields, self._time)
+
+        return at_time
+
+    def localize_dx(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+        """Localize wavelets x-derivative.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            WVFunc: Function computing the wavelet field at a given time.
+        """
+        space_fields = self._build_space_dx(xx=xx, yy=yy)
+
+        def at_time(t: torch.Tensor) -> torch.Tensor:
+            return WaveletBasis._at_time(t, space_fields, self._time)
+
+        return OptimizableFunction(at_time)
+
+    def localize_dy(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+        """Localize wavelets y-derivative.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            WVFunc: Function computing the wavelet field at a given time.
+        """
+        space_fields = self._build_space_dy(xx=xx, yy=yy)
+
+        def at_time(t: torch.Tensor) -> torch.Tensor:
+            return WaveletBasis._at_time(t, space_fields, self._time)
+
+        return OptimizableFunction(at_time)
+
+    @classmethod
+    def from_xyt(
+        cls,
+        xx: torch.Tensor,
+        yy: torch.Tensor,
+        tt: torch.Tensor,
+        *,
+        order: int = 4,
+        Lx_max: float | None = None,
+        Ly_max: float | None = None,
+        Lt_max: float | None = None,
+        sigma_ratio: float | None = None,
+    ) -> Self:
+        """Instantiate the WaveletBasis from x,y and t.
+
+        Args:
+            xx (torch.Tensor): Xs.
+            yy (torch.Tensor): Ys.
+            tt (torch.Tensor): Times.
+            order (int, optional): Decomposition order. Defaults to 4.
+            Lx_max (float | None, optional): Largest dimension along X,
+                total width if set to None. Defaults to None.
+            Ly_max (float | None, optional): Largest dimension along Y,
+                total width if set to None. Defaults to None.
+            Lt_max (float | None, optional): Largest dimension along time,
+                total width if set to None. Defaults to None.
+            sigma_ratio (float | None, optional): Ratio to use to compute
+                sigma, if None, set to 1/sqrt(log(2)). Defaults to None.
+
+        Returns:
+            Self: WaveletBasis.
+        """
+        space_params = generate_space_params(
+            order=order,
+            xx=xx,
+            yy=yy,
+            Lx_max=Lx_max,
+            Ly_max=Ly_max,
+            sigma_ratio=sigma_ratio,
+        )
+        time_params = generate_time_params(
+            order=order, tt=tt, Lt_max=Lt_max, sigma_ratio=sigma_ratio
+        )
+
+        return cls(space_params, time_params)
