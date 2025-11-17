@@ -35,7 +35,7 @@ torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
 if TYPE_CHECKING:
-    from qgsw.models.qg.psiq.filtered.core import (
+    from qgsw.models.qg.psiq.modified.core import (
         QGPSIQCollinearSF,
         QGPSIQMixed,
     )

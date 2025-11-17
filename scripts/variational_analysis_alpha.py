@@ -15,7 +15,7 @@ from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.filtered.core import (
+from qgsw.models.qg.psiq.modified.core import (
     QGPSIQCollinearSF,
     QGPSIQFixeddSF2,
 )

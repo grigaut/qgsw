@@ -17,7 +17,7 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.core.flux import div_flux_5pts_no_pad
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.filtered.core import (
+from qgsw.models.qg.psiq.modified.core import (
     QGPSIQCollinearSF,
     QGPSIQMixed,
 )

@@ -19,7 +19,7 @@ from qgsw.models.core.flux import (
     div_flux_5pts_replicate_q_boundaries,
 )
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.filtered.core import (
+from qgsw.models.qg.psiq.modified.core import (
     QGPSIQCollinearSF,
     QGPSIQFixeddSF2,
 )
