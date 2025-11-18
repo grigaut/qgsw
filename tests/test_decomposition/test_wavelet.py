@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from qgsw.decomposition.wavelets.core import WaveletBasis
+from qgsw.decomposition.wavelets import WaveletBasis
 from qgsw.specs import defaults
 
 specs = defaults.get()

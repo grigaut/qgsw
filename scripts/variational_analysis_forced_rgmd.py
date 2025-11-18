@@ -8,7 +8,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
-from qgsw.decomposition.wavelets.core import (
+from qgsw.decomposition.wavelets import (
     WaveletBasis,
 )
 from qgsw.fields.variables.tuples import UVH

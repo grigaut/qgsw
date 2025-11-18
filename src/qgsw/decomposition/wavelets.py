@@ -254,7 +254,7 @@ class WaveletBasis:
         """
         fields = {}
 
-        for lvl, coefs in self._coefs.items():
+        for lvl, c in self._coefs.items():
             params = self._space[lvl]
 
             centers = params["centers"]
@@ -276,14 +276,15 @@ class WaveletBasis:
                 + self.phase[None, None, None, None, :]
             )
 
-            coef_cos = torch.einsum("tcop,cxyop->tcxyop", coefs, cos_xy).mean(
-                dim=[-1, -2]
-            )
-
             exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
             exp_ = exp / exp.sum(dim=0)
 
-            fields[lvl] = torch.einsum("cxy,tcxy->txy", exp_, coef_cos)
+            exp_cos = torch.einsum("cxy,cxyop->cxyop", exp_, cos_xy)
+            exp_cos_ = exp_cos
+
+            fields[lvl] = torch.einsum("tcop,cxyop->txyop", c, exp_cos_).mean(
+                dim=[-1, -2]
+            )
         return fields
 
     def _build_space_dx(

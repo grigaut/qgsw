@@ -3,7 +3,7 @@
 import torch
 from torch import Tensor
 
-from qgsw.decomposition.wavelets.core import WaveletBasis
+from qgsw.decomposition.wavelets import WaveletBasis
 from qgsw.fields.variables.state import StatePSIQ, StatePSIQAlpha
 from qgsw.fields.variables.tuples import (
     PSIQ,
