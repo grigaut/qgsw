@@ -68,9 +68,14 @@ def laplacian_h(f, dx, dy):
     )
 
 
-def grad_perp(f: torch.Tensor) -> torch.Tensor:
+def grad_perp(f: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Orthogonal gradient"""
     return f[..., :-1] - f[..., 1:], f[..., 1:, :] - f[..., :-1, :]
+
+
+def grad(f: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Gradient"""
+    return f[..., 1:, :] - f[..., :-1, :], f[..., 1:] - f[..., :-1]
 
 
 def div_nofluxbc(flux_x: torch.Tensor, flux_y: torch.Tensor) -> torch.Tensor:
