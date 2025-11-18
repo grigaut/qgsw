@@ -133,7 +133,15 @@ def generate_time_params(
 
 
 class WaveletBasis:
-    """Wavelet decomposition."""
+    """Wavelet decomposition.
+
+    ΣΣ[E(t)/ΣE(t)]Σe(x,y)ΣΣcγ(x,y)
+
+    E(t) = exp(-(t-tc)²/σ_t²)
+    e(x,y) = E(x,y) / ΣE(x,y)
+    E(x,y) = exp(-(x-xc)²/σ_x²)exp(-(y-yc)²/σ_y²)
+    γ(x,y) = cos(kx x cos(θ) + ky y sin(θ) + φ)
+    """
 
     _n_theta = 10
 
