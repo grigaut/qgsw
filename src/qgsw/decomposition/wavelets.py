@@ -1055,7 +1055,7 @@ class WaveletBasis:
         Returns:
             torch.Tensor: Resulting field.
         """
-        field = torch.zeros_like(space_fields[0][0])
+        field = torch.zeros_like(space_fields[0][0].detach())
         tspecs = specs.from_tensor(t)
         for lvl, params in time_params.items():
             centers = params["centers"]
@@ -1087,7 +1087,7 @@ class WaveletBasis:
         Returns:
             torch.Tensor: Resulting field.
         """
-        field = torch.zeros_like(space_fields[0][0])
+        field = torch.zeros_like(space_fields[0][0].detach())
         tspecs = specs.from_tensor(t)
         for lvl, params in time_params.items():
             centers = params["centers"]
