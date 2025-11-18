@@ -253,6 +253,8 @@ class WaveletBasis:
     ) -> dict[int, torch.Tensor]:
         """Build space-related fields.
 
+        Σe(x,y)ΣΣcγ(x,y)
+
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
@@ -298,6 +300,17 @@ class WaveletBasis:
     def _build_space_dx(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> torch.Tensor:
+        """Build x-derivatives of space fields.
+
+        ΣΣΣc[e'(x,y)γ(x,y)+e'(x,y)γ'(x,y)]
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            dict[int, torch.Tensor]: Level -> field
+        """
         fields = {}
 
         for lvl, coefs in self._coefs.items():
@@ -355,6 +368,17 @@ class WaveletBasis:
     def _build_space_dy(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> torch.Tensor:
+        """Build t-derivatives of space fields.
+
+        ΣΣΣc[e'(x,y)γ(x,y)+e'(x,y)γ'(x,y)]
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            dict[int, torch.Tensor]: Level -> field
+        """
         fields = {}
 
         for lvl, coefs in self._coefs.items():
