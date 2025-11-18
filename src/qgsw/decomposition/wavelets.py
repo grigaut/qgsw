@@ -321,28 +321,22 @@ class WaveletBasis:
                 "o,cxyop->cxyop", self._cos_t, sin_xy
             )
 
-            coef_cos = torch.einsum("tcop,cxyop->tcxyop", coefs, cos_xy).mean(
-                dim=[-1, -2]
-            )
-            dx_coef_cos = torch.einsum(
-                "tcop,cxyop->tcxyop", coefs, dx_cos_xy
-            ).mean(dim=[-1, -2])
-
             exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
             exp_s = exp.sum(dim=0)
             dx_exp = -2 * x / sx**2 * exp
             dx_exp_s = dx_exp.sum(dim=0)
 
-            e1 = (
+            exps1 = (
                 torch.einsum("cxy,xy->cxy", dx_exp, exp_s)
                 - torch.einsum("cxy,xy->cxy", exp, dx_exp_s)
-            ) / exp_s**2
-
-            e2 = (torch.einsum("cxy,xy->cxy", exp, dx_exp_s)) / exp_s**2
+            ) / exp_s.square()
+            expcos1 = torch.einsum("cxy,cxyop->cxyop", exps1, cos_xy)
+            exps2 = torch.einsum("cxy,xy->cxy", exp, exp_s) / exp_s.square()
+            expcos2 = torch.einsum("cxy,cxyop->cxyop", exps2, dx_cos_xy)
 
             fields[lvl] = torch.einsum(
-                "cxy,tcxy->txy", e1, coef_cos
-            ) + torch.einsum("cxy,tcxy->txy", e2, dx_coef_cos)
+                "tcop,cxyop->txyop", coefs, expcos1 + expcos2
+            ).mean(dim=[-1, -2])
 
         return fields
 
@@ -380,28 +374,23 @@ class WaveletBasis:
                 "o,cxyop->cxyop", self._sin_t, sin_xy
             )
 
-            coef_cos = torch.einsum("tcop,cxyop->tcxyop", coefs, cos_xy).mean(
-                dim=[-1, -2]
-            )
-            dy_coef_cos = torch.einsum(
-                "tcop,cxyop->tcxyop", coefs, dy_cos_xy
-            ).mean(dim=[-1, -2])
-
             exp = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
             exp_s = exp.sum(dim=0)
             dy_exp = -2 * y / sy**2 * exp
             dy_exp_s = dy_exp.sum(dim=0)
 
-            e1 = (
+            exps1 = (
                 torch.einsum("cxy,xy->cxy", dy_exp, exp_s)
                 - torch.einsum("cxy,xy->cxy", exp, dy_exp_s)
-            ) / exp_s**2
-
-            e2 = (torch.einsum("cxy,xy->cxy", exp, dy_exp_s)) / exp_s**2
+            ) / exp_s.square()
+            expcos1 = torch.einsum("cxy,cxyop->cxyop", exps1, cos_xy)
+            exps2 = (torch.einsum("cxy,xy->cxy", exp, exp_s)) / exp_s.square()
+            expcos2 = torch.einsum("cxy,cxyop->cxyop", exps2, dy_cos_xy)
 
             fields[lvl] = torch.einsum(
-                "cxy,tcxy->txy", e1, coef_cos
-            ) + torch.einsum("cxy,tcxy->txy", e2, dy_coef_cos)
+                "tcop,cxyop->txyop", coefs, expcos1 + expcos2
+            ).mean(dim=[-1, -2])
+
         return fields
 
     @staticmethod
