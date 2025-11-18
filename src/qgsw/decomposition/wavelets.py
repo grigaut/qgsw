@@ -14,7 +14,6 @@ except ImportError:
 import torch
 
 from qgsw import specs
-from qgsw.models.core.utils import OptimizableFunction
 from qgsw.specs import defaults
 
 WVFunc = Callable[[torch.Tensor], torch.Tensor]
@@ -1123,7 +1122,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dt(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets time derivative.
@@ -1157,7 +1156,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dx2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets second order x-derivative.
@@ -1174,7 +1173,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dx3(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets third order x-derivative.
@@ -1191,7 +1190,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dydx2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets x-x-y derivative.
@@ -1208,7 +1207,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dy(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets y-derivative.
@@ -1225,7 +1224,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dy2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets second order y-derivative.
@@ -1242,7 +1241,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dy3(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets third order y-derivative.
@@ -1259,7 +1258,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dxdy2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets y-y-x derivative.
@@ -1276,7 +1275,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_laplacian(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
         """Localize wavelets second order y-derivative.
@@ -1295,7 +1294,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dx_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -1316,7 +1315,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dy_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -1337,7 +1336,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     def localize_dt_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -1358,7 +1357,7 @@ class WaveletBasis:
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._dt_at_time(t, space_fields, self._time)
 
-        return OptimizableFunction(at_time)
+        return at_time
 
     @classmethod
     def from_xyt(
