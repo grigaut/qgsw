@@ -248,6 +248,19 @@ class WaveletBasis:
         """
         self._coefs = coefs
 
+    def _compute_space_params(
+        self, params: dict[str, Any], xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        centers = params["centers"]
+        kx = params["kx"]
+        ky = params["ky"]
+        xc = torch.tensor([c[0] for c in centers], **self._specs)
+        yc = torch.tensor([c[1] for c in centers], **self._specs)
+
+        x = xx[None, :, :] - xc[:, None, None]
+        y = yy[None, :, :] - yc[:, None, None]
+        return (x, y, kx, ky)
+
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> dict[int, torch.Tensor]:
@@ -266,17 +279,10 @@ class WaveletBasis:
 
         for lvl, c in self._coefs.items():
             params = self._space[lvl]
-
-            centers = params["centers"]
-            kx = params["kx"]
-            ky = params["ky"]
             sx = params["sigma_x"]
             sy = params["sigma_y"]
-            xc = torch.tensor([c[0] for c in centers], **self._specs)
-            yc = torch.tensor([c[1] for c in centers], **self._specs)
 
-            x = xx[None, :, :] - xc[:, None, None]
-            y = yy[None, :, :] - yc[:, None, None]
+            x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
             kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
             ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
@@ -315,29 +321,18 @@ class WaveletBasis:
 
         for lvl, coefs in self._coefs.items():
             params = self._space[lvl]
-
-            centers = params["centers"]
-            kx = params["kx"]
-            ky = params["ky"]
             sx = params["sigma_x"]
             sy = params["sigma_y"]
-            xc = torch.tensor([c[0] for c in centers], **self._specs)
-            yc = torch.tensor([c[1] for c in centers], **self._specs)
 
-            x = xx[None, :, :] - xc[:, None, None]
-            y = yy[None, :, :] - yc[:, None, None]
+            x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
             kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
             ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
 
-            gamma_xy = torch.cos(
-                (kx_cos + ky_sin)[..., None]
-                + self.phase[None, None, None, None, :]
-            )
-            sin_xy = torch.sin(
-                (kx_cos + ky_sin)[..., None]
-                + self.phase[None, None, None, None, :]
-            )
+            phase = self.phase[None, None, None, None, :]
+
+            gamma_xy = torch.cos((kx_cos + ky_sin)[..., None] + phase)
+            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
             dx_gamma_xy = -kx * torch.einsum(
                 "o,cxyop->cxyop", self._cos_t, sin_xy
             )
@@ -383,29 +378,17 @@ class WaveletBasis:
 
         for lvl, coefs in self._coefs.items():
             params = self._space[lvl]
-
-            centers = params["centers"]
-            kx = params["kx"]
-            ky = params["ky"]
             sx = params["sigma_x"]
             sy = params["sigma_y"]
-            xc = torch.tensor([c[0] for c in centers], **self._specs)
-            yc = torch.tensor([c[1] for c in centers], **self._specs)
 
-            x = xx[None, :, :] - xc[:, None, None]
-            y = yy[None, :, :] - yc[:, None, None]
+            x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
             kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
             ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
+            phase = self.phase[None, None, None, None, :]
 
-            gamma_xy = torch.cos(
-                (kx_cos + ky_sin)[..., None]
-                + self.phase[None, None, None, None, :]
-            )
-            sin_xy = torch.sin(
-                (kx_cos + ky_sin)[..., None]
-                + self.phase[None, None, None, None, :]
-            )
+            gamma_xy = torch.cos((kx_cos + ky_sin)[..., None] + phase)
+            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
             dy_gamma_xy = -ky * torch.einsum(
                 "o,cxyop->cxyop", self._sin_t, sin_xy
             )
