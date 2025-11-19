@@ -255,19 +255,19 @@ class NormalizedGaussianSupport:
         return torch.einsum("cxy,xy->cxy", self.gs.field, 1 / self.gs_s.field)
 
     def _compute_dx(self) -> torch.Tensor:
-        return (
-            torch.einsum("cxy,xy->cxy", self.gs.dx, self.gs_s.field)
-            - torch.einsum("cxy,xy->cxy", self.gs.field, self.gs_s.dx)
-        ) / self.gs_s.field.pow(2)
+        t = torch.einsum(
+            "cxy,xy->cxy", self.gs.dx, self.gs_s.field
+        ) - torch.einsum("cxy,xy->cxy", self.gs.field, self.gs_s.dx)
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(2))
 
     def _compute_dy(self) -> torch.Tensor:
-        return (
-            torch.einsum("cxy,xy->cxy", self.gs.dy, self.gs_s.field)
-            - torch.einsum("cxy,xy->cxy", self.gs.field, self.gs_s.dy)
-        ) / self.gs_s.field.pow(2)
+        t = torch.einsum(
+            "cxy,xy->cxy", self.gs.dy, self.gs_s.field
+        ) - torch.einsum("cxy,xy->cxy", self.gs.field, self.gs_s.dy)
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(2))
 
     def _compute_dx2(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dx2, self.gs_s.field.pow(2))
             - torch.einsum(
                 "cxy,xy->cxy", self.gs.field, self.gs_s.dx2 * self.gs_s.field
@@ -278,10 +278,11 @@ class NormalizedGaussianSupport:
             )
             + 2
             * torch.einsum("cxy,xy->cxy", self.gs.field, self.gs_s.dx.pow(2))
-        ) / self.gs_s.field.pow(3)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(3))
 
     def _compute_dy2(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dy2, self.gs_s.field.pow(2))
             - torch.einsum(
                 "cxy,xy->cxy", self.gs.field, self.gs_s.dy2 * self.gs_s.field
@@ -292,10 +293,11 @@ class NormalizedGaussianSupport:
             )
             + 2
             * torch.einsum("cxy,xy->cxy", self.gs.field, self.gs_s.dy.pow(2))
-        ) / self.gs_s.field.pow(3)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(3))
 
     def _compute_dydx(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dydx, self.gs_s.field.pow(2))
             - torch.einsum(
                 "cxy,xy->cxy", self.gs.dx, self.gs_s.dy * self.gs_s.field
@@ -309,10 +311,11 @@ class NormalizedGaussianSupport:
                 -self.gs_s.dydx * self.gs_s.field
                 + 2 * self.gs_s.dx * self.gs_s.dy,
             )
-        ) / self.gs_s.field.pow(3)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(3))
 
     def _compute_dxdy(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dxdy, self.gs_s.field.pow(2))
             - torch.einsum(
                 "cxy,xy->cxy", self.gs.dy, self.gs_s.dx * self.gs_s.field
@@ -326,10 +329,11 @@ class NormalizedGaussianSupport:
                 -self.gs_s.dxdy * self.gs_s.field
                 + 2 * self.gs_s.dy * self.gs_s.dx,
             )
-        ) / self.gs_s.field.pow(3)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(3))
 
     def _compute_dx3(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dx3, self.gs_s.field.pow(3))
             - 3
             * torch.einsum(
@@ -351,10 +355,11 @@ class NormalizedGaussianSupport:
                 - self.gs_s.dx3 * self.gs_s.field.pow(2)
                 - 6 * self.gs_s.dx.pow(3),
             )
-        ) / self.gs_s.field.pow(4)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(4))
 
     def _compute_dydx2(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dydx2, self.gs_s.field.pow(3))
             - torch.einsum(
                 "cxy,xy->cxy",
@@ -371,27 +376,28 @@ class NormalizedGaussianSupport:
             * torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.dx,
-                -self.gs_s.dydx * self.gs_s.field
+                -self.gs_s.dydx * self.gs_s.field.pow(2)
                 + 2 * self.gs_s.dx * self.gs_s.dy * self.gs_s.field,
             )
             + torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.dy,
-                -self.gs_s.dx2 * self.gs_s.field
+                -self.gs_s.dx2 * self.gs_s.field.pow(2)
                 + 2 * self.gs_s.dx.pow(2) * self.gs_s.field,
             )
             + torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.field,
-                -self.gs_s.dydx2 * self.gs_s.field
+                -self.gs_s.dydx2 * self.gs_s.field.pow(2)
                 + 2 * self.gs_s.dy * self.gs_s.dx2 * self.gs_s.field
                 + 4 * self.gs_s.dydx * self.gs_s.dx * self.gs_s.field
                 - 6 * self.gs_s.dx.pow(2) * self.gs_s.dy,
             )
-        ) / self.gs_s.field.pow(4)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(4))
 
     def _compute_dy3(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dy3, self.gs_s.field.pow(3))
             - 3
             * torch.einsum(
@@ -413,10 +419,11 @@ class NormalizedGaussianSupport:
                 - self.gs_s.dy3 * self.gs_s.field.pow(2)
                 - 6 * self.gs_s.dy.pow(3),
             )
-        ) / self.gs_s.field.pow(4)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(4))
 
     def _compute_dxdy2(self) -> torch.Tensor:
-        return (
+        t = (
             torch.einsum("cxy,xy->cxy", self.gs.dxdy2, self.gs_s.field.pow(3))
             - torch.einsum(
                 "cxy,xy->cxy",
@@ -433,21 +440,22 @@ class NormalizedGaussianSupport:
             * torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.dy,
-                -self.gs_s.dxdy * self.gs_s.field
+                -self.gs_s.dxdy * self.gs_s.field.pow(2)
                 + 2 * self.gs_s.dy * self.gs_s.dx * self.gs_s.field,
             )
             + torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.dx,
-                -self.gs_s.dy2 * self.gs_s.field
+                -self.gs_s.dy2 * self.gs_s.field.pow(2)
                 + 2 * self.gs_s.dy.pow(2) * self.gs_s.field,
             )
             + torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.field,
-                -self.gs_s.dxdy2 * self.gs_s.field
+                -self.gs_s.dxdy2 * self.gs_s.field.pow(2)
                 + 2 * self.gs_s.dx * self.gs_s.dy2 * self.gs_s.field
                 + 4 * self.gs_s.dxdy * self.gs_s.dy * self.gs_s.field
                 - 6 * self.gs_s.dy.pow(2) * self.gs_s.dx,
             )
-        ) / self.gs_s.field.pow(4)
+        )
+        return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(4))
