@@ -350,17 +350,15 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         if self.time_stepper == "rk3":
             if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
+                coef = 0
             elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
                 coef = 1
-                ftime = self.time + coef * self.dt
+            elif self._rk3_step == 2:
+                coef = 1 / 2
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
+        ftime = self.time + coef * self.dt
         forcing = self.compute_forcing(ftime, psi[:, :1])
         dq = (-div_flux + fcg_drag + forcing) * self.masks.h
         dq_i = self._interpolate(dq)

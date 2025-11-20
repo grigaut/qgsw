@@ -313,7 +313,6 @@ for c in range(n_cycles):
         optimizer.zero_grad()
         model.reset_time()
         model.set_boundary_maps(psi_bc_interp, q_bc_interp)
-        model.alpha = torch.zeros_like(model.psi)
 
         with torch.enable_grad():
             model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))

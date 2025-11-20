@@ -6,6 +6,12 @@ import itertools
 from collections.abc import Callable
 from typing import Any
 
+from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
+from qgsw.decomposition.wavelets.supports import (
+    GaussianSupport,
+    NormalizedGaussianSupport,
+)
+
 try:
     from typing import Self
 except ImportError:
@@ -71,8 +77,8 @@ def generate_space_params(
             for x, y in itertools.product(xs, ys)
         ]
 
-        sigma_x = lx_p * ratio  # For the gaussian enveloppe
-        sigma_y = ly_p * ratio  # For the gaussian enveloppe
+        sigma_x = lx_p / 2 * ratio  # For the gaussian enveloppe
+        sigma_y = ly_p / 2 * ratio  # For the gaussian enveloppe
 
         basis[p] = {
             "centers": centers,
@@ -121,7 +127,7 @@ def generate_time_params(
 
         centers = [t.cpu().item() for t in tc]
 
-        sigma_t = lt_p * ratio  # For the gaussian enveloppe
+        sigma_t = lt_p / 2 * ratio  # For the gaussian enveloppe
 
         basis[p] = {
             "centers": centers,
@@ -152,7 +158,9 @@ class WaveletBasis:
     @n_theta.setter
     def n_theta(self, n_theta: int) -> None:
         self._n_theta = n_theta
-        theta = torch.linspace(0, torch.pi, self.n_theta, **self._specs)
+        theta = torch.linspace(0, torch.pi, self.n_theta + 1, **self._specs)[
+            :-1
+        ]
         self._cos_t = torch.cos(theta)
         self._sin_t = torch.sin(theta)
 
@@ -283,19 +291,22 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
+            phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos(
-                (kx_cos + ky_sin)[..., None]
-                + self.phase[None, None, None, None, :]
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            # e = E / ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            lambd = torch.einsum("cxy,cxyop->cxyop", e, gamma)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+
+            lambd = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.field)
             # ꟛ = e γ
             fields[lvl] = torch.einsum("tcop,cxyop->txyop", c, lambd).mean(
                 dim=[-1, -2]
@@ -325,33 +336,25 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
-
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dx_gamma = -kx * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t, sin_xy
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dx_E = -2 * x / sx**2 * E
-            dx_E_s = dx_E.sum(dim=0)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # e' = (E'ΣE - EΣE')/(ΣE)²
-            dx_e = (
-                torch.einsum("cxy,xy->cxy", dx_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dx_E_s)
-            ) / E_s.square()
             # ꟛ1 = e' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dx_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.field)
             # ꟛ2 = e γ'
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e, dx_gamma)
+            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx)
             # coefs * (e' γ + e γ')
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop", coefs, lambda1 + lambda2
@@ -382,47 +385,27 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
-
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dx_gamma = -kx * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t, sin_xy
-            )
-            dx2_gamma = -(kx**2) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t.square(), gamma
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dx_E = -2 * x / sx**2 * E
-            dx_E_s = dx_E.sum(dim=0)
-            dx2_E = (-2 / sx**2 + 4 * x**2 / sx**4) * E
-            dx2_E_s = dx2_E.sum(dim=0)
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # e' = (E'ΣE - EΣE')/(ΣE)²
-            dx_e = (
-                torch.einsum("cxy,xy->cxy", dx_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dx_E_s)
-            ) / E_s.square()
-            # e'' = (E''(ΣE)² - EΣE''ΣE - 2E'ΣE'ΣE + 2E(ΣE')²)/(ΣE)³
-            dx2_e = (
-                torch.einsum("cxy,xy->cxy", dx2_E, E_s.square())
-                - torch.einsum("cxy,xy->cxy", E, dx2_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dx_E, dx_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dx_E_s.square())
-            ) / E_s.pow(3)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
             # ꟛ1 = e'' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dx2_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.field)
             # ꟛ2 = 2e' γ'
-            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", dx_e, dx_gamma)
+            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dx)
             # ꟛ3 = e γ''
-            lambda3 = torch.einsum("cxy,cxyop->cxyop", e, dx2_gamma)
+            lambda3 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx2)
             # coefs * (e'' γ +2e' γ'+ e γ'')
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop", coefs, lambda1 + lambda2 + lambda3
@@ -453,74 +436,28 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
-
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dx_gamma = -kx * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t, sin_xy
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
-            dx2_gamma = -(kx**2) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t.square(), gamma
-            )
-            dx3_gamma = (kx**3) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t.pow(3), sin_xy
-            )
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dx_E = -2 * x / sx**2 * E
-            dx_E_s = dx_E.sum(dim=0)
-            dx2_E = (-2 / sx**2 + 4 * x**2 / sx**4) * E
-            dx2_E_s = dx2_E.sum(dim=0)
-            dx3_E = (12 * x / sx**4 - 8 * x**3 / sx**6) * E
-            dx3_E_s = dx3_E.sum(dim=0)
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # e' = (E'ΣE - EΣE')/(ΣE)²
-            dx_e = (
-                torch.einsum("cxy,xy->cxy", dx_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dx_E_s)
-            ) / E_s.square()
-            # e'' = (E''(ΣE)² - EΣE''ΣE - 2E'ΣE'ΣE + 2E(ΣE')²)/(ΣE)³
-            dx2_e = (
-                torch.einsum("cxy,xy->cxy", dx2_E, E_s.square())
-                - torch.einsum("cxy,xy->cxy", E, dx2_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dx_E, dx_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dx_E_s.square())
-            ) / E_s.pow(3)
-            # e''' = (
-            #   E'''(ΣE)³ - 3E''ΣE'(ΣE)² - 3E'(ΣE''(ΣE)²-2(ΣE')²ΣE)
-            #   + E[6ΣE''ΣE'ΣE-ΣE'''(ΣE)²-6(ΣE')³]
-            # )/(ΣE)⁴
-            dx3_e = (
-                torch.einsum("cxy,xy->cxy", dx3_E, E_s.pow(3))
-                - 3 * torch.einsum("cxy,xy->cxy", dx2_E, dx_E_s * E_s.square())
-                - 3
-                * torch.einsum(
-                    "cxy,xy->cxy",
-                    dx_E,
-                    dx2_E_s * E_s.square() - 2 * dx_E_s.square() * E_s,
-                )
-                + torch.einsum(
-                    "cxy,xy->cxy",
-                    E,
-                    6 * dx2_E_s * dx_E_s * E_s
-                    - dx3_E_s * E_s.square()
-                    - 6 * dx_E_s.pow(3),
-                )
-            ) / E_s.pow(4)
             # ꟛ1 = e''' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dx3_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx3, gamma.field)
             # ꟛ2 = 3e'' γ'
-            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", dx2_e, dx_gamma)
+            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.dx)
             # ꟛ3 = 3e' γ''
-            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", dx_e, dx2_gamma)
+            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dx2)
             # ꟛ4 = e γ'''
-            lambda4 = torch.einsum("cxy,cxyop->cxyop", e, dx3_gamma)
+            lambda4 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx3)
             # coefs * (e''' γ + 3e' γ'' + 3 e' γ'' + e γ''')
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop",
@@ -553,112 +490,33 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
-
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dx_gamma = -kx * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t, sin_xy
-            )
-            dy_gamma = -ky * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t, sin_xy
-            )
-            dx2_gamma = -(kx**2) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t.square(), gamma
-            )
-            dydx_gamma = -(kx * ky) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t * self._sin_t, gamma
-            )
-            dydx2_gamma = (kx**2 * ky) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t.square() * self._sin_t, sin_xy
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dx_E = -2 * x / sx**2 * E
-            dx_E_s = dx_E.sum(dim=0)
-            dy_E = -2 * y / sy**2 * E
-            dy_E_s = dy_E.sum(dim=0)
-            dx2_E = (-2 / sx**2 + 4 * x**2 / sx**4) * E
-            dx2_E_s = dx2_E.sum(dim=0)
-            dydx_E = (-2 * y / sy**2) * dx_E
-            dydx_E_s = dydx_E.sum(dim=0)
-            dydx2_E = (-2 * y / sy**2) * dx2_E
-            dydx2_E_s = dydx2_E.sum(dim=0)
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # ∂_x e = (E_xΣE - EΣE_x)/(ΣE)²
-            dx_e = (
-                torch.einsum("cxy,xy->cxy", dx_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dx_E_s)
-            ) / E_s.square()
-            # ∂_y e = (E_yΣE - EΣE_y)/(ΣE)²
-            dy_e = (
-                torch.einsum("cxy,xy->cxy", dy_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dy_E_s)
-            ) / E_s.square()
-            # ∂_xx e = (E_xx(ΣE)² - EΣE_xxΣE - 2E_xΣE_xΣE + 2E(ΣE_x)²)/(ΣE)³
-            dx2_e = (
-                torch.einsum("cxy,xy->cxy", dx2_E, E_s.square())
-                - torch.einsum("cxy,xy->cxy", E, dx2_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dx_E, dx_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dx_E_s.square())
-            ) / E_s.pow(3)
-            # ∂_xy e = (
-            #   E_xy(ΣE)² + E_xΣE_yΣE - E_yΣE_xΣE -
-            #   EΣE_xyΣE - 2E_xΣE_yΣE + 2 EΣE_xΣE_y
-            # )/(ΣE)³
-            dydx_e = (
-                torch.einsum("cxy,xy->cxy", dydx_E, E_s.square())
-                + torch.einsum("cxy,xy->cxy", dx_E, dy_E_s * E_s)
-                - torch.einsum("cxy,xy->cxy", dy_E, dx_E_s * E_s)
-                - torch.einsum("cxy,xy->cxy", E, dydx_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dx_E, dy_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dy_E_s * dx_E_s)
-            ) / E_s.pow(3)
-            # ∂_xxy e = (
-            #   E_xxy(ΣE)³ + E(ΣE_xxΣE_yΣE - 4ΣE_y(ΣE_x)² - ΣE_xxy(ΣE)² +
-            #   4ΣE_xyΣE_xΣE) + 2E_x(ΣE_xΣE_yΣE - ΣE_xy(ΣE)²) +
-            #   E_yΣE(ΣE_xxΣE + (ΣE_x)²)
-            # )/(ΣE)⁴
-            dydx2_e = (
-                torch.einsum("cxy,xy->cxy", dydx2_E, E_s.pow(3))
-                + torch.einsum(
-                    "cxy,xy->cxy",
-                    E,
-                    dx2_E_s * dy_E_s * E_s
-                    - 4 * dy_E_s * dx_E_s.square()
-                    - dydx2_E_s * E_s.square()
-                    + 4 * dydx_E_s * dx_E_s * E_s,
-                )
-                + 2
-                * torch.einsum(
-                    "cxy,xy->cxy",
-                    dx_E,
-                    dx_E_s * dy_E_s * E_s - dydx_E_s * E_s.square(),
-                )
-                + torch.einsum(
-                    "cxy,xy->cxy",
-                    dy_E,
-                    dx2_E_s * E_s.square() + dx_E_s.square() * E_s,
-                )
-            ) / E_s.pow(4)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
             # ꟛ1 = ∂_xxy e γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dydx2_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dydx2, gamma.field)
             # ꟛ2 = ∂_xx e ∂_y γ
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", dx2_e, dy_gamma)
+            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.dy)
             # ꟛ3 = 2 ∂_xy e ∂_x γ
-            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", dydx_e, dx_gamma)
+            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dydx, gamma.dx)
             # ꟛ4 = 2 ∂_x e ∂_xy γ
-            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", dx_e, dydx_gamma)
+            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dydx)
             # ꟛ5 = ∂_y e ∂_xx γ
-            lambda5 = torch.einsum("cxy,cxyop->cxyop", dy_e, dx2_gamma)
+            lambda5 = torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dx2)
             # ꟛ5 = e ∂_xxy γ
-            lambda6 = torch.einsum("cxy,cxyop->cxyop", e, dydx2_gamma)
+            lambda6 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dydx2)
             # coefs * ( ∂_xxy e γ + ∂_xx e ∂_y γ +
             #   2 ∂_xy e ∂_x γ + 2 ∂_x e ∂_xy γ +
             #   ∂_y e ∂_xx γ + e ∂_xxy γ )
@@ -693,32 +551,24 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dy_gamma = -ky * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t, sin_xy
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dy_E = -2 * y / sy**2 * E
-            dy_E_s = dy_E.sum(dim=0)
-
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # e' = (E'ΣE - EΣE')/(ΣE)²
-            dy_e = (
-                torch.einsum("cxy,xy->cxy", dy_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dy_E_s)
-            ) / E_s.square()
             # ꟛ1 = e' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dy_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.field)
             # ꟛ2 = e γ'
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e, dy_gamma)
+            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy)
             # coefs * (e' γ + e γ')
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop", coefs, lambda1 + lambda2
@@ -749,47 +599,26 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
-
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dy_gamma = -ky * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t, sin_xy
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
-            dy2_gamma = -(ky**2) * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t.square(), gamma
-            )
-
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dy_E = -2 * y / sy**2 * E
-            dy_E_s = dy_E.sum(dim=0)
-            dy2_E = (-2 / sy**2 + 4 * y**2 / sy**4) * E
-            dy2_E_s = dy2_E.sum(dim=0)
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # e' = (E'ΣE - EΣE')/(ΣE)²
-            dy_e = (
-                torch.einsum("cxy,xy->cxy", dy_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dy_E_s)
-            ) / E_s.square()
-            # e'' = (E''(ΣE)² - EΣE''ΣE - 2E'ΣE'ΣE + 2E(ΣE')²)/(ΣE)³
-            dy2_e = (
-                torch.einsum("cxy,xy->cxy", dy2_E, E_s.square())
-                - torch.einsum("cxy,xy->cxy", E, dy2_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dy_E, dy_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dy_E_s.square())
-            ) / E_s.pow(3)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
             # ꟛ1 = e'' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dy2_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.field)
             # ꟛ2 = 2e' γ'
-            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", dy_e, dy_gamma)
+            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dy)
             # ꟛ3 = e γ''
-            lambda3 = torch.einsum("cxy,cxyop->cxyop", e, dy2_gamma)
+            lambda3 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy2)
             # coefs * (e'' γ +2e' γ'+ e γ'')
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop", coefs, lambda1 + lambda2 + lambda3
@@ -820,75 +649,29 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
-
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dy_gamma = -ky * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t, sin_xy
-            )
-            dy2_gamma = -(ky**2) * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t.square(), gamma
-            )
-            dy3_gamma = (ky**3) * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t.pow(3), sin_xy
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dy_E = -2 * y / sy**2 * E
-            dy_E_s = dy_E.sum(dim=0)
-            dy2_E = (-2 / sy**2 + 4 * y**2 / sy**4) * E
-            dy2_E_s = dy2_E.sum(dim=0)
-            dy3_E = (12 * y / sy**4 - 8 * y**3 / sy**6) * E
-            dy3_E_s = dy3_E.sum(dim=0)
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # e' = (E'ΣE - EΣE')/(ΣE)²
-            dy_e = (
-                torch.einsum("cxy,xy->cxy", dy_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dy_E_s)
-            ) / E_s.square()
-            # e'' = (E''(ΣE)² - EΣE''ΣE - 2E'ΣE'ΣE + 2E(ΣE')²)/(ΣE)³
-            dy2_e = (
-                torch.einsum("cxy,xy->cxy", dy2_E, E_s.square())
-                - torch.einsum("cxy,xy->cxy", E, dy2_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dy_E, dy_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dy_E_s.square())
-            ) / E_s.pow(3)
-            # e''' = (
-            #   E'''(ΣE)³ - 3E''ΣE'(ΣE)² - 3E'(ΣE''(ΣE)²-2(ΣE')²ΣE)
-            #   + E[6ΣE''ΣE'ΣE-ΣE'''(ΣE)²-6(ΣE')³]
-            # )/(ΣE)⁴
-            dy3_e = (
-                torch.einsum("cxy,xy->cxy", dy3_E, E_s.pow(3))
-                - 3 * torch.einsum("cxy,xy->cxy", dy2_E, dy_E_s * E_s.square())
-                - 3
-                * torch.einsum(
-                    "cxy,xy->cxy",
-                    dy_E,
-                    dy2_E_s * E_s.square() - 2 * dy_E_s.square() * E_s,
-                )
-                + torch.einsum(
-                    "cxy,xy->cxy",
-                    E,
-                    6 * dy2_E_s * dy_E_s * E_s
-                    - dy3_E_s * E_s.square()
-                    - 6 * dy_E_s.pow(3),
-                )
-            ) / E_s.pow(4)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
             # ꟛ1 = e''' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dy3_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy3, gamma.field)
             # ꟛ2 = 3e'' γ'
-            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", dy2_e, dy_gamma)
+            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.dy)
             # ꟛ3 = 3e' γ''
-            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", dy_e, dy2_gamma)
+            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dy2)
             # ꟛ4 = e γ'''
-            lambda4 = torch.einsum("cxy,cxyop->cxyop", e, dy3_gamma)
+            lambda4 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy3)
             # coefs * (e''' γ + 3e' γ'' + 3 e' γ'' + e γ''')
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop",
@@ -921,112 +704,33 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
-
             phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos((kx_cos + ky_sin)[..., None] + phase)
-            sin_xy = torch.sin((kx_cos + ky_sin)[..., None] + phase)
-            dy_gamma = -ky * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t, sin_xy
-            )
-            dx_gamma = -kx * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t, sin_xy
-            )
-            dy2_gamma = -(ky**2) * torch.einsum(
-                "o,cxyop->cxyop", self._sin_t.square(), gamma
-            )
-            dxdy_gamma = -(kx * ky) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t * self._sin_t, gamma
-            )
-            dxdy2_gamma = (ky**2 * kx) * torch.einsum(
-                "o,cxyop->cxyop", self._cos_t * self._sin_t.square(), sin_xy
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
 
-            E = torch.exp(-((x**2) / (sx) ** 2 + (y**2) / (sy) ** 2))
-            E_s = E.sum(dim=0)
-            dy_E = -2 * y / sy**2 * E
-            dy_E_s = dy_E.sum(dim=0)
-            dx_E = -2 * x / sx**2 * E
-            dx_E_s = dx_E.sum(dim=0)
-            dy2_E = (-2 / sy**2 + 4 * y**2 / sy**4) * E
-            dy2_E_s = dy2_E.sum(dim=0)
-            dxdy_E = (-2 * x / sx**2) * dy_E
-            dxdy_E_s = dxdy_E.sum(dim=0)
-            dxdy2_E = (-2 * x / sx**2) * dy2_E
-            dxdy2_E_s = dxdy2_E.sum(dim=0)
-            # e = E/ΣE  # noqa: ERA001
-            e = torch.einsum("cxy,xy->cxy", E, 1 / E_s)
-            # ∂_y e = (E_yΣE - EΣE_y)/(ΣE)²
-            dy_e = (
-                torch.einsum("cxy,xy->cxy", dy_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dy_E_s)
-            ) / E_s.square()
-            # ∂_x e = (E_xΣE - EΣE_x)/(ΣE)²
-            dx_e = (
-                torch.einsum("cxy,xy->cxy", dx_E, E_s)
-                - torch.einsum("cxy,xy->cxy", E, dx_E_s)
-            ) / E_s.square()
-            # ∂_yy e = (E_yy(ΣE)² - EΣE_yyΣE - 2E_yΣE_yΣE + 2E(ΣE_y)²)/(ΣE)³
-            dy2_e = (
-                torch.einsum("cxy,xy->cxy", dy2_E, E_s.square())
-                - torch.einsum("cxy,xy->cxy", E, dy2_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dy_E, dy_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dy_E_s.square())
-            ) / E_s.pow(3)
-            # ∂_yx e = (
-            #   E_yx(ΣE)² + E_yΣE_xΣE - E_xΣE_yΣE -
-            #   EΣE_yxΣE - 2E_yΣE_xΣE + 2 EΣE_yΣE_x
-            # )/(ΣE)³
-            dxdy_e = (
-                torch.einsum("cxy,xy->cxy", dxdy_E, E_s.square())
-                + torch.einsum("cxy,xy->cxy", dy_E, dx_E_s * E_s)
-                - torch.einsum("cxy,xy->cxy", dx_E, dy_E_s * E_s)
-                - torch.einsum("cxy,xy->cxy", E, dxdy_E_s * E_s)
-                - 2 * torch.einsum("cxy,xy->cxy", dy_E, dx_E_s * E_s)
-                + 2 * torch.einsum("cxy,xy->cxy", E, dy_E_s * dx_E_s)
-            ) / E_s.pow(3)
-            # ∂_yyx e = (
-            #   E_yyx(ΣE)³ + E(ΣE_yyΣE_xΣE - 4ΣE_x(ΣE_y)² - ΣE_yyx(ΣE)² +
-            #   4ΣE_yxΣE_yΣE) + 2E_y(ΣE_yΣE_xΣE - ΣE_yx(ΣE)²) +
-            #   E_xΣE(ΣE_yyΣE + (ΣE_y)²)
-            # )/(ΣE)⁴
-            dxdy2_e = (
-                torch.einsum("cxy,xy->cxy", dxdy2_E, E_s.pow(3))
-                + torch.einsum(
-                    "cxy,xy->cxy",
-                    E,
-                    dy2_E_s * dx_E_s * E_s
-                    - 4 * dx_E_s * dy_E_s.square()
-                    - dxdy2_E_s * E_s.square()
-                    + 4 * dxdy_E_s * dy_E_s * E_s,
-                )
-                + 2
-                * torch.einsum(
-                    "cxy,xy->cxy",
-                    dy_E,
-                    dy_E_s * dx_E_s * E_s - dxdy_E_s * E_s.square(),
-                )
-                + torch.einsum(
-                    "cxy,xy->cxy",
-                    dx_E,
-                    dy2_E_s * E_s.square() + dy_E_s.square() * E_s,
-                )
-            ) / E_s.pow(4)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
 
             # ꟛ1 = ∂_yyx e γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", dxdy2_e, gamma)
+            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dxdy2, gamma.field)
             # ꟛ2 = ∂_yy e ∂_x γ
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", dy2_e, dx_gamma)
+            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.dx)
             # ꟛ3 = 2 ∂_yx e ∂_y γ
-            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", dxdy_e, dy_gamma)
+            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dxdy, gamma.dy)
             # ꟛ4 = 2 ∂_y e ∂_yx γ
-            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", dy_e, dxdy_gamma)
+            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dxdy)
             # ꟛ5 = ∂_x e ∂_yy γ
-            lambda5 = torch.einsum("cxy,cxyop->cxyop", dx_e, dy2_gamma)
+            lambda5 = torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dy2)
             # ꟛ6 = e ∂_yyx γ
-            lambda6 = torch.einsum("cxy,cxyop->cxyop", e, dxdy2_gamma)
+            lambda6 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dxdy2)
             # coefs * ( ∂_yyx e γ + ∂_yy e ∂_x γ +
             #   2 ∂_yx e ∂_y γ + 2 ∂_y e ∂_yx γ +
             #   ∂_x e ∂_yy γ + e ∂_yyx γ )
@@ -1099,10 +803,9 @@ class WaveletBasis:
             exp_s = exp.sum(dim=0)
             dt_exp = -2 * (t - tc) / st**2 * exp
 
-            field_at_lvl = (
-                torch.einsum("t,txy->xy", dt_exp, space) * exp_s
-                - torch.einsum("t,txy->xy", exp, space) * dt_exp.sum(dim=0)
-            ) / exp_s**2
+            dt_e = (dt_exp * exp_s - exp * dt_exp.sum(dim=0)) / exp_s**2
+
+            field_at_lvl = torch.einsum("t,txy->xy", dt_e, space)
 
             field += field_at_lvl
         return field / len(time_params)

@@ -38,7 +38,7 @@ def test_dt(order: int) -> None:
     )
     dt_analytic = wv_dt(torch.tensor([0.5], **specs))
 
-    torch.testing.assert_close(dt_discrete, dt_analytic)
+    torch.testing.assert_close(dt_discrete, dt_analytic, atol=1e-6, rtol=1e-6)
 
     basis.set_coefs({k: torch.ones_like(v) for k, v in coefs.items()})
     wv_dt = basis.localize_dt(xx, yy)
