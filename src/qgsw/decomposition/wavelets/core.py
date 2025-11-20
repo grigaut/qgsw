@@ -158,7 +158,9 @@ class WaveletBasis:
     @n_theta.setter
     def n_theta(self, n_theta: int) -> None:
         self._n_theta = n_theta
-        theta = torch.linspace(0, torch.pi, self.n_theta, **self._specs)
+        theta = torch.linspace(0, torch.pi, self.n_theta + 1, **self._specs)[
+            :-1
+        ]
         self._cos_t = torch.cos(theta)
         self._sin_t = torch.sin(theta)
 
