@@ -110,7 +110,7 @@ class GaussianSupport:
 
     def _compute_dy3(self) -> torch.Tensor:
         return (
-            12 * self.x / self.sx**4 - 8 * self.x**3 / self.sx**6
+            12 * self.y / self.sy**4 - 8 * self.y**3 / self.sy**6
         ) * self.field
 
     def _compute_dxdy2(self) -> torch.Tensor:
@@ -341,18 +341,18 @@ class NormalizedGaussianSupport:
                 self.gs.dx2,
                 self.gs_s.dx * self.gs_s.field.pow(2),
             )
-            - 3
+            + 3
             * torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.dx,
-                self.gs_s.dx2 * self.gs_s.field.pow(2)
-                - 2 * self.gs_s.dx.pow(2) * self.gs_s.field,
+                -self.gs_s.dx2 * self.gs_s.field.pow(2)
+                + 2 * self.gs_s.dx.pow(2) * self.gs_s.field,
             )
             + torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.field,
-                6 * self.gs_s.dx2 * self.gs_s.dx * self.gs_s.field
-                - self.gs_s.dx3 * self.gs_s.field.pow(2)
+                -self.gs_s.dx3 * self.gs_s.field.pow(2)
+                + 6 * self.gs_s.dx2 * self.gs_s.dx * self.gs_s.field
                 - 6 * self.gs_s.dx.pow(3),
             )
         )
@@ -405,18 +405,18 @@ class NormalizedGaussianSupport:
                 self.gs.dy2,
                 self.gs_s.dy * self.gs_s.field.pow(2),
             )
-            - 3
+            + 3
             * torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.dy,
-                self.gs_s.dy2 * self.gs_s.field.pow(2)
-                - 2 * self.gs_s.dy.pow(2) * self.gs_s.field,
+                -self.gs_s.dy2 * self.gs_s.field.pow(2)
+                + 2 * self.gs_s.dy.pow(2) * self.gs_s.field,
             )
             + torch.einsum(
                 "cxy,xy->cxy",
                 self.gs.field,
-                6 * self.gs_s.dy2 * self.gs_s.dy * self.gs_s.field
-                - self.gs_s.dy3 * self.gs_s.field.pow(2)
+                -self.gs_s.dy3 * self.gs_s.field.pow(2)
+                + 6 * self.gs_s.dy2 * self.gs_s.dy * self.gs_s.field
                 - 6 * self.gs_s.dy.pow(3),
             )
         )
