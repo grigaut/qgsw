@@ -300,7 +300,7 @@ for c in range(n_cycles):
         [
             {
                 "params": list(coefs.values()),
-                "lr": 1e-11,
+                "lr": 1e-10,
                 "name": "Wavelet coefs",
             }
         ]
@@ -365,7 +365,7 @@ for c in range(n_cycles):
 
         lr_forcing = optimizer.param_groups[0]["lr"]
         for v in coefs.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1e-1)
+            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
 
         optimizer.step()
         scheduler.step(loss)
