@@ -158,9 +158,9 @@ class WaveletBasis:
     @n_theta.setter
     def n_theta(self, n_theta: int) -> None:
         self._n_theta = n_theta
-        theta = torch.linspace(0, torch.pi, self.n_theta + 1, **self._specs)[
-            :-1
-        ]
+        theta = torch.linspace(
+            0, 2 * torch.pi, self.n_theta + 1, **self._specs
+        )[:-1]
         self._cos_t = torch.cos(theta)
         self._sin_t = torch.sin(theta)
 
@@ -291,18 +291,22 @@ class WaveletBasis:
 
             x, y, kx, ky = self._compute_space_params(params, xx, yy)
 
-            kx_cos = kx * torch.einsum("cxy,o->cxyo", x, self._cos_t)
-            ky_sin = ky * torch.einsum("cxy,o->cxyo", y, self._sin_t)
+            phase = self.phase[None, None, None, None, :]
 
-            gamma = torch.cos(
-                (kx_cos + ky_sin)[..., None]
-                + self.phase[None, None, None, None, :]
+            gamma = CosineBasisFunctions(
+                x,
+                y,
+                kx,
+                ky,
+                self._cos_t,
+                self._sin_t,
+                phase,
             )
 
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            lambd = torch.einsum("cxy,cxyop->cxyop", e.field, gamma)
+            lambd = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.field)
             # ꟛ = e γ
             fields[lvl] = torch.einsum("tcop,cxyop->txyop", c, lambd).mean(
                 dim=[-1, -2]
@@ -799,10 +803,9 @@ class WaveletBasis:
             exp_s = exp.sum(dim=0)
             dt_exp = -2 * (t - tc) / st**2 * exp
 
-            field_at_lvl = (
-                torch.einsum("t,txy->xy", dt_exp, space) * exp_s
-                - torch.einsum("t,txy->xy", exp, space) * dt_exp.sum(dim=0)
-            ) / exp_s**2
+            dt_e = (dt_exp * exp_s - exp * dt_exp.sum(dim=0)) / exp_s**2
+
+            field_at_lvl = torch.einsum("t,txy->xy", dt_e, space)
 
             field += field_at_lvl
         return field / len(time_params)
