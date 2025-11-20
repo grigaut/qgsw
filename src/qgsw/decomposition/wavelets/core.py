@@ -77,8 +77,8 @@ def generate_space_params(
             for x, y in itertools.product(xs, ys)
         ]
 
-        sigma_x = lx_p * ratio  # For the gaussian enveloppe
-        sigma_y = ly_p * ratio  # For the gaussian enveloppe
+        sigma_x = lx_p / 2 * ratio  # For the gaussian enveloppe
+        sigma_y = ly_p / 2 * ratio  # For the gaussian enveloppe
 
         basis[p] = {
             "centers": centers,
@@ -127,7 +127,7 @@ def generate_time_params(
 
         centers = [t.cpu().item() for t in tc]
 
-        sigma_t = lt_p * ratio  # For the gaussian enveloppe
+        sigma_t = lt_p / 2 * ratio  # For the gaussian enveloppe
 
         basis[p] = {
             "centers": centers,
@@ -158,9 +158,9 @@ class WaveletBasis:
     @n_theta.setter
     def n_theta(self, n_theta: int) -> None:
         self._n_theta = n_theta
-        theta = torch.linspace(
-            0, 2 * torch.pi, self.n_theta + 1, **self._specs
-        )[:-1]
+        theta = torch.linspace(0, torch.pi, self.n_theta + 1, **self._specs)[
+            :-1
+        ]
         self._cos_t = torch.cos(theta)
         self._sin_t = torch.sin(theta)
 
