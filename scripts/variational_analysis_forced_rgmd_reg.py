@@ -196,6 +196,9 @@ space_slice = P.space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
 space_slice_w = P.space.remove_z_h().slice(
     imin - p + 1, imax + p, jmin - p + 1, jmax + p
 )
+space_slice_ww = P.space.remove_z_h().slice(
+    imin - p, imax + p + 1, jmin - p, jmax + p + 1
+)
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
@@ -212,7 +215,7 @@ if not args.no_wind:
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
-gamma = 2500 / comparison_interval
+gamma = 250 / comparison_interval
 
 # Compute PV
 
@@ -238,7 +241,6 @@ compute_q_rg = lambda psi1: compute_q1_interior(
     beta_plane.f0,
     beta_effect_w,
 )
-
 
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
@@ -284,6 +286,7 @@ for c in range(n_cycles):
     }
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
+    q0 = crop(compute_q_rg(psi0), p - 1)
     qs = (compute_q_rg(p1) for p1 in psis)
     q_bcs = [
         Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3) for q in qs
@@ -298,33 +301,26 @@ for c in range(n_cycles):
         [
             {
                 "params": list(coefs_adim.values()),
-                "lr": 1e1,
+                "lr": 1e-1,
                 "name": "Wavelet coefs",
             },
         ]
     )
-    lr_constant = torch.optim.lr_scheduler.ConstantLR(
-        optimizer, factor=1, total_iters=50
-    )
     lr_change_on_plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=5
+        optimizer, factor=0.5, patience=10
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
     register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()}
+        **{f"coefs_{k}": v * psi0_mean * 25 for k, v in coefs_adim.items()}
     )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
         model.reset_time()
-        model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
         with torch.enable_grad():
-            model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
-
-            loss = torch.tensor(0, **defaults.get())
-            coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
+            coefs = {k: v * psi0_mean * 25 for k, v in coefs_adim.items()}
             basis.set_coefs(coefs)
             model.wavelets = basis
 
@@ -353,6 +349,13 @@ for c in range(n_cycles):
                 space_slice.u.xy.y,
             )
 
+            model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            model.set_psiq(crop(psi0, p), q0)
+
+            loss = torch.tensor(0, **defaults.get())
+
+            dt_q2s = []
+
             for n in range(1, n_steps_per_cyle):
                 psi1_ = model.psi[0, 0]
                 time = model.time
@@ -363,27 +366,30 @@ for c in range(n_cycles):
                 dx_psi1 /= space.dx
                 dy_psi1 /= space.dy
 
-                dt_q2 = wv_dt_lap_psi2(
-                    time + model.dt / 2
-                ) - beta_plane.f0**2 / H2 / g2 * (
-                    wv_dt_psi2(time + model.dt / 2) - interpolate(dpsi1)
+                lap_dt = wv_dt_lap_psi2(time + model.dt / 2)
+                dt_psi2 = wv_dt_psi2(time + model.dt / 2)
+
+                dt_q2 = lap_dt[
+                    None, None, ...
+                ] - beta_plane.f0**2 / H2 / g2 * (
+                    dt_psi2[None, None, ...] - interpolate(dpsi1)
                 )
 
-                dy_psi2_dx_q2 = wv_dy_psi2(time) * (
-                    wv_dx_lap_psi2(time) + beta_plane.f0**2 / H2 / g2 * dx_psi1
+                dy_psi2_dx_q2 = -wv_dy_psi2(time)[None, None, ...] * (
+                    wv_dx_lap_psi2(time)[None, None, ...]
+                    + beta_plane.f0**2 / H2 / g2 * dx_psi1
                 )
-                dx_psi2_dy_q2 = wv_dx_psi2(time) * (
-                    wv_dy_lap_psi2(time) + beta_plane.f0**2 / H2 / g2 * dy_psi1
+                dx_psi2_dy_q2 = wv_dx_psi2(time)[None, None, ...] * (
+                    wv_dy_lap_psi2(time)[None, None, ...]
+                    + beta_plane.f0**2 / H2 / g2 * dy_psi1
+                    + beta_plane.beta
                 )
 
                 adv2 = (
-                    -(dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1])
-                    / 2
-                    + (dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :])
-                    / 2
-                )
-
-                dt_div = dt_q2 + adv2
+                    dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1]
+                ) / 2 + (
+                    dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :]
+                ) / 2
 
                 loss += gamma * ((dt_q2 + adv2) / U * L * T).square().sum()
 
@@ -419,13 +425,10 @@ for c in range(n_cycles):
         loss.backward()
 
         for v in coefs_adim.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
+            torch.nn.utils.clip_grad_norm_([v], max_norm=1e-1)
 
         optimizer.step()
-        if o < 50:
-            lr_constant.step()
-        else:
-            lr_change_on_plateau.step(loss)
+        lr_change_on_plateau.step(loss)
         lr_callback.step()
 
     best_loss = register_params.best_loss
