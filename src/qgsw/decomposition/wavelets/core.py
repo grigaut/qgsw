@@ -775,6 +775,38 @@ class WaveletBasis:
         return field / len(time_params)
 
     @staticmethod
+    def _at_time_debug(
+        t: torch.Tensor,
+        space_fields: dict[int, torch.Tensor],
+        time_params: dict[int, dict[str, Any]],
+    ) -> dict[int, torch.Tensor]:
+        """Compute the total field value at a given time.
+
+        Args:
+            t (torch.Tensor): Time to compute field at.
+            space_fields (dict[int, torch.Tensor]): Space-only fields.
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+
+        Returns:
+            torch.Tensor: Resulting field.
+        """
+        fields = {}
+        tspecs = specs.from_tensor(t)
+        for lvl, params in time_params.items():
+            centers = params["centers"]
+            st: float = params["sigma_t"]
+
+            tc = torch.tensor(centers, **tspecs)
+
+            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
+            exp_ = exp / exp.sum(dim=0)
+
+            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
+
+            fields[lvl] = field_at_lvl
+        return fields
+
+    @staticmethod
     def _dt_at_time(
         t: torch.Tensor,
         space_fields: torch.Tensor,
@@ -824,6 +856,25 @@ class WaveletBasis:
 
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis._at_time(t, space_fields, self._time)
+
+        return at_time
+
+    def localize_debug(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> Callable[[torch.Tensor], dict[int, torch.Tensor]]:
+        """Localize wavelets.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            WVFunc: Function computing the wavelet field at a given time.
+        """
+        space_fields = self._build_space(xx=xx, yy=yy)
+
+        def at_time(t: torch.Tensor) -> torch.Tensor:
+            return WaveletBasis._at_time_debug(t, space_fields, self._time)
 
         return at_time
 

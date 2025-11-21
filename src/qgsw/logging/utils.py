@@ -123,59 +123,105 @@ def step(current: int, total: int | None = None) -> str:
     return c_str.zfill(len(t_str)) + "/" + t_str
 
 
-def sec2text(time: float) -> str:
+def sec2text(time: float, *, squeeze_unit: bool = False) -> str:
     """Convert time in seconds to text.
 
     Args:
         time (float): Time in seconds.
+        squeeze_unit (bool, optional): Whether to display only unit symbol.
+            Defaults to False.
 
     Returns:
         str: Text.
     """
     if time < 60:
         s = "s" if time >= 2 else ""
-        return f"{time:.1f} second{s}"
-    return min2text(time / 60)
+        unit = "s" if squeeze_unit else f"second{s}"
+        return f"{time:.1f} {unit}"
+    return min2text(time / 60, squeeze_unit=squeeze_unit)
 
 
-def min2text(time: float) -> str:
+def min2text(time: float, *, squeeze_unit: bool = False) -> str:
     """Convert time in minutes to text.
 
     Args:
         time (float): Time in minutes.
+        squeeze_unit (bool, optional): Whether to display only unit symbol.
+            Defaults to False.
 
     Returns:
         str: Text.
     """
     if time < 60:
         s = "s" if time >= 2 else ""
-        return f"{time:.1f} minutes{s}"
-    return hours2text(time / 60)
+        unit = "min" if squeeze_unit else f"minut{s}"
+        return f"{time:.1f} {unit}"
+    return hours2text(time / 60, squeeze_unit=squeeze_unit)
 
 
-def hours2text(time: float) -> str:
+def hours2text(time: float, *, squeeze_unit: bool = False) -> str:
     """Convert time in hours to text.
 
     Args:
         time (float): Time in hours.
+        squeeze_unit (bool, optional): Whether to display only unit symbol.
+            Defaults to False.
 
     Returns:
         str: Text.
     """
     if time < 24:
         s = "s" if time >= 2 else ""
-        return f"{time:.1f} hour{s}"
-    return days2text(time / 24)
+        unit = "h" if squeeze_unit else f"hour{s}"
+        return f"{time:.1f} {unit}"
+    return days2text(time / 24, squeeze_unit=squeeze_unit)
 
 
-def days2text(time: float) -> str:
+def days2text(time: float, *, squeeze_unit: bool = False) -> str:
     """Convert time in days to text.
 
     Args:
         time (float): Time in days.
+        squeeze_unit (bool, optional): Whether to display only unit symbol.
+            Defaults to False.
 
     Returns:
         str: Text.
     """
     s = "s" if time >= 2 else ""
-    return f"{time:.1f} day{s}"
+    unit = "d" if squeeze_unit else f"day{s}"
+    return f"{time:.1f} {unit}"
+
+
+def meters2text(distance: float, *, squeeze_unit: bool = False) -> str:
+    """Convert distance in meters to text.
+
+    Args:
+        distance (float): Distance in meters.
+        squeeze_unit (bool, optional): Whether to display only unit symbol.
+            Defaults to False.
+
+    Returns:
+        str: Text.
+    """
+    if distance < 1000:
+        s = "s" if distance >= 2 else ""
+        unit = "m" if squeeze_unit else f"meter{s}"
+        return f"{distance:.1f} {unit}"
+    return kilometers2text(distance / 1000, squeeze_unit=squeeze_unit)
+
+
+def kilometers2text(distance: float, *, squeeze_unit: bool = False) -> str:
+    """Convert distance in meters to text.
+
+    Args:
+        distance (float): Distance in meters.
+        squeeze_unit (bool, optional): Whether to display only unit symbol.
+            Defaults to False.
+
+    Returns:
+        str: Text.
+    """
+    s = "s" if distance >= 2 else ""
+    unit = "km" if squeeze_unit else f"kilometer{s}"
+    return f"{distance:.1f} {unit}"

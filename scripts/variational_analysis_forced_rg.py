@@ -205,9 +205,9 @@ beta_effect_w = beta_plane.beta * (y_w - y0)
 
 model_forced = QGPSIQForced(
     space_2d=space_slice,
-    H=H[:1] * H[1:2] / (H[:1] + H[1:2]),
+    H=H[:1],
     beta_plane=beta_plane,
-    g_prime=g_prime[1:2],
+    g_prime=g_prime[:1] * g_prime[1:2] / (g_prime[:1] + g_prime[1:2]),
 )
 model_forced: QGPSIQForced = set_inhomogeneous_model(model_forced)
 

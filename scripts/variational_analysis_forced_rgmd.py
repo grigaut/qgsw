@@ -263,8 +263,8 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     basis = WaveletBasis.from_xyt(
-        xx=space_slice.q.xy.x,
-        yy=space_slice.q.xy.y,
+        xx=space_slice.psi.xy.x,
+        yy=space_slice.psi.xy.y,
         tt=torch.tensor(times, **specs) - times[0],
         order=4,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
@@ -277,7 +277,7 @@ for c in range(n_cycles):
 
     coefs = basis.generate_random_coefs()
     coefs_adim = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
+        k: torch.rand_like(v, requires_grad=True) for k, v in coefs.items()
     }
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)

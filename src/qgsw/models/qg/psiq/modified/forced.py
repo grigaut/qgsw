@@ -243,9 +243,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self._A12 = -1 / H[1].item() / g_prime[1].item()
         super().__init__(
             space_2d=space_2d,
-            H=H[:1] * H[1:2] / (H[:1] + H[1:2]),
+            H=H[:1],
             beta_plane=beta_plane,
-            g_prime=g_prime[1:2],
+            g_prime=g_prime[:1] * g_prime[1:2] / (g_prime[:1] + g_prime[1:2]),
             optimize=optimize,
         )
 
