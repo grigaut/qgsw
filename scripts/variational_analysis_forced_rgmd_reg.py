@@ -268,8 +268,8 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     basis = WaveletBasis.from_xyt(
-        xx=space_slice.q.xy.x,
-        yy=space_slice.q.xy.y,
+        xx=space_slice.psi.xy.x,
+        yy=space_slice.psi.xy.y,
         tt=torch.tensor(times, **specs) - times[0],
         order=4,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
