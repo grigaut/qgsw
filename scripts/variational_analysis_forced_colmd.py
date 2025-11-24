@@ -195,6 +195,9 @@ space_slice = P.space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
 space_slice_w = P.space.remove_z_h().slice(
     imin - p + 1, imax + p, jmin - p + 1, jmax + p
 )
+space_slice_ww = P.space.remove_z_h().slice(
+    imin - p, imax + p + 1, jmin - p, jmax + p + 1
+)
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
@@ -228,6 +231,17 @@ def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
 compute_q_rg = lambda psi1: compute_q1_interior(
     psi1,
     torch.zeros_like(psi1),
+    H1,
+    g1,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    beta_effect_w,
+)
+compute_q = lambda psi1, psi2: compute_q1_interior(
+    psi1,
+    psi2,
     H1,
     g1,
     g2,
@@ -283,11 +297,6 @@ for c in range(n_cycles):
     alpha = torch.tensor(-0.36, **specs, requires_grad=True)
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-    qs = (compute_q_rg(p1) for p1 in psis)
-    q_bcs = [
-        Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3) for q in qs
-    ]
-    q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
     numel = basis.numel() + alpha.numel()
     msg = f"Control vector contains {numel} elements."
@@ -302,7 +311,7 @@ for c in range(n_cycles):
             },
             {
                 "params": list(coefs_adim.values()),
-                "lr": 1e1,
+                "lr": 1e0,
                 "name": "Wavelet coefs",
             },
         ]
@@ -320,16 +329,33 @@ for c in range(n_cycles):
     for o in range(optim_max_step):
         optimizer.zero_grad()
         model.reset_time()
-        model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
         with torch.enable_grad():
             model.alpha = torch.ones_like(model.psi) * alpha
-            model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
-
-            loss = torch.tensor(0, **defaults.get())
             coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
             basis.set_coefs(coefs)
             model.wavelets = basis
+            wv_loc = basis.localize(
+                space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
+            )
+            qs = (
+                compute_q(p1, wv_loc(model.time + n * model.dt) + alpha * p1)
+                for n, p1 in enumerate(psis)
+            )
+            q_bcs = [
+                Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
+                for q in qs
+            ]
+            q_bc_interp = QuadraticInterpolation(times, q_bcs)
+            model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            model.set_psiq(
+                crop(psi0, p),
+                crop(
+                    compute_q(psi0, wv_loc(model.time) + alpha * psi0), p - 1
+                ),
+            )
+
+            loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
                 model.step()
