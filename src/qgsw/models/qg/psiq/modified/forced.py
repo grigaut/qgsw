@@ -254,7 +254,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         time: torch.Tensor,
         psi1: torch.Tensor,
     ) -> torch.Tensor:
-        """Compute contribution of ѱ₂'s advection.
+        """Compute forcing.
 
         Args:
             time (torch.Tensor): Time to evaluate at.
@@ -312,9 +312,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        forcing = self.compute_forcing(ftime, psi[:, :1])
-        dq = (-div_flux + fcg_drag + forcing) * self.masks.h
-        dq_i = self._interpolate(dq)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -360,9 +360,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
         ftime = self.time + coef * self.dt
-        forcing = self.compute_forcing(ftime, psi[:, :1])
-        dq = (-div_flux + fcg_drag + forcing) * self.masks.h
-        dq_i = self._interpolate(dq)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -444,9 +444,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        forcing = self.compute_forcing(ftime, psi[:, :1])
-        dq = (-(div_flux + dt_q_bar) + fcg_drag + forcing) * self.masks.h
-        dq_i = self._interpolate(dq)
+        dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
+        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -952,6 +952,7 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 
         Returns:
             torch.Tensor: -f₀²J(ѱ₁, ѱ₂)/H₂g₂
+            torch.Tensor: -f₀²J(ѱ₁, ѱ₂)/H₂g₂
         """
         u, v = self._grad_perp(psi1)
         u /= self.space.dy
@@ -1016,6 +1017,9 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         dq = (-div_flux + fcg_drag) * self.masks.h
         dt_psi2 = self.compute_psi_2_dt(ftime)
         dq_i = self._interpolate(dq + dt_psi2)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -1063,6 +1067,9 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
+        dq = (-div_flux + fcg_drag) * self.masks.h
+        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dq_i = self._interpolate(dq + dt_psi2)
         dq = (-div_flux + fcg_drag) * self.masks.h
         dt_psi2 = self.compute_psi_2_dt(ftime)
         dq_i = self._interpolate(dq + dt_psi2)
@@ -1147,6 +1154,9 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
+        dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
+        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dq_i = self._interpolate(dq + dt_psi2)
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
         dt_psi2 = self.compute_psi_2_dt(ftime)
         dq_i = self._interpolate(dq + dt_psi2)
