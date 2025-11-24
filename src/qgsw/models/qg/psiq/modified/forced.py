@@ -312,9 +312,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
-        dq_i = self._interpolate(dq + dt_psi2)
+        forcing = self.compute_forcing(ftime, psi[:, :1])
+        dq = (-div_flux + fcg_drag + forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -360,9 +360,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
         ftime = self.time + coef * self.dt
-        dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
-        dq_i = self._interpolate(dq + dt_psi2)
+        forcing = self.compute_forcing(ftime, psi[:, :1])
+        dq = (-div_flux + fcg_drag + forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -444,9 +444,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             else:
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
-        dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
-        dq_i = self._interpolate(dq + dt_psi2)
+        forcing = self.compute_forcing(ftime, psi[:, :1])
+        dq = (-(div_flux + dt_q_bar) + fcg_drag + forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
