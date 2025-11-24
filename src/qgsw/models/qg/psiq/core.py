@@ -788,6 +788,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
+        self.dq = dq
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(

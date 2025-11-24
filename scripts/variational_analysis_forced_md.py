@@ -26,11 +26,9 @@ from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
-from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
@@ -44,7 +42,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_rgmd_reg",
+    prefix_default="results_forced_md",
 )
 specs = defaults.get()
 
@@ -202,6 +200,7 @@ space_slice_ww = P.space.remove_z_h().slice(
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
+
 model = QGPSIQForcedMDWV(
     space_2d=space_slice,
     H=H[:2],
@@ -214,8 +213,6 @@ if not args.no_wind:
     model.set_wind_forcing(
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
-
-gamma = 500 / comparison_interval
 
 # Compute PV
 
@@ -241,7 +238,6 @@ compute_q_rg = lambda psi1: compute_q1_interior(
     beta_plane.f0,
     beta_effect_w,
 )
-
 compute_q = lambda psi1, psi2: compute_q1_interior(
     psi1,
     psi2,
@@ -253,6 +249,7 @@ compute_q = lambda psi1, psi2: compute_q1_interior(
     beta_plane.f0,
     beta_effect_w,
 )
+
 
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
@@ -294,11 +291,10 @@ for c in range(n_cycles):
 
     coefs = basis.generate_random_coefs()
     coefs_adim = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
+        k: torch.rand_like(v, requires_grad=True) for k, v in coefs.items()
     }
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-
     numel = basis.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
@@ -307,18 +303,18 @@ for c in range(n_cycles):
         [
             {
                 "params": list(coefs_adim.values()),
-                "lr": 1e-1,
+                "lr": 1e0,
                 "name": "Wavelet coefs",
             },
         ]
     )
-    lr_change_on_plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=10
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, factor=0.5, patience=5
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
     register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean * 25 for k, v in coefs_adim.items()}
+        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()}
     )
 
     for o in range(optim_max_step):
@@ -326,35 +322,9 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
-            coefs = {k: v * psi0_mean * 25 for k, v in coefs_adim.items()}
+            coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
             basis.set_coefs(coefs)
             model.wavelets = basis
-
-            wv_dt_lap_psi2 = basis.localize_dt_laplacian(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
-            )
-            wv_dt_psi2 = basis.localize_dt(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
-            )
-            wv_dx_psi2 = basis.localize_dx(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-            wv_dy_psi2 = basis.localize_dy(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dx_lap_psi2 = basis.localize_dx_laplacian(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dy_lap_psi2 = basis.localize_dy_laplacian(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-
             wv_loc = basis.localize(
                 space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
             )
@@ -374,44 +344,8 @@ for c in range(n_cycles):
 
             loss = torch.tensor(0, **defaults.get())
 
-            dt_q2s = []
-
             for n in range(1, n_steps_per_cyle):
-                psi1_ = model.psi[0, 0]
-                time = model.time
                 model.step()
-                psi1 = model.psi[0, 0]
-                dpsi1 = (psi1_ - psi1) / model.dt
-                dx_psi1, dy_psi1 = grad(psi1_)
-                dx_psi1 /= space.dx
-                dy_psi1 /= space.dy
-
-                lap_dt = wv_dt_lap_psi2(time + model.dt / 2)
-                dt_psi2 = wv_dt_psi2(time + model.dt / 2)
-
-                dt_q2 = lap_dt[
-                    None, None, ...
-                ] - beta_plane.f0**2 / H2 / g2 * (
-                    dt_psi2[None, None, ...] - interpolate(dpsi1)
-                )
-
-                dy_psi2_dx_q2 = -wv_dy_psi2(time)[None, None, ...] * (
-                    wv_dx_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dx_psi1
-                )
-                dx_psi2_dy_q2 = wv_dx_psi2(time)[None, None, ...] * (
-                    wv_dy_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dy_psi1
-                    + beta_plane.beta
-                )
-
-                adv2 = (
-                    dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1]
-                ) / 2 + (
-                    dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :]
-                ) / 2
-
-                loss += gamma * ((dt_q2 + adv2) / U * L * T).square().sum()
 
                 if n % comparison_interval == 0:
                     loss += rmse(
@@ -445,10 +379,10 @@ for c in range(n_cycles):
         loss.backward()
 
         for v in coefs_adim.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1e-1)
+            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
 
         optimizer.step()
-        lr_change_on_plateau.step(loss)
+        scheduler.step(loss)
         lr_callback.step()
 
     best_loss = register_params.best_loss
