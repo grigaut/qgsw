@@ -215,7 +215,7 @@ if not args.no_wind:
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
-gamma = 250 / comparison_interval
+gamma = 500 / comparison_interval
 
 # Compute PV
 
@@ -233,6 +233,18 @@ def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
 compute_q_rg = lambda psi1: compute_q1_interior(
     psi1,
     torch.zeros_like(psi1),
+    H1,
+    g1,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    beta_effect_w,
+)
+
+compute_q = lambda psi1, psi2: compute_q1_interior(
+    psi1,
+    psi2,
     H1,
     g1,
     g2,
@@ -268,8 +280,8 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     basis = WaveletBasis.from_xyt(
-        xx=space_slice.psi.xy.x,
-        yy=space_slice.psi.xy.y,
+        xx=space_slice_ww.psi.xy.x,
+        yy=space_slice_ww.psi.xy.y,
         tt=torch.tensor(times, **specs) - times[0],
         order=4,
         Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
@@ -286,12 +298,6 @@ for c in range(n_cycles):
     }
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-    q0 = crop(compute_q_rg(psi0), p - 1)
-    qs = (compute_q_rg(p1) for p1 in psis)
-    q_bcs = [
-        Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3) for q in qs
-    ]
-    q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
     numel = basis.numel()
     msg = f"Control vector contains {numel} elements."
@@ -349,8 +355,22 @@ for c in range(n_cycles):
                 space_slice.u.xy.y,
             )
 
+            wv_loc = basis.localize(
+                space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
+            )
+            qs = (
+                compute_q(p1, wv_loc(model.time + n * model.dt))
+                for n, p1 in enumerate(psis)
+            )
+            q_bcs = [
+                Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
+                for q in qs
+            ]
+            q_bc_interp = QuadraticInterpolation(times, q_bcs)
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
-            model.set_psiq(crop(psi0, p), q0)
+            model.set_psiq(
+                crop(psi0, p), crop(compute_q(psi0, wv_loc(model.time)), p - 1)
+            )
 
             loss = torch.tensor(0, **defaults.get())
 
