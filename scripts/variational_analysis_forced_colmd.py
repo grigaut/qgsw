@@ -18,7 +18,7 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
-    QGPSIQForcedMDWV,
+    QGPSIQForcedColMDWV,
 )
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
@@ -169,8 +169,8 @@ y0 = model_3l.y0
 
 ## Inhomogeneous models
 def set_inhomogeneous_model(
-    model: QGPSIQForcedMDWV,
-) -> QGPSIQForcedMDWV:
+    model: QGPSIQForcedColMDWV,
+) -> QGPSIQForcedColMDWV:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0
@@ -202,13 +202,13 @@ y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-model = QGPSIQForcedMDWV(
+model = QGPSIQForcedColMDWV(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model: QGPSIQForcedMDWV = set_inhomogeneous_model(model)
+model: QGPSIQForcedColMDWV = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
