@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-import itertools
 from collections.abc import Callable
 from typing import Any
 
 from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
+from qgsw.decomposition.wavelets.param_generators import (
+    dyadic_decomposition,
+    linear_decomposition,
+)
 from qgsw.decomposition.wavelets.supports import (
     GaussianSupport,
     NormalizedGaussianSupport,
@@ -23,118 +26,6 @@ from qgsw import specs
 from qgsw.specs import defaults
 
 WVFunc = Callable[[torch.Tensor], torch.Tensor]
-
-
-def generate_space_params(
-    order: int,
-    xx: torch.Tensor,
-    yy: torch.Tensor,
-    *,
-    Lx_max: float | None = None,
-    Ly_max: float | None = None,
-    sigma_ratio: float | None = None,
-) -> dict[str, Any]:
-    """Generate space parameters for the Wavelet basis.
-
-    Args:
-        order (int): Order of decomposition.
-        xx (torch.Tensor): X locations.
-        yy (torch.Tensor): Y locations.
-        Lx_max (float | None, optional): Largest dimension along X,
-            total width if set to None. Defaults to None.
-        Ly_max (float | None, optional): Largest dimension along Y,
-            total width if set to None. Defaults to None.
-        sigma_ratio (float | None, optional): Ratio to use to compute sigma,
-            if None, set to 1/sqrt(log(2)). Defaults to None.
-
-    Returns:
-        dict[str, Any]: Space basis dictionnary.
-    """
-    basis = {}
-    lx = (xx[-1, 0] - xx[0, 0]).cpu().item()
-    ly = (yy[0, -1] - yy[0, 0]).cpu().item()
-    Lx = lx if Lx_max is None else Lx_max
-    Ly = ly if Ly_max is None else Ly_max
-    tspecs = specs.from_tensor(xx)
-    ratio = (
-        1 / torch.sqrt(torch.log(torch.tensor(2, **tspecs))).cpu().item()
-        if sigma_ratio is None
-        else sigma_ratio
-    )
-    for p in range(order):
-        Lx_p = Lx / 2**p
-        Ly_p = Ly / 2**p
-        kx_p = 2 * torch.pi / Lx_p
-        ky_p = 2 * torch.pi / Ly_p
-
-        lx_p = lx / 2**p
-        xs = [xx[0, 0] + (2 * k + 1) / 2 * lx_p for k in range(2**p)]
-        ly_p = ly / 2**p
-        ys = [yy[0, 0] + (2 * k + 1) / 2 * ly_p for k in range(2**p)]
-
-        centers = [
-            (x.cpu().item(), y.cpu().item())
-            for x, y in itertools.product(xs, ys)
-        ]
-
-        sigma_x = lx_p / 2 * ratio  # For the gaussian enveloppe
-        sigma_y = ly_p / 2 * ratio  # For the gaussian enveloppe
-
-        basis[p] = {
-            "centers": centers,
-            "kx": kx_p,
-            "ky": ky_p,
-            "sigma_x": sigma_x,
-            "sigma_y": sigma_y,
-            "numel": len(centers),
-        }
-
-    return basis
-
-
-def generate_time_params(
-    order: int,
-    tt: torch.Tensor,
-    *,
-    Lt_max: float | None = None,
-    sigma_ratio: float | None = None,
-) -> dict[str, Any]:
-    """Generate time parameters for the Wavelet basis.
-
-    Args:
-        order (int): Order of decomposition.
-        tt (torch.Tensor): Times.
-        Lt_max (float | None, optional): Largest dimension along time,
-            total width if set to None. Defaults to None.
-        sigma_ratio (float | None, optional): Ratio to use to compute sigma,
-            if None, set to 1/sqrt(log(2)). Defaults to None.
-
-    Returns:
-        dict[str, Any]: Time basis dictionnary.
-    """
-    basis = {}
-    lt = (tt[-1] - tt[0]).cpu().item()
-    Lt = lt if Lt_max is None else Lt_max
-    tspecs = specs.from_tensor(tt)
-    ratio = (
-        1 / torch.sqrt(torch.log(torch.tensor(2, **tspecs))).cpu().item()
-        if sigma_ratio is None
-        else sigma_ratio
-    )
-    for p in range(order):
-        lt_p = Lt / 2**p
-        tc = [tt[0] + (2 * k + 1) / 2 * lt_p for k in range(2**p)]
-
-        centers = [t.cpu().item() for t in tc]
-
-        sigma_t = lt_p / 2 * ratio  # For the gaussian enveloppe
-
-        basis[p] = {
-            "centers": centers,
-            "sigma_t": sigma_t,
-            "numel": len(centers),
-        }
-    return basis
 
 
 class WaveletBasis:
@@ -207,7 +98,11 @@ class WaveletBasis:
 
     def numel(self) -> int:
         """Total number of elements."""
-        return sum((2**i) ** 3 for i in range(self._order)) * 2 * self.n_theta
+        n = sum(
+            s["numel"] * self._time[k]["numel"] for k, s in self._space.items()
+        )
+
+        return n * self.phase.numel() * self.n_theta
 
     def generate_random_coefs(self) -> dict[int, torch.Tensor]:
         """Generate random coefficient.
@@ -225,16 +120,17 @@ class WaveletBasis:
                 └── order: (2**order, (2**order)**2)-shaped
         """
         coefs = {}
-        for o in range(self._order):
-            coefs[o] = torch.randn(
+        for k in self._space:
+            coefs[k] = torch.randn(
                 (
-                    self._time[o]["numel"],
-                    self._space[o]["numel"],
+                    self._time[k]["numel"],
+                    self._space[k]["numel"],
                     self.n_theta,
                     2,
                 ),
                 **self._specs,
             )
+
         return coefs
 
     def set_coefs(self, coefs: dict[int, torch.Tensor]) -> None:
@@ -1114,47 +1010,61 @@ class WaveletBasis:
         return at_time
 
     @classmethod
-    def from_xyt(
+    def from_dyadic_decomposition(
         cls,
-        xx: torch.Tensor,
-        yy: torch.Tensor,
-        tt: torch.Tensor,
-        *,
-        order: int = 4,
-        Lx_max: float | None = None,
-        Ly_max: float | None = None,
-        Lt_max: float | None = None,
-        sigma_ratio: float | None = None,
+        order: int,
+        xx_ref: torch.Tensor,
+        yy_ref: torch.Tensor,
+        Lxy_max: float,
+        Lt_max: float,
     ) -> Self:
-        """Instantiate the WaveletBasis from x,y and t.
+        """Generate space and time basis parameters to instantiate the object.
 
         Args:
-            xx (torch.Tensor): Xs.
-            yy (torch.Tensor): Ys.
-            tt (torch.Tensor): Times.
-            order (int, optional): Decomposition order. Defaults to 4.
-            Lx_max (float | None, optional): Largest dimension along X,
-                total width if set to None. Defaults to None.
-            Ly_max (float | None, optional): Largest dimension along Y,
-                total width if set to None. Defaults to None.
-            Lt_max (float | None, optional): Largest dimension along time,
-                total width if set to None. Defaults to None.
-            sigma_ratio (float | None, optional): Ratio to use to compute
-                sigma, if None, set to 1/sqrt(log(2)). Defaults to None.
+            order (int): "Depth" of decomposition.
+            xx_ref (torch.Tensor): X locations to use as reference.
+            yy_ref (torch.Tensor): Y locations to use as reference.
+            Lxy_max (float): Max horizontal scale.
+            Lt_max (float): Max time scale.
 
         Returns:
-            Self: WaveletBasis.
+            tuple[dict[str, Any], dict[str, Any]]: WaveletBasis.
         """
-        space_params = generate_space_params(
+        space_params, time_params = dyadic_decomposition(
             order=order,
-            xx=xx,
-            yy=yy,
-            Lx_max=Lx_max,
-            Ly_max=Ly_max,
-            sigma_ratio=sigma_ratio,
+            xx_ref=xx_ref,
+            yy_ref=yy_ref,
+            Lxy_max=Lxy_max,
+            Lt_max=Lt_max,
         )
-        time_params = generate_time_params(
-            order=order, tt=tt, Lt_max=Lt_max, sigma_ratio=sigma_ratio
-        )
+        return cls(space_params, time_params)
 
+    @classmethod
+    def from_linear_decomposition(
+        cls,
+        order: int,
+        xx_ref: torch.Tensor,
+        yy_ref: torch.Tensor,
+        Lxy_max: float,
+        Lt_max: float,
+    ) -> Self:
+        """Generate space and time basis parameters to instantiate the object.
+
+        Args:
+            order (int): "Depth" of decomposition.
+            xx_ref (torch.Tensor): X locations to use as reference.
+            yy_ref (torch.Tensor): Y locations to use as reference.
+            Lxy_max (float): Max horizontal scale.
+            Lt_max (float): Max time scale.
+
+        Returns:
+            tuple[dict[str, Any], dict[str, Any]]: WaveletBasis.
+        """
+        space_params, time_params = linear_decomposition(
+            order=order,
+            xx_ref=xx_ref,
+            yy_ref=yy_ref,
+            Lxy_max=Lxy_max,
+            Lt_max=Lt_max,
+        )
         return cls(space_params, time_params)
