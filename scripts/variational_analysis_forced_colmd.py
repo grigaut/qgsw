@@ -414,6 +414,8 @@ for c in range(n_cycles):
             "no-wind": args.no_wind,
             "order": basis.order,
             "n_theta": basis.n_theta,
+            "wv_space": wv_space,
+            "wv_time": wv_time,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
