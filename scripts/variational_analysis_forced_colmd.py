@@ -11,6 +11,7 @@ from qgsw.configs.core import Configuration
 from qgsw.decomposition.wavelets import (
     WaveletBasis,
 )
+from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
@@ -277,24 +278,25 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    basis = WaveletBasis.from_xyt(
-        xx=space_slice.psi.xy.x,
-        yy=space_slice.psi.xy.y,
-        tt=torch.tensor(times, **specs) - times[0],
-        order=4,
-        Lx_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
-        Ly_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,
+    wv_space, wv_time = dyadic_decomposition(
+        4,
+        xx_ref=space_slice.psi.xy.x,
+        yy_ref=space_slice.psi.xy.y,
+        Lxy_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,  # 900000,
+        Lt_max=n_steps_per_cyle * dt,
+        sigma_xy_l_p_ratio=1,
     )
-    basis.n_theta = 15
+    basis = WaveletBasis(wv_space, wv_time)
+    basis.n_theta = 7
 
     msg = f"Using basis of order {basis.order}"
     logger.info(msg)
 
     coefs = basis.generate_random_coefs()
     coefs_adim = {
-        k: torch.randn_like(v, requires_grad=True) for k, v in coefs.items()
+        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
     }
-    alpha = torch.tensor(-0.36, **specs, requires_grad=True)
+    alpha = torch.tensor(0, **specs, requires_grad=True)
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 

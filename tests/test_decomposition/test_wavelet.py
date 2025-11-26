@@ -26,7 +26,9 @@ def test_dt(order: int) -> None:
     yy = y - y[:, :1]
     tt = torch.arange(0, 250, dtype=torch.float64)
 
-    basis = WaveletBasis.from_xyt(xx, yy, tt, order=order)
+    basis = WaveletBasis.from_dyadic_decomposition(
+        order, xx, yy, (x[-1, 0] - x[0, 0]).item(), tt[-1].item()
+    )
     coefs = basis.generate_random_coefs()
     basis.set_coefs(coefs)
 
