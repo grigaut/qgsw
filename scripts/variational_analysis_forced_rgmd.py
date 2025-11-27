@@ -264,11 +264,12 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     wv_space, wv_time = dyadic_decomposition(
-        order=5,
+        5,
         xx_ref=space_slice.psi.xy.x,
         yy_ref=space_slice.psi.xy.y,
-        Lxy_max=900_000,  # ((H1 + H2) * g1).sqrt() / beta_plane.f0,
+        Lxy_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,  # 900000,
         Lt_max=n_steps_per_cyle * dt,
+        sigma_xy_l_p_ratio=1.1,
     )
 
     basis = WaveletBasis(wv_space, wv_time)
