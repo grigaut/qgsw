@@ -270,8 +270,8 @@ for c in range(n_cycles):
 
     wv_space, wv_time = dyadic_decomposition(
         order=5,
-        xx_ref=space_slice.q.xy.x,
-        yy_ref=space_slice.q.xy.y,
+        xx_ref=space_slice_w.psi.xy.x,
+        yy_ref=space_slice_w.psi.xy.y,
         Lxy_max=900_000,
         Lt_max=n_steps_per_cyle * dt,
     )

@@ -279,12 +279,11 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     wv_space, wv_time = dyadic_decomposition(
-        5,
-        xx_ref=space_slice_ww.psi.xy.x,
-        yy_ref=space_slice_ww.psi.xy.y,
-        Lxy_max=((H1 + H2) * g1).sqrt() / beta_plane.f0,  # 900000,
+        order=5,
+        xx_ref=space_slice_w.psi.xy.x,
+        yy_ref=space_slice_w.psi.xy.y,
+        Lxy_max=900_000,
         Lt_max=n_steps_per_cyle * dt,
-        sigma_xy_l_p_ratio=1.13,
     )
     basis = WaveletBasis(wv_space, wv_time)
     basis.n_theta = 7
