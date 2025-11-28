@@ -24,7 +24,10 @@ from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
-from qgsw.pv import compute_q1_interior, compute_q2_2l_interior
+from qgsw.pv import (
+    compute_q1_interior,
+    compute_q2_3l_interior,
+)
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import grad_perp
 from qgsw.spatial.core.discretization import (
@@ -96,7 +99,7 @@ logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
 H = config.model.h
 g_prime = config.model.g_prime
 H1, H2 = H[0], H[1]
-g1, g2 = g_prime[0], g_prime[1]
+g1, g2, g3 = g_prime[0], g_prime[1], g_prime[2]
 beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
@@ -196,21 +199,25 @@ y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
+compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_3l_interior(
     dpsi1,
     dpsi2,
+    torch.zeros_like(dpsi2),
     H2,
     g2,
+    g3,
     dx,
     dy,
     beta_plane.f0,
     torch.zeros_like(beta_effect[..., 1:-1]),
 )
-compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
+compute_q2 = lambda psi1, psi2: compute_q2_3l_interior(
     psi1,
     psi2,
+    torch.zeros_like(psi2),
     H2,
     g2,
+    g3,
     dx,
     dy,
     beta_plane.f0,

@@ -103,7 +103,7 @@ logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
 H = config.model.h
 g_prime = config.model.g_prime
 H1, H2 = H[0], H[1]
-g1, g2 = g_prime[0], g_prime[1]
+g1, g2, g3 = g_prime[0], g_prime[1], g_prime[2]
 beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
@@ -390,10 +390,13 @@ for c in range(n_cycles):
                 lap_dt = wv_dt_lap_psi2(time + model.dt / 2)
                 dt_psi2 = wv_dt_psi2(time + model.dt / 2)
 
-                dt_q2 = lap_dt[
-                    None, None, ...
-                ] - beta_plane.f0**2 / H2 / g2 * (
-                    dt_psi2[None, None, ...] - interpolate(dpsi1)
+                dt_q2 = (
+                    lap_dt[None, None, ...]
+                    - beta_plane.f0**2
+                    / H2
+                    / g2
+                    * (dt_psi2[None, None, ...] - interpolate(dpsi1))
+                    - beta_plane.f0**2 / H2 / g3 * (dt_psi2[None, None, ...])
                 )
 
                 dy_psi2_dx_q2 = -wv_dy_psi2(time)[None, None, ...] * (
