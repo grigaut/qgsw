@@ -671,12 +671,12 @@ class WaveletBasis:
         return field / len(time_params)
 
     @staticmethod
-    def _at_time_debug(
+    def _at_time_decompose(
         t: torch.Tensor,
         space_fields: dict[int, torch.Tensor],
         time_params: dict[int, dict[str, Any]],
     ) -> dict[int, torch.Tensor]:
-        """Compute the total field value at a given time.
+        """Compute the decomposed field value at a given time.
 
         Args:
             t (torch.Tensor): Time to compute field at.
@@ -755,7 +755,7 @@ class WaveletBasis:
 
         return at_time
 
-    def localize_debug(
+    def localize_decompose(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> Callable[[torch.Tensor], dict[int, torch.Tensor]]:
         """Localize wavelets.
@@ -770,7 +770,7 @@ class WaveletBasis:
         space_fields = self._build_space(xx=xx, yy=yy)
 
         def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time_debug(t, space_fields, self._time)
+            return WaveletBasis._at_time_decompose(t, space_fields, self._time)
 
         return at_time
 
