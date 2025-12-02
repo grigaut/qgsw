@@ -2,15 +2,66 @@
 
 from __future__ import annotations
 
+import matplotlib.colorbar as mpl_cbar
 import numpy as np
 import torch
 from matplotlib import figure
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from typing_extensions import ParamSpec
 
 Param = ParamSpec("Param")
 
 DEFAULT_CMAP = "RdBu_r"
+
+
+def retrieve_imshow_data(data: torch.Tensor | np.ndarray) -> np.ndarray:
+    """Retrieve data for imshow plot.
+
+    Args:
+        data (torch.Tensor | np.ndarray): Original data.
+
+    Returns:
+        np.ndarray: Data as a numpy array, transposed for imshow compatibility.
+    """
+    if isinstance(data, torch.Tensor):
+        if data.dtype == torch.bool:
+            data = data.to(torch.int8)
+        data = data.detach().cpu().numpy()
+    return data.T
+
+
+def default_clim(data: np.ndarray) -> tuple[float, float]:
+    """Compute default colorbar limit values.
+
+    Args:
+        data (np.ndarray): Data for which to compute colorbar limits.
+
+    Returns:
+        tuple[float, float]: Colorbar limits as (vmin, vmax).
+    """
+    vmax = np.max(np.abs(data))
+    return -vmax, vmax
+
+
+def retrieve_colorbar(im: plt.AxesImage, ax: plt.Axes) -> mpl_cbar.Colorbar:
+    """Retrieve colorbar axes from axes.
+
+    Args:
+        im (plt.AxesImage): Image to associate colorbar with.
+        ax (plt.Axes): Axes to retrieve colorbar from.
+
+    Returns:
+        plt.Axes: Colorbar axes.
+    """
+    try:
+        return ax.cbar
+    except AttributeError:
+        div = make_axes_locatable(ax)
+        cax = div.append_axes("right", size="5%", pad="3%")
+
+        ax.cbar = ax.figure.colorbar(im, cax=cax)
+        return ax.cbar
 
 
 def imshow(
@@ -19,7 +70,7 @@ def imshow(
     ax: plt.Axes | None = None,
     title: str | None = None,
     **kwargs: Param.kwargs,
-) -> None:
+) -> plt.AxesImage:
     """Wrapper for plt.imshow.
 
     Args:
@@ -28,21 +79,21 @@ def imshow(
         title (str | None, optional): Title. Defaults to None.
         **kwargs: optional arguments to pass to plt.imshow.
     """
-    if isinstance(data, torch.Tensor):
-        if data.dtype == torch.bool:
-            data = data.to(torch.int8)
-        data = data.detach().cpu().numpy()
-    kwargs.setdefault("vmax", np.max(np.abs(data)))
-    kwargs.setdefault("vmin", -kwargs["vmax"])
+    data = retrieve_imshow_data(data)
+    vmin, vmax = default_clim(data)
+    kwargs.setdefault("vmax", vmax)
+    kwargs.setdefault("vmin", vmin)
     kwargs.setdefault("cmap", DEFAULT_CMAP)
     kwargs.setdefault("origin", "lower")
     if ax is None:
         ax = plt.subplot()
 
-    cbar = ax.imshow(data.T, **kwargs)
-    ax.figure.colorbar(cbar, ax=ax)
+    im = ax.imshow(data, **kwargs)
+    cbar = retrieve_colorbar(im, ax)
+    cbar.update_normal(im)
     if title is not None:
         ax.set_title(title)
+    return im
 
 
 def subplots(
@@ -61,9 +112,10 @@ def subplots(
         tuple[mpl.figure.Figure, np.ndarray]: Figure, Axes array.
     """
     kwargs.setdefault("squeeze", False)
-    kwargs.setdefault("constrained_layout", True)
     kwargs.setdefault("figsize", ((4 * ncols, 4 * nrows + 1)))
-    return plt.subplots(nrows=nrows, ncols=ncols, **kwargs)
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, **kwargs)
+    fig.subplots_adjust(wspace=0.3)
+    return fig, axs
 
 
 def show(**kwargs: Param.kwargs) -> None:
