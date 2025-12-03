@@ -10,7 +10,7 @@ from typing import Any
 import torch
 
 from qgsw import specs
-from qgsw.decomposition.wavelets.supports import (
+from qgsw.decomposition.supports.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
 )

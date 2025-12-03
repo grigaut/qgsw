@@ -5,14 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from qgsw.decomposition.supports.gaussian import (
+    GaussianSupport,
+    NormalizedGaussianSupport,
+)
 from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
 from qgsw.decomposition.wavelets.param_generators import (
     dyadic_decomposition,
     linear_decomposition,
-)
-from qgsw.decomposition.wavelets.supports import (
-    GaussianSupport,
-    NormalizedGaussianSupport,
 )
 
 try:
