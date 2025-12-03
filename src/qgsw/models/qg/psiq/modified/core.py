@@ -1052,7 +1052,12 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         msg = "The value of psi2 is used although not updated by the model."
         logger.warning(msg)
         vort = self._compute_vort_from_psi(psi)
-        psi2 = self._ef(self.time)[None, None, ...]
+        try:
+            psi2 = self._ef(self.time)[None, None, ...]
+        except AttributeError:
+            msg = "No psi2 field, using zeros instead."
+            logger.warning(msg)
+            psi2 = torch.zeros_like(self.psi)
         stretching = self.beta_plane.f0**2 * (
             self._A11 * psi + self._A12 * (psi2 + self.alpha * psi)
         )
