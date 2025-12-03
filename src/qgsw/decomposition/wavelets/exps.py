@@ -175,9 +175,8 @@ class ExpField:
         tc = torch.tensor(tc, **tspecs)
 
         exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-        exp_ = exp / exp.sum(dim=0)
 
-        return torch.einsum("t,txy->xy", exp_, space_fields)
+        return torch.einsum("t,txy->xy", exp, space_fields)
 
     @staticmethod
     def _dt_at_time(
@@ -203,14 +202,9 @@ class ExpField:
         tc = torch.tensor(tc, **tspecs)
 
         exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-
-        exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-        exp_s = exp.sum(dim=0)
         dt_exp = -2 * (t - tc) / st**2 * exp
 
-        dt_e = (dt_exp * exp_s - exp * dt_exp.sum(dim=0)) / exp_s**2
-
-        return torch.einsum("t,txy->xy", dt_e, space_fields)
+        return torch.einsum("t,txy->xy", dt_exp, space_fields)
 
     def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> EFFunc:
         """Localize wavelets.
