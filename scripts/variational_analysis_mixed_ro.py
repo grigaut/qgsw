@@ -316,7 +316,10 @@ for c in range(n_cycles):
     bc_bottom = WaveletBasis1D(*params_bottom)
     bc_top = WaveletBasis1D(*params_top)
     space_params, time_params = subdivisions(
-        space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
+        space_slice_ww.psi.xy.x,
+        space_slice_ww.psi.xy.y,
+        subdivision_nb=4,
+        Lt_max=n_steps_per_cyle * dt,
     )
     basis = ExpField(space_params, time_params)
 
