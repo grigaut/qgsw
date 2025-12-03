@@ -9,7 +9,7 @@ import torch
 from qgsw import logging
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
-from qgsw.decomposition.exp_fields.exps import ExpField, subdivisions
+from qgsw.decomposition.exp_fields.core import ExpField, subdivisions
 from qgsw.decomposition.wavelets.unidimensional.core import WaveletBasis1D
 from qgsw.decomposition.wavelets.unidimensional.param_generators import (
     dyadic_decomposition,
