@@ -22,7 +22,7 @@ def test_dt(order: int) -> None:
     x = torch.arange(0, 100, **specs)
     y = torch.arange(0, 100, **specs)
     x, y = torch.meshgrid(x, y, indexing="ij")
-    xx: torch.Tensor = x - x[:1, :]
+    xx = x - x[:1, :]
     yy = y - y[:, :1]
     tt = torch.arange(0, 250, dtype=torch.float64)
 
@@ -40,4 +40,9 @@ def test_dt(order: int) -> None:
     )
     dt_analytic = wv_dt(torch.tensor([0.5], **specs))
 
-    torch.testing.assert_close(dt_discrete, dt_analytic, atol=1e-5, rtol=1e-5)
+    torch.testing.assert_close(dt_discrete, dt_analytic, atol=1e-6, rtol=1e-6)
+
+    basis.set_coefs({k: torch.ones_like(v) for k, v in coefs.items()})
+    wv_dt = basis.localize_dt(xx, yy)
+    dt_analytic = wv_dt(torch.tensor([1.5], **specs))
+    torch.testing.assert_close(torch.zeros_like(dt_analytic), dt_analytic)
