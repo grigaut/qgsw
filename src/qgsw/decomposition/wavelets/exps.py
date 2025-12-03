@@ -31,21 +31,23 @@ def subdivisions(
     Returns:
         tuple[dict[str, Any], dict[str, Any]]: Space params, time params.
     """
+    o = 4
+
     Lx = xx_ref[-1, 0] - xx_ref[0, 0]
     Ly = yy_ref[0, -1] - yy_ref[0, 0]
 
-    lx = Lx / 4
-    ly = Ly / 4
-    lt = 20 * 3600 * 24 / 4
+    lx = Lx / o
+    ly = Ly / o
+    lt = 20 * 3600 * 24 / o
 
-    xc = [(2 * k + 1) * lx / 2 for k in range(4)]
-    yc = [(2 * k + 1) * ly / 2 for k in range(4)]
+    xc = [(2 * k + 1) * lx / 2 for k in range(o)]
+    yc = [(2 * k + 1) * ly / 2 for k in range(o)]
 
     centers = [
         (x.cpu().item(), y.cpu().item()) for x, y in itertools.product(xc, yc)
     ]
 
-    tc = [(2 * k + 1) * lt / 2 for k in range(4)]
+    tc = [(2 * k + 1) * lt / 2 for k in range(o)]
 
     sx = lx / 2 / sqrt(log(2))
     sy = ly / 2 / sqrt(log(2))
