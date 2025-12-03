@@ -663,9 +663,8 @@ class WaveletBasis:
             tc = torch.tensor(centers, **tspecs)
 
             exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_ = exp / exp.sum(dim=0)
 
-            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
+            field_at_lvl = torch.einsum("t,txy->xy", exp, space_fields[lvl])
 
             field += field_at_lvl
         return field / len(time_params)
@@ -695,9 +694,8 @@ class WaveletBasis:
             tc = torch.tensor(centers, **tspecs)
 
             exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_ = exp / exp.sum(dim=0)
 
-            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
+            field_at_lvl = torch.einsum("t,txy->xy", exp, space_fields[lvl])
 
             fields[lvl] = field_at_lvl
         return fields
@@ -728,12 +726,9 @@ class WaveletBasis:
             tc = torch.tensor(centers, **tspecs)
 
             exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_s = exp.sum(dim=0)
             dt_exp = -2 * (t - tc) / st**2 * exp
 
-            dt_e = (dt_exp * exp_s - exp * dt_exp.sum(dim=0)) / exp_s**2
-
-            field_at_lvl = torch.einsum("t,txy->xy", dt_e, space)
+            field_at_lvl = torch.einsum("t,txy->xy", dt_exp, space)
 
             field += field_at_lvl
         return field / len(time_params)
