@@ -484,7 +484,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             optimize=optimize,
         )
 
-    def compute_psi2_avdection(
+    def compute_psi2_advection(
         self,
         time: torch.Tensor,
         psi1: torch.Tensor,
@@ -863,7 +863,7 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
 
-    def compute_psi2_avdection(
+    def compute_psi2_advection(
         self,
         time: torch.Tensor,
         psi1: torch.Tensor,
