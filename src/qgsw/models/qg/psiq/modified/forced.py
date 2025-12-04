@@ -207,8 +207,6 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 
         └── (n_ens, nl, nx, ny)-shaped
         """
-        if self._wavelets is None:
-            return torch.zeros_like(self.q)
         return self._wavelets
 
     @wavelets.setter
