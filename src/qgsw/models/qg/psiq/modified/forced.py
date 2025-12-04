@@ -216,8 +216,8 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self._wavelets = wavelets
         space = self.space.remove_z_h()
         self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
-        self._wv_dx = wavelets.localize_dt(space.u.xy.x, space.u.xy.y)
-        self._wv_dy = wavelets.localize_dt(space.v.xy.x, space.v.xy.y)
+        self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
+        self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
     def __init__(
         self,
@@ -490,8 +490,8 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self._wavelets = wavelets
         space = self.space.remove_z_h()
         self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
-        self._wv_dx = wavelets.localize_dt(space.u.xy.x, space.u.xy.y)
-        self._wv_dy = wavelets.localize_dt(space.v.xy.x, space.v.xy.y)
+        self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
+        self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
     def __init__(
         self,
@@ -775,8 +775,8 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self._wavelets = wavelets
         space = self.space.remove_z_h()
         self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
-        self._wv_dx = wavelets.localize_dt(space.u.xy.x, space.u.xy.y)
-        self._wv_dy = wavelets.localize_dt(space.v.xy.x, space.v.xy.y)
+        self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
+        self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
     def __init__(
         self,
