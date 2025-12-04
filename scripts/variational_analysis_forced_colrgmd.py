@@ -19,7 +19,7 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
-    QGPSIQForcedMDWV,
+    QGPSIQForcedRGMDWV,
 )
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
@@ -27,11 +27,9 @@ from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
-from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
@@ -40,12 +38,13 @@ from qgsw.utils.reshaping import crop
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
+
 ## Config
 
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_rgmd_reg",
+    prefix_default="results_forced_colrgmd",
 )
 specs = defaults.get()
 
@@ -103,7 +102,7 @@ logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
 H = config.model.h
 g_prime = config.model.g_prime
 H1, H2 = H[0], H[1]
-g1, g2, g3 = g_prime[0], g_prime[1], g_prime[2]
+g1, g2 = g_prime[0], g_prime[1]
 beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
@@ -171,8 +170,8 @@ y0 = model_3l.y0
 
 ## Inhomogeneous models
 def set_inhomogeneous_model(
-    model: QGPSIQForcedMDWV,
-) -> QGPSIQForcedMDWV:
+    model: QGPSIQForcedRGMDWV,
+) -> QGPSIQForcedRGMDWV:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0
@@ -203,20 +202,19 @@ space_slice_ww = P.space.remove_z_h().slice(
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
-model = QGPSIQForcedMDWV(
+
+model = QGPSIQForcedRGMDWV(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model: QGPSIQForcedMDWV = set_inhomogeneous_model(model)
+model: QGPSIQForcedRGMDWV = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
-
-gamma = 100 / comparison_interval
 
 # Compute PV
 
@@ -243,17 +241,6 @@ compute_q_rg = lambda psi1: compute_q1_interior(
     beta_effect_w,
 )
 
-compute_q = lambda psi1, psi2: compute_q1_interior(
-    psi1,
-    psi2,
-    H1,
-    g1,
-    g2,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect_w,
-)
 
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
@@ -282,8 +269,8 @@ for c in range(n_cycles):
 
     wv_space, wv_time = dyadic_decomposition(
         order=5,
-        xx_ref=space_slice_w.psi.xy.x,
-        yy_ref=space_slice_w.psi.xy.y,
+        xx_ref=space_slice.psi.xy.x,
+        yy_ref=space_slice.psi.xy.y,
         Lxy_max=900_000,
         Lt_max=n_steps_per_cyle * dt,
     )
@@ -297,15 +284,26 @@ for c in range(n_cycles):
     coefs_adim = {
         k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
     }
+    alpha = torch.tensor(0, **specs, requires_grad=True)
 
+    qs = (compute_q_rg(p1) for p1 in psis)
+    q_bcs = [
+        Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3) for q in qs
+    ]
+    q_bc_interp = QuadraticInterpolation(times, q_bcs)
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    numel = basis.numel()
+    numel = basis.numel() + alpha.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [
+            {
+                "params": alpha,
+                "lr": 1e-2,
+                "name": "ɑ",  # noqa: RUF001
+            },
             {
                 "params": list(coefs_adim.values()),
                 "lr": 1e0,
@@ -313,13 +311,14 @@ for c in range(n_cycles):
             },
         ]
     )
-    lr_change_on_plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=20
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, factor=0.5, patience=5
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
     register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()}
+        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()},
+        alpha=alpha,
     )
 
     for o in range(optim_max_step):
@@ -327,95 +326,20 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
+            model.alpha = torch.ones_like(model.psi) * alpha
             coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
             basis.set_coefs(coefs)
             model.wavelets = basis
-
-            wv_lap_psi2 = basis.localize_laplacian(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
-            )
-            wv_psi2 = basis.localize(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
-            )
-            wv_dx_psi2 = basis.localize_dx(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-            wv_dy_psi2 = basis.localize_dy(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dx_lap_psi2 = basis.localize_dx_laplacian(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dy_lap_psi2 = basis.localize_dy_laplacian(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-
-            wv_loc = basis.localize(
-                space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
-            )
-            qs = (
-                compute_q(p1, wv_loc(model.time + n * model.dt))
-                for n, p1 in enumerate(psis)
-            )
-            q_bcs = [
-                Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
-                for q in qs
-            ]
-            q_bc_interp = QuadraticInterpolation(times, q_bcs)
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
             model.set_psiq(
-                crop(psi0, p), crop(compute_q(psi0, wv_loc(model.time)), p - 1)
+                crop(psi0, p),
+                crop(compute_q_rg(psi0), p - 1),
             )
 
             loss = torch.tensor(0, **defaults.get())
 
-            dt_q2s = []
-
             for n in range(1, n_steps_per_cyle):
-                psi1_ = model.psi[0, 0]
-                time = model.time
                 model.step()
-                psi1 = model.psi[0, 0]
-                dpsi1 = (psi1_ - psi1) / model.dt
-                dx_psi1, dy_psi1 = grad(psi1_)
-                dx_psi1 /= space.dx
-                dy_psi1 /= space.dy
-
-                lap_dt = wv_lap_psi2.dt(time + model.dt / 2)
-                dt_psi2 = wv_psi2.dt(time + model.dt / 2)
-
-                dt_q2 = (
-                    lap_dt[None, None, ...]
-                    - beta_plane.f0**2
-                    / H2
-                    / g2
-                    * (dt_psi2[None, None, ...] - interpolate(dpsi1))
-                    - beta_plane.f0**2 / H2 / g3 * (dt_psi2[None, None, ...])
-                )
-
-                dy_psi2_dx_q2 = -wv_dy_psi2(time)[None, None, ...] * (
-                    wv_dx_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dx_psi1
-                )
-                dx_psi2_dy_q2 = wv_dx_psi2(time)[None, None, ...] * (
-                    wv_dy_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dy_psi1
-                    + beta_plane.beta
-                )
-
-                adv2 = (
-                    dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1]
-                ) / 2 + (
-                    dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :]
-                ) / 2
-
-                loss += gamma * ((dt_q2 + adv2) / U * L * T).square().sum()
 
                 if n % comparison_interval == 0:
                     loss += rmse(
@@ -429,7 +353,7 @@ for c in range(n_cycles):
             break
 
         register_params.step(
-            loss, **{f"coefs_{k}": v for k, v in coefs.items()}
+            loss, **{f"coefs_{k}": v for k, v in coefs.items()}, alpha=alpha
         )
 
         if early_stop.step(loss):
@@ -450,9 +374,10 @@ for c in range(n_cycles):
 
         for v in coefs_adim.values():
             torch.nn.utils.clip_grad_norm_([v], max_norm=1)
+        torch.nn.utils.clip_grad_value_([alpha], clip_value=1)
 
         optimizer.step()
-        lr_change_on_plateau.step(loss)
+        scheduler.step(loss)
         lr_callback.step()
 
     best_loss = register_params.best_loss
@@ -474,6 +399,7 @@ for c in range(n_cycles):
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
         **{f"coefs_{k}": register_params.params[f"coefs_{k}"] for k in coefs},
+        "alpha": register_params.params["alpha"],
     }
     outputs.append(output)
 
