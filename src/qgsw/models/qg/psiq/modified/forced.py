@@ -215,7 +215,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     def wavelets(self, wavelets: WaveletBasis) -> None:
         self._wavelets = wavelets
         space = self.space.remove_z_h()
-        self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
+        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
         self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
         self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
@@ -267,7 +267,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         u /= self.space.dy
         v /= self.space.dx
 
-        dt_psi2 = self._wv_dt(time)
+        dt_psi2 = self._wv.dt(time)
         dx_psi2 = self._wv_dx(time)
         dy_psi2 = self._wv_dy(time)
 
@@ -452,7 +452,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     def wavelets(self, wavelets: WaveletBasis) -> None:
         self._wavelets = wavelets
         space = self.space.remove_z_h()
-        self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
+        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
         self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
         self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
@@ -524,7 +524,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         Returns:
             torch.Tensor: -f₀²ѱ₂/H₂g₂
         """
-        dt_psi2 = self._wv_dt(time)
+        dt_psi2 = self._wv.dt(time)
         return (self.beta_plane.f0**2) * self._A12 * dt_psi2
 
     def _compute_time_derivatives_homogeneous(
@@ -700,7 +700,7 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     def wavelets(self, wavelets: WaveletBasis) -> None:
         self._wavelets = wavelets
         space = self.space.remove_z_h()
-        self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
+        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
         self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
         self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
@@ -904,7 +904,7 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         Returns:
             torch.Tensor: -f₀²ѱ₂/H₂g₂
         """
-        dt_psi2 = self._wv_dt(time)
+        dt_psi2 = self._wv.dt(time)
         return (self.beta_plane.f0**2) * self._A12 * dt_psi2
 
     def _compute_time_derivatives_homogeneous(

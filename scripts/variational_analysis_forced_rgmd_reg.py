@@ -331,11 +331,11 @@ for c in range(n_cycles):
             basis.set_coefs(coefs)
             model.wavelets = basis
 
-            wv_dt_lap_psi2 = basis.localize_dt_laplacian(
+            wv_lap_psi2 = basis.localize_laplacian(
                 space_slice.q.xy.x,
                 space_slice.q.xy.y,
             )
-            wv_dt_psi2 = basis.localize_dt(
+            wv_psi2 = basis.localize(
                 space_slice.q.xy.x,
                 space_slice.q.xy.y,
             )
@@ -387,8 +387,8 @@ for c in range(n_cycles):
                 dx_psi1 /= space.dx
                 dy_psi1 /= space.dy
 
-                lap_dt = wv_dt_lap_psi2(time + model.dt / 2)
-                dt_psi2 = wv_dt_psi2(time + model.dt / 2)
+                lap_dt = wv_lap_psi2.dt(time + model.dt / 2)
+                dt_psi2 = wv_psi2.dt(time + model.dt / 2)
 
                 dt_q2 = (
                     lap_dt[None, None, ...]

@@ -1046,7 +1046,6 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         self._basis = exp_field
         xy = self.space.remove_z_h().psi.xy
         self._ef = self._basis.localize(xy.x, xy.y)
-        self._ef_dt = self._basis.localize_dt(xy.x, xy.y)
 
     def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
         msg = "The value of psi2 is used although not updated by the model."
@@ -1190,7 +1189,7 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
-        dpsi2 = self._ef_dt(self._substep_time)[None, None, ...]
+        dpsi2 = self._ef.dt(self._substep_time)[None, None, ...]
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=True,
@@ -1226,7 +1225,7 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
-        dpsi2 = self._ef_dt(self._substep_time)[None, None, ...]
+        dpsi2 = self._ef.dt(self._substep_time)[None, None, ...]
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
@@ -1298,7 +1297,7 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
-        dpsi2 = self._ef_dt(self._substep_time)[None, None, ...]
+        dpsi2 = self._ef.dt(self._substep_time)[None, None, ...]
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=False,

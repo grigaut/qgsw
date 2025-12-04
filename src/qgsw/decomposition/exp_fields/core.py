@@ -7,11 +7,11 @@ from typing import Any
 
 import torch
 
-from qgsw import specs
-from qgsw.decomposition.supports.gaussian import (
+from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
 )
+from qgsw.decomposition.supports.time.gaussian import GaussianTimeSupport
 from qgsw.specs import defaults
 
 EFFunc = Callable[[torch.Tensor], torch.Tensor]
@@ -45,7 +45,7 @@ class ExpField:
 
     def numel(self) -> int:
         """Total number of elements."""
-        return self._time["numel"] * self._time["numel"]
+        return self._time["numel"] * self._space["numel"]
 
     def _compute_space_params(
         self, params: dict[str, Any], xx: torch.Tensor, yy: torch.Tensor
@@ -103,62 +103,9 @@ class ExpField:
 
         return torch.einsum("tc,cxy->txy", self._coefs, e.field)
 
-    @staticmethod
-    def _at_time(
-        t: torch.Tensor,
-        space_fields: torch.Tensor,
-        time_params: dict[str, Any],
-    ) -> torch.Tensor:
-        """Compute the total field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        tspecs = specs.from_tensor(t)
-
-        tc = time_params["centers"]
-        st = time_params["sigma_t"]
-
-        tc = torch.tensor(tc, **tspecs)
-
-        exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-
-        return torch.einsum("t,txy->xy", exp, space_fields)
-
-    @staticmethod
-    def _dt_at_time(
-        t: torch.Tensor,
-        space_fields: torch.Tensor,
-        time_params: dict[int, dict[str, Any]],
-    ) -> torch.Tensor:
-        """Compute the total time-derivated field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        tspecs = specs.from_tensor(t)
-
-        tc = time_params["centers"]
-        st = time_params["sigma_t"]
-
-        tc = torch.tensor(tc, **tspecs)
-
-        exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-        dt_exp = -2 * (t - tc) / st**2 * exp
-
-        return torch.einsum("t,txy->xy", dt_exp, space_fields)
-
-    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> EFFunc:
+    def localize(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> GaussianTimeSupport:
         """Localize wavelets.
 
         Args:
@@ -166,28 +113,9 @@ class ExpField:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            GaussianTimeSuport: Function computing the wavelet field at
+                a given time.
         """
         space_fields = self._build_space(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return ExpField._at_time(t, space_fields, self._time)
-
-        return at_time
-
-    def localize_dt(self, xx: torch.Tensor, yy: torch.Tensor) -> EFFunc:
-        """Localize wavelets.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            WVFunc: Function computing the wavelet field at a given time.
-        """
-        space_fields = self._build_space(xx=xx, yy=yy)
-
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return ExpField._dt_at_time(t, space_fields, self._time)
-
-        return at_time
+        return GaussianTimeSupport(self._time, space_fields)

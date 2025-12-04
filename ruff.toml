@@ -36,4 +36,3 @@ unfixable = [
 ]
 [lint.pydocstyle]
 convention = "google"
-ignore-decorators = ["qgsw.utils.docstrings.with_docstring"]

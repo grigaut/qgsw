@@ -44,3 +44,25 @@ class TimeSupportFunction(ABC):
         Returns:
             Tensor: Space-time field.
         """
+
+    @abstractmethod
+    def decompose_dt(self, t: torch.Tensor) -> dict[int, torch.Tensor]:
+        """Compute level-wise time-derivated space-time fields.
+
+        Args:
+            t (Tensor): Time.
+
+        Returns:
+            dict[int, Tensor]: Lvl -> space-time field.
+        """
+
+    @abstractmethod
+    def dt(self, t: torch.Tensor) -> torch.Tensor:
+        """Compute the total resulting time derivatived field.
+
+        Args:
+            t (Tensor): Time.
+
+        Returns:
+            Tensor: Space-time field.
+        """

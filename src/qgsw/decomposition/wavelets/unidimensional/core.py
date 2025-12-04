@@ -24,7 +24,6 @@ except ImportError:
 
 import torch
 
-from qgsw import specs
 from qgsw.specs import defaults
 
 WVFunc = Callable[[torch.Tensor], torch.Tensor]
@@ -338,101 +337,6 @@ class WaveletBasis1D:
 
         return fields
 
-    @staticmethod
-    def _at_time(
-        t: torch.Tensor,
-        space_fields: dict[int, torch.Tensor],
-        time_params: dict[int, dict[str, Any]],
-    ) -> torch.Tensor:
-        """Compute the total field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        field = torch.zeros_like(space_fields[0][0].detach())
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-
-            field_at_lvl = torch.einsum("t,tx->x", exp, space_fields[lvl])
-
-            field += field_at_lvl
-        return field / len(time_params)
-
-    @staticmethod
-    def _at_time_decompose(
-        t: torch.Tensor,
-        space_fields: dict[int, torch.Tensor],
-        time_params: dict[int, dict[str, Any]],
-    ) -> dict[int, torch.Tensor]:
-        """Compute the decomposed field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        fields = {}
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-
-            field_at_lvl = torch.einsum("t,tx->x", exp, space_fields[lvl])
-
-            fields[lvl] = field_at_lvl
-        return fields
-
-    @staticmethod
-    def _dt_at_time(
-        t: torch.Tensor,
-        space_fields: torch.Tensor,
-        time_params: dict[int, dict[str, Any]],
-    ) -> torch.Tensor:
-        """Compute the total time-derivated field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        field = torch.zeros_like(space_fields[0][0].detach())
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-            space = space_fields[lvl]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            dt_exp = -2 * (t - tc) / st**2 * exp
-
-            field_at_lvl = torch.einsum("t,tx->x", dt_exp, space)
-
-            field += field_at_lvl
-        return field / len(time_params)
-
     def localize(self, xx: torch.Tensor) -> WVFunc:
         """Localize wavelets.
 
@@ -446,42 +350,6 @@ class WaveletBasis1D:
 
         def at_time(t: torch.Tensor) -> torch.Tensor:
             return WaveletBasis1D._at_time(t, space_fields, self._time)
-
-        return at_time
-
-    def localize_decompose(
-        self, xx: torch.Tensor
-    ) -> Callable[[torch.Tensor], dict[int, torch.Tensor]]:
-        """Localize wavelets.
-
-        Args:
-            xx (torch.Tensor): X locations.
-
-        Returns:
-            WVFunc: Function computing the wavelet field at a given time.
-        """
-        space_fields = self._build_space(xx=xx)
-
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis1D._at_time_decompose(
-                t, space_fields, self._time
-            )
-
-        return at_time
-
-    def localize_dt(self, xx: torch.Tensor) -> WVFunc:
-        """Localize wavelets time derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-
-        Returns:
-            WVFunc: Function computing the wavelet field at a given time.
-        """
-        space_fields = self._build_space(xx=xx)
-
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis1D._dt_at_time(t, space_fields, self._time)
 
         return at_time
 

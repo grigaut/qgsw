@@ -10,7 +10,6 @@ from qgsw.decomposition.supports.space.gaussian import (
 )
 from qgsw.decomposition.supports.time.gaussian import (
     GaussianTimeSupport,
-    GaussianTimeSupportDt,
 )
 from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
 from qgsw.decomposition.wavelets.param_generators import (
@@ -25,7 +24,6 @@ except ImportError:
 
 import torch
 
-from qgsw import specs
 from qgsw.specs import defaults
 
 if TYPE_CHECKING:
@@ -642,106 +640,6 @@ class WaveletBasis:
 
         return fields
 
-    @staticmethod
-    def _at_time(
-        t: torch.Tensor,
-        space_fields: dict[int, torch.Tensor],
-        time_params: dict[int, dict[str, Any]],
-    ) -> torch.Tensor:
-        """Compute the total field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        field = torch.zeros_like(space_fields[0][0].detach())
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_ = exp / exp.sum(dim=0)
-
-            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
-
-            field += field_at_lvl
-        return field / len(time_params)
-
-    @staticmethod
-    def _at_time_decompose(
-        t: torch.Tensor,
-        space_fields: dict[int, torch.Tensor],
-        time_params: dict[int, dict[str, Any]],
-    ) -> dict[int, torch.Tensor]:
-        """Compute the decomposed field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        fields = {}
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_ = exp / exp.sum(dim=0)
-
-            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
-
-            fields[lvl] = field_at_lvl
-        return fields
-
-    @staticmethod
-    def _dt_at_time(
-        t: torch.Tensor,
-        space_fields: torch.Tensor,
-        time_params: dict[int, dict[str, Any]],
-    ) -> torch.Tensor:
-        """Compute the total time-derivated field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        field = torch.zeros_like(space_fields[0][0].detach())
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-            space = space_fields[lvl]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_s = exp.sum(dim=0)
-            dt_exp = -2 * (t - tc) / st**2 * exp
-
-            dt_e = (dt_exp * exp_s - exp * dt_exp.sum(dim=0)) / exp_s**2
-
-            field_at_lvl = torch.einsum("t,txy->xy", dt_e, space)
-
-            field += field_at_lvl
-        return field / len(time_params)
-
     def localize(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> TimeSupportFunction:
@@ -757,22 +655,6 @@ class WaveletBasis:
         space_fields = self._build_space(xx=xx, yy=yy)
 
         return GaussianTimeSupport(self._time, space_fields)
-
-    def localize_dt(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupportDt:
-        """Localize wavelets time derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupportDt: Time support function.
-        """
-        space_fields = self._build_space(xx=xx, yy=yy)
-
-        return GaussianTimeSupportDt(self._time, space_fields)
 
     def localize_dx(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -955,24 +837,6 @@ class WaveletBasis:
         space_fields = {k: dydx2[k] + dy3[k] for k in dydx2}
 
         return GaussianTimeSupport(self._time, space_fields)
-
-    def localize_dt_laplacian(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupportDt:
-        """Localize wavelets second order y-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupportDt: Time support function.
-        """
-        dx2 = self._build_space_dx2(xx=xx, yy=yy)
-        dy2 = self._build_space_dy2(xx=xx, yy=yy)
-        space_fields = {k: dx2[k] + dy2[k] for k in dx2}
-
-        return GaussianTimeSupportDt(self._time, space_fields)
 
     @classmethod
     def from_dyadic_decomposition(

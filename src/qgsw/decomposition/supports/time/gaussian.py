@@ -46,11 +46,7 @@ class GaussianTimeSupport(TimeSupportFunction):
 
     __call__.__doc__ = TimeSupportFunction.__call__.__doc__
 
-
-class GaussianTimeSupportDt(GaussianTimeSupport):
-    """Time-derivative of Gaussian support function."""
-
-    def decompose(self, t: Tensor) -> dict[int, Tensor]:
+    def decompose_dt(self, t: Tensor) -> dict[int, Tensor]:
         fields = {}
         tspecs = specs.from_tensor(t)
         for lvl, params in self.params.items():
@@ -69,4 +65,10 @@ class GaussianTimeSupportDt(GaussianTimeSupport):
             fields[lvl] = torch.einsum("t,txy->xy", dt_e, space)
         return fields
 
-    decompose.__doc__ = TimeSupportFunction.decompose.__doc__
+    decompose_dt.__doc__ = TimeSupportFunction.decompose_dt.__doc__
+
+    def dt(self, t: Tensor) -> Tensor:
+        fields = self.decompose(t)
+        return sum(fields.values()) / len(self.params)
+
+    dt.__doc__ = TimeSupportFunction.dt.__doc__
