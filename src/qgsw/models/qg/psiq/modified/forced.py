@@ -215,7 +215,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     def wavelets(self, wavelets: WaveletBasis) -> None:
         self._wavelets = wavelets
         space = self.space.remove_z_h()
-        self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
+        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
         self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
         self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
@@ -267,7 +267,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         u /= self.space.dy
         v /= self.space.dx
 
-        dt_psi2 = self._wv_dt(time)
+        dt_psi2 = self._wv.dt(time)
         dx_psi2 = self._wv_dx(time)
         dy_psi2 = self._wv_dy(time)
 
@@ -299,20 +299,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
-                coef = 1
-                ftime = self.time + coef * self.dt
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
-        forcing = self.compute_forcing(ftime, psi[:, :1])
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
         dq = (-div_flux + fcg_drag + forcing) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
@@ -349,18 +336,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = advection_psi_q
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 0
-            elif self._rk3_step == 1:
-                coef = 1
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
-        ftime = self.time + coef * self.dt
-        forcing = self.compute_forcing(ftime, psi[:, :1])
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
         dq = (-div_flux + fcg_drag + forcing) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
@@ -385,7 +361,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
                 raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
-    def _compute_time_derivatives_mean_flow(  # noqa: C901, PLR0912, PLR0915
+    def _compute_time_derivatives_mean_flow(
         self,
         prognostic: PSIQ,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -431,20 +407,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             dt_q_bar = (self._pv_bar_interp(t + dt) - self._pv_bar) / dt
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
-                coef = 1
-                ftime = self.time + coef * self.dt
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
-        forcing = self.compute_forcing(ftime, psi[:, :1])
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
         dq = (-(div_flux + dt_q_bar) + fcg_drag + forcing) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
@@ -489,7 +452,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     def wavelets(self, wavelets: WaveletBasis) -> None:
         self._wavelets = wavelets
         space = self.space.remove_z_h()
-        self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
+        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
         self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
         self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
@@ -561,7 +524,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         Returns:
             torch.Tensor: -f₀²ѱ₂/H₂g₂
         """
-        dt_psi2 = self._wv_dt(time)
+        dt_psi2 = self._wv.dt(time)
         return (self.beta_plane.f0**2) * self._A12 * dt_psi2
 
     def _compute_time_derivatives_homogeneous(
@@ -584,21 +547,8 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
-                coef = 1
-                ftime = self.time + coef * self.dt
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
         dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -634,19 +584,8 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = advection_psi_q
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 0
-            elif self._rk3_step == 1:
-                coef = 1
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
-        ftime = self.time + coef * self.dt
         dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
         dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -670,7 +609,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
                 raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
-    def _compute_time_derivatives_mean_flow(  # noqa: C901, PLR0912, PLR0915
+    def _compute_time_derivatives_mean_flow(
         self,
         prognostic: PSIQ,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -716,21 +655,8 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             dt_q_bar = (self._pv_bar_interp(t + dt) - self._pv_bar) / dt
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
-                coef = 1
-                ftime = self.time + coef * self.dt
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
         dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -774,7 +700,7 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     def wavelets(self, wavelets: WaveletBasis) -> None:
         self._wavelets = wavelets
         space = self.space.remove_z_h()
-        self._wv_dt = wavelets.localize_dt(space.q.xy.x, space.q.xy.y)
+        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
         self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
         self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
 
@@ -978,7 +904,7 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         Returns:
             torch.Tensor: -f₀²ѱ₂/H₂g₂
         """
-        dt_psi2 = self._wv_dt(time)
+        dt_psi2 = self._wv.dt(time)
         return (self.beta_plane.f0**2) * self._A12 * dt_psi2
 
     def _compute_time_derivatives_homogeneous(
@@ -1001,24 +927,8 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
-                coef = 1
-                ftime = self.time + coef * self.dt
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
-        dq_i = self._interpolate(dq + dt_psi2)
-        dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
         dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -1054,24 +964,8 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = advection_psi_q
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
-                coef = 1
-                ftime = self.time + coef * self.dt
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
-        dq_i = self._interpolate(dq + dt_psi2)
-        dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
         dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -1095,7 +989,7 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
                 raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
-    def _compute_time_derivatives_mean_flow(  # noqa: C901, PLR0912, PLR0915
+    def _compute_time_derivatives_mean_flow(
         self,
         prognostic: PSIQ,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -1141,24 +1035,8 @@ class QGPSIQForcedColMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             dt_q_bar = (self._pv_bar_interp(t + dt) - self._pv_bar) / dt
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 1 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 1:
-                coef = 3 / 2
-                ftime = self.time + coef * self.dt
-            elif self._rk3_step == 2:
-                coef = 1
-                ftime = self.time + coef * self.dt
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
-        dq_i = self._interpolate(dq + dt_psi2)
-        dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(ftime)
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
         dq_i = self._interpolate(dq + dt_psi2)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(

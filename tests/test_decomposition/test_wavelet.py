@@ -33,16 +33,15 @@ def test_dt(order: int) -> None:
     basis.set_coefs(coefs)
 
     wv = basis.localize(xx, yy)
-    wv_dt = basis.localize_dt(xx, yy)
 
     dt_discrete = wv(torch.tensor([1], **specs)) - wv(
         torch.tensor([0], **specs)
     )
-    dt_analytic = wv_dt(torch.tensor([0.5], **specs))
+    dt_analytic = wv.dt(torch.tensor([0.5], **specs))
 
     torch.testing.assert_close(dt_discrete, dt_analytic, atol=1e-6, rtol=1e-6)
 
     basis.set_coefs({k: torch.ones_like(v) for k, v in coefs.items()})
-    wv_dt = basis.localize_dt(xx, yy)
-    dt_analytic = wv_dt(torch.tensor([1.5], **specs))
+    wv = basis.localize(xx, yy)
+    dt_analytic = wv.dt(torch.tensor([1.5], **specs))
     torch.testing.assert_close(torch.zeros_like(dt_analytic), dt_analytic)

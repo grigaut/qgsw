@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from qgsw.decomposition.supports.space.gaussian import (
+    GaussianSupport,
+    NormalizedGaussianSupport,
+)
+from qgsw.decomposition.supports.time.gaussian import (
+    GaussianTimeSupport,
+)
 from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
 from qgsw.decomposition.wavelets.param_generators import (
     dyadic_decomposition,
     linear_decomposition,
-)
-from qgsw.decomposition.wavelets.supports import (
-    GaussianSupport,
-    NormalizedGaussianSupport,
 )
 
 try:
@@ -22,10 +24,10 @@ except ImportError:
 
 import torch
 
-from qgsw import specs
 from qgsw.specs import defaults
 
-WVFunc = Callable[[torch.Tensor], torch.Tensor]
+if TYPE_CHECKING:
+    from qgsw.decomposition.supports.time.base import TimeSupportFunction
 
 
 class WaveletBasis:
@@ -638,126 +640,9 @@ class WaveletBasis:
 
         return fields
 
-    @staticmethod
-    def _at_time(
-        t: torch.Tensor,
-        space_fields: dict[int, torch.Tensor],
-        time_params: dict[int, dict[str, Any]],
-    ) -> torch.Tensor:
-        """Compute the total field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        field = torch.zeros_like(space_fields[0][0].detach())
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_ = exp / exp.sum(dim=0)
-
-            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
-
-            field += field_at_lvl
-        return field / len(time_params)
-
-    @staticmethod
-    def _at_time_decompose(
-        t: torch.Tensor,
-        space_fields: dict[int, torch.Tensor],
-        time_params: dict[int, dict[str, Any]],
-    ) -> dict[int, torch.Tensor]:
-        """Compute the decomposed field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        fields = {}
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_ = exp / exp.sum(dim=0)
-
-            field_at_lvl = torch.einsum("t,txy->xy", exp_, space_fields[lvl])
-
-            fields[lvl] = field_at_lvl
-        return fields
-
-    @staticmethod
-    def _dt_at_time(
-        t: torch.Tensor,
-        space_fields: torch.Tensor,
-        time_params: dict[int, dict[str, Any]],
-    ) -> torch.Tensor:
-        """Compute the total time-derivated field value at a given time.
-
-        Args:
-            t (torch.Tensor): Time to compute field at.
-            space_fields (dict[int, torch.Tensor]): Space-only fields.
-            time_params (dict[int, dict[str, Any]]): Time parameters.
-
-        Returns:
-            torch.Tensor: Resulting field.
-        """
-        field = torch.zeros_like(space_fields[0][0].detach())
-        tspecs = specs.from_tensor(t)
-        for lvl, params in time_params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-            space = space_fields[lvl]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_s = exp.sum(dim=0)
-            dt_exp = -2 * (t - tc) / st**2 * exp
-
-            dt_e = (dt_exp * exp_s - exp * dt_exp.sum(dim=0)) / exp_s**2
-
-            field_at_lvl = torch.einsum("t,txy->xy", dt_e, space)
-
-            field += field_at_lvl
-        return field / len(time_params)
-
-    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
-        """Localize wavelets.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            WVFunc: Function computing the wavelet field at a given time.
-        """
-        space_fields = self._build_space(xx=xx, yy=yy)
-
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
-
-        return at_time
-
-    def localize_decompose(
+    def localize(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> Callable[[torch.Tensor], dict[int, torch.Tensor]]:
+    ) -> TimeSupportFunction:
         """Localize wavelets.
 
         Args:
@@ -765,33 +650,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time_decompose(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dt(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
-        """Localize wavelets time derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            WVFunc: Function computing the wavelet field at a given time.
-        """
-        space_fields = self._build_space(xx=xx, yy=yy)
-
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._dt_at_time(t, space_fields, self._time)
-
-        return at_time
-
-    def localize_dx(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dx(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets x-derivative.
 
         Args:
@@ -799,16 +666,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dx(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dx2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets second order x-derivative.
 
         Args:
@@ -816,16 +682,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dx2(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dx3(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dx3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets third order x-derivative.
 
         Args:
@@ -833,16 +698,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dx3(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dydx2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dydx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets x-x-y derivative.
 
         Args:
@@ -850,16 +714,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dydx2(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dy(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dy(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets y-derivative.
 
         Args:
@@ -867,16 +730,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dy(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dy2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets second order y-derivative.
 
         Args:
@@ -884,16 +746,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dy2(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dy3(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dy3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets third order y-derivative.
 
         Args:
@@ -901,16 +762,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dy3(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_dxdy2(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_dxdy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets y-y-x derivative.
 
         Args:
@@ -918,16 +778,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         space_fields = self._build_space_dxdy2(xx=xx, yy=yy)
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
+        return GaussianTimeSupport(self._time, space_fields)
 
-        return at_time
-
-    def localize_laplacian(self, xx: torch.Tensor, yy: torch.Tensor) -> WVFunc:
+    def localize_laplacian(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
         """Localize wavelets second order y-derivative.
 
         Args:
@@ -935,20 +794,17 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         dx2 = self._build_space_dx2(xx=xx, yy=yy)
         dy2 = self._build_space_dy2(xx=xx, yy=yy)
         space_fields = {k: dx2[k] + dy2[k] for k in dx2}
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
-
-        return at_time
+        return GaussianTimeSupport(self._time, space_fields)
 
     def localize_dx_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> WVFunc:
+    ) -> TimeSupportFunction:
         """Localize wavelets x derivative of laplacian.
 
         Args:
@@ -956,20 +812,17 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         dx3 = self._build_space_dx3(xx=xx, yy=yy)
         dxdy2 = self._build_space_dxdy2(xx=xx, yy=yy)
         space_fields = {k: dx3[k] + dxdy2[k] for k in dx3}
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
-
-        return at_time
+        return GaussianTimeSupport(self._time, space_fields)
 
     def localize_dy_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> WVFunc:
+    ) -> TimeSupportFunction:
         """Localize wavelets x derivative of laplacian.
 
         Args:
@@ -977,37 +830,13 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            WVFunc: Function computing the wavelet field at a given time.
+            TimeSupportFunction: Time support function.
         """
         dydx2 = self._build_space_dydx2(xx=xx, yy=yy)
         dy3 = self._build_space_dy3(xx=xx, yy=yy)
         space_fields = {k: dydx2[k] + dy3[k] for k in dydx2}
 
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._at_time(t, space_fields, self._time)
-
-        return at_time
-
-    def localize_dt_laplacian(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> WVFunc:
-        """Localize wavelets second order y-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            WVFunc: Function computing the wavelet field at a given time.
-        """
-        dx2 = self._build_space_dx2(xx=xx, yy=yy)
-        dy2 = self._build_space_dy2(xx=xx, yy=yy)
-        space_fields = {k: dx2[k] + dy2[k] for k in dx2}
-
-        def at_time(t: torch.Tensor) -> torch.Tensor:
-            return WaveletBasis._dt_at_time(t, space_fields, self._time)
-
-        return at_time
+        return GaussianTimeSupport(self._time, space_fields)
 
     @classmethod
     def from_dyadic_decomposition(

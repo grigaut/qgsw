@@ -6,32 +6,40 @@ from pathlib import Path
 
 import torch
 
+from qgsw import logging
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
-from qgsw.decomposition.wavelets import (
-    WaveletBasis,
+from qgsw.decomposition.exp_fields.space_only.param_generator import (
+    subdivide_from_spacing,
 )
-from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
+from qgsw.decomposition.supports.space.gaussian import (
+    GaussianSupport,
+    NormalizedGaussianSupport,
+)
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
+from qgsw.models.core.flux import div_flux_5pts_no_pad
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.modified.forced import (
-    QGPSIQForcedMDWV,
+from qgsw.models.qg.psiq.modified.core import (
+    QGPSIQCollinearSF,
+    QGPSIQMixed,
 )
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
-from qgsw.pv import compute_q1_interior
+from qgsw.pv import (
+    compute_q1_interior,
+    compute_q2_3l_interior,
+)
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad
+from qgsw.solver.finite_diff import grad_perp
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
-from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
@@ -45,7 +53,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_rgmd_reg",
+    prefix_default="results_mixed_ro",
 )
 specs = defaults.get()
 
@@ -74,11 +82,6 @@ imin, imax, jmin, jmax = indices
 p = 4
 psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
 psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
-q_slices = [slice(imin, imax), slice(jmin, jmax)]
-q_slices_w = [
-    slice(imin - (p - 1), imax + (p - 1)),
-    slice(jmin - (p - 1), jmax + (p - 1)),
-]
 
 ## Output
 prefix = args.prefix
@@ -171,8 +174,8 @@ y0 = model_3l.y0
 
 ## Inhomogeneous models
 def set_inhomogeneous_model(
-    model: QGPSIQForcedMDWV,
-) -> QGPSIQForcedMDWV:
+    model: QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed,
+) -> QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0
@@ -193,32 +196,102 @@ model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
 space_slice = P.space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
+y = space_slice.q.xy.y[0, :].unsqueeze(0)
+beta_effect = beta_plane.beta * (y - y0)
 
 space_slice_w = P.space.remove_z_h().slice(
     imin - p + 1, imax + p, jmin - p + 1, jmax + p
 )
+y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
+beta_effect_w = beta_plane.beta * (y_w - y0)
 space_slice_ww = P.space.remove_z_h().slice(
     imin - p, imax + p + 1, jmin - p, jmax + p + 1
 )
-y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
-beta_effect_w = beta_plane.beta * (y_w - y0)
 
-model = QGPSIQForcedMDWV(
+
+compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_3l_interior(
+    dpsi1,
+    dpsi2,
+    torch.zeros_like(dpsi2),
+    H2,
+    g2,
+    g3,
+    dx,
+    dy,
+    beta_plane.f0,
+    torch.zeros_like(beta_effect[..., 1:-1]),
+)
+compute_q2 = lambda psi1, psi2: compute_q2_3l_interior(
+    psi1,
+    psi2,
+    torch.zeros_like(psi2),
+    H2,
+    g2,
+    g3,
+    dx,
+    dy,
+    beta_plane.f0,
+    beta_effect[..., 1:-1],
+)
+
+
+def regularization(
+    psi1: torch.Tensor,
+    psi2: torch.Tensor,
+    dpsi1: torch.Tensor,
+    dpsi2: torch.Tensor,
+) -> torch.Tensor:
+    """Compute regularization.
+
+    Args:
+        psi1 (torch.Tensor): Top layer stream function.
+        psi2 (torch.Tensor): Bottom layer stream function.
+        dpsi1 (torch.Tensor): Top layer stream function derivative.
+        dpsi2 (torch.Tensor): Bottom layer stream function derivative
+
+    Returns:
+        torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
+    """
+    dtq2 = compute_dtq2(dpsi1, dpsi2)[..., 1:-1, 1:-1]
+    q2 = compute_q2(psi1, psi2)
+
+    u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
+    u2 /= dy
+    v2 /= dx
+
+    dq_2 = div_flux_5pts_no_pad(q2, u2[..., 1:-1, :], v2[..., :, 1:-1], dx, dy)
+    return ((dtq2 + dq_2) / U * L * T).square().sum()
+
+
+gamma = 1 / comparison_interval
+
+# PV computation
+
+compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
+    psi1,
+    psi2,
+    H1,
+    g1,
+    g2,
+    dx,
+    dy,
+    beta_plane.f0,
+    beta_effect_w,
+)
+
+
+model_mixed = QGPSIQMixed(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model: QGPSIQForcedMDWV = set_inhomogeneous_model(model)
+model_mixed: QGPSIQMixed = set_inhomogeneous_model(model_mixed)
 
 if not args.no_wind:
-    model.set_wind_forcing(
+    model_mixed.set_wind_forcing(
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
-
-gamma = 500 / comparison_interval
-
-# Compute PV
 
 
 def extract_psi_w(psi: torch.Tensor) -> torch.Tensor:
@@ -230,30 +303,6 @@ def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
     """Extract psi."""
     return Boundaries.extract(psi, p, -p - 1, p, -p - 1, 2)
 
-
-compute_q_rg = lambda psi1: compute_q1_interior(
-    psi1,
-    torch.zeros_like(psi1),
-    H1,
-    g1,
-    g2,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect_w,
-)
-
-compute_q = lambda psi1, psi2: compute_q1_interior(
-    psi1,
-    psi2,
-    H1,
-    g1,
-    g2,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect_w,
-)
 
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
@@ -280,156 +329,113 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    wv_space, wv_time = dyadic_decomposition(
-        order=5,
-        xx_ref=space_slice_w.psi.xy.x,
-        yy_ref=space_slice_w.psi.xy.y,
-        Lxy_max=900_000,
-        Lt_max=n_steps_per_cyle * dt,
-    )
-    basis = WaveletBasis(wv_space, wv_time)
-    basis.n_theta = 7
-
-    msg = f"Using basis of order {basis.order}"
-    logger.info(msg)
-
-    coefs = basis.generate_random_coefs()
-    coefs_adim = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
-    }
-
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    numel = basis.numel()
+    xx = space_slice_ww.psi.xy.x
+    yy = space_slice_ww.psi.xy.y
+
+    space_param = subdivide_from_spacing(2, xx, yy)
+
+    xc = torch.tensor([x for x, _ in space_param[0]["centers"]], **specs)[
+        :, None, None
+    ]
+    yc = torch.tensor([y for _, y in space_param[0]["centers"]], **specs)[
+        :, None, None
+    ]
+
+    xs = xx[None, :, :] - xc
+    ys = yy[None, :, :] - yc
+
+    gs = NormalizedGaussianSupport(
+        GaussianSupport(
+            xs,
+            ys,
+            space_param[0]["sigma_x"],
+            space_param[0]["sigma_y"],
+        )
+    ).field
+
+    alpha = torch.tensor(0.5, **specs, requires_grad=True)
+    coefs_psi2_adim = (torch.rand_like(gs[:, 0, 0]) * 1e-1).requires_grad_()
+    coefs_dpsi2 = (torch.rand_like(gs[:, 0, 0]) * 1e-3).requires_grad_()
+
+    numel = alpha.numel() + coefs_psi2_adim.numel() + coefs_dpsi2.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [
-            {
-                "params": list(coefs_adim.values()),
-                "lr": 1e-1,
-                "name": "Wavelet coefs",
-            },
-        ]
+            {"params": [alpha], "lr": 1e-1, "name": "ɑ"},  # noqa: RUF001
+            {"params": [coefs_psi2_adim], "lr": 1e-1, "name": "ѱ₂"},
+            {"params": [coefs_dpsi2], "lr": 1e-3, "name": "dѱ₂"},
+        ],
     )
-    lr_change_on_plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=10
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, factor=0.5, patience=5
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean * 25 for k, v in coefs_adim.items()}
+    register_params_mixed = RegisterParams(
+        alpha=alpha,
+        psi2=torch.einsum("cxy,c->xy", gs, coefs_psi2_adim * psi0_mean)[
+            None, None, ...
+        ],
+        dpsi2=torch.einsum("cxy,c->xy", gs, coefs_dpsi2)[None, None, ...],
     )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
-        model.reset_time()
+        model_mixed.reset_time()
 
         with torch.enable_grad():
-            coefs = {k: v * psi0_mean * 25 for k, v in coefs_adim.items()}
-            basis.set_coefs(coefs)
-            model.wavelets = basis
-
-            wv_lap_psi2 = basis.localize_laplacian(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
+            psi2 = torch.einsum("cxy,c->xy", gs, coefs_psi2_adim * psi0_mean)[
+                None, None, ...
+            ]
+            dpsi2 = torch.einsum("cxy,c->xy", gs, coefs_dpsi2)[None, None, ...]
+            q0 = crop(compute_q_psi2(psi0, psi2 + alpha * psi0), p - 1)
+            psis_ = (
+                (p[:, :1], psi2 + n * dt * dpsi2 + alpha * p[:, :1])
+                for n, p in enumerate(psis)
             )
-            wv_psi2 = basis.localize(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
-            )
-            wv_dx_psi2 = basis.localize_dx(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-            wv_dy_psi2 = basis.localize_dy(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dx_lap_psi2 = basis.localize_dx_laplacian(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dy_lap_psi2 = basis.localize_dy_laplacian(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-
-            wv_loc = basis.localize(
-                space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
-            )
-            qs = (
-                compute_q(p1, wv_loc(model.time + n * model.dt))
-                for n, p1 in enumerate(psis)
-            )
+            qs = (compute_q_psi2(p1, p2) for p1, p2 in psis_)
             q_bcs = [
                 Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
                 for q in qs
             ]
+
+            model_mixed.set_psiq(crop(psi0[:, :1], p), q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model.set_boundary_maps(psi_bc_interp, q_bc_interp)
-            model.set_psiq(
-                crop(psi0, p), crop(compute_q(psi0, wv_loc(model.time)), p - 1)
-            )
+            model_mixed.alpha = torch.ones_like(model_mixed.psi) * alpha
+            model_mixed.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            model_mixed.dpsi2 = crop(dpsi2, p)
 
             loss = torch.tensor(0, **defaults.get())
 
-            dt_q2s = []
-
             for n in range(1, n_steps_per_cyle):
-                psi1_ = model.psi[0, 0]
-                time = model.time
-                model.step()
-                psi1 = model.psi[0, 0]
-                dpsi1 = (psi1_ - psi1) / model.dt
-                dx_psi1, dy_psi1 = grad(psi1_)
-                dx_psi1 /= space.dx
-                dy_psi1 /= space.dy
+                psi1_ = model_mixed.psi
+                psi2_ = crop(psi2 + (n - 1) * dt * dpsi2, p) + alpha * psi1_
 
-                lap_dt = wv_lap_psi2.dt(time + model.dt / 2)
-                dt_psi2 = wv_psi2.dt(time + model.dt / 2)
+                model_mixed.step()
 
-                dt_q2 = (
-                    lap_dt[None, None, ...]
-                    - beta_plane.f0**2
-                    / H2
-                    / g2
-                    * (dt_psi2[None, None, ...] - interpolate(dpsi1))
-                    - beta_plane.f0**2 / H2 / g3 * (dt_psi2[None, None, ...])
-                )
-
-                dy_psi2_dx_q2 = -wv_dy_psi2(time)[None, None, ...] * (
-                    wv_dx_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dx_psi1
-                )
-                dx_psi2_dy_q2 = wv_dx_psi2(time)[None, None, ...] * (
-                    wv_dy_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dy_psi1
-                    + beta_plane.beta
-                )
-
-                adv2 = (
-                    dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1]
-                ) / 2 + (
-                    dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :]
-                ) / 2
-
-                loss += gamma * ((dt_q2 + adv2) / U * L * T).square().sum()
+                psi1 = model_mixed.psi
+                dpsi1_ = (psi1 - psi1_) / dt
+                dpsi2_ = crop(dpsi2, p) + alpha * (psi1 - psi1_) / dt
+                reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
+                loss += reg
 
                 if n % comparison_interval == 0:
-                    loss += rmse(
-                        model.psi[0, 0],
-                        crop(psis[n][0, 0], p),
-                    )
+                    loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
             logger.warning(box(msg, style="="))
             break
 
-        register_params.step(
-            loss, **{f"coefs_{k}": v for k, v in coefs.items()}
+        register_params_mixed.step(
+            loss,
+            alpha=alpha,
+            psi2=psi2,
+            dpsi2=dpsi2,
         )
 
         if early_stop.step(loss):
@@ -448,15 +454,42 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        for v in coefs_adim.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1e-1)
+        grad_alpha = alpha.grad.item()
+        torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
+        grad_alpha_ = alpha.grad.item()
+
+        norm_grad_psi2 = coefs_psi2_adim.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([coefs_psi2_adim], max_norm=1e-1)
+        norm_grad_psi2_ = coefs_psi2_adim.grad.norm().item()
+
+        norm_grad_dpsi2 = coefs_dpsi2.grad.norm().item()
+        torch.nn.utils.clip_grad_norm_([coefs_dpsi2], max_norm=1e-1)
+        norm_grad_dpsi2_ = coefs_dpsi2.grad.norm().item()
+
+        with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
+            msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
+            logger.detail(msg)
+
+        with logger.section("ѱ₂ parameters:", level=logging.DETAIL):
+            msg = (
+                f"Gradient norm: {norm_grad_psi2:.1e} -> {norm_grad_psi2_:.1e}"
+            )
+            logger.detail(msg)
+        with logger.section("dѱ₂ parameters:", level=logging.DETAIL):
+            msg = (
+                f"Gradient norm: {norm_grad_dpsi2:.1e} ->"
+                f" {norm_grad_dpsi2_:.1e}"
+            )
+            logger.detail(msg)
 
         optimizer.step()
-        lr_change_on_plateau.step(loss)
+        scheduler.step(loss)
         lr_callback.step()
 
-    best_loss = register_params.best_loss
-    msg = f"Forcing optimization completed with loss: {best_loss:3.5f}"
+    best_loss = register_params_mixed.best_loss
+    msg = (
+        f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:3.5f}"  # noqa: RUF001
+    )
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
     logger.info(box(msg, msg_mem, style="round"))
@@ -466,14 +499,12 @@ for c in range(n_cycles):
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
-            "order": basis.order,
-            "n_theta": basis.n_theta,
-            "wv_space": wv_space,
-            "wv_time": wv_time,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        **{f"coefs_{k}": register_params.params[f"coefs_{k}"] for k in coefs},
+        "alpha": register_params_mixed.params["alpha"].detach().cpu(),
+        "psi2": register_params_mixed.params["psi2"].detach().cpu(),
+        "dpsi2": register_params_mixed.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
 
