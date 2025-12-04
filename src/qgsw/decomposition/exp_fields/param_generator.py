@@ -14,7 +14,7 @@ def subdivisions(
     subdivision_nb: int,
     Lt_max: float,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Compute space subdivision in 4.
+    """Compute space subdivision.
 
     Args:
         xx_ref (torch.Tensor): Refrecence X locations.
@@ -46,12 +46,16 @@ def subdivisions(
     st = lt / 2 / sqrt(log(2))
 
     return {
-        "centers": centers,
-        "sigma_x": sx,
-        "sigma_y": sy,
-        "numel": len(centers),
+        0: {
+            "centers": centers,
+            "sigma_x": sx,
+            "sigma_y": sy,
+            "numel": len(centers),
+        }
     }, {
-        "centers": tc,
-        "sigma_t": st,
-        "numel": len(tc),
+        0: {
+            "centers": tc,
+            "sigma_t": st,
+            "numel": len(tc),
+        }
     }

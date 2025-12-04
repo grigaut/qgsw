@@ -67,7 +67,7 @@ class ExpField:
             torch.Tensor: Coefficients.
         """
         return torch.randn(
-            self._time["numel"], self._space["numel"], **self._specs
+            self._time[0]["numel"], self._space[0]["numel"], **self._specs
         )
 
     def set_coefs(self, coefs: torch.Tensor) -> None:
@@ -93,15 +93,15 @@ class ExpField:
         Returns:
             dict[int, torch.Tensor]: Level -> field
         """
-        sx: float = self._space["sigma_x"]
-        sy: float = self._space["sigma_y"]
+        sx: float = self._space[0]["sigma_x"]
+        sy: float = self._space[0]["sigma_y"]
 
-        x, y = self._compute_space_params(self._space, xx, yy)
+        x, y = self._compute_space_params(self._space[0], xx, yy)
 
         E = GaussianSupport(x, y, sx, sy)
         e = NormalizedGaussianSupport(E)
 
-        return torch.einsum("tc,cxy->txy", self._coefs, e.field)
+        return {0: torch.einsum("tc,cxy->txy", self._coefs, e.field)}
 
     def localize(
         self, xx: torch.Tensor, yy: torch.Tensor
