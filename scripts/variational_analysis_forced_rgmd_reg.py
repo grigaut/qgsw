@@ -216,7 +216,7 @@ if not args.no_wind:
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
-gamma = 500 / comparison_interval
+gamma = 100 / comparison_interval
 
 # Compute PV
 
@@ -308,18 +308,18 @@ for c in range(n_cycles):
         [
             {
                 "params": list(coefs_adim.values()),
-                "lr": 1e-1,
+                "lr": 1e0,
                 "name": "Wavelet coefs",
             },
         ]
     )
     lr_change_on_plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=10
+        optimizer, factor=0.5, patience=20
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
     register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean * 25 for k, v in coefs_adim.items()}
+        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()}
     )
 
     for o in range(optim_max_step):
@@ -327,7 +327,7 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
-            coefs = {k: v * psi0_mean * 25 for k, v in coefs_adim.items()}
+            coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
             basis.set_coefs(coefs)
             model.wavelets = basis
 
@@ -449,7 +449,7 @@ for c in range(n_cycles):
         loss.backward()
 
         for v in coefs_adim.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1e-1)
+            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
 
         optimizer.step()
         lr_change_on_plateau.step(loss)
