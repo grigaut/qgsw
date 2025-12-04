@@ -68,7 +68,7 @@ class GaussianTimeSupport(TimeSupportFunction):
     decompose_dt.__doc__ = TimeSupportFunction.decompose_dt.__doc__
 
     def dt(self, t: Tensor) -> Tensor:
-        fields = self.decompose(t)
+        fields = self.decompose_dt(t)
         return sum(fields.values()) / len(self.params)
 
     dt.__doc__ = TimeSupportFunction.dt.__doc__
