@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
@@ -25,9 +25,6 @@ except ImportError:
 import torch
 
 from qgsw.specs import defaults
-
-if TYPE_CHECKING:
-    from qgsw.decomposition.supports.time.base import TimeSupportFunction
 
 
 class WaveletBasis:
@@ -640,9 +637,64 @@ class WaveletBasis:
 
         return fields
 
+    def freeze_time_normalization(self, t: torch.Tensor) -> None:
+        """Freeze time normalization.
+
+        Args:
+            t (torch.Tensor): Time to freeze normalization at.
+        """
+        self.generate_time_support = (
+            lambda time_params,
+            space_fields: self._generate_frozen_time_support(
+                t, time_params, space_fields
+            )
+        )
+
+    def unfreeze_time_normalization(self) -> None:
+        """Unfreeze time normalization."""
+        self.generate_time_support = self._generate_time_support
+
+    def _generate_frozen_time_support(
+        self,
+        t: torch.Tensor,
+        time_params: dict[int, dict[str, Any]],
+        space_fields: dict[int, torch.Tensor],
+    ) -> GaussianTimeSupport:
+        """Generate frozen time support.
+
+        Args:
+            t (torch.Tensor): Time to freeze normalization at.
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+            space_fields (dict[int, torch.Tensor]): Space fields.
+
+        Returns:
+            GaussianTimeSupport: Frozen gaussian time support.
+        """
+        gts = GaussianTimeSupport(time_params, space_fields)
+        gts.freeze_normalization(t)
+        return gts
+
+    def _generate_time_support(
+        self,
+        time_params: dict[int, dict[str, Any]],
+        space_fields: dict[int, torch.Tensor],
+    ) -> GaussianTimeSupport:
+        """Generate time support.
+
+        Args:
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+            space_fields (dict[int, torch.Tensor]): Space fields.
+
+        Returns:
+            GaussianTimeSupport: Gaussian time support.
+        """
+        return GaussianTimeSupport(time_params, space_fields)
+
+    generate_time_support = _generate_time_support
+
     def localize(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets.
 
         Args:
@@ -650,15 +702,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dx(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets x-derivative.
 
         Args:
@@ -666,15 +718,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dx(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dx2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets second order x-derivative.
 
         Args:
@@ -682,15 +734,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dx2(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dx3(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets third order x-derivative.
 
         Args:
@@ -698,15 +750,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dx3(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dydx2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets x-x-y derivative.
 
         Args:
@@ -714,15 +766,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dydx2(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dy(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets y-derivative.
 
         Args:
@@ -730,15 +782,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dy(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dy2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets second order y-derivative.
 
         Args:
@@ -746,15 +798,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dy2(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dy3(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets third order y-derivative.
 
         Args:
@@ -762,15 +814,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dy3(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dxdy2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets y-y-x derivative.
 
         Args:
@@ -778,15 +830,15 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         space_fields = self._build_space_dxdy2(xx=xx, yy=yy)
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets second order y-derivative.
 
         Args:
@@ -794,17 +846,17 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         dx2 = self._build_space_dx2(xx=xx, yy=yy)
         dy2 = self._build_space_dy2(xx=xx, yy=yy)
         space_fields = {k: dx2[k] + dy2[k] for k in dx2}
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dx_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets x derivative of laplacian.
 
         Args:
@@ -812,17 +864,17 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         dx3 = self._build_space_dx3(xx=xx, yy=yy)
         dxdy2 = self._build_space_dxdy2(xx=xx, yy=yy)
         space_fields = {k: dx3[k] + dxdy2[k] for k in dx3}
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dy_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> GaussianTimeSupport:
         """Localize wavelets x derivative of laplacian.
 
         Args:
@@ -830,13 +882,13 @@ class WaveletBasis:
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            GaussianTimeSupport: Time support function.
         """
         dydx2 = self._build_space_dydx2(xx=xx, yy=yy)
         dy3 = self._build_space_dy3(xx=xx, yy=yy)
         space_fields = {k: dydx2[k] + dy3[k] for k in dydx2}
 
-        return GaussianTimeSupport(self._time, space_fields)
+        return self.generate_time_support(self._time, space_fields)
 
     @classmethod
     def from_dyadic_decomposition(
