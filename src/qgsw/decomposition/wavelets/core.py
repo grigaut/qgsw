@@ -29,7 +29,7 @@ except ImportError:
 import torch
 
 
-class WaveletBasis(SpaceTimeDecomposition):
+class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
     """Wavelet decomposition.
 
     ΣΣ[E(t)/ΣE(t)]Σe(x,y)ΣΣcγ(x,y)
