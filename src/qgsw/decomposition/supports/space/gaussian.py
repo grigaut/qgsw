@@ -1,67 +1,12 @@
 """Gaussian support."""
 
-from functools import cached_property
-
 import torch
 
+from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 
-class GaussianSupport:
+
+class GaussianSupport(SpaceSupportFunction):
     """Space gaussian kernel."""
-
-    @cached_property
-    def field(self) -> torch.Tensor:
-        """Field."""
-        return self._compute()
-
-    @cached_property
-    def dx(self) -> torch.Tensor:
-        """X-derivative."""
-        return self._compute_dx()
-
-    @cached_property
-    def dy(self) -> torch.Tensor:
-        """Y-derivative."""
-        return self._compute_dy()
-
-    @cached_property
-    def dx2(self) -> torch.Tensor:
-        """Second X-derivative."""
-        return self._compute_dx2()
-
-    @cached_property
-    def dydx(self) -> torch.Tensor:
-        """X-Y-derivative."""
-        return self._compute_dydx()
-
-    @cached_property
-    def dy2(self) -> torch.Tensor:
-        """Second Y-derivative."""
-        return self._compute_dy2()
-
-    @cached_property
-    def dxdy(self) -> torch.Tensor:
-        """Y-X-derivative."""
-        return self._compute_dxdy()
-
-    @cached_property
-    def dx3(self) -> torch.Tensor:
-        """Third X-derivative."""
-        return self._compute_dx3()
-
-    @cached_property
-    def dy3(self) -> torch.Tensor:
-        """Third Y-derivative."""
-        return self._compute_dy3()
-
-    @cached_property
-    def dydx2(self) -> torch.Tensor:
-        """X-X-Y-derivative."""
-        return self._compute_dydx2()
-
-    @cached_property
-    def dxdy2(self) -> torch.Tensor:
-        """Y-Y-X-derivative."""
-        return self._compute_dxdy2()
 
     def __init__(
         self, x: torch.Tensor, y: torch.Tensor, sx: float, sy: float
@@ -117,63 +62,8 @@ class GaussianSupport:
         return (-2 * self.x / self.sx**2) * self.dy2
 
 
-class SumGaussianSupports:
+class SumGaussianSupports(SpaceSupportFunction):
     """Center-sumed gaussian supports."""
-
-    @cached_property
-    def field(self) -> torch.Tensor:
-        """Field."""
-        return self.gs.field.sum(dim=0)
-
-    @cached_property
-    def dx(self) -> torch.Tensor:
-        """X-derivative."""
-        return self.gs.dx.sum(dim=0)
-
-    @cached_property
-    def dy(self) -> torch.Tensor:
-        """Y-derivative."""
-        return self.gs.dy.sum(dim=0)
-
-    @cached_property
-    def dx2(self) -> torch.Tensor:
-        """Second X-derivative."""
-        return self.gs.dx2.sum(dim=0)
-
-    @cached_property
-    def dydx(self) -> torch.Tensor:
-        """X-Y-derivative."""
-        return self.gs.dydx.sum(dim=0)
-
-    @cached_property
-    def dy2(self) -> torch.Tensor:
-        """Second Y-derivative."""
-        return self.gs.dy2.sum(dim=0)
-
-    @cached_property
-    def dxdy(self) -> torch.Tensor:
-        """Y-X-derivative."""
-        return self.gs.dxdy.sum(dim=0)
-
-    @cached_property
-    def dx3(self) -> torch.Tensor:
-        """Third X-derivative."""
-        return self.gs.dx3.sum(dim=0)
-
-    @cached_property
-    def dy3(self) -> torch.Tensor:
-        """Third Y-derivative."""
-        return self.gs.dy3.sum(dim=0)
-
-    @cached_property
-    def dydx2(self) -> torch.Tensor:
-        """X-X-Y-derivative."""
-        return self.gs.dydx2.sum(dim=0)
-
-    @cached_property
-    def dxdy2(self) -> torch.Tensor:
-        """Y-Y-X-derivative."""
-        return self.gs.dxdy2.sum(dim=0)
 
     def __init__(self, gaussian_support: GaussianSupport) -> None:
         """Instantiate the class.
@@ -183,64 +73,42 @@ class SumGaussianSupports:
         """
         self.gs = gaussian_support
 
+    def _compute(self) -> torch.Tensor:
+        return self.gs.field.sum(dim=0)
 
-class NormalizedGaussianSupport:
+    def _compute_dx(self) -> torch.Tensor:
+        return self.gs.dx.sum(dim=0)
+
+    def _compute_dy(self) -> torch.Tensor:
+        return self.gs.dy.sum(dim=0)
+
+    def _compute_dx2(self) -> torch.Tensor:
+        return self.gs.dx2.sum(dim=0)
+
+    def _compute_dydx(self) -> torch.Tensor:
+        return self.gs.dydx.sum(dim=0)
+
+    def _compute_dy2(self) -> torch.Tensor:
+        return self.gs.dy2.sum(dim=0)
+
+    def _compute_dxdy(self) -> torch.Tensor:
+        return self.gs.dxdy.sum(dim=0)
+
+    def _compute_dx3(self) -> torch.Tensor:
+        return self.gs.dx3.sum(dim=0)
+
+    def _compute_dy3(self) -> torch.Tensor:
+        return self.gs.dy3.sum(dim=0)
+
+    def _compute_dydx2(self) -> torch.Tensor:
+        return self.gs.dydx2.sum(dim=0)
+
+    def _compute_dxdy2(self) -> torch.Tensor:
+        return self.gs.dxdy2.sum(dim=0)
+
+
+class NormalizedGaussianSupport(SpaceSupportFunction):
     """Normalized space gaussian supports."""
-
-    @cached_property
-    def field(self) -> torch.Tensor:
-        """Field."""
-        return self._compute()
-
-    @cached_property
-    def dx(self) -> torch.Tensor:
-        """X-derivative."""
-        return self._compute_dx()
-
-    @cached_property
-    def dy(self) -> torch.Tensor:
-        """Y-derivative."""
-        return self._compute_dy()
-
-    @cached_property
-    def dx2(self) -> torch.Tensor:
-        """Second X-derivative."""
-        return self._compute_dx2()
-
-    @cached_property
-    def dydx(self) -> torch.Tensor:
-        """X-Y-derivative."""
-        return self._compute_dydx()
-
-    @cached_property
-    def dy2(self) -> torch.Tensor:
-        """Second Y-derivative."""
-        return self._compute_dy2()
-
-    @cached_property
-    def dxdy(self) -> torch.Tensor:
-        """Y-X-derivative."""
-        return self._compute_dxdy()
-
-    @cached_property
-    def dx3(self) -> torch.Tensor:
-        """Third X-derivative."""
-        return self._compute_dx3()
-
-    @cached_property
-    def dy3(self) -> torch.Tensor:
-        """Third Y-derivative."""
-        return self._compute_dy3()
-
-    @cached_property
-    def dydx2(self) -> torch.Tensor:
-        """X-X-Y-derivative."""
-        return self._compute_dydx2()
-
-    @cached_property
-    def dxdy2(self) -> torch.Tensor:
-        """Y-Y-X-derivative."""
-        return self._compute_dxdy2()
 
     def __init__(self, gaussian_support: GaussianSupport) -> None:
         """Instantiate the class.
@@ -461,28 +329,8 @@ class NormalizedGaussianSupport:
         return torch.einsum("cxy,xy->cxy", t, 1 / self.gs_s.field.pow(4))
 
 
-class GaussianSupport1D:
+class GaussianSupport1D(SpaceSupportFunction):
     """Space gaussian kernel."""
-
-    @cached_property
-    def field(self) -> torch.Tensor:
-        """Field."""
-        return self._compute()
-
-    @cached_property
-    def dx(self) -> torch.Tensor:
-        """X-derivative."""
-        return self._compute_dx()
-
-    @cached_property
-    def dx2(self) -> torch.Tensor:
-        """Second X-derivative."""
-        return self._compute_dx2()
-
-    @cached_property
-    def dx3(self) -> torch.Tensor:
-        """Third X-derivative."""
-        return self._compute_dx3()
 
     def __init__(self, x: torch.Tensor, sx: float) -> None:
         """Instantiate the class.
@@ -509,69 +357,41 @@ class GaussianSupport1D:
         ) * self.field
 
 
-class SumGaussianSupports1D:
+class SumGaussianSupports1D(SpaceSupportFunction):
     """Center-sumed gaussian supports."""
 
-    @cached_property
-    def field(self) -> torch.Tensor:
-        """Field."""
+    def __init__(self, gaussian_support: GaussianSupport1D) -> None:
+        """Instantiate the class.
+
+        Args:
+            gaussian_support (GaussianSupport): Gaussian support.
+        """
+        self.gs = gaussian_support
+
+    def _compute_field(self) -> torch.Tensor:
         return self.gs.field.sum(dim=0)
 
-    @cached_property
-    def dx(self) -> torch.Tensor:
-        """X-derivative."""
+    def _compute_dx(self) -> torch.Tensor:
         return self.gs.dx.sum(dim=0)
 
-    @cached_property
-    def dx2(self) -> torch.Tensor:
-        """Second X-derivative."""
+    def _compute_dx2(self) -> torch.Tensor:
         return self.gs.dx2.sum(dim=0)
 
-    @cached_property
-    def dx3(self) -> torch.Tensor:
-        """Third X-derivative."""
+    def _compute_dx3(self) -> torch.Tensor:
         return self.gs.dx3.sum(dim=0)
 
-    def __init__(self, gaussian_support: GaussianSupport) -> None:
-        """Instantiate the class.
 
-        Args:
-            gaussian_support (GaussianSupport): Gaussian support.
-        """
-        self.gs = gaussian_support
-
-
-class NormalizedGaussianSupport1D:
+class NormalizedGaussianSupport1D(SpaceSupportFunction):
     """Normalized space gaussian supports."""
 
-    @cached_property
-    def field(self) -> torch.Tensor:
-        """Field."""
-        return self._compute()
-
-    @cached_property
-    def dx(self) -> torch.Tensor:
-        """X-derivative."""
-        return self._compute_dx()
-
-    @cached_property
-    def dx2(self) -> torch.Tensor:
-        """Second X-derivative."""
-        return self._compute_dx2()
-
-    @cached_property
-    def dx3(self) -> torch.Tensor:
-        """Third X-derivative."""
-        return self._compute_dx3()
-
-    def __init__(self, gaussian_support: GaussianSupport) -> None:
+    def __init__(self, gaussian_support: GaussianSupport1D) -> None:
         """Instantiate the class.
 
         Args:
             gaussian_support (GaussianSupport): Gaussian support.
         """
         self.gs = gaussian_support
-        self.gs_s = SumGaussianSupports(gaussian_support)
+        self.gs_s = SumGaussianSupports1D(gaussian_support)
 
     def _compute(self) -> torch.Tensor:
         return torch.einsum("cx,x->cx", self.gs.field, 1 / self.gs_s.field)
