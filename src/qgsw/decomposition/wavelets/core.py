@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from qgsw.decomposition.base import SpaceTimeDecomposition
 from qgsw.decomposition.supports.space.cosine import (
     CosineBasisFunctions,
 )
@@ -27,10 +28,8 @@ except ImportError:
 
 import torch
 
-from qgsw.specs import defaults
 
-
-class WaveletBasis:
+class WaveletBasis(SpaceTimeDecomposition):
     """Wavelet decomposition.
 
     ΣΣ[E(t)/ΣE(t)]Σe(x,y)ΣΣcγ(x,y)
@@ -57,11 +56,6 @@ class WaveletBasis:
         self._cos_t = torch.cos(theta)
         self._sin_t = torch.sin(theta)
 
-    @property
-    def order(self) -> int:
-        """Decomposition order."""
-        return self._order
-
     def __init__(
         self,
         space_params: dict[int, dict[str, Any]],
@@ -80,23 +74,9 @@ class WaveletBasis:
             device (torch.device | None, optional): Ddevice.
                 Defaults to None.
         """
-        self._check_validity(space_params, time_params)
-        self._order = len(space_params.keys())
-        self._specs = defaults.get(dtype=dtype, device=device)
-        self._space = space_params
-        self._time = time_params
+        super().__init__(space_params, time_params, dtype=dtype, device=device)
         self.n_theta = self._n_theta
         self.phase = torch.tensor([0, torch.pi / 2], **self._specs)
-
-    def _check_validity(
-        self,
-        space_params: dict[str, Any],
-        time_params: dict[str, Any],
-    ) -> None:
-        """Check parameters validity."""
-        if space_params.keys() != time_params.keys():
-            msg = "Mismatching keys between space and time parameters."
-            raise ValueError(msg)
 
     def numel(self) -> int:
         """Total number of elements."""
@@ -134,24 +114,6 @@ class WaveletBasis:
             )
 
         return coefs
-
-    def set_coefs(self, coefs: dict[int, torch.Tensor]) -> None:
-        """Set coefficients values.
-
-        To ensure consistent coefficients shapes, best is to use
-        self.generate_random_coefs().
-
-        Args:
-            coefs (torch.Tensor): Coefficients.
-                ├── 0: (1, 1)-shaped
-                ├── 1: (2, 4)-shaped
-                ├── 2: (4, 16)-shaped
-                ├── ...
-                ├── p: (2**p, (2**p)**2)-shaped
-                ├── ...
-                └── order: (2**order, (2**order)**2)-shaped
-        """
-        self._coefs = coefs
 
     def _compute_space_params(
         self, params: dict[str, Any], xx: torch.Tensor, yy: torch.Tensor
