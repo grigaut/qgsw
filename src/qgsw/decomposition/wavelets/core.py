@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from qgsw.decomposition.supports.space.cosine import (
+    CosineBasisFunctions,
+)
 from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
@@ -12,7 +15,6 @@ from qgsw.decomposition.supports.space.gaussian_cosine import ExpCosSupport
 from qgsw.decomposition.supports.time.gaussian import (
     GaussianTimeSupport,
 )
-from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
 from qgsw.decomposition.wavelets.param_generators import (
     dyadic_decomposition,
     linear_decomposition,

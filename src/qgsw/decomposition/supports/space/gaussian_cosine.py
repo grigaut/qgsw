@@ -4,10 +4,12 @@ from functools import cached_property
 
 import torch
 
+from qgsw.decomposition.supports.space.cosine import (
+    CosineBasisFunctions,
+)
 from qgsw.decomposition.supports.space.gaussian import (
     NormalizedGaussianSupport,
 )
-from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
 
 
 class ExpCosSupport:
