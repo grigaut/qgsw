@@ -8,6 +8,7 @@ from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
 )
+from qgsw.decomposition.supports.space.gaussian_cosine import ExpCosSupport
 from qgsw.decomposition.supports.time.gaussian import (
     GaussianTimeSupport,
 )
@@ -201,11 +202,12 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            lambd = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.field)
-            # ꟛ = e γ
-            fields[lvl] = torch.einsum("tcop,cxyop->txyop", c, lambd).mean(
-                dim=[-1, -2]
-            )
+            space_support = ExpCosSupport(e, gamma)
+            fields[lvl] = torch.einsum(
+                "tcop,cxyop->txyop",
+                c,
+                space_support.field,
+            ).mean(dim=[-1, -2])
         return fields
 
     def _build_space_dx(
@@ -246,13 +248,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.field)
-            # ꟛ2 = e γ'
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx)
-            # coefs * (e' γ + e γ')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2
+                "tcop,cxyop->txyop", coefs, space_support.dx
             ).mean(dim=[-1, -2])
 
         return fields
@@ -295,15 +294,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e'' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.field)
-            # ꟛ2 = 2e' γ'
-            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dx)
-            # ꟛ3 = e γ''
-            lambda3 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx2)
-            # coefs * (e'' γ +2e' γ'+ e γ'')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2 + lambda3
+                "tcop,cxyop->txyop", coefs, space_support.dx2
             ).mean(dim=[-1, -2])
 
         return fields
@@ -345,19 +339,12 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e''' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx3, gamma.field)
-            # ꟛ2 = 3e'' γ'
-            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.dx)
-            # ꟛ3 = 3e' γ''
-            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dx2)
-            # ꟛ4 = e γ'''
-            lambda4 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx3)
-            # coefs * (e''' γ + 3e' γ'' + 3 e' γ'' + e γ''')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop",
                 coefs,
-                lambda1 + lambda2 + lambda3 + lambda4,
+                space_support.dx3,
             ).mean(dim=[-1, -2])
 
         return fields
@@ -400,25 +387,12 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = ∂_xxy e γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dydx2, gamma.field)
-            # ꟛ2 = ∂_xx e ∂_y γ
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.dy)
-            # ꟛ3 = 2 ∂_xy e ∂_x γ
-            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dydx, gamma.dx)
-            # ꟛ4 = 2 ∂_x e ∂_xy γ
-            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dydx)
-            # ꟛ5 = ∂_y e ∂_xx γ
-            lambda5 = torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dx2)
-            # ꟛ5 = e ∂_xxy γ
-            lambda6 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dydx2)
-            # coefs * ( ∂_xxy e γ + ∂_xx e ∂_y γ +
-            #   2 ∂_xy e ∂_x γ + 2 ∂_x e ∂_xy γ +
-            #   ∂_y e ∂_xx γ + e ∂_xxy γ )
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop",
                 coefs,
-                lambda1 + lambda2 + lambda3 + lambda4 + lambda5 + lambda6,
+                space_support.dydx2,
             ).mean(dim=[-1, -2])
 
         return fields
@@ -460,13 +434,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.field)
-            # ꟛ2 = e γ'
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy)
-            # coefs * (e' γ + e γ')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2
+                "tcop,cxyop->txyop", coefs, space_support.dy
             ).mean(dim=[-1, -2])
 
         return fields
@@ -508,15 +479,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e'' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.field)
-            # ꟛ2 = 2e' γ'
-            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dy)
-            # ꟛ3 = e γ''
-            lambda3 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy2)
-            # coefs * (e'' γ +2e' γ'+ e γ'')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2 + lambda3
+                "tcop,cxyop->txyop", coefs, space_support.dy2
             ).mean(dim=[-1, -2])
 
         return fields
@@ -559,19 +525,9 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e''' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy3, gamma.field)
-            # ꟛ2 = 3e'' γ'
-            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.dy)
-            # ꟛ3 = 3e' γ''
-            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dy2)
-            # ꟛ4 = e γ'''
-            lambda4 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy3)
-            # coefs * (e''' γ + 3e' γ'' + 3 e' γ'' + e γ''')
+            space_support = ExpCosSupport(e, gamma)
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop",
-                coefs,
-                lambda1 + lambda2 + lambda3 + lambda4,
+                "tcop,cxyop->txyop", coefs, space_support.dy3
             ).mean(dim=[-1, -2])
 
         return fields
@@ -614,25 +570,9 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = ∂_yyx e γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dxdy2, gamma.field)
-            # ꟛ2 = ∂_yy e ∂_x γ
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.dx)
-            # ꟛ3 = 2 ∂_yx e ∂_y γ
-            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dxdy, gamma.dy)
-            # ꟛ4 = 2 ∂_y e ∂_yx γ
-            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dxdy)
-            # ꟛ5 = ∂_x e ∂_yy γ
-            lambda5 = torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dy2)
-            # ꟛ6 = e ∂_yyx γ
-            lambda6 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dxdy2)
-            # coefs * ( ∂_yyx e γ + ∂_yy e ∂_x γ +
-            #   2 ∂_yx e ∂_y γ + 2 ∂_y e ∂_yx γ +
-            #   ∂_x e ∂_yy γ + e ∂_yyx γ )
+            space_support = ExpCosSupport(e, gamma)
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop",
-                coefs,
-                lambda1 + lambda2 + lambda3 + lambda4 + lambda5 + lambda6,
+                "tcop,cxyop->txyop", coefs, space_support.dxdy2
             ).mean(dim=[-1, -2])
 
         return fields
