@@ -410,10 +410,11 @@ for c in range(n_cycles):
                 )
 
                 adv2 = (
-                    dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1]
-                ) / 2 + (
-                    dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :]
-                ) / 2
+                    -(dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1])
+                    / 2
+                    + (dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :])
+                    / 2
+                )
 
                 loss += gamma * ((dt_q2 + adv2) / U * L * T).square().sum()
 
