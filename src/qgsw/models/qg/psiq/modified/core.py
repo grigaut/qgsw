@@ -3,7 +3,9 @@
 import torch
 from torch import Tensor
 
-from qgsw.decomposition.exp_fields.core import ExpField
+from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.supports.space.base import SpaceSupportFunction
+from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.fields.variables.state import StatePSIQ, StatePSIQAlpha
 from qgsw.fields.variables.tuples import (
     PSIQ,
@@ -1037,22 +1039,29 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
     """Mixed model using both alpha and psi2."""
 
     @property
-    def basis(self) -> ExpField:
+    def basis(
+        self,
+    ) -> SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]:
         """Basis for the reduced order field."""
         return self._basis
 
     @basis.setter
-    def basis(self, exp_field: ExpField) -> None:
-        self._basis = exp_field
+    def basis(
+        self,
+        basis: SpaceTimeDecomposition[
+            SpaceSupportFunction, TimeSupportFunction
+        ],
+    ) -> None:
+        self._basis = basis
         xy = self.space.remove_z_h().psi.xy
-        self._ef = self._basis.localize(xy.x, xy.y)
+        self._loc = self._basis.localize(xy.x, xy.y)
 
     def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
         msg = "The value of psi2 is used although not updated by the model."
         logger.warning(msg)
         vort = self._compute_vort_from_psi(psi)
         try:
-            psi2 = self._ef(self.time)[None, None, ...]
+            psi2 = self._loc(self.time)[None, None, ...]
         except AttributeError:
             msg = "No psi2 field, using zeros instead."
             logger.warning(msg)
@@ -1189,7 +1198,7 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
-        dpsi2 = self._ef.dt(self._substep_time)[None, None, ...]
+        dpsi2 = self._loc.dt(self._substep_time)[None, None, ...]
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=True,
@@ -1225,7 +1234,7 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
-        dpsi2 = self._ef.dt(self._substep_time)[None, None, ...]
+        dpsi2 = self._loc.dt(self._substep_time)[None, None, ...]
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
@@ -1297,7 +1306,7 @@ class QGPSIQMixedReducedOrder(QGPSIQCollinearSF):
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
-        dpsi2 = self._ef.dt(self._substep_time)[None, None, ...]
+        dpsi2 = self._loc.dt(self._substep_time)[None, None, ...]
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=False,
