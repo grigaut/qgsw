@@ -11,6 +11,7 @@ from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
 )
+from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.decomposition.supports.time.taylor import TaylorSeriesTimeSupport
 
 
@@ -50,9 +51,20 @@ class TaylorExpBasis(
 
         return DecompositionCoefs.from_dict(coefs)
 
-    numel.__doc__ = SpaceTimeDecomposition[
+    generate_random_coefs.__doc__ = SpaceTimeDecomposition[
         NormalizedGaussianSupport, TaylorSeriesTimeSupport
     ].generate_random_coefs.__doc__
+
+    def generate_time_support(  # noqa: D102
+        self,
+        time_params: dict[int, dict[str, Any]],
+        space_fields: dict[int, Tensor],
+    ) -> TimeSupportFunction:
+        return TaylorSeriesTimeSupport(time_params, space_fields)
+
+    generate_time_support.__doc__ = SpaceTimeDecomposition[
+        NormalizedGaussianSupport, TaylorSeriesTimeSupport
+    ].generate_time_support.__doc__
 
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -105,29 +117,104 @@ class TaylorExpBasis(
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy)
         return fields
 
-    def localize(self, xx: Tensor, yy: Tensor) -> TaylorSeriesTimeSupport:  # noqa: D102
-        space_fields = self._build_space(xx=xx, yy=yy)
+    def _build_space_dx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
 
-        return TaylorSeriesTimeSupport(self._time, space_fields)
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
 
-    localize.__doc__ = SpaceTimeDecomposition[
-        NormalizedGaussianSupport, TaylorSeriesTimeSupport
-    ].localize.__doc__
+            x, y = self._compute_space_params(params, xx, yy)
 
-    def localize_dx(self, xx: Tensor, yy: Tensor) -> TaylorSeriesTimeSupport:  # noqa: D102
-        space_fields = self._build_space_dx(xx=xx, yy=yy)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx2)
+        return fields
 
-        return TaylorSeriesTimeSupport(self._time, space_fields)
+    def _build_space_dy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
 
-    localize_dx.__doc__ = SpaceTimeDecomposition[
-        NormalizedGaussianSupport, TaylorSeriesTimeSupport
-    ].localize_dx.__doc__
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
 
-    def localize_dy(self, xx: Tensor, yy: Tensor) -> TaylorSeriesTimeSupport:  # noqa: D102
-        space_fields = self._build_space_dy(xx=xx, yy=yy)
+            x, y = self._compute_space_params(params, xx, yy)
 
-        return TaylorSeriesTimeSupport(self._time, space_fields)
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy2)
+        return fields
 
-    localize_dy.__doc__ = SpaceTimeDecomposition[
-        NormalizedGaussianSupport, TaylorSeriesTimeSupport
-    ].localize_dy.__doc__
+    def _build_space_dx3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
+
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
+
+            x, y = self._compute_space_params(params, xx, yy)
+
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx3)
+        return fields
+
+    def _build_space_dy3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
+
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
+
+            x, y = self._compute_space_params(params, xx, yy)
+
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy3)
+        return fields
+
+    def _build_space_dydx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
+
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
+
+            x, y = self._compute_space_params(params, xx, yy)
+
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dydx2)
+        return fields
+
+    def _build_space_dxdy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
+
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
+
+            x, y = self._compute_space_params(params, xx, yy)
+
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dxdy2)
+        return fields
