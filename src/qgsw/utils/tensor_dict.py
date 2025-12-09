@@ -2,11 +2,38 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import torch
 
 from qgsw.specs import defaults
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+def iterate_over_dict(
+    d: dict[str, Any], f: Callable[[torch.Tensor], Any]
+) -> dict[str, Any]:
+    """Iterate tensor operations on the tensors of a given dictionary.
+
+    Args:
+        d (dict[str, Any]): Dictionary.
+        f (Callable[[torch.Tensor], Any]): Function to apply
+            to tensors.
+
+    Returns:
+        dict[str, Any]: Resulting dictionary.
+    """
+    out = {}
+    for k, v in d.items():
+        if isinstance(v, torch.Tensor):
+            out[k] = f(v)
+        elif isinstance(v, dict):
+            out[k] = iterate_over_dict(v, f)
+        else:
+            out[k] = v
+    return out
 
 
 def change_specs(
