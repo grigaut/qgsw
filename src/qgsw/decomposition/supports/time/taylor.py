@@ -45,7 +45,7 @@ class TaylorSeriesTimeSupport(TimeSupportFunction):
         fields = {}
         for lvl in self.params:
             if lvl == 0:
-                fields[lvl] = torch.zeros_like(self._space[lvl])
+                fields[lvl] = torch.zeros_like(self._space[lvl][0])
                 continue
             fact_lvl = factorial(lvl - 1)
             fields[lvl] = torch.einsum(
