@@ -91,166 +91,286 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
         self._coefs = coefs
 
     @abstractmethod
-    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
-        """Localize space support function.
+    def generate_time_support(
+        self,
+        time_params: dict[int, dict[str, Any]],
+        space_fields: dict[int, torch.Tensor],
+    ) -> TimeSupportFunction:
+        """Generate time support.
+
+        Args:
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+            space_fields (dict[int, torch.Tensor]): Space fields.
+
+        Returns:
+            TimeSupportFunction: Gaussian time support.
+        """
+
+    def localize(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
+        """Localize wavelets.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
+        space_fields = self._build_space(xx=xx, yy=yy)
 
-    def localize_dx(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
-        """Localize x-derivative of space support function.
+        return self.generate_time_support(self._time, space_fields)
+
+    def localize_dx(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
+        """Localize wavelets x-derivative.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
-        msg = "This decomposition does not implement x-derivative."
-        raise NotImplementedError(msg)
+        space_fields = self._build_space_dx(xx=xx, yy=yy)
 
-    def localize_dy(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
-        """Localize y-derivative of space support function.
+        return self.generate_time_support(self._time, space_fields)
+
+    def localize_dx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
+        """Localize wavelets second order x-derivative.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
-        msg = "This decomposition does not implement y-derivative."
-        raise NotImplementedError(msg)
+        space_fields = self._build_space_dx2(xx=xx, yy=yy)
 
-    def localize_dx2(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
-        """Localize xx-derivative of space support function.
+        return self.generate_time_support(self._time, space_fields)
+
+    def localize_dx3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
+        """Localize wavelets third order x-derivative.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
-        msg = "This decomposition does not implement xx-derivative."
-        raise NotImplementedError(msg)
+        space_fields = self._build_space_dx3(xx=xx, yy=yy)
 
-    def localize_dy2(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
-        """Localize yy-derivative of space support function.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            TimeSupport: Time support function.
-        """
-        msg = "This decomposition does not implement yy-derivative."
-        raise NotImplementedError(msg)
-
-    def localize_dx3(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
-        """Localize xxx-derivative of space support function.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            TimeSupport: Time support function.
-        """
-        msg = "This decomposition does not implement xxx-derivative."
-        raise NotImplementedError(msg)
-
-    def localize_dy3(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
-        """Localize yyy-derivative of space support function.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            TimeSupport: Time support function.
-        """
-        msg = "This decomposition does not implement yyy-derivative."
-        raise NotImplementedError(msg)
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dydx2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
-        """Localize xxy-derivative of space support function.
+    ) -> TimeSupportFunction:
+        """Localize wavelets x-x-y derivative.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
-        msg = "This decomposition does not implement xxy-derivative."
-        raise NotImplementedError(msg)
+        space_fields = self._build_space_dydx2(xx=xx, yy=yy)
+
+        return self.generate_time_support(self._time, space_fields)
+
+    def localize_dy(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
+        """Localize wavelets y-derivative.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            TimeSupportFunction: Time support function.
+        """
+        space_fields = self._build_space_dy(xx=xx, yy=yy)
+
+        return self.generate_time_support(self._time, space_fields)
+
+    def localize_dy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
+        """Localize wavelets second order y-derivative.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            TimeSupportFunction: Time support function.
+        """
+        space_fields = self._build_space_dy2(xx=xx, yy=yy)
+
+        return self.generate_time_support(self._time, space_fields)
+
+    def localize_dy3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupportFunction:
+        """Localize wavelets third order y-derivative.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            TimeSupportFunction: Time support function.
+        """
+        space_fields = self._build_space_dy3(xx=xx, yy=yy)
+
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dxdy2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
-        """Localize yyx-derivative of space support function.
+    ) -> TimeSupportFunction:
+        """Localize wavelets y-y-x derivative.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
-        msg = "This decomposition does not implement yyx-derivative."
-        raise NotImplementedError(msg)
+        space_fields = self._build_space_dxdy2(xx=xx, yy=yy)
+
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
-        """Localize laplacian of space support function.
+    ) -> TimeSupportFunction:
+        """Localize wavelets second order y-derivative.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
-        msg = "This decomposition does not implement laplacian."
-        raise NotImplementedError(msg)
+        dx2 = self._build_space_dx2(xx=xx, yy=yy)
+        dy2 = self._build_space_dy2(xx=xx, yy=yy)
+        space_fields = {k: dx2[k] + dy2[k] for k in dx2}
+
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dx_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
-        """Localize x-derivative of laplacian of space support function.
+    ) -> TimeSupportFunction:
+        """Localize wavelets x derivative of laplacian.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
-        msg = "This decomposition does not implement dx laplacian."
-        raise NotImplementedError(msg)
+        dx3 = self._build_space_dx3(xx=xx, yy=yy)
+        dxdy2 = self._build_space_dxdy2(xx=xx, yy=yy)
+        space_fields = {k: dx3[k] + dxdy2[k] for k in dx3}
+
+        return self.generate_time_support(self._time, space_fields)
 
     def localize_dy_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
-        """Localize y-derivative of laplacian of space support function.
+    ) -> TimeSupportFunction:
+        """Localize wavelets x derivative of laplacian.
 
         Args:
             xx (torch.Tensor): X locations.
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupport: Time support function.
+            TimeSupportFunction: Time support function.
         """
+        dydx2 = self._build_space_dydx2(xx=xx, yy=yy)
+        dy3 = self._build_space_dy3(xx=xx, yy=yy)
+        space_fields = {k: dydx2[k] + dy3[k] for k in dydx2}
+
+        return self.generate_time_support(self._time, space_fields)
+
+    @abstractmethod
+    def _build_space(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport: ...
+
+    def _build_space_dx(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement x-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_dy(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement y-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_dx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement xx-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_dy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement yy-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_dx3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement xxx-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_dy3(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement yyy-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_dydx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement xxy-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_dxdy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement yyx-derivative."
+        raise NotImplementedError(msg)
+
+    def _build_space_laplacian(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement laplacian."
+        raise NotImplementedError(msg)
+
+    def _build_space_dx_laplacian(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
+        msg = "This decomposition does not implement dx laplacian."
+        raise NotImplementedError(msg)
+
+    def _build_space_dy_laplacian(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> TimeSupport:
         msg = "This decomposition does not implement dy laplacian."
         raise NotImplementedError(msg)
