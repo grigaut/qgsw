@@ -13,6 +13,7 @@ from qgsw.specs import defaults
 if TYPE_CHECKING:
     import torch
 
+    from qgsw.decomposition.coefficients import DecompositionCoefs
 TimeSupport = TypeVar("TimeSupport", bound=TimeSupportFunction)
 SpaceSupport = TypeVar("SpaceSupport", bound=SpaceSupportFunction)
 
@@ -63,26 +64,26 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
         """Total number of elements."""
 
     @abstractmethod
-    def generate_random_coefs(self) -> dict[int, torch.Tensor]:
+    def generate_random_coefs(self) -> DecompositionCoefs:
         """Generate random coefficient.
 
         Useful to properly instantiate coefs.
 
         Returns:
-            dict[int, torch.Tensor]: Level -> coefficients.
+            DecompositionCoefs: Level -> coefficients.
                 ├── 0: coefficents for level 0.
                 ├── ...
                 └── order-1: coefficient for level order-1
         """
 
-    def set_coefs(self, coefs: dict[int, torch.Tensor]) -> None:
+    def set_coefs(self, coefs: DecompositionCoefs) -> None:
         """Set coefficients values.
 
         To ensure consistent coefficients shapes, best is to use
         self.generate_random_coefs().
 
         Args:
-            coefs (dict[int, torch.Tensor]): Level -> coefficients.
+            coefs (DecompositionCoefs): Level -> coefficients.
                 ├── 0: coefficents for level 0.
                 ├── ...
                 └── order-1: coefficient for level order-1

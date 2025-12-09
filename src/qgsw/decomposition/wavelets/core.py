@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.cosine import (
     CosineBasisFunctions,
 )
@@ -86,13 +87,13 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
 
         return n * self.phase.numel() * self.n_theta
 
-    def generate_random_coefs(self) -> dict[int, torch.Tensor]:
+    def generate_random_coefs(self) -> DecompositionCoefs:
         """Generate random coefficient.
 
         Useful to properly instantiate coefs.
 
         Returns:
-            dict[int, torch.Tensor]: Level -> coefficients.
+            DecompositionCoefs: Level -> coefficients.
                 ├── 0: (1, 1)-shaped
                 ├── 1: (2, 4)-shaped
                 ├── 2: (4, 16)-shaped
@@ -113,7 +114,7 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
                 **self._specs,
             )
 
-        return coefs
+        return DecompositionCoefs.from_dict(coefs)
 
     def _compute_space_params(
         self, params: dict[str, Any], xx: torch.Tensor, yy: torch.Tensor
