@@ -70,6 +70,40 @@ class TaylorExpBasis(
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.field)
         return fields
 
+    def _build_space_dx(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
+
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
+
+            x, y = self._compute_space_params(params, xx, yy)
+
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx)
+        return fields
+
+    def _build_space_dy(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, torch.Tensor]:
+        fields = {}
+
+        for lvl, c in self._coefs.items():
+            params = self._space[lvl]
+            sx: float = params["sigma_x"]
+            sy: float = params["sigma_y"]
+
+            x, y = self._compute_space_params(params, xx, yy)
+
+            E = GaussianSupport(x, y, sx, sy)
+            e = NormalizedGaussianSupport(E)
+            fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy)
+        return fields
+
     def localize(self, xx: Tensor, yy: Tensor) -> TaylorSeriesTimeSupport:  # noqa: D102
         space_fields = self._build_space(xx=xx, yy=yy)
 
@@ -78,3 +112,21 @@ class TaylorExpBasis(
     localize.__doc__ = SpaceTimeDecomposition[
         NormalizedGaussianSupport, TaylorSeriesTimeSupport
     ].localize.__doc__
+
+    def localize_dx(self, xx: Tensor, yy: Tensor) -> TaylorSeriesTimeSupport:  # noqa: D102
+        space_fields = self._build_space_dx(xx=xx, yy=yy)
+
+        return TaylorSeriesTimeSupport(self._time, space_fields)
+
+    localize_dx.__doc__ = SpaceTimeDecomposition[
+        NormalizedGaussianSupport, TaylorSeriesTimeSupport
+    ].localize_dx.__doc__
+
+    def localize_dy(self, xx: Tensor, yy: Tensor) -> TaylorSeriesTimeSupport:  # noqa: D102
+        space_fields = self._build_space_dy(xx=xx, yy=yy)
+
+        return TaylorSeriesTimeSupport(self._time, space_fields)
+
+    localize_dy.__doc__ = SpaceTimeDecomposition[
+        NormalizedGaussianSupport, TaylorSeriesTimeSupport
+    ].localize_dy.__doc__
