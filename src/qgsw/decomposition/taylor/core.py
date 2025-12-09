@@ -3,6 +3,7 @@
 import torch
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.full_field import FullFieldSpaceSupport
 from qgsw.decomposition.supports.time.taylor import TaylorSeriesTimeSupport
 
@@ -19,7 +20,7 @@ class TaylorFullFieldBasis(
         FullFieldSpaceSupport, TaylorSeriesTimeSupport
     ].numel.__doc__
 
-    def generate_random_coefs(self) -> dict[int, torch.Tensor]:  # noqa: D102
+    def generate_random_coefs(self) -> DecompositionCoefs:  # noqa: D102
         coefs = {}
         for k in self._space:
             coefs[k] = torch.randn(
@@ -30,7 +31,7 @@ class TaylorFullFieldBasis(
                 **self._specs,
             )
 
-        return coefs
+        return DecompositionCoefs.from_dict(coefs)
 
     numel.__doc__ = SpaceTimeDecomposition[
         FullFieldSpaceSupport, TaylorSeriesTimeSupport
