@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, TypeVar
 
 import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets import (
     WaveletBasis,
 )
@@ -27,8 +29,9 @@ from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad
+from qgsw.solver.finite_diff import grad, laplacian
 from qgsw.spatial.core.discretization import (
+    SpaceDiscretization2D,
     SpaceDiscretization3D,
 )
 from qgsw.spatial.core.grid_conversion import interpolate
@@ -36,6 +39,14 @@ from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
 from qgsw.utils.reshaping import crop
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from qgsw.decomposition.base import SpaceTimeDecomposition
+    from qgsw.decomposition.supports.space.base import SpaceSupportFunction
+    from qgsw.decomposition.supports.time.base import TimeSupportFunction
+
 
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
@@ -45,7 +56,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_rgmd_reg",
+    prefix_default="results_forced_colrgmd_reg",
 )
 specs = defaults.get()
 
@@ -170,9 +181,12 @@ y0 = model_3l.y0
 
 
 ## Inhomogeneous models
+M = TypeVar("M", bound=QGPSIQ)
+
+
 def set_inhomogeneous_model(
-    model: QGPSIQForcedMDWV,
-) -> QGPSIQForcedMDWV:
+    model: M,
+) -> M:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0
@@ -216,7 +230,6 @@ if not args.no_wind:
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
-gamma = 100 / comparison_interval
 
 # Compute PV
 
@@ -255,6 +268,104 @@ compute_q = lambda psi1, psi2: compute_q1_interior(
     beta_effect_w,
 )
 
+
+def compute_regularization_func(
+    psi2_basis: SpaceTimeDecomposition[
+        SpaceSupportFunction, TimeSupportFunction
+    ],
+    alpha: torch.Tensor,
+    space: SpaceDiscretization2D,
+) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
+    """Build regularization function.
+
+    Args:
+        psi2_basis (SpaceTimeDecomposition): Basis.
+        alpha (torch.Tensor): Collinearity coefficient.
+        space (SpaceDiscretization2D): Space.
+
+    Returns:
+        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
+            Regularization function.
+    """
+    q = space.q.xy
+    x = crop(q.x, 1)
+    y = crop(q.y, 1)
+
+    fpsi2 = psi2_basis.localize(x, y)
+    fdx_psi2 = psi2_basis.localize_dx(x, y)
+    fdy_psi2 = psi2_basis.localize_dy(x, y)
+    flap_psi2 = psi2_basis.localize_laplacian(x, y)
+    fdx_lap_psi2 = psi2_basis.localize_dx_laplacian(x, y)
+    fdy_lap_psi2 = psi2_basis.localize_dy_laplacian(x, y)
+
+    def compute_reg(
+        psi1: torch.Tensor,
+        dpsi1: torch.Tensor,
+        time: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute regularization term.
+
+        Args:
+            psi1 (torch.Tensor): Top layer stream function.
+            dpsi1 (torch.Tensor): Top layer stream function derivative.
+            time (torch.Tensor): Time.
+
+        Returns:
+            torch.Tensor: ∂ₜq₂ + J(ѱ₂, q₂)
+        """
+        dt_lap_psi2 = flap_psi2.dt(time) + alpha * interpolate(
+            laplacian(dpsi1, dx, dy)
+        )
+        dt_psi2 = fpsi2.dt(time) + alpha * interpolate(crop(dpsi1, 1))
+
+        dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
+            (1 / H2 / g2) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
+            + 1 / H2 / g3 * (dt_psi2)
+        )
+
+        dx_psi1, dy_psi1 = grad(psi1)
+        dx_psi1 /= dx
+        dy_psi1 /= dy
+
+        dx_psi1_i = (dx_psi1[..., 1:] + dx_psi1[..., :-1]) / 2
+        dy_psi1_i = (dy_psi1[..., 1:, :] + dy_psi1[..., :-1, :]) / 2
+
+        dx_psi2 = fdx_psi2(time) + alpha * crop(dx_psi1_i, 1)
+        dy_psi2 = fdy_psi2(time) + alpha * crop(dy_psi1_i, 1)
+
+        lap_dy_psi1 = laplacian(dy_psi1_i, dx, dy)
+
+        dy_q2 = (
+            fdy_lap_psi2(time)
+            + alpha * lap_dy_psi1
+            - beta_plane.f0**2
+            * (
+                (1 / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1))
+                + 1 / H2 / g3 * (dy_psi2)
+            )
+        ) + beta_plane.beta
+
+        lap_dx_psi1 = laplacian(dx_psi1_i, dx, dy)
+
+        dx_q2 = (
+            fdx_lap_psi2(time)
+            + alpha * lap_dx_psi1
+            - beta_plane.f0**2
+            * (
+                (1 / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1))
+                + 1 / H2 / g3 * (dx_psi2)
+            )
+        )
+
+        adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
+        return ((dt_q2 + adv_q2) / U * L * T).square().sum()
+
+    return compute_reg
+
+
+gamma = 100 / comparison_interval
+
+
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
     times = [model_3l.time.item()]
@@ -280,87 +391,72 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    wv_space, wv_time = dyadic_decomposition(
-        order=5,
+    space_params, time_params = dyadic_decomposition(
+        order=4,
         xx_ref=space_slice_w.psi.xy.x,
         yy_ref=space_slice_w.psi.xy.y,
         Lxy_max=900_000,
         Lt_max=n_steps_per_cyle * dt,
     )
-    basis = WaveletBasis(wv_space, wv_time)
+    basis = WaveletBasis(space_params, time_params)
     basis.n_theta = 7
 
     msg = f"Using basis of order {basis.order}"
     logger.info(msg)
 
     coefs = basis.generate_random_coefs()
-    coefs_adim = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
-    }
+    coefs = DecompositionCoefs.zeros_like(coefs)
+    coefs = coefs.requires_grad_()
+    alpha = torch.tensor(0, **specs, requires_grad=True)
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    numel = basis.numel()
+    numel = coefs.numel() + alpha.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [
             {
-                "params": list(coefs_adim.values()),
+                "params": [alpha],
+                "lr": 1e-2,
+                "name": "ɑ",  # noqa: RUF001
+            },
+            {
+                "params": list(coefs.values()),
                 "lr": 1e0,
                 "name": "Wavelet coefs",
             },
         ]
     )
     lr_change_on_plateau = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=20
+        optimizer, factor=0.5, patience=5
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()}
-    )
+    coefs_scaled = coefs.scale(*(psi0_mean for _ in range(basis.order)))
+    register_params = RegisterParams(alpha=alpha, coefs=coefs_scaled.to_dict())
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
         model.reset_time()
 
         with torch.enable_grad():
-            coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
-            basis.set_coefs(coefs)
-            model.wavelets = basis
-
-            wv_lap_psi2 = basis.localize_laplacian(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
+            model.alpha = torch.ones_like(model.psi) * alpha
+            coefs_scaled = coefs.scale(
+                *(psi0_mean for _ in range(basis.order))
             )
-            wv_psi2 = basis.localize(
-                space_slice.q.xy.x,
-                space_slice.q.xy.y,
-            )
-            wv_dx_psi2 = basis.localize_dx(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-            wv_dy_psi2 = basis.localize_dy(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dx_lap_psi2 = basis.localize_dx_laplacian(
-                space_slice.v.xy.x,
-                space_slice.v.xy.y,
-            )
-            wv_dy_lap_psi2 = basis.localize_dy_laplacian(
-                space_slice.u.xy.x,
-                space_slice.u.xy.y,
-            )
-
+            basis.set_coefs(coefs_scaled)
+            model.basis = basis
             wv_loc = basis.localize(
                 space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
             )
+
+            compute_reg = compute_regularization_func(
+                basis, alpha, space_slice
+            )
             qs = (
-                compute_q(p1, wv_loc(model.time + n * model.dt))
+                compute_q(p1, wv_loc(model.time + n * model.dt) + alpha * p1)
                 for n, p1 in enumerate(psis)
             )
             q_bcs = [
@@ -370,7 +466,10 @@ for c in range(n_cycles):
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
             model.set_psiq(
-                crop(psi0, p), crop(compute_q(psi0, wv_loc(model.time)), p - 1)
+                crop(psi0, p),
+                crop(
+                    compute_q(psi0, wv_loc(model.time) + alpha * psi0), p - 1
+                ),
             )
 
             loss = torch.tensor(0, **defaults.get())
@@ -383,39 +482,8 @@ for c in range(n_cycles):
                 model.step()
                 psi1 = model.psi[0, 0]
                 dpsi1 = (psi1_ - psi1) / model.dt
-                dx_psi1, dy_psi1 = grad(psi1_)
-                dx_psi1 /= space.dx
-                dy_psi1 /= space.dy
 
-                lap_dt = wv_lap_psi2.dt(time + model.dt / 2)
-                dt_psi2 = wv_psi2.dt(time + model.dt / 2)
-
-                dt_q2 = (
-                    lap_dt[None, None, ...]
-                    - beta_plane.f0**2
-                    / H2
-                    / g2
-                    * (dt_psi2[None, None, ...] - interpolate(dpsi1))
-                    - beta_plane.f0**2 / H2 / g3 * (dt_psi2[None, None, ...])
-                )
-
-                dy_psi2_dx_q2 = -wv_dy_psi2(time)[None, None, ...] * (
-                    wv_dx_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dx_psi1
-                )
-                dx_psi2_dy_q2 = wv_dx_psi2(time)[None, None, ...] * (
-                    wv_dy_lap_psi2(time)[None, None, ...]
-                    + beta_plane.f0**2 / H2 / g2 * dy_psi1
-                    + beta_plane.beta
-                )
-
-                adv2 = (
-                    dy_psi2_dx_q2[..., :, 1:] + dy_psi2_dx_q2[..., :, :-1]
-                ) / 2 + (
-                    dx_psi2_dy_q2[..., 1:, :] + dx_psi2_dy_q2[..., :-1, :]
-                ) / 2
-
-                loss += gamma * ((dt_q2 + adv2) / U * L * T).square().sum()
+                loss += gamma * compute_reg(psi1_, dpsi1, time)
 
                 if n % comparison_interval == 0:
                     loss += rmse(
@@ -428,9 +496,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params.step(
-            loss, **{f"coefs_{k}": v for k, v in coefs.items()}
-        )
+        register_params.step(loss, alpha=alpha, coefs=coefs_scaled.to_dict())
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
@@ -447,9 +513,8 @@ for c in range(n_cycles):
         logger.info(msg)
 
         loss.backward()
-
-        for v in coefs_adim.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
+        torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1)
+        torch.nn.utils.clip_grad_value_([alpha], clip_value=1)
 
         optimizer.step()
         lr_change_on_plateau.step(loss)
@@ -466,10 +531,7 @@ for c in range(n_cycles):
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
-            "order": basis.order,
-            "n_theta": basis.n_theta,
-            "wv_space": wv_space,
-            "wv_time": wv_time,
+            "basis": basis.get_params(),
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),

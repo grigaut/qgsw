@@ -3,7 +3,9 @@
 import torch
 from torch import Tensor
 
-from qgsw.decomposition.wavelets import WaveletBasis
+from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.supports.space.base import SpaceSupportFunction
+from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.fields.variables.state import StatePSIQ, StatePSIQAlpha
 from qgsw.fields.variables.tuples import (
     PSIQ,
@@ -199,23 +201,27 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
 class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
-    _wavelets: WaveletBasis
+    _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
 
     @property
-    def wavelets(self) -> WaveletBasis:
-        """Forcing term.
+    def basis(
+        self,
+    ) -> SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]:
+        """Decomposition basis."""
+        return self._basis
 
-        └── (n_ens, nl, nx, ny)-shaped
-        """
-        return self._wavelets
-
-    @wavelets.setter
-    def wavelets(self, wavelets: WaveletBasis) -> None:
-        self._wavelets = wavelets
+    @basis.setter
+    def basis(
+        self,
+        basis: SpaceTimeDecomposition[
+            SpaceSupportFunction, TimeSupportFunction
+        ],
+    ) -> None:
+        self._basis = basis
         space = self.space.remove_z_h()
-        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
-        self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
-        self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
+        self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
+        self._fpsi2_dx = basis.localize_dx(space.u.xy.x, space.u.xy.y)
+        self._fpsi2_dy = basis.localize_dy(space.v.xy.x, space.v.xy.y)
 
     def __init__(
         self,
@@ -396,9 +402,9 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         u /= self.space.dy
         v /= self.space.dx
 
-        dt_psi2 = self._wv.dt(time)
-        dx_psi2 = self._wv_dx(time)
-        dy_psi2 = self._wv_dy(time)
+        dt_psi2 = self._fpsi2.dt(time)
+        dx_psi2 = self._fpsi2_dx(time)
+        dy_psi2 = self._fpsi2_dy(time)
 
         u_dxpsi2 = u * dx_psi2
         v_dypsi2 = v * dy_psi2
@@ -565,25 +571,27 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
-    _wavelets: WaveletBasis
+    _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
 
     @property
-    def wavelets(self) -> WaveletBasis:
-        """Forcing term.
+    def basis(
+        self,
+    ) -> SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]:
+        """Decomposition basis."""
+        return self._basis
 
-        └── (n_ens, nl, nx, ny)-shaped
-        """
-        if self._wavelets is None:
-            return torch.zeros_like(self.q)
-        return self._wavelets
-
-    @wavelets.setter
-    def wavelets(self, wavelets: WaveletBasis) -> None:
-        self._wavelets = wavelets
+    @basis.setter
+    def basis(
+        self,
+        basis: SpaceTimeDecomposition[
+            SpaceSupportFunction, TimeSupportFunction
+        ],
+    ) -> None:
+        self._basis = basis
         space = self.space.remove_z_h()
-        self._wv = wavelets.localize(space.q.xy.x, space.q.xy.y)
-        self._wv_dx = wavelets.localize_dx(space.u.xy.x, space.u.xy.y)
-        self._wv_dy = wavelets.localize_dy(space.v.xy.x, space.v.xy.y)
+        self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
+        self._fpsi2_dx = basis.localize_dx(space.u.xy.x, space.u.xy.y)
+        self._fpsi2_dy = basis.localize_dy(space.v.xy.x, space.v.xy.y)
 
     def __init__(
         self,
@@ -765,8 +773,8 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         u /= self.space.dy
         v /= self.space.dx
 
-        dx_psi2 = self._wv_dx(time)
-        dy_psi2 = self._wv_dy(time)
+        dx_psi2 = self._fpsi2_dx(time)
+        dy_psi2 = self._fpsi2_dy(time)
 
         u_dxpsi2 = u * dx_psi2
         v_dypsi2 = v * dy_psi2
@@ -785,7 +793,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         Returns:
             torch.Tensor: -f₀²ѱ₂/H₂g₂
         """
-        dt_psi2 = self._wv.dt(time)
+        dt_psi2 = self._fpsi2.dt(time)
         return (self.beta_plane.f0**2) * self._A12 * dt_psi2
 
     def _compute_time_derivatives_homogeneous(

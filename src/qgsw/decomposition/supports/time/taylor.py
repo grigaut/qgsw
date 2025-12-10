@@ -28,7 +28,9 @@ class TaylorSeriesTimeSupport(TimeSupportFunction):
         for lvl in self.params:
             fact_lvl = factorial(lvl)
 
-            fields[lvl] = t**lvl / fact_lvl * self._space[lvl]
+            fields[lvl] = torch.einsum(
+                "t,txy->xy", t**lvl / fact_lvl, self._space[lvl]
+            )
         return fields
 
     decompose.__doc__ = TimeSupportFunction.decompose.__doc__
@@ -43,10 +45,12 @@ class TaylorSeriesTimeSupport(TimeSupportFunction):
         fields = {}
         for lvl in self.params:
             if lvl == 0:
-                fields[lvl] = torch.zeros_like(self._space[lvl])
+                fields[lvl] = torch.zeros_like(self._space[lvl][0])
                 continue
             fact_lvl = factorial(lvl - 1)
-            fields[lvl] = t ** (lvl - 1) / fact_lvl * self._space[lvl]
+            fields[lvl] = torch.einsum(
+                "t,txy->xy", t ** (lvl - 1) / fact_lvl, self._space[lvl]
+            )
         return fields
 
     decompose_dt.__doc__ = TimeSupportFunction.decompose_dt.__doc__

@@ -4,14 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
+from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.coefficients import DecompositionCoefs
+from qgsw.decomposition.supports.space.cosine import (
+    CosineBasisFunctions,
+)
 from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
 )
+from qgsw.decomposition.supports.space.gaussian_cosine import ExpCosSupport
 from qgsw.decomposition.supports.time.gaussian import (
     GaussianTimeSupport,
 )
-from qgsw.decomposition.wavelets.basis_functions import CosineBasisFunctions
 from qgsw.decomposition.wavelets.param_generators import (
     dyadic_decomposition,
     linear_decomposition,
@@ -24,10 +29,8 @@ except ImportError:
 
 import torch
 
-from qgsw.specs import defaults
 
-
-class WaveletBasis:
+class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
     """Wavelet decomposition.
 
     ΣΣ[E(t)/ΣE(t)]Σe(x,y)ΣΣcγ(x,y)
@@ -38,6 +41,7 @@ class WaveletBasis:
     γ(x,y) = cos(kx x cos(θ) + ky y sin(θ) + φ)
     """
 
+    _type = "wavelets"
     _n_theta = 10
 
     @property
@@ -53,11 +57,6 @@ class WaveletBasis:
         ]
         self._cos_t = torch.cos(theta)
         self._sin_t = torch.sin(theta)
-
-    @property
-    def order(self) -> int:
-        """Decomposition order."""
-        return self._order
 
     def __init__(
         self,
@@ -77,23 +76,9 @@ class WaveletBasis:
             device (torch.device | None, optional): Ddevice.
                 Defaults to None.
         """
-        self._check_validity(space_params, time_params)
-        self._order = len(space_params.keys())
-        self._specs = defaults.get(dtype=dtype, device=device)
-        self._space = space_params
-        self._time = time_params
+        super().__init__(space_params, time_params, dtype=dtype, device=device)
         self.n_theta = self._n_theta
         self.phase = torch.tensor([0, torch.pi / 2], **self._specs)
-
-    def _check_validity(
-        self,
-        space_params: dict[str, Any],
-        time_params: dict[str, Any],
-    ) -> None:
-        """Check parameters validity."""
-        if space_params.keys() != time_params.keys():
-            msg = "Mismatching keys between space and time parameters."
-            raise ValueError(msg)
 
     def numel(self) -> int:
         """Total number of elements."""
@@ -103,13 +88,13 @@ class WaveletBasis:
 
         return n * self.phase.numel() * self.n_theta
 
-    def generate_random_coefs(self) -> dict[int, torch.Tensor]:
+    def generate_random_coefs(self) -> DecompositionCoefs:
         """Generate random coefficient.
 
         Useful to properly instantiate coefs.
 
         Returns:
-            dict[int, torch.Tensor]: Level -> coefficients.
+            DecompositionCoefs: Level -> coefficients.
                 ├── 0: (1, 1)-shaped
                 ├── 1: (2, 4)-shaped
                 ├── 2: (4, 16)-shaped
@@ -130,25 +115,7 @@ class WaveletBasis:
                 **self._specs,
             )
 
-        return coefs
-
-    def set_coefs(self, coefs: dict[int, torch.Tensor]) -> None:
-        """Set coefficients values.
-
-        To ensure consistent coefficients shapes, best is to use
-        self.generate_random_coefs().
-
-        Args:
-            coefs (torch.Tensor): Coefficients.
-                ├── 0: (1, 1)-shaped
-                ├── 1: (2, 4)-shaped
-                ├── 2: (4, 16)-shaped
-                ├── ...
-                ├── p: (2**p, (2**p)**2)-shaped
-                ├── ...
-                └── order: (2**order, (2**order)**2)-shaped
-        """
-        self._coefs = coefs
+        return DecompositionCoefs.from_dict(coefs)
 
     def _compute_space_params(
         self, params: dict[str, Any], xx: torch.Tensor, yy: torch.Tensor
@@ -201,11 +168,12 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            lambd = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.field)
-            # ꟛ = e γ
-            fields[lvl] = torch.einsum("tcop,cxyop->txyop", c, lambd).mean(
-                dim=[-1, -2]
-            )
+            space_support = ExpCosSupport(e, gamma)
+            fields[lvl] = torch.einsum(
+                "tcop,cxyop->txyop",
+                c,
+                space_support.field,
+            ).mean(dim=[-1, -2])
         return fields
 
     def _build_space_dx(
@@ -246,13 +214,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.field)
-            # ꟛ2 = e γ'
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx)
-            # coefs * (e' γ + e γ')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2
+                "tcop,cxyop->txyop", coefs, space_support.dx
             ).mean(dim=[-1, -2])
 
         return fields
@@ -295,15 +260,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e'' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.field)
-            # ꟛ2 = 2e' γ'
-            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dx)
-            # ꟛ3 = e γ''
-            lambda3 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx2)
-            # coefs * (e'' γ +2e' γ'+ e γ'')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2 + lambda3
+                "tcop,cxyop->txyop", coefs, space_support.dx2
             ).mean(dim=[-1, -2])
 
         return fields
@@ -345,19 +305,12 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e''' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dx3, gamma.field)
-            # ꟛ2 = 3e'' γ'
-            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.dx)
-            # ꟛ3 = 3e' γ''
-            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dx2)
-            # ꟛ4 = e γ'''
-            lambda4 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dx3)
-            # coefs * (e''' γ + 3e' γ'' + 3 e' γ'' + e γ''')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop",
                 coefs,
-                lambda1 + lambda2 + lambda3 + lambda4,
+                space_support.dx3,
             ).mean(dim=[-1, -2])
 
         return fields
@@ -400,25 +353,12 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = ∂_xxy e γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dydx2, gamma.field)
-            # ꟛ2 = ∂_xx e ∂_y γ
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.dx2, gamma.dy)
-            # ꟛ3 = 2 ∂_xy e ∂_x γ
-            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dydx, gamma.dx)
-            # ꟛ4 = 2 ∂_x e ∂_xy γ
-            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dydx)
-            # ꟛ5 = ∂_y e ∂_xx γ
-            lambda5 = torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dx2)
-            # ꟛ5 = e ∂_xxy γ
-            lambda6 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dydx2)
-            # coefs * ( ∂_xxy e γ + ∂_xx e ∂_y γ +
-            #   2 ∂_xy e ∂_x γ + 2 ∂_x e ∂_xy γ +
-            #   ∂_y e ∂_xx γ + e ∂_xxy γ )
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
                 "tcop,cxyop->txyop",
                 coefs,
-                lambda1 + lambda2 + lambda3 + lambda4 + lambda5 + lambda6,
+                space_support.dydx2,
             ).mean(dim=[-1, -2])
 
         return fields
@@ -460,13 +400,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.field)
-            # ꟛ2 = e γ'
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy)
-            # coefs * (e' γ + e γ')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2
+                "tcop,cxyop->txyop", coefs, space_support.dy
             ).mean(dim=[-1, -2])
 
         return fields
@@ -508,15 +445,10 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e'' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.field)
-            # ꟛ2 = 2e' γ'
-            lambda2 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dy)
-            # ꟛ3 = e γ''
-            lambda3 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy2)
-            # coefs * (e'' γ +2e' γ'+ e γ'')
+            space_support = ExpCosSupport(e, gamma)
+
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop", coefs, lambda1 + lambda2 + lambda3
+                "tcop,cxyop->txyop", coefs, space_support.dy2
             ).mean(dim=[-1, -2])
 
         return fields
@@ -559,19 +491,9 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = e''' γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dy3, gamma.field)
-            # ꟛ2 = 3e'' γ'
-            lambda2 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.dy)
-            # ꟛ3 = 3e' γ''
-            lambda3 = 3 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dy2)
-            # ꟛ4 = e γ'''
-            lambda4 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dy3)
-            # coefs * (e''' γ + 3e' γ'' + 3 e' γ'' + e γ''')
+            space_support = ExpCosSupport(e, gamma)
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop",
-                coefs,
-                lambda1 + lambda2 + lambda3 + lambda4,
+                "tcop,cxyop->txyop", coefs, space_support.dy3
             ).mean(dim=[-1, -2])
 
         return fields
@@ -614,25 +536,9 @@ class WaveletBasis:
             E = GaussianSupport(x, y, sx, sy)
             e = NormalizedGaussianSupport(E)
 
-            # ꟛ1 = ∂_yyx e γ
-            lambda1 = torch.einsum("cxy,cxyop->cxyop", e.dxdy2, gamma.field)
-            # ꟛ2 = ∂_yy e ∂_x γ
-            lambda2 = torch.einsum("cxy,cxyop->cxyop", e.dy2, gamma.dx)
-            # ꟛ3 = 2 ∂_yx e ∂_y γ
-            lambda3 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dxdy, gamma.dy)
-            # ꟛ4 = 2 ∂_y e ∂_yx γ
-            lambda4 = 2 * torch.einsum("cxy,cxyop->cxyop", e.dy, gamma.dxdy)
-            # ꟛ5 = ∂_x e ∂_yy γ
-            lambda5 = torch.einsum("cxy,cxyop->cxyop", e.dx, gamma.dy2)
-            # ꟛ6 = e ∂_yyx γ
-            lambda6 = torch.einsum("cxy,cxyop->cxyop", e.field, gamma.dxdy2)
-            # coefs * ( ∂_yyx e γ + ∂_yy e ∂_x γ +
-            #   2 ∂_yx e ∂_y γ + 2 ∂_y e ∂_yx γ +
-            #   ∂_x e ∂_yy γ + e ∂_yyx γ )
+            space_support = ExpCosSupport(e, gamma)
             fields[lvl] = torch.einsum(
-                "tcop,cxyop->txyop",
-                coefs,
-                lambda1 + lambda2 + lambda3 + lambda4 + lambda5 + lambda6,
+                "tcop,cxyop->txyop", coefs, space_support.dxdy2
             ).mean(dim=[-1, -2])
 
         return fields
@@ -691,204 +597,6 @@ class WaveletBasis:
         return GaussianTimeSupport(time_params, space_fields)
 
     generate_time_support = _generate_time_support
-
-    def localize(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dx(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets x-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dx(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dx2(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets second order x-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dx2(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dx3(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets third order x-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dx3(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dydx2(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets x-x-y derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dydx2(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dy(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets y-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dy(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dy2(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets second order y-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dy2(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dy3(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets third order y-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dy3(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dxdy2(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets y-y-x derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        space_fields = self._build_space_dxdy2(xx=xx, yy=yy)
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_laplacian(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets second order y-derivative.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        dx2 = self._build_space_dx2(xx=xx, yy=yy)
-        dy2 = self._build_space_dy2(xx=xx, yy=yy)
-        space_fields = {k: dx2[k] + dy2[k] for k in dx2}
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dx_laplacian(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets x derivative of laplacian.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        dx3 = self._build_space_dx3(xx=xx, yy=yy)
-        dxdy2 = self._build_space_dxdy2(xx=xx, yy=yy)
-        space_fields = {k: dx3[k] + dxdy2[k] for k in dx3}
-
-        return self.generate_time_support(self._time, space_fields)
-
-    def localize_dy_laplacian(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> GaussianTimeSupport:
-        """Localize wavelets x derivative of laplacian.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            GaussianTimeSupport: Time support function.
-        """
-        dydx2 = self._build_space_dydx2(xx=xx, yy=yy)
-        dy3 = self._build_space_dy3(xx=xx, yy=yy)
-        space_fields = {k: dydx2[k] + dy3[k] for k in dydx2}
-
-        return self.generate_time_support(self._time, space_fields)
 
     @classmethod
     def from_dyadic_decomposition(
@@ -949,3 +657,27 @@ class WaveletBasis:
             Lt_max=Lt_max,
         )
         return cls(space_params, time_params)
+
+    def get_params(self) -> dict[str, Any]:
+        """Return decomposition params as dict.
+
+        Returns:
+            dict[str, Any]: Decomposition params.
+        """
+        params = super().get_params()
+        params["n_theta"] = self.n_theta
+        return params
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> Self:
+        """Build class from params dict.
+
+        Args:
+            params (dict[str, Any]): Decomposition params.
+
+        Returns:
+            Self: Instance of class.
+        """
+        obj = cls(space_params=params["space"], time_params=params["time"])
+        obj.n_theta = params["n_theta"]
+        return obj

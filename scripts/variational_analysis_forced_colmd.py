@@ -8,6 +8,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets import (
     WaveletBasis,
 )
@@ -278,28 +279,27 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    wv_space, wv_time = dyadic_decomposition(
+    space_params, time_params = dyadic_decomposition(
         order=5,
         xx_ref=space_slice_w.psi.xy.x,
         yy_ref=space_slice_w.psi.xy.y,
         Lxy_max=900_000,
         Lt_max=n_steps_per_cyle * dt,
     )
-    basis = WaveletBasis(wv_space, wv_time)
+    basis = WaveletBasis(space_params, time_params)
     basis.n_theta = 7
 
     msg = f"Using basis of order {basis.order}"
     logger.info(msg)
 
     coefs = basis.generate_random_coefs()
-    coefs_adim = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
-    }
+    coefs = DecompositionCoefs.zeros_like(coefs)
+    coefs = coefs.requires_grad_()
     alpha = torch.tensor(0, **specs, requires_grad=True)
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    numel = basis.numel() + alpha.numel()
+    numel = coefs.numel() + alpha.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
@@ -311,7 +311,7 @@ for c in range(n_cycles):
                 "name": "ɑ",  # noqa: RUF001
             },
             {
-                "params": list(coefs_adim.values()),
+                "params": list(coefs.values()),
                 "lr": 1e0,
                 "name": "Wavelet coefs",
             },
@@ -322,10 +322,9 @@ for c in range(n_cycles):
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()},
-        alpha=alpha,
-    )
+
+    coefs_scaled = coefs.scale(*(psi0_mean for _ in range(basis.order)))
+    register_params = RegisterParams(alpha=alpha, coefs=coefs_scaled.to_dict())
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
@@ -333,9 +332,11 @@ for c in range(n_cycles):
 
         with torch.enable_grad():
             model.alpha = torch.ones_like(model.psi) * alpha
-            coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
-            basis.set_coefs(coefs)
-            model.wavelets = basis
+            coefs_scaled = coefs.scale(
+                *(psi0_mean for _ in range(basis.order))
+            )
+            basis.set_coefs(coefs_scaled)
+            model.basis = basis
             wv_loc = basis.localize(
                 space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
             )
@@ -372,9 +373,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params.step(
-            loss, **{f"coefs_{k}": v for k, v in coefs.items()}, alpha=alpha
-        )
+        register_params.step(loss, alpha=alpha, coefs=coefs_scaled.to_dict())
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
@@ -392,8 +391,7 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        for v in coefs_adim.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
+        torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1)
         torch.nn.utils.clip_grad_value_([alpha], clip_value=1)
 
         optimizer.step()
@@ -411,15 +409,12 @@ for c in range(n_cycles):
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
-            "order": basis.order,
-            "n_theta": basis.n_theta,
-            "wv_space": wv_space,
-            "wv_time": wv_time,
+            "basis": basis.get_params(),
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        **{f"coefs_{k}": register_params.params[f"coefs_{k}"] for k in coefs},
         "alpha": register_params.params["alpha"],
+        "coefs": register_params.params["coefs"],
     }
     outputs.append(output)
 

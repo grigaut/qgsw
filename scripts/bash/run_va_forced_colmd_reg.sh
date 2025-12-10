@@ -7,7 +7,7 @@
 #OAR -E logs/OAR.%jobid%.stderr
 #OAR --notify mail:gaetan.rigaut@inria.fr
 
-# To run with arguments use quotes: oarsub -S "./run_va_alpha.sh --config=config/variational_analysis.toml -vv"
+# To run with arguments use quotes: oarsub -S "./run_va_psi2.sh --config=config/variational_analysis.toml -vv"
 
 lscpu | grep 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1'
 
@@ -19,7 +19,7 @@ cd $SRCDIR
 
 date
 
-.venv/bin/python3 -u scripts/variational_analysis_single_alpha.py $@
+.venv/bin/python3 -u scripts/variational_analysis_forced_colmd_reg.py $@
 
 date
 
