@@ -9,6 +9,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets import (
     WaveletBasis,
 )
@@ -204,16 +205,16 @@ y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-model_forced = QGPSIQForced(
+model = QGPSIQForced(
     space_2d=space_slice,
     H=H[:1],
     beta_plane=beta_plane,
     g_prime=g_prime[:1] * g_prime[1:2] / (g_prime[:1] + g_prime[1:2]),
 )
-model_forced: QGPSIQForced = set_inhomogeneous_model(model_forced)
+model: QGPSIQForced = set_inhomogeneous_model(model)
 
 if not args.no_wind:
-    model_forced.set_wind_forcing(
+    model.set_wind_forcing(
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
@@ -283,9 +284,8 @@ for c in range(n_cycles):
     logger.info(msg)
 
     coefs = basis.generate_random_coefs()
-    coefs = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
-    }
+    coefs = DecompositionCoefs.zeros_like(coefs)
+    coefs = coefs.requires_grad_()
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
     qs = (compute_q_rg(p1) for p1 in psis)
@@ -294,7 +294,7 @@ for c in range(n_cycles):
     ]
     q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
-    numel = basis.numel()
+    numel = coefs.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
@@ -312,31 +312,27 @@ for c in range(n_cycles):
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    register_params_mixed = RegisterParams(
-        **{f"coefs_{k}": v for k, v in coefs.items()}
-    )
+    register_params = RegisterParams(coefs=coefs.to_dict())
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
-        model_forced.reset_time()
-        model_forced.set_boundary_maps(psi_bc_interp, q_bc_interp)
+        model.reset_time()
+        model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
         with torch.enable_grad():
-            model_forced.set_psiq(
-                crop(psi0, p), crop(compute_q_rg(psi0), p - 1)
-            )
+            model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
 
             loss = torch.tensor(0, **defaults.get())
             basis.set_coefs(coefs)
             wv = basis.localize(space_slice.q.xy.x, space_slice.q.xy.y)
 
             for n in range(1, n_steps_per_cyle):
-                model_forced.forcing = wv(model_forced.time)[None, None, ...]
-                model_forced.step()
+                model.forcing = wv(model.time)[None, None, ...]
+                model.step()
 
                 if n % comparison_interval == 0:
                     loss += rmse(
-                        model_forced.psi[0, 0],
+                        model.psi[0, 0],
                         crop(psis[n][0, 0], p),
                     )
 
@@ -345,9 +341,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_mixed.step(
-            loss, **{f"coefs_{k}": v for k, v in coefs.items()}
-        )
+        register_params.step(loss, coefs=coefs.to_dict())
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
@@ -365,15 +359,13 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        lr_forcing = optimizer.param_groups[0]["lr"]
-        for v in coefs.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
+        torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1)
 
         optimizer.step()
         scheduler.step(loss)
         lr_callback.step()
 
-    best_loss = register_params_mixed.best_loss
+    best_loss = register_params.best_loss
     msg = f"Forcing optimization completed with loss: {best_loss:3.5f}"
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
@@ -391,10 +383,7 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        **{
-            f"coefs_{k}": register_params_mixed.params[f"coefs_{k}"]
-            for k in coefs
-        },
+        "coefs": register_params.params["coefs"],
     }
     outputs.append(output)
 

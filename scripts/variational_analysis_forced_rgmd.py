@@ -8,6 +8,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVA
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets import (
     WaveletBasis,
 )
@@ -278,9 +279,8 @@ for c in range(n_cycles):
     logger.info(msg)
 
     coefs = basis.generate_random_coefs()
-    coefs_adim = {
-        k: torch.zeros_like(v, requires_grad=True) for k, v in coefs.items()
-    }
+    coefs = DecompositionCoefs.zeros_like(coefs)
+    coefs = coefs.requires_grad_()
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
     qs = (compute_q_rg(p1) for p1 in psis)
@@ -289,14 +289,14 @@ for c in range(n_cycles):
     ]
     q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
-    numel = basis.numel()
+    numel = coefs.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(
         [
             {
-                "params": list(coefs_adim.values()),
+                "params": list(coefs.values()),
                 "lr": 1e1,
                 "name": "Wavelet coefs",
             },
@@ -307,9 +307,9 @@ for c in range(n_cycles):
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    register_params = RegisterParams(
-        **{f"coefs_{k}": v * psi0_mean for k, v in coefs_adim.items()}
-    )
+
+    coefs_scaled = coefs.scale(*(psi0_mean for _ in range(basis.order)))
+    register_params = RegisterParams(coefs=coefs_scaled.to_dict())
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
@@ -318,11 +318,14 @@ for c in range(n_cycles):
 
         with torch.enable_grad():
             model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
+            coefs_scaled = coefs.scale(
+                *(psi0_mean for _ in range(basis.order))
+            )
+
+            basis.set_coefs(coefs_scaled)
+            model.wavelets = basis
 
             loss = torch.tensor(0, **defaults.get())
-            coefs = {k: v * psi0_mean for k, v in coefs_adim.items()}
-            basis.set_coefs(coefs)
-            model.wavelets = basis
 
             for n in range(1, n_steps_per_cyle):
                 model.step()
@@ -338,9 +341,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params.step(
-            loss, **{f"coefs_{k}": v for k, v in coefs.items()}
-        )
+        register_params.step(loss, coefs=coefs_scaled.to_dict())
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
@@ -358,8 +359,7 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        for v in coefs_adim.values():
-            torch.nn.utils.clip_grad_norm_([v], max_norm=1)
+        torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1)
 
         optimizer.step()
         scheduler.step(loss)
@@ -383,7 +383,7 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        **{f"coefs_{k}": register_params.params[f"coefs_{k}"] for k in coefs},
+        "coefs": register_params.params["coefs"],
     }
     outputs.append(output)
 
