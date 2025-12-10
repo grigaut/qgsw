@@ -2,27 +2,31 @@
 
 from typing import Any
 
+import torch
+
 
 def taylor_series(
     order: int,
-    nx: int,
-    ny: int,
+    xx_ref: torch.Tensor,
+    yy_ref: torch.Tensor,
 ) -> tuple[dict[int, dict[str, Any]], dict[int, dict[str, Any]]]:
     """Generate parameters for taylor time series with full field.
 
     Args:
         order (int): Order of the time decomposition.
-        nx (int): Number of points in the x-direction.
-        ny (int): Number of points in the y-direction.
+        xx_ref (torch.Tensor): Reference X locations.
+        yy_ref (torch.Tensor): Reference Y-locations.
 
     Returns:
         tuple[dict[int, dict[str, Any]], dict[int, dict[str, Any]]]: Space,
             time.
     """
+    xs = xx_ref[:, 0]
+    ys = yy_ref[0, :]
     space_params = {
-        "nx": nx,
-        "ny": ny,
-        "numel": nx * ny,
+        "xs": xs,
+        "ys": ys,
+        "numel": xs.numel() * ys.numel(),
     }
 
     space = {}
