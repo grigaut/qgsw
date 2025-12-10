@@ -270,16 +270,16 @@ compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
 )
 
 
-model_mixed = QGPSIQMixed(
+model = QGPSIQMixed(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model_mixed: QGPSIQMixed = set_inhomogeneous_model(model_mixed)
+model: QGPSIQMixed = set_inhomogeneous_model(model)
 
 if not args.no_wind:
-    model_mixed.set_wind_forcing(
+    model.set_wind_forcing(
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
@@ -341,7 +341,7 @@ for c in range(n_cycles):
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    register_params_mixed = RegisterParams(
+    register_params = RegisterParams(
         alpha=alpha,
         psi2=psi2_adim * psi0_mean,
         dpsi2=dpsi2,
@@ -349,7 +349,7 @@ for c in range(n_cycles):
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
-        model_mixed.reset_time()
+        model.reset_time()
 
         with torch.enable_grad():
             psi2 = psi2_adim * psi0_mean
@@ -364,21 +364,21 @@ for c in range(n_cycles):
                 for q in qs
             ]
 
-            model_mixed.set_psiq(crop(psi0[:, :1], p), q0)
+            model.set_psiq(crop(psi0[:, :1], p), q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model_mixed.alpha = torch.ones_like(model_mixed.psi) * alpha
-            model_mixed.set_boundary_maps(psi_bc_interp, q_bc_interp)
-            model_mixed.dpsi2 = crop(dpsi2, p)
+            model.alpha = torch.ones_like(model.psi) * alpha
+            model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            model.dpsi2 = crop(dpsi2, p)
 
             loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
-                psi1_ = model_mixed.psi
+                psi1_ = model.psi
                 psi2_ = crop(psi2 + (n - 1) * dt * dpsi2, p) + alpha * psi1_
 
-                model_mixed.step()
+                model.step()
 
-                psi1 = model_mixed.psi
+                psi1 = model.psi
                 dpsi1_ = (psi1 - psi1_) / dt
                 dpsi2_ = crop(dpsi2, p) + alpha * (psi1 - psi1_) / dt
                 reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
@@ -392,7 +392,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_mixed.step(
+        register_params.step(
             loss,
             alpha=alpha,
             psi2=psi2,
@@ -447,7 +447,7 @@ for c in range(n_cycles):
         scheduler.step(loss)
         lr_callback.step()
 
-    best_loss = register_params_mixed.best_loss
+    best_loss = register_params.best_loss
     msg = (
         f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:3.5f}"  # noqa: RUF001
     )
@@ -463,9 +463,9 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        "alpha": register_params_mixed.params["alpha"].detach().cpu(),
-        "psi2": register_params_mixed.params["psi2"].detach().cpu(),
-        "dpsi2": register_params_mixed.params["dpsi2"].detach().cpu(),
+        "alpha": register_params.params["alpha"].detach().cpu(),
+        "psi2": register_params.params["psi2"].detach().cpu(),
+        "dpsi2": register_params.params["dpsi2"].detach().cpu(),
     }
     outputs.append(output)
 
