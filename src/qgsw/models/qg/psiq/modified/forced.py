@@ -578,8 +578,6 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self,
     ) -> SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]:
         """Decomposition basis."""
-        if self._basis is None:
-            return torch.zeros_like(self.q)
         return self._basis
 
     @basis.setter
