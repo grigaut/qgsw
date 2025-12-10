@@ -348,16 +348,16 @@ compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
 )
 
 
-model_mixed = QGPSIQForcedMDWV(
+model = QGPSIQForcedMDWV(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model_mixed: QGPSIQForcedMDWV = set_inhomogeneous_model(model_mixed)
+model: QGPSIQForcedMDWV = set_inhomogeneous_model(model)
 
 if not args.no_wind:
-    model_mixed.set_wind_forcing(
+    model.set_wind_forcing(
         tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
     )
 
@@ -402,7 +402,7 @@ for c in range(n_cycles):
     xx = space_slice_ww.psi.xy.x
     yy = space_slice_ww.psi.xy.y
 
-    space_param, time_param = regular_spacing(2, 2, xx, yy)
+    space_param, time_param = regular_spacing(3, 2, xx, yy)
     basis = TaylorExpBasis(space_param, time_param)
     coefs = basis.generate_random_coefs()
     coefs = coefs.requires_grad_()
@@ -415,10 +415,10 @@ for c in range(n_cycles):
 
     optimizer = torch.optim.Adam(
         [
-            {"params": [alpha], "lr": 1e-1, "name": "ɑ"},  # noqa: RUF001
+            {"params": [alpha], "lr": 1e-2, "name": "ɑ"},  # noqa: RUF001
             {
                 "params": list(coefs.values()),
-                "lr": 1e-1,
+                "lr": 1e0,
                 "name": "Decomposition coefs",
             },
         ],
@@ -435,13 +435,11 @@ for c in range(n_cycles):
             for k in range(basis.order)
         )
     )
-    register_params_mixed = RegisterParams(
-        alpha=alpha, coefs=coefs_scaled.to_dict()
-    )
+    register_params = RegisterParams(alpha=alpha, coefs=coefs_scaled.to_dict())
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
-        model_mixed.reset_time()
+        model.reset_time()
 
         with torch.enable_grad():
             coefs_scaled = coefs.scale(
@@ -453,7 +451,7 @@ for c in range(n_cycles):
 
             basis.set_coefs(coefs_scaled)
 
-            model_mixed.wavelets = basis
+            model.wavelets = basis
 
             compute_reg = compute_regularization_func(
                 basis, alpha, space_slice
@@ -462,17 +460,14 @@ for c in range(n_cycles):
             compute_psi2 = basis.localize(xx, yy)
 
             q0 = crop(
-                compute_q_psi2(
-                    psi0, compute_psi2(model_mixed.time) + alpha * psi0
-                ),
+                compute_q_psi2(psi0, compute_psi2(model.time) + alpha * psi0),
                 p - 1,
             )
 
             psis_ = (
                 (
                     p[:, :1],
-                    compute_psi2(model_mixed.time + n * model_mixed.dt)
-                    + alpha * p[:, :1],
+                    compute_psi2(model.time + n * model.dt) + alpha * p[:, :1],
                 )
                 for n, p in enumerate(psis)
             )
@@ -482,20 +477,20 @@ for c in range(n_cycles):
                 for q in qs
             ]
 
-            model_mixed.set_psiq(crop(psi0[:, :1], p), q0)
+            model.set_psiq(crop(psi0[:, :1], p), q0)
             q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model_mixed.alpha = torch.ones_like(model_mixed.psi) * alpha
-            model_mixed.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            model.alpha = torch.ones_like(model.psi) * alpha
+            model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
             loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
-                psi1_ = model_mixed.psi
-                time = model_mixed.time.clone()
+                psi1_ = model.psi
+                time = model.time.clone()
 
-                model_mixed.step()
+                model.step()
 
-                psi1 = model_mixed.psi
+                psi1 = model.psi
                 dpsi1_ = (psi1 - psi1_) / dt
                 reg = gamma * compute_reg(psi1_, dpsi1_, time)
                 loss += reg
@@ -508,7 +503,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params_mixed.step(
+        register_params.step(
             loss,
             alpha=alpha,
             coefs=coefs_scaled.to_dict(),
@@ -534,7 +529,7 @@ for c in range(n_cycles):
         torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
         grad_alpha_ = alpha.grad.item()
 
-        torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e-1)
+        torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
         with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
             msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
@@ -544,7 +539,7 @@ for c in range(n_cycles):
         scheduler.step(loss)
         lr_callback.step()
 
-    best_loss = register_params_mixed.best_loss
+    best_loss = register_params.best_loss
     msg = (
         f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:3.5f}"  # noqa: RUF001
     )
@@ -560,8 +555,8 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        "alpha": register_params_mixed.params["alpha"],
-        "coefs": register_params_mixed.params["coefs"],
+        "alpha": register_params.params["alpha"],
+        "coefs": register_params.params["coefs"],
     }
     outputs.append(output)
 
