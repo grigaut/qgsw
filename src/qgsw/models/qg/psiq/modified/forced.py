@@ -3,7 +3,9 @@
 import torch
 from torch import Tensor
 
-from qgsw.decomposition.wavelets import WaveletBasis
+from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.supports.space.base import SpaceSupportFunction
+from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.fields.variables.state import StatePSIQ, StatePSIQAlpha
 from qgsw.fields.variables.tuples import (
     PSIQ,
@@ -199,18 +201,22 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
 class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
-    _basis: WaveletBasis
+    _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
 
     @property
-    def basis(self) -> WaveletBasis:
-        """Forcing term.
-
-        └── (n_ens, nl, nx, ny)-shaped
-        """
+    def basis(
+        self,
+    ) -> SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]:
+        """Decomposition basis."""
         return self._basis
 
     @basis.setter
-    def basis(self, basis: WaveletBasis) -> None:
+    def basis(
+        self,
+        basis: SpaceTimeDecomposition[
+            SpaceSupportFunction, TimeSupportFunction
+        ],
+    ) -> None:
         self._basis = basis
         space = self.space.remove_z_h()
         self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
@@ -565,20 +571,24 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
-    _basis: WaveletBasis
+    _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
 
     @property
-    def basis(self) -> WaveletBasis:
-        """Forcing term.
-
-        └── (n_ens, nl, nx, ny)-shaped
-        """
+    def basis(
+        self,
+    ) -> SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]:
+        """Decomposition basis."""
         if self._basis is None:
             return torch.zeros_like(self.q)
         return self._basis
 
     @basis.setter
-    def basis(self, basis: WaveletBasis) -> None:
+    def basis(
+        self,
+        basis: SpaceTimeDecomposition[
+            SpaceSupportFunction, TimeSupportFunction
+        ],
+    ) -> None:
         self._basis = basis
         space = self.space.remove_z_h()
         self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
