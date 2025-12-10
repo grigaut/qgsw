@@ -20,6 +20,8 @@ class TaylorExpBasis(
 ):
     """Taylor Series Time suuport and Gaussian space support."""
 
+    _type = "taylor-exps"
+
     def _compute_space_params(
         self, params: dict[str, Any], xx: torch.Tensor, yy: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, float, float]:
