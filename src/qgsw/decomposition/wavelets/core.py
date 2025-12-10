@@ -656,3 +656,27 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
             Lt_max=Lt_max,
         )
         return cls(space_params, time_params)
+
+    def get_params(self) -> dict[str, Any]:
+        """Return decomposition params as dict.
+
+        Returns:
+            dict[str, Any]: Decomposition params.
+        """
+        params = super().get_params()
+        params["n_theta"] = self.n_theta
+        return params
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> Self:
+        """Build class from params dict.
+
+        Args:
+            params (dict[str, Any]): Decomposition params.
+
+        Returns:
+            Self: Instance of class.
+        """
+        obj = cls(space_params=params["space"], time_params=params["time"])
+        obj.n_theta = params["n_theta"]
+        return obj

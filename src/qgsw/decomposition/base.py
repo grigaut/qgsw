@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
+
 from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
@@ -20,6 +25,8 @@ SpaceSupport = TypeVar("SpaceSupport", bound=SpaceSupportFunction)
 
 class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
     """Space-time decomposition."""
+
+    _type: str
 
     @cached_property
     def order(self) -> int:
@@ -374,3 +381,23 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
     ) -> TimeSupport:
         msg = "This decomposition does not implement dy laplacian."
         raise NotImplementedError(msg)
+
+    def get_params(self) -> dict[str, Any]:
+        """Return decomposition params as dict.
+
+        Returns:
+            dict[str, Any]: Decomposition params.
+        """
+        return {"type": self._type, "space": self._space, "time": self._time}
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> Self:
+        """Build class from params dict.
+
+        Args:
+            params (dict[str, Any]): Decomposition params.
+
+        Returns:
+            Self: Instance of class.
+        """
+        return cls(space_params=params["space"], time_params=params["time"])
