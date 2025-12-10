@@ -391,14 +391,14 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    wv_space, wv_time = dyadic_decomposition(
+    space_params, time_params = dyadic_decomposition(
         order=4,
         xx_ref=space_slice_w.psi.xy.x,
         yy_ref=space_slice_w.psi.xy.y,
         Lxy_max=900_000,
         Lt_max=n_steps_per_cyle * dt,
     )
-    basis = WaveletBasis(wv_space, wv_time)
+    basis = WaveletBasis(space_params, time_params)
     basis.n_theta = 7
 
     msg = f"Using basis of order {basis.order}"
@@ -533,8 +533,8 @@ for c in range(n_cycles):
             "no-wind": args.no_wind,
             "order": basis.order,
             "n_theta": basis.n_theta,
-            "wv_space": wv_space,
-            "wv_time": wv_time,
+            "space_params": space_params,
+            "time_params": time_params,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),

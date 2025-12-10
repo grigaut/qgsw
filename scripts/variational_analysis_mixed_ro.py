@@ -402,8 +402,8 @@ for c in range(n_cycles):
     xx = space_slice_ww.psi.xy.x
     yy = space_slice_ww.psi.xy.y
 
-    space_param, time_param = regular_spacing(2, 2, xx, yy)
-    basis = TaylorExpBasis(space_param, time_param)
+    space_params, time_params = regular_spacing(2, 2, xx, yy)
+    basis = TaylorExpBasis(space_params, time_params)
     coefs = basis.generate_random_coefs()
     coefs = coefs.requires_grad_()
 
@@ -552,6 +552,8 @@ for c in range(n_cycles):
             "comparison_interval": comparison_interval,
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
+            "space_params": space_params,
+            "time_params": time_params,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
