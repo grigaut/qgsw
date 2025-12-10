@@ -19,7 +19,7 @@ cd $SRCDIR
 
 date
 
-.venv/bin/python3 -u scripts/variational_analysis_forced_rgmd_reg.py $@
+.venv/bin/python3 -u scripts/variational_analysis_forced_colmd_reg.py $@
 
 date
 
