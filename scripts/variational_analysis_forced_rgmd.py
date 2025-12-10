@@ -323,7 +323,7 @@ for c in range(n_cycles):
             )
 
             basis.set_coefs(coefs_scaled)
-            model.wavelets = basis
+            model.basis = basis
 
             loss = torch.tensor(0, **defaults.get())
 

@@ -451,7 +451,7 @@ for c in range(n_cycles):
 
             basis.set_coefs(coefs_scaled)
 
-            model.wavelets = basis
+            model.basis = basis
 
             compute_reg = compute_regularization_func(
                 basis, alpha, space_slice

@@ -330,7 +330,7 @@ for c in range(n_cycles):
                 *(psi0_mean for _ in range(basis.order))
             )
             basis.set_coefs(coefs_scaled)
-            model.wavelets = basis
+            model.basis = basis
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
             model.set_psiq(
                 crop(psi0, p),

@@ -447,7 +447,7 @@ for c in range(n_cycles):
                 *(psi0_mean for _ in range(basis.order))
             )
             basis.set_coefs(coefs_scaled)
-            model.wavelets = basis
+            model.basis = basis
             wv_loc = basis.localize(
                 space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
             )
