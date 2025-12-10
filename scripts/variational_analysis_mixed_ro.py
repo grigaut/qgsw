@@ -331,7 +331,7 @@ def compute_regularization_func(
     return compute_reg
 
 
-gamma = 1 / comparison_interval
+gamma = 1 / comparison_interval * 0.1
 
 # PV computation
 
@@ -402,7 +402,7 @@ for c in range(n_cycles):
     xx = space_slice_ww.psi.xy.x
     yy = space_slice_ww.psi.xy.y
 
-    space_param, time_param = regular_spacing(3, 2, xx, yy)
+    space_param, time_param = regular_spacing(2, 2, xx, yy)
     basis = TaylorExpBasis(space_param, time_param)
     coefs = basis.generate_random_coefs()
     coefs = coefs.requires_grad_()
