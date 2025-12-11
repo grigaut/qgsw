@@ -41,7 +41,7 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
     γ(x,y) = cos(kx x cos(θ) + ky y sin(θ) + φ)
     """
 
-    _type = "wavelets"
+    type = "wavelets"
     _n_theta = 10
 
     @property

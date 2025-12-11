@@ -26,7 +26,7 @@ SpaceSupport = TypeVar("SpaceSupport", bound=SpaceSupportFunction)
 class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
     """Space-time decomposition."""
 
-    _type: str
+    type: str
 
     @cached_property
     def order(self) -> int:
@@ -388,7 +388,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
         Returns:
             dict[str, Any]: Decomposition params.
         """
-        return {"type": self._type, "space": self._space, "time": self._time}
+        return {"type": self.type, "space": self._space, "time": self._time}
 
     @classmethod
     def from_params(cls, params: dict[str, Any]) -> Self:
