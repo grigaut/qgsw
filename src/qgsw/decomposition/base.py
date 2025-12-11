@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from qgsw.logging.core import getLogger
+
 try:
     from typing import Self
 except ImportError:
@@ -21,6 +23,8 @@ if TYPE_CHECKING:
     from qgsw.decomposition.coefficients import DecompositionCoefs
 TimeSupport = TypeVar("TimeSupport", bound=TimeSupportFunction)
 SpaceSupport = TypeVar("SpaceSupport", bound=SpaceSupportFunction)
+
+logger = getLogger(__name__)
 
 
 class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
@@ -52,6 +56,9 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
                 Defaults to None.
         """
         self._check_validity(space_params, time_params)
+        msg = f"Instantiating {self.__class__.__name__}."
+        logger.info(msg)
+
         self._specs = defaults.get(dtype=dtype, device=device)
         self._space = space_params
         self._time = time_params
