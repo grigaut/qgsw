@@ -765,33 +765,11 @@ class QGPSIQMixed(QGPSIQCollinearSF):
         space = self.space.remove_z_h()
         self._fpsi2 = basis.localize(space.psi.xy.x, space.psi.xy.y)
 
-    @property
-    def dpsi2(self) -> torch.Tensor:
-        """Time increment for psi2."""
-        return self._dpsi2
-
-    @dpsi2.setter
-    def dpsi2(self, dpsi2: torch.Tensor) -> None:
-        self._dpsi2 = dpsi2
-
-    @property
-    def psi2(self) -> torch.Tensor:
-        """Psi2 in the bottom layer."""
-        if self._psi2 is None:
-            msg = "No psi2 field, using zeros instead."
-            logger.warning(msg)
-            return torch.zeros_like(self.psi)
-        return self._psi2
-
-    @psi2.setter
-    def psi2(self, psi2: torch.Tensor) -> None:
-        self._psi2 = psi2
-
     def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
         vort = self._compute_vort_from_psi(psi)
 
         try:
-            psi2 = self._fpsi2(self.time)
+            psi2 = self._fpsi2(self.time)[None, None, ...]
         except AttributeError:
             msg = "Decompostion basis not set. Using 0s for ѱ₂ instead."
             logger.warning(msg)
@@ -929,7 +907,7 @@ class QGPSIQMixed(QGPSIQCollinearSF):
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
-        dpsi2 = self._fpsi2.dt(self._substep_time)
+        dpsi2 = self._fpsi2.dt(self._substep_time)[None, None, ...]
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=True,
@@ -966,7 +944,7 @@ class QGPSIQMixed(QGPSIQCollinearSF):
         dq = (-div_flux + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
-        dpsi2 = self._fpsi2.dt(self._substep_time)
+        dpsi2 = self._fpsi2.dt(self._substep_time)[None, None, ...]
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=False,
@@ -1037,7 +1015,7 @@ class QGPSIQMixed(QGPSIQCollinearSF):
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
-        dpsi2 = self._fpsi2.dt(self._substep_time)
+        dpsi2 = self._fpsi2.dt(self._substep_time)[None, None, ...]
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i + self.beta_plane.f0**2 * self._A12 * dpsi2[..., 1:-1, 1:-1],
             ensure_mass_conservation=False,

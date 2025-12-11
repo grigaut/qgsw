@@ -16,7 +16,7 @@ class TaylorFullFieldBasis(
 ):
     """Taylor Series time support with full field."""
 
-    _type = "taylor-fullfield"
+    type = "taylor-fullfield"
 
     def numel(self) -> int:  # noqa: D102
         return sum(s["numel"] for s in self._space.values())

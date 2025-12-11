@@ -56,7 +56,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVA.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_colrgmd_reg",
+    prefix_default="results_forced_colmd_reg",
 )
 specs = defaults.get()
 
@@ -363,7 +363,7 @@ def compute_regularization_func(
     return compute_reg
 
 
-gamma = 100 / comparison_interval
+gamma = 10 / comparison_interval
 
 
 for c in range(n_cycles):
@@ -392,7 +392,7 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     space_params, time_params = dyadic_decomposition(
-        order=4,
+        order=5,
         xx_ref=space_slice_w.psi.xy.x,
         yy_ref=space_slice_w.psi.xy.y,
         Lxy_max=900_000,
@@ -434,7 +434,7 @@ for c in range(n_cycles):
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
-    coefs_scaled = coefs.scale(*(psi0_mean for _ in range(basis.order)))
+    coefs_scaled = coefs.scale(*(1e1 * psi0_mean for _ in range(basis.order)))
     register_params = RegisterParams(alpha=alpha, coefs=coefs_scaled.to_dict())
 
     for o in range(optim_max_step):
@@ -444,7 +444,7 @@ for c in range(n_cycles):
         with torch.enable_grad():
             model.alpha = torch.ones_like(model.psi) * alpha
             coefs_scaled = coefs.scale(
-                *(psi0_mean for _ in range(basis.order))
+                *(1e1 * psi0_mean for _ in range(basis.order))
             )
             basis.set_coefs(coefs_scaled)
             model.basis = basis
