@@ -535,7 +535,8 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
-        **{f"coefs_{k}": register_params.params[f"coefs_{k}"] for k in coefs},
+        "alpha": register_params.params["alpha"],
+        "coefs": register_params.params["coefs"],
     }
     outputs.append(output)
 
