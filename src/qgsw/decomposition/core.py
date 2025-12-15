@@ -3,6 +3,7 @@
 from typing import Any
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.decomposition.taylor.core import TaylorFullFieldBasis
@@ -15,6 +16,7 @@ BASES: dict[str, type[Basis]] = {
     WaveletBasis.type: WaveletBasis,
     TaylorExpBasis.type: TaylorExpBasis,
     TaylorFullFieldBasis.type: TaylorFullFieldBasis,
+    GaussianExpBasis.type: GaussianExpBasis,
 }
 
 
