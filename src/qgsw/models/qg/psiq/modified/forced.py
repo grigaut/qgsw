@@ -1,11 +1,12 @@
 """Forced QG models."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import torch
 from torch import Tensor
 
-from qgsw.decomposition.base import SpaceTimeDecomposition
-from qgsw.decomposition.supports.space.base import SpaceSupportFunction
-from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.fields.variables.state import StatePSIQ, StatePSIQAlpha
 from qgsw.fields.variables.tuples import (
     PSIQ,
@@ -15,15 +16,20 @@ from qgsw.fields.variables.tuples import (
 from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
 from qgsw.models.qg.psiq.core import QGPSIQCore
-from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.solver.finite_diff import laplacian
 from qgsw.solver.pv_inversion import (
     HomogeneousPVInversionCollinear,
     InhomogeneousPVInversionCollinear,
 )
-from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE, defaults
+
+if TYPE_CHECKING:
+    from qgsw.decomposition.base import SpaceTimeDecomposition
+    from qgsw.decomposition.supports.space.base import SpaceSupportFunction
+    from qgsw.decomposition.supports.time.base import TimeSupportFunction
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
+    from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 logger = getLogger(__name__)
 
@@ -46,6 +52,46 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
     @forcing.setter
     def forcing(self, forcing: torch.Tensor) -> None:
         self._forcing = forcing
+
+    @property
+    def wind_scaling(self) -> torch.Tensor:
+        """Wind forcing scaling."""
+        try:
+            return self._wind_scaling
+        except AttributeError:
+            return self.H[0, 0, 0].item()
+
+    @wind_scaling.setter
+    def wind_scaling(self, wind_scaling: torch.Tensor) -> None:
+        self._wind_scaling = wind_scaling
+
+    def set_wind_forcing(
+        self,
+        taux: torch.Tensor | float,
+        tauy: torch.Tensor | float,
+    ) -> None:
+        """Set the wind forcing.
+
+        WARNING: Both taux and tauy are padded on the right.
+
+        Args:
+            taux (torch.Tensor): Wind stress in the x direction.
+                └── (n_ens, nl, nx, ny)-shaped
+            tauy (torch.Tensor): Wind stress in the y direction.
+                └── (n_ens, nl, nx, ny)-shaped
+        """
+        if isinstance(taux, float) and isinstance(tauy, float):
+            self._curl_tau = torch.zeros(
+                (self.n_ens, 1, self.space.nx, self.space.ny),
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            return
+        curl_tau = (
+            torch.diff(tauy, dim=-2) / self._space.dx
+            - torch.diff(taux, dim=-1) / self._space.dy
+        )
+        self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.wind_scaling
 
     def _compute_time_derivatives_homogeneous(
         self,
