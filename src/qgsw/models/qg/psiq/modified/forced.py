@@ -23,7 +23,7 @@ from qgsw.solver.pv_inversion import (
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import interpolate
-from qgsw.specs import DEVICE
+from qgsw.specs import DEVICE, defaults
 
 logger = getLogger(__name__)
 
@@ -959,3 +959,44 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         return vort - self.masks.h * self._interpolate(
             self.masks.psi * stretching
         )
+
+
+class QGPSIQForcedMDWVDR(QGPSIQForcedMDWV):
+    """Mixed model using both alpha and psi2."""
+
+    _kappa = torch.tensor(0, **defaults.get())
+
+    @property
+    def kappa(self) -> torch.Tensor:
+        """Deformation radius multiplyer."""
+        return self._kappa
+
+    @kappa.setter
+    def kappa(self, kappa: torch.Tensor) -> torch.Tensor:
+        self._kappa = kappa
+        self.compute_auxillary_matrices()
+        self._set_solver()
+
+    def compute_auxillary_matrices(self) -> None:
+        """Compute auxillary matrices."""
+        dtype = torch.float64
+        device = DEVICE.get()
+        H = self.H[:, 0, 0]
+        g_prime = self.g_prime[:, 0, 0]
+
+        H1, H2 = H
+        g1, g2 = g_prime
+
+        self.A = torch.tensor(
+            [
+                [
+                    1 / H1 / g1 + (1 - self.kappa) / H1 / g2,
+                    -(1 - self.kappa) / H1 / g2,
+                ],
+                [-(1 - self.kappa) / H2 / g2, (1 - self.kappa) / H2 / g2],
+            ],
+            dtype=dtype,
+            device=device,
+        )
+        self._A11 = self.A[0, 0]
+        self._A12 = self.A[0, 1]
