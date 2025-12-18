@@ -109,7 +109,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
         self,
         time_params: dict[int, dict[str, Any]],
         space_fields: dict[int, torch.Tensor],
-    ) -> TimeSupportFunction:
+    ) -> TimeSupport:
         """Generate time support.
 
         Args:
@@ -117,12 +117,10 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             space_fields (dict[int, torch.Tensor]): Space fields.
 
         Returns:
-            TimeSupportFunction: Gaussian time support.
+            TimeSupport: Gaussian time support.
         """
 
-    def localize(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
         """Localize wavelets.
 
         Args:
@@ -130,15 +128,13 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space(xx=xx, yy=yy)
 
         return self.generate_time_support(self._time, space_fields)
 
-    def localize_dx(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    def localize_dx(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
         """Localize wavelets x-derivative.
 
         Args:
@@ -146,15 +142,13 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dx(xx=xx, yy=yy)
 
         return self.generate_time_support(self._time, space_fields)
 
-    def localize_dx2(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    def localize_dx2(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
         """Localize wavelets second order x-derivative.
 
         Args:
@@ -162,15 +156,13 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dx2(xx=xx, yy=yy)
 
         return self.generate_time_support(self._time, space_fields)
 
-    def localize_dx3(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    def localize_dx3(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
         """Localize wavelets third order x-derivative.
 
         Args:
@@ -178,7 +170,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dx3(xx=xx, yy=yy)
 
@@ -186,7 +178,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
 
     def localize_dydx2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> TimeSupport:
         """Localize wavelets x-x-y derivative.
 
         Args:
@@ -194,15 +186,13 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dydx2(xx=xx, yy=yy)
 
         return self.generate_time_support(self._time, space_fields)
 
-    def localize_dy(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    def localize_dy(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
         """Localize wavelets y-derivative.
 
         Args:
@@ -210,15 +200,13 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dy(xx=xx, yy=yy)
 
         return self.generate_time_support(self._time, space_fields)
 
-    def localize_dy2(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    def localize_dy2(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
         """Localize wavelets second order y-derivative.
 
         Args:
@@ -226,15 +214,13 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dy2(xx=xx, yy=yy)
 
         return self.generate_time_support(self._time, space_fields)
 
-    def localize_dy3(
-        self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    def localize_dy3(self, xx: torch.Tensor, yy: torch.Tensor) -> TimeSupport:
         """Localize wavelets third order y-derivative.
 
         Args:
@@ -242,7 +228,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dy3(xx=xx, yy=yy)
 
@@ -250,7 +236,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
 
     def localize_dxdy2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> TimeSupport:
         """Localize wavelets y-y-x derivative.
 
         Args:
@@ -258,7 +244,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         space_fields = self._build_space_dxdy2(xx=xx, yy=yy)
 
@@ -266,7 +252,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
 
     def localize_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> TimeSupport:
         """Localize wavelets second order y-derivative.
 
         Args:
@@ -274,7 +260,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         dx2 = self._build_space_dx2(xx=xx, yy=yy)
         dy2 = self._build_space_dy2(xx=xx, yy=yy)
@@ -284,7 +270,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
 
     def localize_dx_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> TimeSupport:
         """Localize wavelets x derivative of laplacian.
 
         Args:
@@ -292,7 +278,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         dx3 = self._build_space_dx3(xx=xx, yy=yy)
         dxdy2 = self._build_space_dxdy2(xx=xx, yy=yy)
@@ -302,7 +288,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
 
     def localize_dy_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupportFunction:
+    ) -> TimeSupport:
         """Localize wavelets x derivative of laplacian.
 
         Args:
@@ -310,7 +296,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             yy (torch.Tensor): Y locations.
 
         Returns:
-            TimeSupportFunction: Time support function.
+            TimeSupport: Time support function.
         """
         dydx2 = self._build_space_dydx2(xx=xx, yy=yy)
         dy3 = self._build_space_dy3(xx=xx, yy=yy)
