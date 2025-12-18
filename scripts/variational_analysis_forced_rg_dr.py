@@ -25,11 +25,12 @@ from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
-from qgsw.pv import compute_q1_interior
 from qgsw.solver.boundary_conditions.base import Boundaries
+from qgsw.solver.finite_diff import laplacian
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
@@ -231,17 +232,18 @@ def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
     return Boundaries.extract(psi, p, -p - 1, p, -p - 1, 2)
 
 
-compute_q_rg = lambda psi1: compute_q1_interior(
-    psi1,
-    torch.zeros_like(psi1),
-    H1,
-    g1,
-    g2,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect_w,
-)
+def compute_q_rg(  # noqa: D103
+    psi1: torch.Tensor,
+) -> torch.Tensor:
+    return (
+        interpolate(
+            laplacian(psi1, dx, dy)
+            - beta_plane.f0**2
+            * (1 / (H1 * H2 / (H1 + H2)) / g2)
+            * psi1[..., 1:-1, 1:-1]
+        )
+        + beta_effect_w
+    )
 
 
 for c in range(n_cycles):
