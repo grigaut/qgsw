@@ -189,3 +189,25 @@ def set_rowtitles(
             xycoords=ax.yaxis.label,
             **kwargs,
         )
+
+
+def clamp_ylims(bottom: float, top: float, ax: plt.Axes) -> None:
+    """Clamp y lims.
+
+    Args:
+        bottom (float): Bottom value.
+        top (float): Top value.
+        ax (plt.Axes): Axes.
+    """
+    ax.relim()
+    ax.autoscale_view()
+
+    _, my = ax.margins()
+
+    y0 = max(bottom, ax.dataLim.ymin)
+    y1 = min(top, ax.dataLim.ymax)
+
+    dy = y1 - y0
+    pad = my * dy
+
+    ax.set_ylim(y0 - pad, y1 + pad)
