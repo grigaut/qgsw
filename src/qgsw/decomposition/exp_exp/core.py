@@ -3,7 +3,6 @@
 from typing import Any
 
 import torch
-from torch import Tensor
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
 from qgsw.decomposition.coefficients import DecompositionCoefs
@@ -55,17 +54,6 @@ class GaussianExpBasis(
     generate_random_coefs.__doc__ = SpaceTimeDecomposition[
         NormalizedGaussianSupport, GaussianTimeSupport
     ].generate_random_coefs.__doc__
-
-    def generate_time_support(  # noqa: D102
-        self,
-        time_params: dict[int, dict[str, Any]],
-        space_fields: dict[int, Tensor],
-    ) -> GaussianTimeSupport:
-        return GaussianTimeSupport(time_params, space_fields)
-
-    generate_time_support.__doc__ = SpaceTimeDecomposition[
-        NormalizedGaussianSupport, GaussianTimeSupport
-    ].generate_time_support.__doc__
 
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -219,3 +207,58 @@ class GaussianExpBasis(
             e = NormalizedGaussianSupport(E)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dxdy2)
         return fields
+
+    def freeze_time_normalization(self, t: torch.Tensor) -> None:
+        """Freeze time normalization.
+
+        Args:
+            t (torch.Tensor): Time to freeze normalization at.
+        """
+        self.generate_time_support = (
+            lambda time_params,
+            space_fields: self._generate_frozen_time_support(
+                t, time_params, space_fields
+            )
+        )
+
+    def unfreeze_time_normalization(self) -> None:
+        """Unfreeze time normalization."""
+        self.generate_time_support = self._generate_time_support
+
+    def _generate_frozen_time_support(
+        self,
+        t: torch.Tensor,
+        time_params: dict[int, dict[str, Any]],
+        space_fields: dict[int, torch.Tensor],
+    ) -> GaussianTimeSupport:
+        """Generate frozen time support.
+
+        Args:
+            t (torch.Tensor): Time to freeze normalization at.
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+            space_fields (dict[int, torch.Tensor]): Space fields.
+
+        Returns:
+            GaussianTimeSupport: Frozen gaussian time support.
+        """
+        gts = GaussianTimeSupport(time_params, space_fields)
+        gts.freeze_normalization(t)
+        return gts
+
+    def _generate_time_support(
+        self,
+        time_params: dict[int, dict[str, Any]],
+        space_fields: dict[int, torch.Tensor],
+    ) -> GaussianTimeSupport:
+        """Generate time support.
+
+        Args:
+            time_params (dict[int, dict[str, Any]]): Time parameters.
+            space_fields (dict[int, torch.Tensor]): Space fields.
+
+        Returns:
+            GaussianTimeSupport: Gaussian time support.
+        """
+        return GaussianTimeSupport(time_params, space_fields)
+
+    generate_time_support = _generate_time_support
