@@ -5,6 +5,7 @@ from qgsw.plots.plt_wrapper import (
     imshow,
     set_coltitles,
     set_rowtitles,
+    set_ylims,
     show,
     subplots,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "imshow",
     "set_coltitles",
     "set_rowtitles",
+    "set_ylims",
     "show",
     "subplots",
 ]

@@ -211,3 +211,25 @@ def clamp_ylims(bottom: float, top: float, ax: plt.Axes) -> None:
     pad = my * dy
 
     ax.set_ylim(y0 - pad, y1 + pad)
+
+
+def set_ylims(bottom: float, top: float, ax: plt.Axes) -> None:
+    """Set y lims.
+
+    Args:
+        bottom (float): Bottom value.
+        top (float): Top value.
+        ax (plt.Axes): Axes.
+    """
+    ax.relim()
+    ax.autoscale_view()
+
+    _, my = ax.margins()
+
+    y0 = bottom
+    y1 = top
+
+    dy = y1 - y0
+    pad = my * dy
+
+    ax.set_ylim(y0 - pad, y1 + pad)
