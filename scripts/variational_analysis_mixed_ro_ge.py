@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 import torch
 
-from qgsw import logging
-from qgsw.cli import ScriptArgsVA
+from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
@@ -18,7 +17,7 @@ from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.modified.forced import QGPSIQForcedMDWV
+from qgsw.models.qg.psiq.modified.forced import QGPSIQPsi2Transport
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.callbacks import LRChangeCallback
@@ -51,11 +50,13 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVA.from_cli(
+args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
     prefix_default="results_mixed_ro_ge",
 )
+with_reg = not args.no_reg
+with_alpha = not args.no_alpha
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -85,7 +86,7 @@ psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
 psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 
 ## Output
-prefix = args.prefix
+prefix = args.complete_prefix()
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
 output_file = output_dir.joinpath(filename)
 
@@ -348,13 +349,13 @@ compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
 )
 
 
-model = QGPSIQForcedMDWV(
+model = QGPSIQPsi2Transport(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model: QGPSIQForcedMDWV = set_inhomogeneous_model(model)
+model: QGPSIQPsi2Transport = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
@@ -409,22 +410,32 @@ for c in range(n_cycles):
     coefs = basis.generate_random_coefs()
     coefs = coefs.requires_grad_()
 
-    alpha = torch.tensor(0.5, **specs, requires_grad=True)
-
-    numel = alpha.numel() + coefs.numel()
-    msg = f"Control vector contains {numel} elements."
-    logger.info(box(msg, style="round"))
-
-    optimizer = torch.optim.Adam(
-        [
+    if with_alpha:
+        alpha = torch.tensor(0.5, **specs, requires_grad=True)
+        numel = alpha.numel() + coefs.numel()
+        params = [
             {"params": [alpha], "lr": 1e-2, "name": "ɑ"},  # noqa: RUF001
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
                 "name": "Decomposition coefs",
             },
-        ],
-    )
+        ]
+    else:
+        alpha = torch.tensor(0.5, **specs)
+        numel = coefs.numel()
+        params = [
+            {
+                "params": list(coefs.values()),
+                "lr": 1e0,
+                "name": "Decomposition coefs",
+            },
+        ]
+
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
+
+    optimizer = torch.optim.Adam(params)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -493,9 +504,11 @@ for c in range(n_cycles):
                 model.step()
 
                 psi1 = model.psi
-                dpsi1_ = (psi1 - psi1_) / dt
-                reg = gamma * compute_reg(psi1_, dpsi1_, time)
-                loss += reg
+
+                if with_reg:
+                    dpsi1_ = (psi1 - psi1_) / dt
+                    reg = gamma * compute_reg(psi1_, dpsi1_, time)
+                    loss += reg
 
                 if n % comparison_interval == 0:
                     loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
@@ -527,15 +540,10 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        grad_alpha = alpha.grad.item()
-        torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
-        grad_alpha_ = alpha.grad.item()
+        if with_alpha:
+            torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
-
-        with logger.section("ɑ parameters:", level=logging.DETAIL):  # noqa: RUF001
-            msg = f"Gradient: {grad_alpha:.1e} -> {grad_alpha_:.1e}"
-            logger.detail(msg)
 
         optimizer.step()
         scheduler.step(loss)

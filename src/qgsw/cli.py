@@ -187,3 +187,87 @@ class ScriptArgsVA(ScriptArgs):
             action="store_true",
             help="Disable wind forcing.",
         )
+
+
+@dataclass
+class ScriptArgsVAModified(ScriptArgsVA):
+    """Script arguments."""
+
+    no_reg: bool = False
+    no_alpha: bool = False
+
+    @classmethod
+    def from_cli(
+        cls,
+        *,
+        comparison_default: int = 1,
+        cycles_default: int = 3,
+        prefix_default: str = "results",
+    ) -> Self:
+        """Instantiate script arguments from CLI.
+
+        Args:
+            comparison_default (int, optional): Default value
+                for comparison interval. Defaults to 1.
+            cycles_default (int, optional): Default value
+                for number of cycles. Defaults to 3.
+            prefix_default (str, optional): Default value for
+                output file prefix. Defaults to "results".
+
+        Returns:
+            Self: ScriptArgsVA.
+        """
+        parser = argparse.ArgumentParser(
+            description="Retrieve script arguments.",
+        )
+        cls._add_config(parser)
+        cls._add_verbose(parser)
+        cls._add_indices(parser)
+        cls._add_comparison_interval(parser, comparison_default)
+        cls._add_cycles(parser, cycles_default)
+        cls._add_prefix(parser, prefix_default)
+        cls._add_wind(parser)
+        cls._add_reg(parser)
+        cls._add_alpha(parser)
+        return cls(**vars(parser.parse_args()))
+
+    @classmethod
+    def _add_reg(cls, parser: argparse.ArgumentParser) -> None:
+        """Specify whether to use regularization or not.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+        """
+        parser.add_argument(
+            "--no-reg",
+            action="store_true",
+            help="Disable regularization.",
+        )
+
+    @classmethod
+    def _add_alpha(cls, parser: argparse.ArgumentParser) -> None:
+        """Specify whether to use alpha or not.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+        """
+        parser.add_argument(
+            "--no-alpha",
+            action="store_true",
+            help="Disable regularization.",
+        )
+
+    def complete_prefix(self) -> str:
+        """Complete prefix with no reg and no alpha info.
+
+        Returns:
+            str: Completed prefix.
+        """
+        prefix = self.prefix
+        if self.no_alpha:
+            prefix += "_noalpha"
+        if self.no_reg:
+            prefix += "_noreg"
+        if self.no_wind:
+            prefix += "_nowind"
+        return prefix

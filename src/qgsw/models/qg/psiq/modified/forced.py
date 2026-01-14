@@ -23,6 +23,7 @@ from qgsw.solver.pv_inversion import (
 )
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE, defaults
+from qgsw.utils.reshaping import crop
 
 if TYPE_CHECKING:
     from qgsw.decomposition.base import SpaceTimeDecomposition
@@ -244,7 +245,7 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
         return PSIQ(dpsi, dq)
 
 
-class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
@@ -614,7 +615,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         return PSIQ(dpsi, dq)
 
 
-class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
@@ -635,9 +636,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     ) -> None:
         self._basis = basis
         space = self.space.remove_z_h()
-        self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
-        self._fpsi2_dx = basis.localize_dx(space.u.xy.x, space.u.xy.y)
-        self._fpsi2_dy = basis.localize_dy(space.v.xy.x, space.v.xy.y)
+        self._fpsi2 = basis.localize(space.psi.xy.x, space.psi.xy.y)
 
     def __init__(
         self,
@@ -800,36 +799,6 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
 
-    def compute_psi2_advection(
-        self,
-        time: torch.Tensor,
-        psi1: torch.Tensor,
-    ) -> torch.Tensor:
-        """Compute contribution of ѱ₂'s advection.
-
-        Args:
-            time (torch.Tensor): Time to evaluate at.
-            psi1 (torch.Tensor): Top layer stream function.
-
-        Returns:
-            torch.Tensor: -f₀²J(ѱ₁, ѱ₂)/H₂g₂
-            torch.Tensor: -f₀²J(ѱ₁, ѱ₂)/H₂g₂
-        """
-        u, v = self._grad_perp(psi1)
-        u /= self.space.dy
-        v /= self.space.dx
-
-        dx_psi2 = self._fpsi2_dx(time)
-        dy_psi2 = self._fpsi2_dy(time)
-
-        u_dxpsi2 = u * dx_psi2
-        v_dypsi2 = v * dy_psi2
-
-        adv = (u_dxpsi2[..., 1:, :] + u_dxpsi2[..., :-1, :]) / 2 + (
-            v_dypsi2[..., 1:] + v_dypsi2[..., :-1]
-        ) / 2
-        return (self.beta_plane.f0**2) * self._A12 * adv
-
     def compute_psi_2_dt(self, time: torch.Tensor) -> torch.Tensor:
         """Compute contribution of ѱ₂'s time derivative.
 
@@ -864,7 +833,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         fcg_drag = self._compute_drag_homogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
         dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq + dt_psi2)
+        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -901,7 +870,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
         dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq + dt_psi2)
+        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -972,7 +941,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
         dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq + dt_psi2)
+        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -1007,7 +976,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         )
 
 
-class QGPSIQForcedMDWVDR(QGPSIQForcedMDWV):
+class QGPSIQPsi2TransportDR(QGPSIQPsi2Transport):
     """Mixed model using both alpha and psi2."""
 
     _kappa = torch.tensor(0, **defaults.get())
