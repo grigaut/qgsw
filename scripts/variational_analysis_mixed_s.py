@@ -7,7 +7,7 @@ from typing import TypeVar
 
 import torch
 
-from qgsw.cli import ScriptArgsVA
+from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.taylor.core import TaylorFullFieldBasis
 from qgsw.decomposition.taylor.param_generators import taylor_series
@@ -44,11 +44,13 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVA.from_cli(
+args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
     prefix_default="results_mixed_s",
 )
+with_reg = not args.no_reg
+with_alpha = not args.no_alpha
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -78,7 +80,7 @@ psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
 psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
 
 ## Output
-prefix = args.prefix
+prefix = args.complete_prefix()
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
 output_file = output_dir.joinpath(filename)
 
@@ -335,22 +337,32 @@ for c in range(n_cycles):
     coefs = basis.generate_random_coefs()
     coefs = coefs.requires_grad_()
 
-    alpha = torch.tensor(0.5, **specs, requires_grad=True)
-
-    numel = alpha.numel() + coefs.numel()
-    msg = f"Control vector contains {numel} elements."
-    logger.info(box(msg, style="round"))
-
-    optimizer = torch.optim.Adam(
-        [
+    if with_alpha:
+        alpha = torch.tensor(0.5, **specs, requires_grad=True)
+        numel = alpha.numel() + coefs.numel()
+        params = [
             {"params": [alpha], "lr": 1e-2, "name": "ɑ"},  # noqa: RUF001
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
                 "name": "Decomposition coefs",
             },
-        ],
-    )
+        ]
+    else:
+        alpha = torch.tensor(0.5, **specs)
+        numel = coefs.numel()
+        params = [
+            {
+                "params": list(coefs.values()),
+                "lr": 1e0,
+                "name": "Decomposition coefs",
+            },
+        ]
+
+    msg = f"Control vector contains {numel} elements."
+    logger.info(box(msg, style="round"))
+
+    optimizer = torch.optim.Adam(params)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
@@ -415,13 +427,15 @@ for c in range(n_cycles):
                 model.step()
 
                 psi1 = model.psi
-                dpsi1_ = (psi1 - psi1_) / dt
-                dpsi2_ = (
-                    crop(compute_psi2.dt(time), p)
-                    + alpha * (psi1 - psi1_) / dt
-                )
-                reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
-                loss += reg
+
+                if with_reg:
+                    dpsi1_ = (psi1 - psi1_) / dt
+                    dpsi2_ = (
+                        crop(compute_psi2.dt(time), p)
+                        + alpha * (psi1 - psi1_) / dt
+                    )
+                    reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
+                    loss += reg
 
                 if n % comparison_interval == 0:
                     loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
@@ -453,7 +467,8 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
+        if with_alpha:
+            torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
