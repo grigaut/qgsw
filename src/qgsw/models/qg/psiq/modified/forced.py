@@ -244,7 +244,7 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
         return PSIQ(dpsi, dq)
 
 
-class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+class QGPSIQForcedRGMD(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
@@ -614,7 +614,7 @@ class QGPSIQForcedRGMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         return PSIQ(dpsi, dq)
 
 
-class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+class QGPSIQForcedMD(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
@@ -1007,7 +1007,7 @@ class QGPSIQForcedMDWV(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         )
 
 
-class QGPSIQForcedMDWVDR(QGPSIQForcedMDWV):
+class QGPSIQForcedMDDR(QGPSIQForcedMD):
     """Mixed model using both alpha and psi2."""
 
     _kappa = torch.tensor(0, **defaults.get())
