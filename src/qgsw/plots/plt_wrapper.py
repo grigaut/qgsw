@@ -118,8 +118,10 @@ def subplots(
     return fig, axs
 
 
-def show(**kwargs: Param.kwargs) -> None:
+def show(*, tight_layout: bool = True, **kwargs: Param.kwargs) -> None:
     """Wrapper for plt.show."""
+    if tight_layout:
+        plt.tight_layout()
     return plt.show(**kwargs)
 
 
