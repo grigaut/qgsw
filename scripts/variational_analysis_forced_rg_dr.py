@@ -86,7 +86,7 @@ q_slices_w = [
 ]
 
 ## Output
-prefix = args.prefix
+prefix = args.complete_prefix()
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
 output_file = output_dir.joinpath(filename)
 
