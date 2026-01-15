@@ -18,9 +18,7 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.core.flux import div_flux_5pts_no_pad
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.modified.core import (
-    QGPSIQMixed,
-)
+from qgsw.models.qg.psiq.modified.forced import QGPSIQPsi2Transport
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.optim.callbacks import LRChangeCallback
@@ -279,13 +277,13 @@ compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
 )
 
 
-model = QGPSIQMixed(
+model = QGPSIQPsi2Transport(
     space_2d=space_slice,
     H=H[:2],
     beta_plane=beta_plane,
     g_prime=g_prime[:2],
 )
-model: QGPSIQMixed = set_inhomogeneous_model(model)
+model: QGPSIQPsi2Transport = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
