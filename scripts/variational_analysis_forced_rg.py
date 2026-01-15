@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TypeVar
 
 import torch
 
@@ -38,11 +38,6 @@ from qgsw.utils.reshaping import crop
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
-if TYPE_CHECKING:
-    from qgsw.models.qg.psiq.modified.core import (
-        QGPSIQCollinearSF,
-        QGPSIQMixed,
-    )
 
 ## Config
 
@@ -85,7 +80,7 @@ q_slices_w = [
 ]
 
 ## Output
-prefix = args.prefix
+prefix = args.complete_prefix()
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
 output_file = output_dir.joinpath(filename)
 
@@ -174,9 +169,12 @@ y0 = model_3l.y0
 
 
 ## Inhomogeneous models
+M = TypeVar("M", bound=QGPSIQ)
+
+
 def set_inhomogeneous_model(
-    model: QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed | QGPSIQForced,
-) -> QGPSIQ | QGPSIQCollinearSF | QGPSIQMixed | QGPSIQForced:
+    model: M,
+) -> M:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0

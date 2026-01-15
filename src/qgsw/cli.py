@@ -188,6 +188,17 @@ class ScriptArgsVA(ScriptArgs):
             help="Disable wind forcing.",
         )
 
+    def complete_prefix(self) -> str:
+        """Complete prefix with cli arguments info.
+
+        Returns:
+            str: Completed prefix.
+        """
+        prefix = self.prefix
+        if self.comparison != 1:
+            prefix += f"_c{self.comparison}"
+        return prefix
+
 
 @dataclass
 class ScriptArgsVAModified(ScriptArgsVA):
@@ -258,7 +269,7 @@ class ScriptArgsVAModified(ScriptArgsVA):
         )
 
     def complete_prefix(self) -> str:
-        """Complete prefix with no reg and no alpha info.
+        """Complete prefix with cli arguments info.
 
         Returns:
             str: Completed prefix.
@@ -270,4 +281,6 @@ class ScriptArgsVAModified(ScriptArgsVA):
             prefix += "_noreg"
         if self.no_wind:
             prefix += "_nowind"
+        if self.comparison != 1:
+            prefix += f"_c{self.comparison}"
         return prefix
