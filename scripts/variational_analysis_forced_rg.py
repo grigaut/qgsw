@@ -313,7 +313,7 @@ for c in range(n_cycles):
 
     coefs_scaled = coefs.scale(*(U**2 / L**2 for _ in range(basis.order)))
 
-    register_params = RegisterParams(coefs=coefs.to_dict())
+    register_params = RegisterParams(coefs=coefs_scaled.to_dict())
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
@@ -347,7 +347,7 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
-        register_params.step(loss, coefs=coefs.to_dict())
+        register_params.step(loss, coefs=coefs_scaled.to_dict())
 
         if early_stop.step(loss):
             msg = f"Convergence reached after {o + 1} iterations."
