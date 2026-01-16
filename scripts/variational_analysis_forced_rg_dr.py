@@ -302,7 +302,7 @@ for c in range(n_cycles):
         [
             {
                 "params": list(coefs.values()),
-                "lr": 1e-10,
+                "lr": 1e-2,
                 "name": "Wavelet coefs",
             }
         ]
@@ -312,6 +312,9 @@ for c in range(n_cycles):
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
+
+    coefs_scaled = coefs.scale(*(U**2 / L**2 for _ in range(basis.order)))
+
     register_params = RegisterParams(coefs=coefs.to_dict())
 
     for o in range(optim_max_step):
@@ -322,9 +325,14 @@ for c in range(n_cycles):
         with torch.enable_grad():
             model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
 
-            loss = torch.tensor(0, **defaults.get())
-            basis.set_coefs(coefs)
+            coefs_scaled = coefs.scale(
+                *(U**2 / L**2 for _ in range(basis.order))
+            )
+            basis.set_coefs(coefs_scaled)
+
             wv = basis.localize(space_slice.q.xy.x, space_slice.q.xy.y)
+
+            loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
                 model.forcing = wv(model.time)[None, None, ...]
