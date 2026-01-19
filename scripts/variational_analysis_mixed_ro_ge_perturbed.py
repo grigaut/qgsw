@@ -172,8 +172,8 @@ model_3l.dt = dt
 y0 = model_3l.y0
 
 
-H1, H2 = H[0], H[1] + 500
-g1, g2, g3 = g_prime[0], g_prime[1] * 1.4, g_prime[2] * 0.75
+H1, H2 = H[0], H[1]
+g1, g2, g3 = g_prime[0], g_prime[1] * 10, g_prime[2] * 10
 
 ## Inhomogeneous models
 M = TypeVar("M", bound=QGPSIQ)
