@@ -422,7 +422,7 @@ for c in range(n_cycles):
             },
         ]
     else:
-        alpha = torch.tensor(0.5, **specs)
+        alpha = torch.tensor(0, **specs)
         numel = coefs.numel()
         params = [
             {
