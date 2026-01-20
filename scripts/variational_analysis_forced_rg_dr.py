@@ -145,7 +145,7 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 
 def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     """RMSE."""
-    return (f - f_ref).square().mean().sqrt() / f_ref.square().mean().sqrt()
+    return (f - f_ref).square().mean() / f_ref.square().mean()
 
 
 # Models

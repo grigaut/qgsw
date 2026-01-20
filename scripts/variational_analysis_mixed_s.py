@@ -140,9 +140,9 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 ## Error
 
 
-def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
+def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     """RMSE."""
-    return (f - f_ref).square().mean().sqrt() / f_ref.square().mean().sqrt()
+    return (f - f_ref).square().mean() / f_ref.square().mean()
 
 
 # Models
@@ -436,7 +436,7 @@ for c in range(n_cycles):
                     loss += reg
 
                 if n % comparison_interval == 0:
-                    loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
+                    loss += mse(psi1[0, 0], crop(psis[n][0, 0], p))
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
