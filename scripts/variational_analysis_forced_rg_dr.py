@@ -143,7 +143,7 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 ## Error
 
 
-def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
+def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     """RMSE."""
     return (f - f_ref).square().mean() / f_ref.square().mean()
 
@@ -339,7 +339,7 @@ for c in range(n_cycles):
                 model.step()
 
                 if n % comparison_interval == 0:
-                    loss += rmse(
+                    loss += mse(
                         model.psi[0, 0],
                         crop(psis[n][0, 0], p),
                     )
