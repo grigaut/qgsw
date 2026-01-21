@@ -47,11 +47,11 @@ class DecompositionCoefs:
         """Return coefs items."""
         return self._coefs.items()
 
-    def values(self) -> ValuesView[int, torch.Tensor]:
+    def values(self) -> ValuesView[torch.Tensor]:
         """Return coefs values."""
         return self._coefs.values()
 
-    def keys(self) -> KeysView[int, torch.Tensor]:
+    def keys(self) -> KeysView[int]:
         """Return coefs keys."""
         return self._coefs.keys()
 
