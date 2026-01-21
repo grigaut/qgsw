@@ -308,7 +308,7 @@ for c in range(n_cycles):
         ]
     )
 
-    gamma = 1e4
+    gamma = 1e4 / comparison_interval
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
