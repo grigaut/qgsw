@@ -146,9 +146,9 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 ## Error
 
 
-def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
+def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     """RMSE."""
-    return (f - f_ref).square().mean().sqrt() / f_ref.square().mean().sqrt()
+    return (f - f_ref).square().mean() / f_ref.square().mean()
 
 
 # Models
@@ -245,6 +245,7 @@ def compute_regularization_func(
     ],
     alpha: torch.Tensor,
     space: SpaceDiscretization2D,
+    kappa: torch.Tensor,
 ) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
     """Build regularization function.
 
@@ -289,7 +290,7 @@ def compute_regularization_func(
         dt_psi2 = fpsi2.dt(time) + alpha * interpolate(crop(dpsi1, 1))
 
         dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
-            (1 / H2 / g2) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
+            ((1 - kappa) / H2 / g2) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
             + 1 / H2 / g3 * (dt_psi2)
         )
 
@@ -310,7 +311,7 @@ def compute_regularization_func(
             + alpha * lap_dy_psi1
             - beta_plane.f0**2
             * (
-                (1 / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1))
+                ((1 - kappa) / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1))
                 + 1 / H2 / g3 * (dy_psi2)
             )
         ) + beta_plane.beta
@@ -322,7 +323,7 @@ def compute_regularization_func(
             + alpha * lap_dx_psi1
             - beta_plane.f0**2
             * (
-                (1 / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1))
+                ((1 - kappa) / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1))
                 + 1 / H2 / g3 * (dx_psi2)
             )
         )
@@ -336,13 +337,12 @@ def compute_regularization_func(
 gamma = 1 / comparison_interval * 0.1
 
 # PV computation
-
-compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
+compute_q_psi2 = lambda psi1, psi2, kappa: compute_q1_interior(
     psi1,
     psi2,
     H1,
     g1,
-    g2,
+    g2 / (1 - kappa),
     dx,
     dy,
     beta_plane.f0,
@@ -412,10 +412,12 @@ for c in range(n_cycles):
     coefs = coefs.requires_grad_()
 
     if with_alpha:
-        alpha = torch.tensor(0.5, **specs, requires_grad=True)
-        numel = alpha.numel() + coefs.numel()
+        alpha_ = torch.tensor(0, **specs, requires_grad=True)
+        kappa_ = torch.tensor(0, **specs, requires_grad=True)
+        numel = alpha_.numel() + kappa_.numel() + coefs.numel()
         params = [
-            {"params": [alpha], "lr": 1e-2, "name": "ɑ"},  # noqa: RUF001
+            {"params": [alpha_], "lr": 1e0, "name": "ɑ"},
+            # {"params": [kappa_], "lr": 1e-1, "name": "κ"},
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
@@ -423,7 +425,8 @@ for c in range(n_cycles):
             },
         ]
     else:
-        alpha = torch.tensor(0, **specs)
+        alpha_ = torch.tensor(0, **specs)
+        kappa_ = torch.tensor(0, **specs)
         numel = coefs.numel()
         params = [
             {
@@ -437,10 +440,17 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(params)
+    # optimizer_ = torch.optim.Adam(
+    #     [{"params": [kappa_], "lr": 5e-1, "name": "κ"}]
+    # )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
+    # scheduler_ = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #     optimizer_, factor=0.1, patience=5
+    # )
     lr_callback = LRChangeCallback(optimizer)
+    # lr_callback_ = LRChangeCallback(optimizer_)
     early_stop = EarlyStop()
 
     coefs_scaled = coefs.scale(
@@ -449,16 +459,24 @@ for c in range(n_cycles):
             for k in range(basis.order)
         )
     )
-    register_params = RegisterParams(alpha=alpha, coefs=coefs_scaled.to_dict())
+    register_params = RegisterParams(
+        alpha=torch.asinh(alpha_), coefs=coefs_scaled.to_dict()
+    )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
+        # optimizer_.zero_grad()
         model.reset_time()
 
         with torch.enable_grad():
+            kappa = torch.asinh(kappa_)
+            alpha = 1 - torch.exp(alpha_)
             coefs_scaled = coefs.scale(
                 *(
-                    1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
+                    (1 - alpha)
+                    * 1e-1
+                    * psi0_mean
+                    / (n_steps_per_cyle * dt) ** k
                     for k in range(basis.order)
                 )
             )
@@ -466,15 +484,18 @@ for c in range(n_cycles):
             basis.set_coefs(coefs_scaled)
 
             model.basis = basis
+            model.kappa = kappa
 
             compute_reg = compute_regularization_func(
-                basis, alpha, space_slice
+                basis, alpha, space_slice, kappa=kappa
             )
 
             compute_psi2 = basis.localize(xx, yy)
 
             q0 = crop(
-                compute_q_psi2(psi0, compute_psi2(model.time) + alpha * psi0),
+                compute_q_psi2(
+                    psi0, compute_psi2(model.time) + alpha * psi0, kappa
+                ),
                 p - 1,
             )
 
@@ -485,7 +506,7 @@ for c in range(n_cycles):
                 )
                 for n, p in enumerate(psis)
             )
-            qs = (compute_q_psi2(p1, p2) for p1, p2 in psis_)
+            qs = (compute_q_psi2(p1, p2, kappa) for p1, p2 in psis_)
             q_bcs = [
                 Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
                 for q in qs
@@ -512,7 +533,7 @@ for c in range(n_cycles):
                     loss += reg
 
                 if n % comparison_interval == 0:
-                    loss += rmse(psi1[0, 0], crop(psis[n][0, 0], p))
+                    loss += mse(psi1[0, 0], crop(psis[n][0, 0], p))
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
@@ -535,26 +556,30 @@ for c in range(n_cycles):
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
             f"Optimization step {step(o + 1, optim_max_step)} | "
-            f"Loss: {loss_:3.5f} | "
-            f"Best loss: {register_params.best_loss:3.5f}"
+            f"Loss: {loss_:>#10.5g} | "
+            f"Best loss: {register_params.best_loss:>#10.5g}"
         )
         logger.info(msg)
+        logger.info(f"\tɑ: {alpha.item():>#10.5g} | κ: {kappa.item():>#10.5g}")
 
         loss.backward()
 
-        if with_alpha:
-            torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
+        if alpha.requires_grad:
+            torch.nn.utils.clip_grad_value_([alpha_], clip_value=1.0)
+        if kappa_.requires_grad:
+            torch.nn.utils.clip_grad_value_([kappa_], clip_value=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
         optimizer.step()
+        # optimizer_.step()
         scheduler.step(loss)
+        # scheduler_.step(loss)
         lr_callback.step()
+        # lr_callback_.step()
 
     best_loss = register_params.best_loss
-    msg = (
-        f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:3.5f}"  # noqa: RUF001
-    )
+    msg = f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:>#10.5g}"  # noqa: RUF001
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
     logger.info(box(msg, msg_mem, style="round"))
