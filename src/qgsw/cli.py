@@ -118,7 +118,7 @@ class ScriptArgsVA(ScriptArgs):
             "-i",
             "--indices",
             required=True,
-            nargs="4",
+            nargs=4,
             type=int,
             help="Indices (imin, imax, jmin, jmax), "
             "for example (64, 128, 128, 256).",
