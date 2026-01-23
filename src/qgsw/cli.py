@@ -66,7 +66,7 @@ class ScriptArgs:
 class ScriptArgsVA(ScriptArgs):
     """Script arguments."""
 
-    indices: list[int]
+    indices: tuple[int, int, int, int]
     comparison: int
     cycles: int
     prefix: str
