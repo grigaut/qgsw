@@ -114,7 +114,7 @@ def on_track(f: torch.Tensor) -> torch.Tensor:
 
 ## Regularization
 
-gamma = args.gamma / comparison_interval * obs_track.sum() / obs_track.numel()
+gamma = args.gamma / comparison_interval
 
 if with_reg:
     msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
