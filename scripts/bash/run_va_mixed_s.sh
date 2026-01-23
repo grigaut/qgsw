@@ -23,4 +23,4 @@ date
 
 date
 
-exit 1
+exit 0
