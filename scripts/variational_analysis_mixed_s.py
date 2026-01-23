@@ -49,6 +49,8 @@ args = ScriptArgsVAModified.from_cli(
 )
 with_reg = not args.no_reg
 with_alpha = not args.no_alpha
+with_obs_track = args.obs_track
+
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -260,7 +262,33 @@ def regularization(
     return ((dtq2 + dq_2) / U * L * T).square().sum()
 
 
-gamma = 1 / comparison_interval * 0.1
+if with_obs_track:
+    obs_track = torch.zeros_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    )
+    for i in range(obs_track.shape[0]):
+        for j in range(obs_track.shape[1]):
+            if abs(i - j + 20) < 15:
+                obs_track[i, j] = True
+    obs_track = obs_track.flatten()
+    track_ratio = obs_track.sum() / obs_track.numel()
+    msg = (
+        "Sampling observation along a track "
+        f"spanning over {track_ratio:.2%} of the domain."
+    )
+    logger.info(box(msg, style="round"))
+else:
+    obs_track = torch.ones_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    ).flatten()
+
+
+def on_track(f: torch.Tensor) -> torch.Tensor:
+    """Project f on the observation track."""
+    return f.flatten()[obs_track]
+
+
+gamma = 1 / comparison_interval * obs_track.sum() / obs_track.numel() * 0.1
 
 # PV computation
 
@@ -436,7 +464,10 @@ for c in range(n_cycles):
                     loss += reg
 
                 if n % comparison_interval == 0:
-                    loss += mse(psi1[0, 0], crop(psis[n][0, 0], p))
+                    loss += mse(
+                        on_track(psi1[0, 0]),
+                        on_track(crop(psis[n][0, 0], p)),
+                    )
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
@@ -476,7 +507,7 @@ for c in range(n_cycles):
         lr_callback.step()
 
     best_loss = register_params.best_loss
-    msg = f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:>#10.5g}"  # noqa: RUF001
+    msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
     logger.info(box(msg, msg_mem, style="round"))

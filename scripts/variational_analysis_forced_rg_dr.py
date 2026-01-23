@@ -47,6 +47,8 @@ args = ScriptArgsVA.from_cli(
     cycles_default=3,
     prefix_default="results_forced_rg_dr",
 )
+with_obs_track = args.obs_track
+
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -244,6 +246,32 @@ def compute_q_rg(  # noqa: D103
     )
 
 
+if with_obs_track:
+    obs_track = torch.zeros_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    )
+    for i in range(obs_track.shape[0]):
+        for j in range(obs_track.shape[1]):
+            if abs(i - j + 20) < 15:
+                obs_track[i, j] = True
+    obs_track = obs_track.flatten()
+    track_ratio = obs_track.sum() / obs_track.numel()
+    msg = (
+        "Sampling observation along a track "
+        f"spanning over {track_ratio:.2%} of the domain."
+    )
+    logger.info(box(msg, style="round"))
+else:
+    obs_track = torch.ones_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    ).flatten()
+
+
+def on_track(f: torch.Tensor) -> torch.Tensor:
+    """Project f on the observation track."""
+    return f.flatten()[obs_track]
+
+
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
     times = [model_3l.time.item()]
@@ -313,7 +341,9 @@ for c in range(n_cycles):
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
 
-    coefs_scaled = coefs.scale(*(U**2 / L**2 for _ in range(basis.order)))
+    coefs_scaled = coefs.scale(
+        *(1e-2 * U**2 / L**2 for _ in range(basis.order))
+    )
 
     register_params = RegisterParams(coefs=coefs_scaled.to_dict())
 
@@ -326,7 +356,7 @@ for c in range(n_cycles):
             model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
 
             coefs_scaled = coefs.scale(
-                *(U**2 / L**2 for _ in range(basis.order))
+                *(1e-2 * U**2 / L**2 for _ in range(basis.order))
             )
             basis.set_coefs(coefs_scaled)
 
@@ -340,8 +370,8 @@ for c in range(n_cycles):
 
                 if n % comparison_interval == 0:
                     loss += mse(
-                        model.psi[0, 0],
-                        crop(psis[n][0, 0], p),
+                        on_track(model.psi[0, 0]),
+                        on_track(crop(psis[n][0, 0], p)),
                     )
 
         if torch.isnan(loss.detach()):
@@ -361,8 +391,8 @@ for c in range(n_cycles):
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
             f"Optimization step {step(o + 1, optim_max_step)} | "
-            f"Loss: {loss_:3.5f} | "
-            f"Best loss: {register_params.best_loss:3.5f}"
+            f"Loss: {loss_:>#10.5g} | "
+            f"Best loss: {register_params.best_loss:>#10.5g}"
         )
         logger.info(msg)
 
@@ -375,7 +405,7 @@ for c in range(n_cycles):
         lr_callback.step()
 
     best_loss = register_params.best_loss
-    msg = f"Forcing optimization completed with loss: {best_loss:3.5f}"
+    msg = f"Forcing optimization completed with loss: {best_loss:>#10.5g}"
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
     logger.info(box(msg, msg_mem, style="round"))

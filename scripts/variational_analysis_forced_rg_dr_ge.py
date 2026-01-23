@@ -45,6 +45,8 @@ args = ScriptArgsVA.from_cli(
     cycles_default=3,
     prefix_default="results_forced_rg_dr_ge",
 )
+with_obs_track = args.obs_track
+
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -245,6 +247,32 @@ def compute_q_rg(  # noqa: D103
     )
 
 
+if with_obs_track:
+    obs_track = torch.zeros_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    )
+    for i in range(obs_track.shape[0]):
+        for j in range(obs_track.shape[1]):
+            if abs(i - j + 20) < 15:
+                obs_track[i, j] = True
+    obs_track = obs_track.flatten()
+    track_ratio = obs_track.sum() / obs_track.numel()
+    msg = (
+        "Sampling observation along a track "
+        f"spanning over {track_ratio:.2%} of the domain."
+    )
+    logger.info(box(msg, style="round"))
+else:
+    obs_track = torch.ones_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    ).flatten()
+
+
+def on_track(f: torch.Tensor) -> torch.Tensor:
+    """Project f on the observation track."""
+    return f.flatten()[obs_track]
+
+
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
     times = [model_3l.time.item()]
@@ -335,8 +363,8 @@ for c in range(n_cycles):
 
                 if n % comparison_interval == 0:
                     loss += mse(
-                        model.psi[0, 0],
-                        crop(psis[n][0, 0], p),
+                        on_track(model.psi[0, 0]),
+                        on_track(crop(psis[n][0, 0], p)),
                     )
 
         if torch.isnan(loss.detach()):

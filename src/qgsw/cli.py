@@ -71,6 +71,7 @@ class ScriptArgsVA(ScriptArgs):
     cycles: int
     prefix: str
     no_wind: bool = False
+    obs_track: bool = False
 
     @classmethod
     def from_cli(
@@ -103,6 +104,7 @@ class ScriptArgsVA(ScriptArgs):
         cls._add_cycles(parser, cycles_default)
         cls._add_prefix(parser, prefix_default)
         cls._add_wind(parser)
+        cls._add_obs_track(parser)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -188,6 +190,19 @@ class ScriptArgsVA(ScriptArgs):
             help="Disable wind forcing.",
         )
 
+    @classmethod
+    def _add_obs_track(cls, parser: argparse.ArgumentParser) -> None:
+        """Specify whether to use observation trackes or not.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+        """
+        parser.add_argument(
+            "--obs-track",
+            action="store_true",
+            help="Enable observations tracks.",
+        )
+
     def complete_prefix(self) -> str:
         """Complete prefix with cli arguments info.
 
@@ -195,6 +210,8 @@ class ScriptArgsVA(ScriptArgs):
             str: Completed prefix.
         """
         prefix = self.prefix
+        if self.obs_track:
+            prefix += "_obstrack"
         if self.comparison != 1:
             prefix += f"_c{self.comparison}"
         return prefix
@@ -240,6 +257,7 @@ class ScriptArgsVAModified(ScriptArgsVA):
         cls._add_wind(parser)
         cls._add_reg(parser)
         cls._add_alpha(parser)
+        cls._add_obs_track(parser)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -281,6 +299,8 @@ class ScriptArgsVAModified(ScriptArgsVA):
             prefix += "_noreg"
         if self.no_wind:
             prefix += "_nowind"
+        if self.obs_track:
+            prefix += "_obstrack"
         if self.comparison != 1:
             prefix += f"_c{self.comparison}"
         return prefix
