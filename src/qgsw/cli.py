@@ -203,26 +203,28 @@ class ScriptArgsVA(ScriptArgs):
             help="Enable observations tracks.",
         )
 
+    def _build_suffix(self) -> list[str]:
+        return [
+            "_nowind" if self.no_wind else "",
+            "_obstrack" if self.obs_track else "",
+            f"_c{self.comparison}" if self.comparison != 1 else "",
+        ]
+
     def complete_prefix(self) -> str:
         """Complete prefix with cli arguments info.
 
         Returns:
             str: Completed prefix.
         """
-        prefix = self.prefix
-        if self.obs_track:
-            prefix += "_obstrack"
-        if self.comparison != 1:
-            prefix += f"_c{self.comparison}"
-        return prefix
+        return self.prefix + "".join(self._build_suffix())
 
 
 @dataclass
-class ScriptArgsVAModified(ScriptArgsVA):
+class ScriptArgsVARegularized(ScriptArgsVA):
     """Script arguments."""
 
     no_reg: bool = False
-    no_alpha: bool = False
+    gamma: float = 1
 
     @classmethod
     def from_cli(
@@ -231,6 +233,7 @@ class ScriptArgsVAModified(ScriptArgsVA):
         comparison_default: int = 1,
         cycles_default: int = 3,
         prefix_default: str = "results",
+        gamma_default: float = 0,
     ) -> Self:
         """Instantiate script arguments from CLI.
 
@@ -241,6 +244,7 @@ class ScriptArgsVAModified(ScriptArgsVA):
                 for number of cycles. Defaults to 3.
             prefix_default (str, optional): Default value for
                 output file prefix. Defaults to "results".
+            gamma_default (float): Default value for gamme. Defaults to 0.
 
         Returns:
             Self: ScriptArgsVA.
@@ -256,9 +260,26 @@ class ScriptArgsVAModified(ScriptArgsVA):
         cls._add_prefix(parser, prefix_default)
         cls._add_wind(parser)
         cls._add_reg(parser)
-        cls._add_alpha(parser)
+        cls._add_gamma(parser, gamma_default)
         cls._add_obs_track(parser)
         return cls(**vars(parser.parse_args()))
+
+    @classmethod
+    def _add_gamma(
+        cls, parser: argparse.ArgumentParser, default: float
+    ) -> None:
+        """Specify whether to use regularization or not.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (float): Default value.
+        """
+        parser.add_argument(
+            "--gamma",
+            type=float,
+            default=default,
+            help="Gamma value.",
+        )
 
     @classmethod
     def _add_reg(cls, parser: argparse.ArgumentParser) -> None:
@@ -273,6 +294,62 @@ class ScriptArgsVAModified(ScriptArgsVA):
             help="Disable regularization.",
         )
 
+    def _build_suffix(self) -> list[str]:
+        gamma_str = str(self.gamma).rstrip("0").rstrip(".").replace(".", "_")
+        return [
+            "_noreg" if self.no_reg else "",
+            f"_gamma{gamma_str}"
+            if (not self.no_reg and self.gamma != 1)
+            else "",
+            *super()._build_suffix(),
+        ]
+
+
+@dataclass
+class ScriptArgsVAModified(ScriptArgsVARegularized):
+    """Script arguments."""
+
+    no_alpha: bool = False
+
+    @classmethod
+    def from_cli(
+        cls,
+        *,
+        comparison_default: int = 1,
+        cycles_default: int = 3,
+        prefix_default: str = "results",
+        gamma_default: float = 0,
+    ) -> Self:
+        """Instantiate script arguments from CLI.
+
+        Args:
+            comparison_default (int, optional): Default value
+                for comparison interval. Defaults to 1.
+            cycles_default (int, optional): Default value
+                for number of cycles. Defaults to 3.
+            prefix_default (str, optional): Default value for
+                output file prefix. Defaults to "results".
+            gamma_default (float): Default value for gamme. Defaults to 0.
+
+        Returns:
+            Self: ScriptArgsVA.
+        """
+        parser = argparse.ArgumentParser(
+            description="Retrieve script arguments.",
+        )
+        cls._add_config(parser)
+        cls._add_verbose(parser)
+        cls._add_indices(parser)
+        cls._add_comparison_interval(parser, comparison_default)
+        cls._add_cycles(parser, cycles_default)
+        cls._add_prefix(parser, prefix_default)
+        cls._add_wind(parser)
+        cls._add_reg(parser)
+        cls._add_gamma(parser, gamma_default)
+        cls._add_alpha(parser)
+        cls._add_obs_track(parser)
+        return cls(**vars(parser.parse_args()))
+
     @classmethod
     def _add_alpha(cls, parser: argparse.ArgumentParser) -> None:
         """Specify whether to use alpha or not.
@@ -286,21 +363,8 @@ class ScriptArgsVAModified(ScriptArgsVA):
             help="Disable regularization.",
         )
 
-    def complete_prefix(self) -> str:
-        """Complete prefix with cli arguments info.
-
-        Returns:
-            str: Completed prefix.
-        """
-        prefix = self.prefix
-        if self.no_alpha:
-            prefix += "_noalpha"
-        if self.no_reg:
-            prefix += "_noreg"
-        if self.no_wind:
-            prefix += "_nowind"
-        if self.obs_track:
-            prefix += "_obstrack"
-        if self.comparison != 1:
-            prefix += f"_c{self.comparison}"
-        return prefix
+    def _build_suffix(self) -> str:
+        return [
+            "_noalpha" if self.no_alpha else "",
+            *super()._build_suffix(),
+        ]
