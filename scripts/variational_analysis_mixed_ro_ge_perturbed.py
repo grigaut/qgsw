@@ -57,6 +57,8 @@ args = ScriptArgsVAModified.from_cli(
 )
 with_reg = not args.no_reg
 with_alpha = not args.no_alpha
+with_obs_track = args.obs_track
+
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -253,6 +255,7 @@ def compute_regularization_func(
         psi2_basis (SpaceTimeDecomposition): Basis.
         alpha (torch.Tensor): Collinearity coefficient.
         space (SpaceDiscretization2D): Space.
+        kappa (torch.Tensor): Kappa.
 
     Returns:
         Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
@@ -291,7 +294,6 @@ def compute_regularization_func(
 
         dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
             ((1 - kappa) / H2 / g2) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
-            + 1 / H2 / g3 * (dt_psi2)
         )
 
         dx_psi1, dy_psi1 = grad(psi1)
@@ -310,10 +312,7 @@ def compute_regularization_func(
             fdy_lap_psi2(time)
             + alpha * lap_dy_psi1
             - beta_plane.f0**2
-            * (
-                ((1 - kappa) / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1))
-                + 1 / H2 / g3 * (dy_psi2)
-            )
+            * (((1 - kappa) / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1)))
         ) + beta_plane.beta
 
         lap_dx_psi1 = laplacian(dx_psi1_i, dx, dy)
@@ -322,10 +321,7 @@ def compute_regularization_func(
             fdx_lap_psi2(time)
             + alpha * lap_dx_psi1
             - beta_plane.f0**2
-            * (
-                ((1 - kappa) / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1))
-                + 1 / H2 / g3 * (dx_psi2)
-            )
+            * (((1 - kappa) / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1)))
         )
 
         adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
@@ -334,7 +330,33 @@ def compute_regularization_func(
     return compute_reg
 
 
-gamma = 1 / comparison_interval * 0.1
+if with_obs_track:
+    obs_track = torch.zeros_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    )
+    for i in range(obs_track.shape[0]):
+        for j in range(obs_track.shape[1]):
+            if abs(i - j + 20) < 15:
+                obs_track[i, j] = True
+    obs_track = obs_track.flatten()
+    track_ratio = obs_track.sum() / obs_track.numel()
+    msg = (
+        "Sampling observations along a track "
+        f"covering {track_ratio:.2%} of the domain."
+    )
+    logger.info(box(msg, style="round"))
+else:
+    obs_track = torch.ones_like(
+        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
+    ).flatten()
+
+
+def on_track(f: torch.Tensor) -> torch.Tensor:
+    """Project f on the observation track."""
+    return f.flatten()[obs_track]
+
+
+gamma = 1 / comparison_interval * obs_track.sum() / obs_track.numel() * 0.1
 
 # PV computation
 compute_q_psi2 = lambda psi1, psi2, kappa: compute_q1_interior(
@@ -416,8 +438,7 @@ for c in range(n_cycles):
         kappa_ = torch.tensor(0, **specs, requires_grad=True)
         numel = alpha_.numel() + kappa_.numel() + coefs.numel()
         params = [
-            {"params": [alpha_], "lr": 1e0, "name": "ɑ"},
-            # {"params": [kappa_], "lr": 1e-1, "name": "κ"},
+            {"params": [alpha_], "lr": 1e0, "name": "ɑ"},  # noqa: RUF001
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
@@ -440,17 +461,10 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     optimizer = torch.optim.Adam(params)
-    # optimizer_ = torch.optim.Adam(
-    #     [{"params": [kappa_], "lr": 5e-1, "name": "κ"}]
-    # )
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
-    # scheduler_ = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    #     optimizer_, factor=0.1, patience=5
-    # )
     lr_callback = LRChangeCallback(optimizer)
-    # lr_callback_ = LRChangeCallback(optimizer_)
     early_stop = EarlyStop()
 
     coefs_scaled = coefs.scale(
@@ -465,11 +479,10 @@ for c in range(n_cycles):
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
-        # optimizer_.zero_grad()
         model.reset_time()
 
         with torch.enable_grad():
-            kappa = torch.asinh(kappa_)
+            kappa = 1 - torch.exp(kappa_)
             alpha = 1 - torch.exp(alpha_)
             coefs_scaled = coefs.scale(
                 *(
@@ -533,7 +546,10 @@ for c in range(n_cycles):
                     loss += reg
 
                 if n % comparison_interval == 0:
-                    loss += mse(psi1[0, 0], crop(psis[n][0, 0], p))
+                    loss += mse(
+                        on_track(psi1[0, 0]),
+                        on_track(crop(psis[n][0, 0], p)),
+                    )
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
@@ -560,7 +576,6 @@ for c in range(n_cycles):
             f"Best loss: {register_params.best_loss:>#10.5g}"
         )
         logger.info(msg)
-        logger.info(f"\tɑ: {alpha.item():>#10.5g} | κ: {kappa.item():>#10.5g}")
 
         loss.backward()
 
@@ -572,14 +587,11 @@ for c in range(n_cycles):
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
         optimizer.step()
-        # optimizer_.step()
         scheduler.step(loss)
-        # scheduler_.step(loss)
         lr_callback.step()
-        # lr_callback_.step()
 
     best_loss = register_params.best_loss
-    msg = f"ɑ, dɑ, ѱ₂ and dѱ₂ optimization completed with loss: {best_loss:>#10.5g}"  # noqa: RUF001
+    msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
     max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
     msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
     logger.info(box(msg, msg_mem, style="round"))
