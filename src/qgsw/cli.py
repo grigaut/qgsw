@@ -295,7 +295,10 @@ class ScriptArgsVARegularized(ScriptArgsVA):
         )
 
     def _build_suffix(self) -> list[str]:
-        gamma_str = str(self.gamma).rstrip("0").rstrip(".").replace(".", "_")
+        if (g := self.gamma) != 0:
+            gamma_str = str(g).rstrip("0").rstrip(".").replace(".", "_")
+        else:
+            gamma_str = "0"
         return [
             "_noreg" if self.no_reg else "",
             f"_gamma{gamma_str}"
