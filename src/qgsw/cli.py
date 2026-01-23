@@ -118,7 +118,7 @@ class ScriptArgsVA(ScriptArgs):
             "-i",
             "--indices",
             required=True,
-            nargs="+",
+            nargs="4",
             type=int,
             help="Indices (imin, imax, jmin, jmax), "
             "for example (64, 128, 128, 256).",
@@ -366,7 +366,7 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
             help="Disable regularization.",
         )
 
-    def _build_suffix(self) -> str:
+    def _build_suffix(self) -> list[str]:
         return [
             "_noalpha" if self.no_alpha else "",
             *super()._build_suffix(),
