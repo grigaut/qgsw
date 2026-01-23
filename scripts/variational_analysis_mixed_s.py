@@ -273,7 +273,7 @@ if with_obs_track:
     obs_track = obs_track.flatten()
     track_ratio = obs_track.sum() / obs_track.numel()
     msg = (
-        "Sampling observation along a track "
+        "Sampling observations along a track "
         f"spanning over {track_ratio:.2%} of the domain."
     )
     logger.info(box(msg, style="round"))

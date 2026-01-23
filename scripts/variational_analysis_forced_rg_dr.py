@@ -257,7 +257,7 @@ if with_obs_track:
     obs_track = obs_track.flatten()
     track_ratio = obs_track.sum() / obs_track.numel()
     msg = (
-        "Sampling observation along a track "
+        "Sampling observations along a track "
         f"spanning over {track_ratio:.2%} of the domain."
     )
     logger.info(box(msg, style="round"))
@@ -341,9 +341,7 @@ for c in range(n_cycles):
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
 
-    coefs_scaled = coefs.scale(
-        *(1e-2 * U**2 / L**2 for _ in range(basis.order))
-    )
+    coefs_scaled = coefs.scale(*(U**2 / L**2 for _ in range(basis.order)))
 
     register_params = RegisterParams(coefs=coefs_scaled.to_dict())
 
@@ -356,7 +354,7 @@ for c in range(n_cycles):
             model.set_psiq(crop(psi0, p), crop(compute_q_rg(psi0), p - 1))
 
             coefs_scaled = coefs.scale(
-                *(1e-2 * U**2 / L**2 for _ in range(basis.order))
+                *(U**2 / L**2 for _ in range(basis.order))
             )
             basis.set_coefs(coefs_scaled)
 
