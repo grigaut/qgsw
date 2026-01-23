@@ -7,7 +7,7 @@ from typing import TypeVar
 
 import torch
 
-from qgsw.cli import ScriptArgsVA
+from qgsw.cli import ScriptArgsVARegularized
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets import (
@@ -42,11 +42,13 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVA.from_cli(
+args = ScriptArgsVARegularized.from_cli(
     comparison_default=1,
     cycles_default=3,
     prefix_default="results_forced_rg_dr_reg",
+    gamma_default=1e3,
 )
+with_reg = not args.no_reg
 with_obs_track = args.obs_track
 
 specs = defaults.get()
@@ -82,6 +84,55 @@ q_slices_w = [
     slice(jmin - (p - 1), jmax + (p - 1)),
 ]
 
+## Observations
+
+if with_obs_track:
+    obs_track = torch.zeros(
+        (imax - imin + 1, jmax - jmin + 1),
+        dtype=torch.bool,
+        device=specs["device"],
+    )
+    for i in range(obs_track.shape[0]):
+        for j in range(obs_track.shape[1]):
+            if abs(i - j + 20) < 15:
+                obs_track[i, j] = True
+    obs_track = obs_track.flatten()
+    track_ratio = obs_track.sum() / obs_track.numel()
+    msg_obs = (
+        "Sampling observations along a track "
+        f"covering {track_ratio:.2%} of the domain."
+    )
+else:
+    obs_track = torch.ones(
+        (imax - imin + 1, jmax - jmin + 1),
+        dtype=torch.bool,
+        device=specs["device"],
+    ).flatten()
+    msg_obs = "Sampling observations over the entire domain."
+
+
+def on_track(f: torch.Tensor) -> torch.Tensor:
+    """Project f on the observation track."""
+    return f.flatten()[obs_track]
+
+
+## Regularization
+
+gamma = args.gamma / comparison_interval * obs_track.sum() / obs_track.numel()
+
+if with_reg:
+    msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
+    if gamma != args.gamma:
+        msg_reg += (
+            f" (rescaled from ɣ = {args.gamma:#5.3g} to"  # noqa: RUF001
+            " account for observations sparsity)."
+        )
+    else:
+        msg_reg += "."
+else:
+    msg_reg = "No regularization."
+
+
 ## Output
 prefix = args.complete_prefix()
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
@@ -98,7 +149,9 @@ msg_loss = f"RMSE will be evaluated every {comp_dt}."
 msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
 msg_output = f"Output will be saved to {output_file}."
 
-logger.info(box(msg_simu, msg_loss, msg_area, msg_output, style="="))
+logger.info(
+    box(msg_simu, msg_loss, msg_area, msg_obs, msg_reg, msg_output, style="=")
+)
 
 # Parameters
 
@@ -246,32 +299,6 @@ def compute_q_rg(  # noqa: D103
     )
 
 
-if with_obs_track:
-    obs_track = torch.zeros_like(
-        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
-    )
-    for i in range(obs_track.shape[0]):
-        for j in range(obs_track.shape[1]):
-            if abs(i - j + 20) < 15:
-                obs_track[i, j] = True
-    obs_track = obs_track.flatten()
-    track_ratio = obs_track.sum() / obs_track.numel()
-    msg = (
-        "Sampling observations along a track "
-        f"covering {track_ratio:.2%} of the domain."
-    )
-    logger.info(box(msg, style="round"))
-else:
-    obs_track = torch.ones_like(
-        model_3l.psi[0, 0, imin : imax + 1, jmin : jmax + 1], dtype=torch.bool
-    ).flatten()
-
-
-def on_track(f: torch.Tensor) -> torch.Tensor:
-    """Project f on the observation track."""
-    return f.flatten()[obs_track]
-
-
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
     times = [model_3l.time.item()]
@@ -335,8 +362,6 @@ for c in range(n_cycles):
             }
         ]
     )
-
-    gamma = 1e2 / comparison_interval * obs_track.sum() / obs_track.numel()
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
