@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
+try:
+    from typing import Unpack
+except ImportError:
+    from typing_extensions import Unpack
+
+
 import matplotlib.colorbar as mpl_cbar
 import numpy as np
 import torch
@@ -64,12 +72,20 @@ def retrieve_colorbar(im: plt.AxesImage, ax: plt.Axes) -> mpl_cbar.Colorbar:
         return ax.cbar
 
 
+class ImshowKwargs(TypedDict, total=False):
+    """Non-exhaustives kwargs for imshow."""
+
+    cmap: str
+    vmin: float
+    vmax: float
+
+
 def imshow(
     data: torch.Tensor | np.ndarray,
     *,
     ax: plt.Axes | None = None,
     title: str | None = None,
-    **kwargs: Param.kwargs,
+    **kwargs: Unpack[ImshowKwargs],
 ) -> plt.AxesImage:
     """Wrapper for plt.imshow.
 
@@ -96,10 +112,14 @@ def imshow(
     return im
 
 
+class SubplotsKwargs(TypedDict, total=False):
+    """Non-exhaustives kwargs for subplots."""
+
+
 def subplots(
     nrows: int = 1,
     ncols: int = 1,
-    **kwargs: Param.kwargs,
+    **kwargs: Unpack[SubplotsKwargs],
 ) -> tuple[figure.Figure, np.ndarray]:
     """Wrapper for plt.subplots.
 
@@ -118,11 +138,19 @@ def subplots(
     return fig, axs
 
 
-def show(*, tight_layout: bool = True, **kwargs: Param.kwargs) -> None:
+class ShowKwargs(TypedDict, total=False):
+    """Non-exhaustives kwargs for show."""
+
+
+def show(*, tight_layout: bool = True, **kwargs: Unpack[ShowKwargs]) -> None:
     """Wrapper for plt.show."""
     if tight_layout:
         plt.tight_layout()
     return plt.show(**kwargs)
+
+
+class AnnotateKwargs(TypedDict, total=False):
+    """Non-exhaustives kwargs for show."""
 
 
 def set_coltitles(
@@ -130,7 +158,7 @@ def set_coltitles(
     axs: np.ndarray,
     *,
     pad: int = 5,
-    **kwargs: Param.kwargs,
+    **kwargs: Unpack[AnnotateKwargs],
 ) -> None:
     """Set column titles.
 
@@ -138,7 +166,7 @@ def set_coltitles(
         colnames (list[str]): Column names.
         axs (np.ndarray): Axes array.
         pad (int, optional): Padding below text. Defaults to 5.
-        **kwargs (Param.kwargs): Keywords arguments to pass to ax.annotate
+        **kwargs: Keywords arguments to pass to ax.annotate
 
     Raises:
         ValueError: If length mismatch between colnames and axs.
@@ -161,7 +189,7 @@ def set_rowtitles(
     axs: np.ndarray,
     *,
     pad: int = 5,
-    **kwargs: Param.kwargs,
+    **kwargs: Unpack[AnnotateKwargs],
 ) -> None:
     """Set row titles.
 
@@ -169,7 +197,7 @@ def set_rowtitles(
         rownames (list[str]): Row names.
         axs (np.ndarray): Axes array.
         pad (int, optional): Padding below text. Defaults to 5.
-        **kwargs (Param.kwargs): Keywords arguments to pass to ax.annotate
+        **kwargs: Keywords arguments to pass to ax.annotate
 
     Raises:
         ValueError: If length mismatch between rownames and axs.
