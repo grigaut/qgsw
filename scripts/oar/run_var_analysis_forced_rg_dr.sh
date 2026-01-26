@@ -27,7 +27,6 @@ cmd2="${cmd} --indices 32 96 256 384"
 cmd3="${cmd} --indices 112 176 64 192"
 cmd4="${cmd} --indices 112 176 256 384"
 
-
 if [ "$contiguous" = true ]; then
     # OAR options
     OAR_OPTS="-q production -l gpu=1,walltime=12 -O logs/OAR.%jobid%.stdout -E logs/OAR.%jobid%.stderr --notify mail:gaetan.rigaut@inria.fr"
