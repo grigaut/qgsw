@@ -29,7 +29,7 @@ cmd4="${cmd} --indices 112 176 256 384"
 
 if [ "$contiguous" = true ]; then
     # OAR options
-    OAR_OPTS="-q production -l gpu=1,walltime=12 -O logs/OAR.%jobid%.stdout -E logs/OAR.%jobid%.stderr --notify mail:gaetan.rigaut@inria.fr"
+    OAR_OPTS="-q production -l gpu=1,walltime=16 -O logs/OAR.%jobid%.stdout -E logs/OAR.%jobid%.stderr --notify mail:gaetan.rigaut@inria.fr"
     # Run commands sequentially in a single oarsub
     combined_cmd="$cmd1 ; $cmd2 ; $cmd3 ; $cmd4"
     oarsub $OAR_OPTS -S "$combined_cmd" -n "VA-frg-dr-contiguous"

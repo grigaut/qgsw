@@ -7,7 +7,7 @@ from typing import TypeVar
 
 import torch
 
-from qgsw.cli import ScriptArgsVA
+from qgsw.cli import ScriptArgsVARegularized
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
@@ -42,13 +42,14 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVA.from_cli(
+args = ScriptArgsVARegularized.from_cli(
     comparison_default=1,
     cycles_default=3,
     prefix_default="results_forced_rg_dr_ge",
+    gamma_default=1e3,
 )
+with_reg = not args.no_reg
 with_obs_track = args.obs_track
-
 specs = defaults.get()
 
 setup_root_logger(args.verbose)
@@ -135,7 +136,20 @@ def update_loss(
 
 ## Regularization
 
-msg_reg = "No regularization."
+gamma = args.gamma / comparison_interval
+
+if with_reg:
+    msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
+    if gamma != args.gamma:
+        msg_reg += (
+            f" (rescaled from ɣ = {args.gamma:#5.3g} to"  # noqa: RUF001
+            " account for observations sparsity)."
+        )
+    else:
+        msg_reg += "."
+else:
+    msg_reg = "No regularization."
+
 
 ## Output
 prefix = args.complete_prefix()
@@ -384,6 +398,9 @@ for c in range(n_cycles):
                     crop(psis[n][0, 0], p),
                     model.time,
                 )
+            if with_reg:
+                for coef in coefs.values():
+                    loss += gamma * coef.square().mean()
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
