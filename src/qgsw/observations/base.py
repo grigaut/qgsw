@@ -104,8 +104,6 @@ class BaseObservationMask(ABC):
             title_txt.format(time=sec2text(0)),
             fig,
             axs[0, 0],
-            ha="left",
-            fontsize=25,
         )
 
         cov_txt = "Coverage: {cov:.0%}"
