@@ -207,7 +207,9 @@ class ScriptArgsVA(ScriptArgs):
         return [
             "_nowind" if self.no_wind else "",
             "_obstrack" if self.obs_track else "",
-            f"_c{self.comparison}" if self.comparison != 1 else "",
+            f"_c{self.comparison}"
+            if (not self.obs_track) and (self.comparison != 1)
+            else "",
         ]
 
     def complete_prefix(self) -> str:
