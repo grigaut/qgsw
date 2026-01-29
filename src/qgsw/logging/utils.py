@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 
 def assert_char(char: str) -> None:
@@ -95,9 +95,14 @@ def box(
         h = v = tl = tr = bl = br = ml = mr = char
     else:
         h, v, tl, tr, bl, br, ml, mr = box_styles[style]
-    max_len = max(max(len(m) for m in msg.split("\n")) for msg in msgs)
+    max_lens = [max(len(m) for m in msg.split("\n")) for msg in msgs]
+    max_len = max(max_lens)
+    msgs_ljusted = [
+        "\n".join(m_.ljust(m) for m_ in msg.split("\n"))
+        for msg, m in zip(msgs, max_lens)
+    ]
     msgs_ = [tl + "".join([h] * (max_len + 2)) + tr]
-    for msg in msgs:
+    for msg in msgs_ljusted:
         msg_c = "\n".join([m.center(max_len) for m in msg.split("\n")])
         blank_banner = banner(msg_c, " ")
         msg_pad = pad(blank_banner, " ")
@@ -225,3 +230,100 @@ def kilometers2text(distance: float, *, squeeze_unit: bool = False) -> str:
     s = "s" if distance >= 2 else ""
     unit = "km" if squeeze_unit else f"kilometer{s}"
     return f"{distance:.1f} {unit}"
+
+
+def tree(*parts: str | list) -> str:
+    """Generate a tree-like structure from nested strings and lists.
+
+    The structure is interpreted as:
+    - A string is a node
+    - A list following a string contains that string's children
+    - A list at the start has no parent
+
+    Args:
+        *parts: Strings or nested lists of strings.
+
+    Returns:
+        str: Tree representation of the structure.
+
+    Examples:
+        >>> print(tree("A", ["B", ["B1", "B2"], "C", ["C1"]]))
+        A
+        ├── B
+        │   ├── B1
+        │   └── B2
+        └── C
+            └── C1
+    """
+    if not parts:
+        return ""
+
+    lines = []
+    _process_items(list(parts), lines, prefix="", is_root=True)
+    return "\n".join(lines)
+
+
+def _process_items(
+    items: list[Any],
+    lines: list[str],
+    prefix: str = "",
+    *,
+    is_root: bool = False,
+) -> int:
+    """Process a list of items, handling strings and nested lists.
+
+    Args:
+        items: list of items to process.
+        lines: Output lines list.
+        prefix: Current prefix for indentation.
+        is_root: Whether we're at root level.
+
+    Returns:
+        int: Number of items consumed.
+    """
+    i = 0
+    item_count = 0
+
+    while i < len(items):
+        item = items[i]
+
+        if isinstance(item, str):
+            # Determine if this is the last item at this level
+            # (checking if next item is a string or if we're at the end)
+            next_idx = i + 1
+            # Skip the next item if it's a list (children)
+            if next_idx < len(items) and isinstance(items[next_idx], list):
+                next_idx += 1
+
+            # Check if there are more siblings
+            is_last = next_idx >= len(items) or not isinstance(
+                items[next_idx], str
+            )
+
+            # Add the item
+            if is_root and item_count == 0:
+                lines.append(item)
+            else:
+                connector = "└── " if is_last else "├── "
+                lines.append(f"{prefix}{connector}{item}")
+
+            # Check if next item is a list of children
+            if i + 1 < len(items) and isinstance(items[i + 1], list):
+                extension = "    " if is_last else "│   "
+                _process_items(
+                    items[i + 1],
+                    lines,
+                    prefix=prefix + extension,
+                    is_root=False,
+                )
+                i += 2  # Skip both the string and its children list
+            else:
+                i += 1
+
+            item_count += 1
+        else:
+            # It's a list without a parent string
+            _process_items(item, lines, prefix=prefix, is_root=is_root)
+            i += 1
+
+    return item_count
