@@ -269,61 +269,37 @@ def _process_items(
     prefix: str = "",
     *,
     is_root: bool = False,
-) -> int:
-    """Process a list of items, handling strings and nested lists.
-
-    Args:
-        items: list of items to process.
-        lines: Output lines list.
-        prefix: Current prefix for indentation.
-        is_root: Whether we're at root level.
-
-    Returns:
-        int: Number of items consumed.
-    """
-    i = 0
-    item_count = 0
-
-    while i < len(items):
-        item = items[i]
-
-        if isinstance(item, str):
-            # Determine if this is the last item at this level
-            # (checking if next item is a string or if we're at the end)
-            next_idx = i + 1
-            # Skip the next item if it's a list (children)
-            if next_idx < len(items) and isinstance(items[next_idx], list):
-                next_idx += 1
-
-            # Check if there are more siblings
-            is_last = next_idx >= len(items) or not isinstance(
-                items[next_idx], str
+) -> None:
+    """Process a list of items, handling strings and nested lists."""
+    # Pre-process to identify which items are actual nodes (not children lists)
+    nodes = []
+    j = 0
+    while j < len(items):
+        if isinstance(items[j], str):
+            children = (
+                items[j + 1]
+                if j + 1 < len(items) and isinstance(items[j + 1], list)
+                else None
             )
-
-            # Add the item
-            if is_root and item_count == 0:
-                lines.append(item)
-            else:
-                connector = "└── " if is_last else "├── "
-                lines.append(f"{prefix}{connector}{item}")
-
-            # Check if next item is a list of children
-            if i + 1 < len(items) and isinstance(items[i + 1], list):
-                extension = "    " if is_last else "│   "
-                _process_items(
-                    items[i + 1],
-                    lines,
-                    prefix=prefix + extension,
-                    is_root=False,
-                )
-                i += 2  # Skip both the string and its children list
-            else:
-                i += 1
-
-            item_count += 1
+            nodes.append((items[j], children))
+            j += 2 if children is not None else 1
         else:
-            # It's a list without a parent string
-            _process_items(item, lines, prefix=prefix, is_root=is_root)
-            i += 1
+            # Orphaned list - process inline
+            _process_items(items[j], lines, prefix=prefix, is_root=is_root)
+            j += 1
 
-    return item_count
+    # Now render nodes
+    for idx, (name, children) in enumerate(nodes):
+        is_last = idx == len(nodes) - 1
+
+        if is_root and idx == 0:
+            lines.append(name)
+        else:
+            connector = "└── " if is_last else "├── "
+            lines.append(f"{prefix}{connector}{name}")
+
+        if children:
+            extension = "    " if is_last else "│   "
+            _process_items(
+                children, lines, prefix=prefix + extension, is_root=False
+            )
