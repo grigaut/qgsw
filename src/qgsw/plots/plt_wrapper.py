@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 try:
     from typing import Unpack
@@ -10,15 +10,18 @@ except ImportError:
     from typing_extensions import Unpack
 
 
-import matplotlib.colorbar as mpl_cbar
 import numpy as np
 import torch
-from matplotlib import figure
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from typing_extensions import ParamSpec
 
-Param = ParamSpec("Param")
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.colorbar import Colorbar
+    from matplotlib.figure import Figure
+    from matplotlib.image import AxesImage
+    from matplotlib.text import Annotation, Text
+
 
 DEFAULT_CMAP = "RdBu_r"
 
@@ -52,15 +55,15 @@ def default_clim(data: np.ndarray) -> tuple[float, float]:
     return -vmax, vmax
 
 
-def retrieve_colorbar(im: plt.AxesImage, ax: plt.Axes) -> mpl_cbar.Colorbar:
+def retrieve_colorbar(im: AxesImage, ax: Axes) -> Colorbar:
     """Retrieve colorbar axes from axes.
 
     Args:
-        im (plt.AxesImage): Image to associate colorbar with.
-        ax (plt.Axes): Axes to retrieve colorbar from.
+        im (AxesImage): Image to associate colorbar with.
+        ax (Axes): Axes to retrieve colorbar from.
 
     Returns:
-        plt.Axes: Colorbar axes.
+        Axes: Colorbar axes.
     """
     try:
         return ax.cbar
@@ -83,15 +86,15 @@ class ImshowKwargs(TypedDict, total=False):
 def imshow(
     data: torch.Tensor | np.ndarray,
     *,
-    ax: plt.Axes | None = None,
+    ax: Axes | None = None,
     title: str | None = None,
     **kwargs: Unpack[ImshowKwargs],
-) -> plt.AxesImage:
+) -> AxesImage:
     """Wrapper for plt.imshow.
 
     Args:
         data (torch.Tensor | np.ndarray): 2D array to plot.
-        ax (plt.Axes | None, optional): Axes to plot on. Defaults to None.
+        ax (Axes | None, optional): Axes to plot on. Defaults to None.
         title (str | None, optional): Title. Defaults to None.
         **kwargs: optional arguments to pass to plt.imshow.
     """
@@ -120,7 +123,7 @@ def subplots(
     nrows: int = 1,
     ncols: int = 1,
     **kwargs: Unpack[SubplotsKwargs],
-) -> tuple[figure.Figure, np.ndarray]:
+) -> tuple[Figure, np.ndarray]:
     """Wrapper for plt.subplots.
 
     Args:
@@ -129,7 +132,7 @@ def subplots(
         **kwargs: optional arguments to pass to plt.subplots.
 
     Returns:
-        tuple[mpl.figure.Figure, np.ndarray]: Figure, Axes array.
+        tuple[mpl.Figure, np.ndarray]: Figure, Axes array.
     """
     kwargs.setdefault("squeeze", False)
     kwargs.setdefault("figsize", ((4 * ncols, 4 * nrows + 1)))
@@ -159,7 +162,7 @@ def set_coltitles(
     *,
     pad: int = 5,
     **kwargs: Unpack[AnnotateKwargs],
-) -> None:
+) -> list[Annotation]:
     """Set column titles.
 
     Args:
@@ -179,9 +182,11 @@ def set_coltitles(
     kwargs.setdefault("textcoords", "offset points")
     kwargs.setdefault("ha", "center")
     kwargs.setdefault("va", "baseline")
-
+    col_titles: list[Annotation] = []
     for ax, col in zip(axs[0], colnames):
-        ax.annotate(col, xytext=(0, pad), **kwargs)
+        ax: Axes
+        col_titles.append(ax.annotate(col, xytext=(0, pad), **kwargs))
+    return col_titles
 
 
 def set_rowtitles(
@@ -190,7 +195,7 @@ def set_rowtitles(
     *,
     pad: int = 5,
     **kwargs: Unpack[AnnotateKwargs],
-) -> None:
+) -> list[Annotation]:
     """Set row titles.
 
     Args:
@@ -211,23 +216,27 @@ def set_rowtitles(
     kwargs.setdefault("ha", "right")
     kwargs.setdefault("va", "center")
     kwargs.setdefault("rotation", 90)
-
+    row_titles: list[Annotation] = []
     for ax, row in zip(axs[:, 0], rownames):
-        ax.annotate(
-            row,
-            xytext=(-ax.yaxis.labelpad - pad, 0),
-            xycoords=ax.yaxis.label,
-            **kwargs,
+        ax: Axes
+        row_titles.append(
+            ax.annotate(
+                row,
+                xytext=(-ax.yaxis.labelpad - pad, 0),
+                xycoords=ax.yaxis.label,
+                **kwargs,
+            )
         )
+    return row_titles
 
 
-def clamp_ylims(bottom: float, top: float, ax: plt.Axes) -> None:
+def clamp_ylims(bottom: float, top: float, ax: Axes) -> None:
     """Clamp y lims.
 
     Args:
         bottom (float): Bottom value.
         top (float): Top value.
-        ax (plt.Axes): Axes.
+        ax (Axes): Axes.
     """
     ax.relim()
     ax.autoscale_view()
@@ -243,13 +252,13 @@ def clamp_ylims(bottom: float, top: float, ax: plt.Axes) -> None:
     ax.set_ylim(y0 - pad, y1 + pad)
 
 
-def set_ylims(bottom: float, top: float, ax: plt.Axes) -> None:
+def set_ylims(bottom: float, top: float, ax: Axes) -> None:
     """Set y lims.
 
     Args:
         bottom (float): Bottom value.
         top (float): Top value.
-        ax (plt.Axes): Axes.
+        ax (Axes): Axes.
     """
     ax.relim()
     ax.autoscale_view()
@@ -263,3 +272,76 @@ def set_ylims(bottom: float, top: float, ax: plt.Axes) -> None:
     pad = my * dy
 
     ax.set_ylim(y0 - pad, y1 + pad)
+
+
+class SuptitleKwargs(TypedDict, total=False):
+    """Non-exhaustives kwargs for suptitle."""
+
+
+def blittable_suptitle(
+    text: str,
+    fig: Figure,
+    ax: Axes,
+    **kwargs: Unpack[SuptitleKwargs],
+) -> Text:
+    """Set the figure suptitle through ax.text.
+
+    This allow the returned text to be modified in animation
+    with blit = True.
+
+    Args:
+        text (str): Suptitle text.
+        fig (Figure): Figure to add suptitle to.
+        ax (Axes): Ax to use for the suptitle.
+        **kwargs: Keywords arguments to pass to ax.text.
+
+    Returns:
+        Text: Suptitle text.
+    """
+    temp_suptitle = fig.suptitle(text, **kwargs)
+
+    # Get ALL text properties using get_fontproperties() and other getters
+    position = temp_suptitle.get_position()
+    font_properties = temp_suptitle.get_fontproperties()
+    color = temp_suptitle.get_color()
+    ha = temp_suptitle.get_ha()
+    va = temp_suptitle.get_va()
+    alpha = temp_suptitle.get_alpha()
+    rotation = temp_suptitle.get_rotation()
+    bbox = temp_suptitle.get_bbox_patch()
+
+    # Remove the suptitle
+    temp_suptitle.remove()
+
+    suptitle = ax.text(
+        position[0],
+        position[1],
+        text,
+        ha=ha,
+        va=va,
+        fontproperties=font_properties,
+        color=color,
+        alpha=alpha,
+        rotation=rotation,
+        transform=fig.transFigure,
+    )
+    if bbox:
+        suptitle.set_bbox(
+            {
+                "boxstyle": bbox.get_boxstyle(),
+                "facecolor": bbox.get_facecolor(),
+                "edgecolor": bbox.get_edgecolor(),
+                "alpha": bbox.get_alpha(),
+            }
+        )
+    return suptitle
+
+
+def close(fig: int | str | Figure | None = None) -> None:
+    """Close a figure window, and unregister it from pyplot.
+
+    Args:
+        fig (int | str | Figure | None, optional): Figure to close.
+            Defaults to None.
+    """
+    plt.close(fig)

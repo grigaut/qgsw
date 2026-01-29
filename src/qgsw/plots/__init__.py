@@ -1,7 +1,9 @@
 """Plotting related tools."""
 
 from qgsw.plots.plt_wrapper import (
+    blittable_suptitle,
     clamp_ylims,
+    close,
     imshow,
     set_coltitles,
     set_rowtitles,
@@ -11,7 +13,9 @@ from qgsw.plots.plt_wrapper import (
 )
 
 __all__ = [
+    "blittable_suptitle",
     "clamp_ylims",
+    "close",
     "imshow",
     "set_coltitles",
     "set_rowtitles",
