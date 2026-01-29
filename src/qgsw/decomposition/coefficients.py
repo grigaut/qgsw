@@ -115,3 +115,17 @@ class DecompositionCoefs:
         coefs_zeros = {k: torch.zeros_like(v) for k, v in coefs.items()}
 
         return cls.from_dict(coefs_zeros)
+
+    @classmethod
+    def ones_like(cls, coefs: "DecompositionCoefs") -> Self:
+        """Set all coefs to 1.
+
+        Args:
+            coefs (DecompositionCoefs): Decompositon coefs.
+
+        Returns:
+            Self: DecompositionCoefs.
+        """
+        coefs_ones = {k: torch.ones_like(v) for k, v in coefs.items()}
+
+        return cls.from_dict(coefs_ones)
