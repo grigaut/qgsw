@@ -23,6 +23,8 @@ from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import QGPSIQForced
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.observations.full_domain import FullDomainMask
+from qgsw.observations.satellite_track import SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import compute_q1_interior
@@ -75,42 +77,62 @@ imin, imax, jmin, jmax = indices
 p = 4
 psi_slices = [slice(imin, imax + 1), slice(jmin, jmax + 1)]
 psi_slices_w = [slice(imin - p, imax + p + 1), slice(jmin - p, jmax + p + 1)]
-q_slices = [slice(imin, imax), slice(jmin, jmax)]
-q_slices_w = [
-    slice(imin - (p - 1), imax + (p - 1)),
-    slice(jmin - (p - 1), jmax + (p - 1)),
-]
 
+space = SpaceDiscretization3D.from_config(
+    config.space,
+    config.model,
+)
+
+space_slice = space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
+
+space_slice_w = space.remove_z_h().slice(
+    imin - p + 1, imax + p, jmin - p + 1, jmax + p
+)
+space_slice_ww = space.remove_z_h().slice(
+    imin - p, imax + p + 1, jmin - p, jmax + p + 1
+)
 ## Observations
 
 if with_obs_track:
-    obs_track = torch.zeros(
-        (imax - imin + 1, jmax - jmin + 1),
-        dtype=torch.bool,
-        device=specs["device"],
+    obs_mask = SatelliteTrackMask(
+        space_slice.psi.xy.x,
+        space_slice.psi.xy.y,
+        track_width=100000,
+        track_interval=500000,
+        theta=torch.pi / 12,
+        full_coverage_time=20 * 3600 * 24,
     )
-    for i in range(obs_track.shape[0]):
-        for j in range(obs_track.shape[1]):
-            if abs(i - j + 20) < 15:
-                obs_track[i, j] = True
-    obs_track = obs_track.flatten()
-    track_ratio = obs_track.sum() / obs_track.numel()
-    msg_obs = (
-        "Sampling observations along a track "
-        f"covering {track_ratio:.2%} of the domain."
-    )
+    if comparison_interval != 1:
+        msg = (
+            "Using Satellite track, comparison interval"
+            "inferred from tracks trajectory."
+        )
+        logger.warning(box(msg, style="="))
+    msg_obs = "Surface observed along satellite tracks."
 else:
-    obs_track = torch.ones(
-        (imax - imin + 1, jmax - jmin + 1),
-        dtype=torch.bool,
-        device=specs["device"],
-    ).flatten()
-    msg_obs = "Sampling observations over the entire domain."
+    obs_mask = FullDomainMask(
+        space_slice.psi.xy.x,
+        space_slice.psi.xy.y,
+        dt=comparison_interval * dt,
+    )
+    msg_obs = (
+        f"Full surface observed every {sec2text(comparison_interval * dt)}"
+    )
 
 
-def on_track(f: torch.Tensor) -> torch.Tensor:
-    """Project f on the observation track."""
-    return f.flatten()[obs_track]
+def update_loss(
+    loss: torch.Tensor,
+    f: torch.Tensor,
+    f_ref: torch.Tensor,
+    time: torch.Tensor,
+) -> None:
+    """Update loss."""
+    mask = obs_mask.at_time(time)
+    if not mask.any():
+        return loss
+    f_sliced = f.flatten()[mask.flatten()]
+    f_ref_sliced = f_ref.flatten()[mask.flatten()]
+    return loss + mse(f_sliced, f_ref_sliced)
 
 
 ## Regularization
@@ -128,14 +150,10 @@ msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
-comp_dt = sec2text(comparison_interval * dt)
-msg_loss = f"RMSE will be evaluated every {comp_dt}."
 msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
 msg_output = f"Output will be saved to {output_file}."
 
-logger.info(
-    box(msg_simu, msg_loss, msg_area, msg_obs, msg_reg, msg_output, style="=")
-)
+logger.info(box(msg_simu, msg_area, msg_obs, msg_reg, msg_output, style="="))
 
 # Parameters
 
@@ -234,14 +252,8 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-space_slice = P.space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
-
-space_slice_w = P.space.remove_z_h().slice(
-    imin - p + 1, imax + p, jmin - p + 1, jmax + p
-)
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
-
 
 model = QGPSIQForced(
     space_2d=space_slice,
@@ -376,11 +388,12 @@ for c in range(n_cycles):
                 model.forcing = wv(model.time)[None, None, ...]
                 model.step()
 
-                if n % comparison_interval == 0:
-                    loss += mse(
-                        on_track(model.psi[0, 0]),
-                        on_track(crop(psis[n][0, 0], p)),
-                    )
+                loss = update_loss(
+                    loss,
+                    model.psi[0, 0],
+                    crop(psis[n][0, 0], p),
+                    model.time,
+                )
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
