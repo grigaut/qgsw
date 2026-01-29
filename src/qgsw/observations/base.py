@@ -1,17 +1,23 @@
 """Base class for observations systems."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import torch
 from matplotlib.animation import FuncAnimation
-from matplotlib.image import AxesImage
-from matplotlib.text import Annotation, Text
 
 from qgsw import plots
 from qgsw.logging.utils import sec2text
 from qgsw.plots.plt_wrapper import retrieve_imshow_data
 from qgsw.specs import defaults
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from matplotlib.image import AxesImage
+    from matplotlib.text import Annotation, Text
 
 
 class BaseObservationMask(ABC):
@@ -148,3 +154,23 @@ class BaseObservationMask(ABC):
         anim = FuncAnimation(fig, update, frames=nb_ite, blit=True)
         anim.save(output, fps=20)
         plots.close(fig)
+
+    def compute_obs_nb(
+        self, n_steps: int, dt: float, t0: torch.Tensor | float = 0
+    ) -> int:
+        """Compute number of observations between t0 and tf.
+
+        Args:
+            n_steps (int): Number of steps.
+            dt (float): Time step between observations.
+            t0 (torch.Tensor | float, optional): Initial time. Defaults to 0.
+
+        Returns:
+            int: Number of observed points.
+        """
+        return sum(
+            self.at_time(
+                t0 + torch.tensor([step * dt], **defaults.get())
+            ).sum()
+            for step in range(n_steps)
+        )
