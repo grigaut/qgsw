@@ -36,6 +36,10 @@ class BaseObservationMask(ABC):
         self._x = x
         self._y = y
 
+    def __repr__(self) -> str:
+        """String representation."""
+        return "Observation mask"
+
     def _validate_xy(self, x: torch.Tensor, y: torch.Tensor) -> None:
         """Validate x and y shapes.
 

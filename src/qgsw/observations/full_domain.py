@@ -1,10 +1,12 @@
 """Full domain masks."""
 
+from __future__ import annotations
+
 import torch
 from torch import Tensor
 
 from qgsw.logging.core import getLogger
-from qgsw.logging.utils import sec2text
+from qgsw.logging.utils import sec2text, tree
 from qgsw.observations.base import BaseObservationMask
 
 logger = getLogger(__name__)
@@ -73,3 +75,15 @@ class FullDomainMask(BaseObservationMask):
             return torch.zeros_like(self._y, dtype=torch.bool)
 
         return torch.ones_like(self._x, dtype=torch.bool)
+
+    def get_repr_parts(self) -> list[str | list]:
+        """String representations parts.
+
+        Returns:
+            list[str | list]: String representation parts.
+        """
+        return [self.__class__.__name__, [f"dt: {sec2text(self._dt)}"]]
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return tree(*self.get_repr_parts())

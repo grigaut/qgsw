@@ -1,10 +1,12 @@
 """Satellite-track-like observation system."""
 
+from __future__ import annotations
+
 import numpy as np
 import torch
 
 from qgsw.logging.core import getLogger
-from qgsw.logging.utils import sec2text
+from qgsw.logging.utils import meters2text, sec2text, tree
 from qgsw.observations.base import BaseObservationMask
 from qgsw.specs import defaults
 
@@ -125,6 +127,28 @@ class SatelliteTrackMask(BaseObservationMask):
         self._assert_valid_params()
         self._full_coverage_nb_ite = self._compute_full_coverage_nb_ite()
         self.full_coverage_time = full_coverage_time
+
+    def get_repr_parts(self) -> list[str | list]:
+        """String representations parts.
+
+        Returns:
+            list[str | list]: String representation parts.
+        """
+        return [
+            self.__class__.__name__,
+            [
+                f"Track width: {meters2text(self.track_width)}",
+                f"Interval width: {meters2text(self.track_interval)}",
+                f"Orientation: {self.theta / torch.pi:.2f} π",
+                f"dt: {sec2text(self._dt)}",
+            ],
+        ]
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return tree(
+            *self.get_repr_parts(),
+        )
 
     def _compute_acceptable_xs(
         self,
