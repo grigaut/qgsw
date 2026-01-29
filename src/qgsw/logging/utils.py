@@ -154,7 +154,7 @@ def min2text(time: float, *, squeeze_unit: bool = False) -> str:
     """
     if time < 60:
         s = "s" if time >= 2 else ""
-        unit = "min" if squeeze_unit else f"minut{s}"
+        unit = "min" if squeeze_unit else f"minute{s}"
         return f"{time:.1f} {unit}"
     return hours2text(time / 60, squeeze_unit=squeeze_unit)
 
