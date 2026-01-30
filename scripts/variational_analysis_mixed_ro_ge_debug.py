@@ -444,7 +444,8 @@ def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
 
 
 for c in range(n_cycles):
-    torch.cuda.reset_peak_memory_stats()
+    if specs["device"] == torch.device("cuda"):
+        torch.cuda.reset_peak_memory_stats()
     times = [model_3l.time.item()]
 
     psi0 = extract_psi_w(model_3l.psi[:, :1])
@@ -626,8 +627,13 @@ for c in range(n_cycles):
 
     best_loss = register_params.best_loss
     msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
-    max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
-    msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
+
+    if specs["device"] == torch.device("cuda"):
+        max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
+        msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
+    else:
+        max_mem = None
+        msg_mem = "Unable to read max memory xith cpu runs"
     logger.info(box(msg, msg_mem, style="round"))
     output = {
         "cycle": c,
