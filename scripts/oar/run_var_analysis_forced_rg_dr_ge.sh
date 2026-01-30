@@ -32,7 +32,7 @@ if [ "$contiguous" = true ]; then
     OAR_OPTS="-q production -l gpu=1,walltime=16 -O logs/OAR.%jobid%.stdout -E logs/OAR.%jobid%.stderr --notify mail:gaetan.rigaut@inria.fr"
     # Run commands sequentially in a single oarsub
     combined_cmd="$cmd1 ; $cmd2 ; $cmd3 ; $cmd4"
-    oarsub $OAR_OPTS -S "$combined_cmd" -n "VA-frg-dr-ge-contiguous"
+    oarsub $OAR_OPTS "$combined_cmd" -n "VA-frg-dr-ge-contiguous"
 else
     # Run commands as separate jobs
     oarsub -S "$cmd1" -n "VA-frg-dr-ge-[32 96 64 192]"
