@@ -88,6 +88,7 @@ def imshow(
     *,
     ax: Axes | None = None,
     title: str | None = None,
+    show_cbar: bool = True,
     **kwargs: Unpack[ImshowKwargs],
 ) -> AxesImage:
     """Wrapper for plt.imshow.
@@ -96,6 +97,7 @@ def imshow(
         data (torch.Tensor | np.ndarray): 2D array to plot.
         ax (Axes | None, optional): Axes to plot on. Defaults to None.
         title (str | None, optional): Title. Defaults to None.
+        show_cbar (bool): Whether to show colorbar or not.
         **kwargs: optional arguments to pass to plt.imshow.
     """
     data = retrieve_imshow_data(data)
@@ -108,8 +110,9 @@ def imshow(
         ax = plt.subplot()
 
     im = ax.imshow(data, **kwargs)
-    cbar = retrieve_colorbar(im, ax)
-    cbar.update_normal(im)
+    if show_cbar:
+        cbar = retrieve_colorbar(im, ax)
+        cbar.update_normal(im)
     if title is not None:
         ax.set_title(title)
     return im
@@ -312,6 +315,7 @@ def blittable_suptitle(
 
     # Remove the suptitle
     temp_suptitle.remove()
+    fig._suptitle = None  # noqa: SLF001
 
     suptitle = ax.text(
         position[0],
