@@ -117,8 +117,9 @@ class BaseObservationMask(ABC):
         )
 
         cov_txt = "Coverage: {cov:.0%}"
+        cumul_txt = "Cumulative coverage: {cumul:.0%}"
         coltitles = plots.set_coltitles(
-            ["Track Mask", cov_txt.format(cov=0), "Cumulative tracks"],
+            ["Track Mask", cov_txt.format(cov=0), cumul_txt.format(cumul=0)],
             axs=axs,
         )
         im1 = plots.imshow(
@@ -146,14 +147,24 @@ class BaseObservationMask(ABC):
 
         def update(
             frame: int,
-        ) -> tuple[AxesImage, AxesImage, AxesImage, Annotation, Text]:
+        ) -> tuple[
+            AxesImage,
+            AxesImage,
+            AxesImage,
+            Annotation,
+            Annotation,
+            Text,
+        ]:
             im1.set_array(retrieve_imshow_data(masks[frame]))
             im2.set_array(retrieve_imshow_data(coverages[frame] > 0))
             im3.set_array(retrieve_imshow_data(coverages[frame]))
             coverage = (coverages[frame] > 0).to(torch.float64).mean().item()
             coltitles[1].set_text(cov_txt.format(cov=coverage))
+            cumul = coverages[frame].to(torch.float64).mean().item()
+            coltitles[1].set_text(cov_txt.format(cov=coverage))
+            coltitles[2].set_text(cumul_txt.format(cumul=cumul))
             title.set_text(title_txt.format(time=sec2text(frame * frame_dt)))
-            return (im1, im2, im3, coltitles[1], title)
+            return (im1, im2, im3, coltitles[1], coltitles[2], title)
 
         anim = FuncAnimation(fig, update, frames=nb_ite, blit=True)
         anim.save(output, fps=20)
