@@ -172,7 +172,9 @@ class SatelliteTrackMask(BaseObservationMask):
             torch.Tensor: Acceptable X positions.
         """
         dx = x[1] - x[0]
-        x_min = x[0] - (self._tan_theta * (y[-1] - y[0]) // dx + 1) * dx
+        x_offset = self._tan_theta * (y[-1] - y[0])
+        x_o_grid = (torch.div(x_offset, dx, rounding_mode="floor") + 1) * dx
+        x_min = x[0] - x_o_grid
         x_max = x[-1]
         return torch.arange(x_min, x_max + dx, step=dx)
 
