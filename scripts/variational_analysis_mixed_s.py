@@ -398,7 +398,7 @@ for c in range(n_cycles):
     coefs = coefs.requires_grad_()
 
     if with_alpha:
-        alpha = torch.tensor(0.5, **specs, requires_grad=True)
+        alpha = torch.tensor(0, **specs, requires_grad=True)
         numel = alpha.numel() + coefs.numel()
         params = [
             {"params": [alpha], "lr": 1e-2, "name": "ɑ"},  # noqa: RUF001
