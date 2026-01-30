@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 try:
     from typing import ParamSpec
 except ImportError:
@@ -48,7 +50,17 @@ class OptimizableFunction(Generic[Param, T]):
         """
         msg = f"Tracing {self._func.__name__} using torch.jit.trace."
         logger.detail(msg)
-        self._core = torch.jit.trace(self._func, args)
+        # Catch warning that may occur when tracing function.
+        # The trace check accesses the .grad attribute of the inputs
+        # However this does not modify the gradient, the warning can thus
+        # be safely ignored
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                category=UserWarning,
+                message=".*grad attribute of a Tensor that is not a leaf.*",
+            )
+            self._core = torch.jit.trace(self._func, args)
         return self._core(*args, **kwargs)
 
     def __call__(self, *args: Param.args, **kwargs: Param.kwargs) -> T:
