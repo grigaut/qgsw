@@ -1,7 +1,7 @@
 #!/bin/bash
 SRCDIR=$HOME/qgsw
 cd $SRCDIR
-chmod +x scripts/bash/run_va_mixed_psi2.sh
+chmod +x scripts/bash/run_va_psi2.sh
 
 # Check for --contiguous flag
 contiguous=false
@@ -16,7 +16,7 @@ for arg in "$@"; do
 done
 
 # Build base command with filtered arguments
-cmd="./scripts/bash/run_va_mixed_psi2.sh"
+cmd="./scripts/bash/run_va_psi2.sh"
 for arg in "${args[@]}"; do
     cmd+=" $arg"
 done
