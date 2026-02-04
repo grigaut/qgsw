@@ -32,7 +32,9 @@ class GaussianExpBasis(
         return (x, y)
 
     def numel(self) -> int:  # noqa: D102
-        return sum(s["numel"] for s in self._space.values())
+        return sum(
+            s["numel"] * self._time[k]["numel"] for k, s in self._space.items()
+        )
 
     numel.__doc__ = SpaceTimeDecomposition[
         NormalizedGaussianSupport, GaussianTimeSupport
