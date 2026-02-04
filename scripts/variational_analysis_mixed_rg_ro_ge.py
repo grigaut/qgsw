@@ -27,7 +27,6 @@ from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import (
     compute_q1_interior,
-    compute_q2_3l_interior,
 )
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import grad, laplacian
@@ -271,36 +270,8 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-y = space_slice.q.xy.y[0, :].unsqueeze(0)
-beta_effect = beta_plane.beta * (y - y0)
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
-
-
-compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_3l_interior(
-    dpsi1,
-    dpsi2,
-    torch.zeros_like(dpsi2),
-    H2,
-    g2,
-    g3,
-    dx,
-    dy,
-    beta_plane.f0,
-    torch.zeros_like(beta_effect[..., 1:-1]),
-)
-compute_q2 = lambda psi1, psi2: compute_q2_3l_interior(
-    psi1,
-    psi2,
-    torch.zeros_like(psi2),
-    H2,
-    g2,
-    g3,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect[..., 1:-1],
-)
 
 
 def compute_regularization_func(
@@ -354,7 +325,6 @@ def compute_regularization_func(
 
         dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
             (1 / H2 / g2) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
-            + 1 / H2 / g3 * (dt_psi2)
         )
 
         dx_psi1, dy_psi1 = grad(psi1)
@@ -373,10 +343,7 @@ def compute_regularization_func(
             fdy_lap_psi2(time)
             + alpha * lap_dy_psi1
             - beta_plane.f0**2
-            * (
-                (1 / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1))
-                + 1 / H2 / g3 * (dy_psi2)
-            )
+            * ((1 / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1)))
         ) + beta_plane.beta
 
         lap_dx_psi1 = laplacian(dx_psi1_i, dx, dy)
@@ -385,10 +352,7 @@ def compute_regularization_func(
             fdx_lap_psi2(time)
             + alpha * lap_dx_psi1
             - beta_plane.f0**2
-            * (
-                (1 / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1))
-                + 1 / H2 / g3 * (dx_psi2)
-            )
+            * ((1 / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1)))
         )
 
         adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
@@ -470,8 +434,8 @@ for c in range(n_cycles):
     q_bc_interp = QuadraticInterpolation(times, q_bcs)
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    xx = space_slice_ww.psi.xy.x
-    yy = space_slice_ww.psi.xy.y
+    xx = space_slice.psi.xy.x
+    yy = space_slice.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
         0, 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 4 * 7200
@@ -539,8 +503,6 @@ for c in range(n_cycles):
             compute_reg = compute_regularization_func(
                 basis, alpha, space_slice
             )
-
-            compute_psi2 = basis.localize(xx, yy)
 
             model.set_psiq(crop(psi0[:, :1], p), q0)
             model.alpha = torch.ones_like(model.psi) * alpha
