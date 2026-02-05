@@ -17,16 +17,16 @@ from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.modified.forced import QGPSIQPsi2TransportDR
+from qgsw.models.qg.psiq.modified.forced import (
+    QGPSIQRGPsi2Transport,
+)
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
-from qgsw.observations.full_domain import FullDomainMask
-from qgsw.observations.satellite_track import SatelliteTrackMask
+from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import (
     compute_q1_interior,
-    compute_q2_3l_interior,
 )
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import grad, laplacian
@@ -55,7 +55,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_mixed_ro_ge_perturbed",
+    prefix_default="results_mixed_rg_ro_ge_perturbed",
     gamma_default=0.1,
 )
 with_reg = not args.no_reg
@@ -244,9 +244,6 @@ model_3l.dt = dt
 y0 = model_3l.y0
 
 
-H1, H2 = H[0], H[1]
-g1, g2, g3 = g_prime[0], g_prime[1] * 10, g_prime[2] * 10
-
 ## Inhomogeneous models
 M = TypeVar("M", bound=QGPSIQ)
 
@@ -271,36 +268,12 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-y = space_slice.q.xy.y[0, :].unsqueeze(0)
-beta_effect = beta_plane.beta * (y - y0)
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_3l_interior(
-    dpsi1,
-    dpsi2,
-    torch.zeros_like(dpsi2),
-    H2,
-    g2,
-    g3,
-    dx,
-    dy,
-    beta_plane.f0,
-    torch.zeros_like(beta_effect[..., 1:-1]),
-)
-compute_q2 = lambda psi1, psi2: compute_q2_3l_interior(
-    psi1,
-    psi2,
-    torch.zeros_like(psi2),
-    H2,
-    g2,
-    g3,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect[..., 1:-1],
-)
+H1_, H2_ = H[0], H[1]
+g1_, g2_ = g_prime[0], g_prime[1] * 0.1
 
 
 def compute_regularization_func(
@@ -309,7 +282,6 @@ def compute_regularization_func(
     ],
     alpha: torch.Tensor,
     space: SpaceDiscretization2D,
-    kappa: torch.Tensor,
 ) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
     """Build regularization function.
 
@@ -317,7 +289,6 @@ def compute_regularization_func(
         psi2_basis (SpaceTimeDecomposition): Basis.
         alpha (torch.Tensor): Collinearity coefficient.
         space (SpaceDiscretization2D): Space.
-        kappa (torch.Tensor): Kappa.
 
     Returns:
         Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
@@ -355,7 +326,7 @@ def compute_regularization_func(
         dt_psi2 = fpsi2.dt(time) + alpha * interpolate(crop(dpsi1, 1))
 
         dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
-            ((1 - kappa) / H2 / g2) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
+            (1 / H2_ / g2_) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
         )
 
         dx_psi1, dy_psi1 = grad(psi1)
@@ -374,7 +345,7 @@ def compute_regularization_func(
             fdy_lap_psi2(time)
             + alpha * lap_dy_psi1
             - beta_plane.f0**2
-            * (((1 - kappa) / H2 / g2) * (dy_psi2 - crop(dy_psi1_i, 1)))
+            * ((1 / H2_ / g2_) * (dy_psi2 - crop(dy_psi1_i, 1)))
         ) + beta_plane.beta
 
         lap_dx_psi1 = laplacian(dx_psi1_i, dx, dy)
@@ -383,7 +354,7 @@ def compute_regularization_func(
             fdx_lap_psi2(time)
             + alpha * lap_dx_psi1
             - beta_plane.f0**2
-            * (((1 - kappa) / H2 / g2) * (dx_psi2 - crop(dx_psi1_i, 1)))
+            * ((1 / H2_ / g2_) * (dx_psi2 - crop(dx_psi1_i, 1)))
         )
 
         adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
@@ -393,12 +364,13 @@ def compute_regularization_func(
 
 
 # PV computation
-compute_q_psi2 = lambda psi1, psi2, kappa: compute_q1_interior(
+
+compute_q_rg = lambda psi1: compute_q1_interior(
     psi1,
-    psi2,
-    H1,
-    g1,
-    g2 / (1 - kappa),
+    torch.zeros_like(psi1),
+    H1_,
+    g1_,
+    g2_,
     dx,
     dy,
     beta_plane.f0,
@@ -406,13 +378,13 @@ compute_q_psi2 = lambda psi1, psi2, kappa: compute_q1_interior(
 )
 
 
-model = QGPSIQPsi2TransportDR(
+model = QGPSIQRGPsi2Transport(
     space_2d=space_slice,
-    H=torch.tensor([H1, H2], **specs),
+    H=torch.tensor([H1_, H2_], **specs),
     beta_plane=beta_plane,
-    g_prime=torch.tensor([g1, g2], **specs),
+    g_prime=torch.tensor([g1_, g2_], **specs),
 )
-model: QGPSIQPsi2TransportDR = set_inhomogeneous_model(model)
+model: QGPSIQRGPsi2Transport = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
@@ -455,10 +427,17 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
+    q0 = crop(compute_q_rg(psi0), p - 1)
+
+    qs = (compute_q_rg(p1) for p1 in psis)
+    q_bcs = [
+        Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3) for q in qs
+    ]
+    q_bc_interp = QuadraticInterpolation(times, q_bcs)
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    xx = space_slice_ww.psi.xy.x
-    yy = space_slice_ww.psi.xy.y
+    xx = space_slice.psi.xy.x
+    yy = space_slice.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
         0, 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 4 * 7200
@@ -468,11 +447,10 @@ for c in range(n_cycles):
     coefs = coefs.requires_grad_()
 
     if with_alpha:
-        alpha_ = torch.tensor(0, **specs, requires_grad=True)
-        kappa_ = torch.tensor(0, **specs, requires_grad=True)
-        numel = alpha_.numel() + kappa_.numel() + coefs.numel()
+        alpha = torch.tensor(0, **specs, requires_grad=True)
+        numel = alpha.numel() + coefs.numel()
         params = [
-            {"params": [alpha_], "lr": 1e0, "name": "ɑ"},  # noqa: RUF001
+            {"params": [alpha], "lr": 1e-2, "name": "ɑ"},  # noqa: RUF001
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
@@ -480,8 +458,7 @@ for c in range(n_cycles):
             },
         ]
     else:
-        alpha_ = torch.tensor(0, **specs)
-        kappa_ = torch.tensor(0, **specs)
+        alpha = torch.tensor(0, **specs)
         numel = coefs.numel()
         params = [
             {
@@ -507,23 +484,16 @@ for c in range(n_cycles):
             for k in range(basis.order)
         )
     )
-    register_params = RegisterParams(
-        alpha=torch.asinh(alpha_), coefs=coefs_scaled.to_dict()
-    )
+    register_params = RegisterParams(alpha=alpha, coefs=coefs_scaled.to_dict())
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
         model.reset_time()
 
         with torch.enable_grad():
-            kappa = 1 - torch.exp(kappa_)
-            alpha = 1 - torch.exp(alpha_)
             coefs_scaled = coefs.scale(
                 *(
-                    (1 - alpha)
-                    * 1e-1
-                    * psi0_mean
-                    / (n_steps_per_cyle * dt) ** k
+                    1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
                     for k in range(basis.order)
                 )
             )
@@ -531,36 +501,12 @@ for c in range(n_cycles):
             basis.set_coefs(coefs_scaled)
 
             model.basis = basis
-            model.kappa = kappa
 
             compute_reg = compute_regularization_func(
-                basis, alpha, space_slice, kappa=kappa
+                basis, alpha, space_slice
             )
-
-            compute_psi2 = basis.localize(xx, yy)
-
-            q0 = crop(
-                compute_q_psi2(
-                    psi0, compute_psi2(model.time) + alpha * psi0, kappa
-                ),
-                p - 1,
-            )
-
-            psis_ = (
-                (
-                    p[:, :1],
-                    compute_psi2(model.time + n * model.dt) + alpha * p[:, :1],
-                )
-                for n, p in enumerate(psis)
-            )
-            qs = (compute_q_psi2(p1, p2, kappa) for p1, p2 in psis_)
-            q_bcs = [
-                Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
-                for q in qs
-            ]
 
             model.set_psiq(crop(psi0[:, :1], p), q0)
-            q_bc_interp = QuadraticInterpolation(times, q_bcs)
             model.alpha = torch.ones_like(model.psi) * alpha
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
@@ -614,10 +560,8 @@ for c in range(n_cycles):
 
         loss.backward()
 
-        if alpha.requires_grad:
-            torch.nn.utils.clip_grad_value_([alpha_], clip_value=1.0)
-        if kappa_.requires_grad:
-            torch.nn.utils.clip_grad_value_([kappa_], clip_value=1.0)
+        if with_alpha:
+            torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 

@@ -18,7 +18,7 @@ cd $SRCDIR
 
 date
 
-.venv/bin/python3 -u scripts/variational_analysis_mixed_ro_ge_perturbed.py $@
+.venv/bin/python3 -u scripts/variational_analysis_mixed_rg_ro_ge_perturbed.py $@
 
 date
 
