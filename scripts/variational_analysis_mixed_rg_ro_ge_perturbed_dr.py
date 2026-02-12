@@ -3,41 +3,49 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import torch
 
 from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
-from qgsw.decomposition.taylor.core import TaylorFullFieldBasis
-from qgsw.decomposition.taylor.param_generators import taylor_series
+from qgsw.decomposition.exp_exp.core import GaussianExpBasis
+from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
-from qgsw.models.core.flux import div_flux_5pts_no_pad
 from qgsw.models.qg.psiq.core import QGPSIQ
-from qgsw.models.qg.psiq.modified.forced import QGPSIQPsi2Transport
-from qgsw.models.qg.stretching_matrix import compute_A
+from qgsw.models.qg.psiq.modified.forced import (
+    QGPSIQRGPsi2TransportDR,
+)
+from qgsw.models.qg.stretching_matrix import compute_A, compute_A_tilde
 from qgsw.models.qg.uvh.projectors.core import QGProjector
-from qgsw.observations.full_domain import FullDomainMask
-from qgsw.observations.satellite_track import SatelliteTrackMask
+from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.pv import (
     compute_q1_interior,
-    compute_q2_2l_interior,
 )
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad_perp
+from qgsw.solver.finite_diff import grad
 from qgsw.spatial.core.discretization import (
+    SpaceDiscretization2D,
     SpaceDiscretization3D,
 )
+from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
 from qgsw.utils import covphys
 from qgsw.utils.interpolation import QuadraticInterpolation
 from qgsw.utils.reshaping import crop
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from qgsw.decomposition.base import SpaceTimeDecomposition
+    from qgsw.decomposition.supports.space.base import SpaceSupportFunction
+    from qgsw.decomposition.supports.time.base import TimeSupportFunction
 
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
@@ -47,7 +55,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_mixed_s",
+    prefix_default="results_mixed_rg_ro_ge_perturbed_dr",
     gamma_default=0.1,
 )
 with_reg = not args.no_reg
@@ -175,8 +183,6 @@ logger.info(box(msg_simu, msg_area, msg_obs, msg_reg, msg_output, style="="))
 
 H = config.model.h
 g_prime = config.model.g_prime
-H1, H2 = H[0], H[1]
-g1, g2, g3 = g_prime[0], g_prime[1], g_prime[2]
 beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
@@ -242,9 +248,7 @@ y0 = model_3l.y0
 M = TypeVar("M", bound=QGPSIQ)
 
 
-def set_inhomogeneous_model(
-    model: M,
-) -> M:
+def set_inhomogeneous_model(model: M) -> M:
     """Set up inhomogeneous model."""
     space = model.space
     model.y0 = y0
@@ -264,71 +268,101 @@ outputs = []
 model_3l.reset_time()
 model_3l.set_psi(psi_start)
 
-y = space_slice.q.xy.y[0, :].unsqueeze(0)
-beta_effect = beta_plane.beta * (y - y0)
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-A = compute_A(H[:2, 0, 0], g_prime[:2, 0, 0], **specs)
-
-compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
-    dpsi1,
-    dpsi2,
-    A[1:2, :1],
-    A[1:2, 1:2],
-    dx,
-    dy,
-    beta_plane.f0,
-    torch.zeros_like(beta_effect[..., 1:-1]),
-)
-compute_q2 = lambda psi1, psi2: compute_q2_2l_interior(
-    psi1,
-    psi2,
-    A[1:2, :1],
-    A[1:2, 1:2],
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect[..., 1:-1],
-)
+H1_, H2_ = H[0], H[1]
+g1_, g2_ = g_prime[0], g_prime[1] * 0.1
 
 
-def regularization(
-    psi1: torch.Tensor,
-    psi2: torch.Tensor,
-    dpsi1: torch.Tensor,
-    dpsi2: torch.Tensor,
-) -> torch.Tensor:
-    """Compute regularization.
+def compute_regularization_func(
+    psi2_basis: SpaceTimeDecomposition[
+        SpaceSupportFunction, TimeSupportFunction
+    ],
+    alpha: torch.Tensor,
+    space: SpaceDiscretization2D,
+) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
+    """Build regularization function.
 
     Args:
-        psi1 (torch.Tensor): Top layer stream function.
-        psi2 (torch.Tensor): Bottom layer stream function.
-        dpsi1 (torch.Tensor): Top layer stream function derivative.
-        dpsi2 (torch.Tensor): Bottom layer stream function derivative
+        psi2_basis (SpaceTimeDecomposition): Basis.
+        alpha (torch.Tensor) : Baroclinic radius perturbation.
+        space (SpaceDiscretization2D): Space.
 
     Returns:
-        torch.Tensor: ||∂_t q₂ + J(ѱ₂,q₂)||² (normalized by U / LT)
+        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
+            Regularization function.
     """
-    dtq2 = compute_dtq2(dpsi1, dpsi2)[..., 1:-1, 1:-1]
-    q2 = compute_q2(psi1, psi2)
+    A_tilde = compute_A_tilde(H[:2], g_prime[:2], alpha, **specs)
+    A_21 = A_tilde[1:2, :1]
+    A_22 = A_tilde[1:2, 1:2]
 
-    u2, v2 = grad_perp(psi2[..., 1:-1, 1:-1])
-    u2 /= dy
-    v2 /= dx
+    q = space.q.xy
+    x = crop(q.x, 1)
+    y = crop(q.y, 1)
 
-    dq_2 = div_flux_5pts_no_pad(q2, u2[..., 1:-1, :], v2[..., :, 1:-1], dx, dy)
-    return ((dtq2 + dq_2) / U * L * T).square().sum()
+    fpsi2 = psi2_basis.localize(x, y)
+    fdx_psi2 = psi2_basis.localize_dx(x, y)
+    fdy_psi2 = psi2_basis.localize_dy(x, y)
+    flap_psi2 = psi2_basis.localize_laplacian(x, y)
+    fdx_lap_psi2 = psi2_basis.localize_dx_laplacian(x, y)
+    fdy_lap_psi2 = psi2_basis.localize_dy_laplacian(x, y)
+
+    def compute_reg(
+        psi1: torch.Tensor,
+        dpsi1: torch.Tensor,
+        time: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute regularization term.
+
+        Args:
+            psi1 (torch.Tensor): Top layer stream function.
+            dpsi1 (torch.Tensor): Top layer stream function derivative.
+            time (torch.Tensor): Time.
+
+        Returns:
+            torch.Tensor: ∂ₜq₂ + J(ѱ₂, q₂)
+        """
+        dt_lap_psi2 = flap_psi2.dt(time)
+        dt_psi2 = fpsi2.dt(time)
+
+        dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
+            A_22 * dt_psi2 + A_21 * interpolate(crop(dpsi1, 1))
+        )
+
+        dx_psi1, dy_psi1 = grad(psi1)
+        dx_psi1 /= dx
+        dy_psi1 /= dy
+
+        dx_psi1_i = (dx_psi1[..., 1:] + dx_psi1[..., :-1]) / 2
+        dy_psi1_i = (dy_psi1[..., 1:, :] + dy_psi1[..., :-1, :]) / 2
+
+        dx_psi2 = fdx_psi2(time)
+        dy_psi2 = fdy_psi2(time)
+
+        dy_q2 = (
+            fdy_lap_psi2(time)
+            - beta_plane.f0**2 * (A_22 * dy_psi2 + A_21 * crop(dy_psi1_i, 1))
+        ) + beta_plane.beta
+
+        dx_q2 = fdx_lap_psi2(time) - beta_plane.f0**2 * (
+            A_22 * dx_psi2 + A_21 * crop(dx_psi1_i, 1)
+        )
+
+        adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
+        return ((dt_q2 + adv_q2) / U * L * T).square().sum()
+
+    return compute_reg
 
 
 # PV computation
 
-compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
+build_compute_q_rg = lambda A11, A12: lambda psi1: compute_q1_interior(
     psi1,
-    psi2,
-    A[:1, :1],
-    A[:1, 1:2],
+    torch.zeros_like(psi1),
+    A11,
+    A12,
     dx,
     dy,
     beta_plane.f0,
@@ -336,13 +370,13 @@ compute_q_psi2 = lambda psi1, psi2: compute_q1_interior(
 )
 
 
-model = QGPSIQPsi2Transport(
+model = QGPSIQRGPsi2TransportDR(
     space_2d=space_slice,
-    H=H[:2],
+    H=torch.tensor([H1_, H2_], **specs),
     beta_plane=beta_plane,
-    g_prime=g_prime[:2],
+    g_prime=torch.tensor([g1_, g2_], **specs),
 )
-model: QGPSIQPsi2Transport = set_inhomogeneous_model(model)
+model: QGPSIQRGPsi2TransportDR = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
@@ -387,18 +421,21 @@ for c in range(n_cycles):
 
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
-    space_params, time_params = taylor_series(
-        2, space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
+    xx = space_slice.psi.xy.x
+    yy = space_slice.psi.xy.y
+
+    space_params, time_params = gaussian_exp_field(
+        0, 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 4 * 7200
     )
-    basis = TaylorFullFieldBasis(space_params, time_params)
+    basis = GaussianExpBasis(space_params, time_params)
     coefs = basis.generate_random_coefs()
     coefs = coefs.requires_grad_()
 
     if with_alpha:
-        alpha = torch.tensor(0, **specs, requires_grad=True)
-        numel = alpha.numel() + coefs.numel()
+        alpha_ = torch.tensor(0, **specs, requires_grad=True)
+        numel = alpha_.numel() + coefs.numel()
         params = [
-            {"params": [alpha], "lr": 1e-2, "name": "ɑ"},  # noqa: RUF001
+            {"params": [alpha_], "lr": 1e-1, "name": "ɑ"},  # noqa: RUF001
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
@@ -406,7 +443,7 @@ for c in range(n_cycles):
             },
         ]
     else:
-        alpha = torch.tensor(0, **specs)
+        alpha_ = torch.tensor(0, **specs)
         numel = coefs.numel()
         params = [
             {
@@ -432,54 +469,54 @@ for c in range(n_cycles):
             for k in range(basis.order)
         )
     )
-    register_params = RegisterParams(alpha=alpha, coefs=coefs_scaled.to_dict())
+    register_params = RegisterParams(
+        alpha=torch.exp(-alpha_) - 1,
+        coefs=coefs_scaled.to_dict(),
+    )
 
     for o in range(optim_max_step):
         optimizer.zero_grad()
         model.reset_time()
 
         with torch.enable_grad():
+            alpha = torch.exp(-alpha_) - 1
             coefs_scaled = coefs.scale(
                 *(
                     1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
                     for k in range(basis.order)
                 )
             )
+
             basis.set_coefs(coefs_scaled)
+
             model.basis = basis
+            model.alpha = alpha
 
-            compute_psi2 = basis.localize(
-                space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
+            compute_reg = compute_regularization_func(
+                basis, alpha, space_slice
             )
 
-            q0 = crop(
-                compute_q_psi2(psi0, compute_psi2(model.time) + alpha * psi0),
-                p - 1,
+            compute_q_rg = build_compute_q_rg(
+                model.A[:1, :1],
+                model.A[:1, 1:2],
             )
-            psis_ = (
-                (
-                    p[:, :1],
-                    compute_psi2(model.time + n * dt) + alpha * p[:, :1],
-                )
-                for n, p in enumerate(psis)
-            )
-            qs = (compute_q_psi2(p1, p2) for p1, p2 in psis_)
+            q0 = crop(compute_q_rg(psi0), p - 1)
+
+            qs = (compute_q_rg(p1) for p1 in psis)
             q_bcs = [
                 Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
                 for q in qs
             ]
+            q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
             model.set_psiq(crop(psi0[:, :1], p), q0)
-            q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            model.alpha = torch.ones_like(model.psi) * alpha
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
             loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
                 psi1_ = model.psi
-                time = model.time
-                psi2_ = crop(compute_psi2(time), p) + alpha * psi1_
+                time = model.time.clone()
 
                 model.step()
 
@@ -487,11 +524,7 @@ for c in range(n_cycles):
 
                 if with_reg:
                     dpsi1_ = (psi1 - psi1_) / dt
-                    dpsi2_ = (
-                        crop(compute_psi2.dt(time), p)
-                        + alpha * (psi1 - psi1_) / dt
-                    )
-                    reg = gamma * regularization(psi1_, psi2_, dpsi1_, dpsi2_)
+                    reg = gamma * compute_reg(psi1_, dpsi1_, time)
                     loss += reg
 
                 loss = update_loss(
@@ -530,7 +563,7 @@ for c in range(n_cycles):
         loss.backward()
 
         if with_alpha:
-            torch.nn.utils.clip_grad_value_([alpha], clip_value=1.0)
+            torch.nn.utils.clip_grad_value_([alpha_], clip_value=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 

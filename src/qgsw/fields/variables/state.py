@@ -493,23 +493,23 @@ class StatePSIQAlpha(BaseStatePSIQ[PSIQTAlpha]):
     @classmethod
     def from_tensors(
         cls,
-        u: torch.Tensor,
-        v: torch.Tensor,
-        h: torch.Tensor,
+        psi: torch.Tensor,
+        q: torch.Tensor,
+        t: torch.Tensor,
         alpha: torch.Tensor,
     ) -> Self:
         """Instantiate the state from tensors.
 
         Args:
-            u (torch.Tensor): Zonal velocity.
-            v (torch.Tensor): Meridional velocity.
-            h (torch.Tensor): Surface height anomaly.
+            psi (torch.Tensor): Stream function.
+            q (torch.Tensor): Potential vorticity.
+            t (torch.Tensor): Time.
             alpha (torch.Tensor): Collinearity coefficient.
 
         Returns:
             Self: StatePSIQTAlpha.
         """
-        return cls(PSIQTAlpha(u, v, h, alpha))
+        return cls(PSIQTAlpha(psi, q, t, alpha))
 
 
 class StateUVH(BaseStateUVH[UVHT]):

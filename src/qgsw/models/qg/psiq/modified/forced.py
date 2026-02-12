@@ -16,9 +16,14 @@ from qgsw.fields.variables.tuples import (
 from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
 from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.stretching_matrix import (
+    compute_A_tilde,
+)
 from qgsw.solver.finite_diff import laplacian
 from qgsw.solver.pv_inversion import (
+    HomogeneousPVInversion,
     HomogeneousPVInversionCollinear,
+    InhomogeneousPVInversion,
     InhomogeneousPVInversionCollinear,
 )
 from qgsw.spatial.core.grid_conversion import interpolate
@@ -681,7 +686,10 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     @property
     def alpha(self) -> torch.Tensor:
         """Collinearity coefficient."""
-        return self._state.alpha.get()
+        try:
+            return self._state.alpha.get()
+        except AttributeError:
+            return torch.zeros_like(self.psi)
 
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
@@ -976,42 +984,84 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         )
 
 
-class QGPSIQPsi2TransportDR(QGPSIQPsi2Transport):
+class QGPSIQRGPsi2TransportDR(QGPSIQRGPsi2Transport):
     """Mixed model using both alpha and psi2."""
 
-    _kappa = torch.tensor(0, **defaults.get())
-
     @property
-    def kappa(self) -> torch.Tensor:
-        """Deformation radius multiplyer."""
-        return self._kappa
+    def alpha(self) -> torch.Tensor:
+        """Collinearity coefficient."""
+        try:
+            return self._state.alpha.get()
+        except AttributeError:
+            return torch.tensor(0, **defaults.get())
 
-    @kappa.setter
-    def kappa(self, kappa: torch.Tensor) -> torch.Tensor:
-        self._kappa = kappa
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self._state.update_alpha(alpha)
         self.compute_auxillary_matrices()
         self._set_solver()
 
+    def _set_state(self) -> None:
+        """Set the state."""
+        alpha = torch.tensor(0, **defaults.get())
+        self._state = StatePSIQAlpha.from_tensors(
+            *PSIQT.steady(
+                n_ens=self.n_ens,
+                nl=self.space.nl - 1,
+                nx=self.space.nx,
+                ny=self.space.ny,
+                dtype=self.dtype,
+                device=self.device.get(),
+            ),
+            alpha,
+        )
+        self.compute_auxillary_matrices()
+        self._set_solver()
+        self._set_io(self._state)
+        q = self._compute_q_from_psi(self.psi)
+        self._state.update_psiq(PSIQ(self.psi, q))
+
+    def _set_solver(self) -> None:
+        """Set Helmholtz equation solver."""
+        # PV equation solver
+        self._solver_homogeneous = HomogeneousPVInversion(
+            self.A[:1, :1],
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+        self._solver_inhomogeneous = InhomogeneousPVInversion(
+            self.A[:1, :1],
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+        if self._with_bc:
+            sf_bc = self._sf_bc_interp(self.time.item())
+            if self._with_mean_flow:
+                sf_bar_bc = self._sf_bar_bc_interp(self.time.item())
+                self._solver_inhomogeneous.set_boundaries(
+                    sf_bc.get_band(0) - sf_bar_bc.get_band(0)
+                )
+            else:
+                self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
+
     def compute_auxillary_matrices(self) -> None:
         """Compute auxillary matrices."""
-        dtype = torch.float64
-        device = DEVICE.get()
         H = self.H[:, 0, 0]
         g_prime = self.g_prime[:, 0, 0]
 
-        H1, H2 = H
-        g1, g2 = g_prime
+        self.A = compute_A_tilde(H, g_prime, self.alpha, **defaults.get())
+        self._A11 = self.A[:1, :1]
+        self._A12 = self.A[:1, 1:2]
 
-        self.A = torch.tensor(
-            [
-                [
-                    1 / H1 / g1 + (1 - self.kappa) / H1 / g2,
-                    -(1 - self.kappa) / H1 / g2,
-                ],
-                [-(1 - self.kappa) / H2 / g2, (1 - self.kappa) / H2 / g2],
-            ],
-            dtype=dtype,
-            device=device,
+    def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
+        vort = self._compute_vort_from_psi(psi)
+        stretching = self.beta_plane.f0**2 * self._A11 * psi
+        if self.with_bc:
+            return vort - self.masks.h * self._interpolate(stretching)
+        return vort - self.masks.h * self._interpolate(
+            self.masks.psi * stretching
         )
-        self._A11 = self.A[0, 0]
-        self._A12 = self.A[0, 1]
