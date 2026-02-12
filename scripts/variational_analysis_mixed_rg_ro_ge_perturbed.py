@@ -274,6 +274,9 @@ beta_effect_w = beta_plane.beta * (y_w - y0)
 
 H1_, H2_ = H[0], H[1]
 g1_, g2_ = g_prime[0], g_prime[1] * 0.1
+H_ = torch.tensor([H1_, H2_], **specs)
+g_prime_ = torch.tensor([g1_, g2_], **specs)
+A_ = compute_A(H_, g_prime_, **specs)
 
 
 def compute_regularization_func(
@@ -326,7 +329,7 @@ def compute_regularization_func(
         dt_psi2 = fpsi2.dt(time) + alpha * interpolate(crop(dpsi1, 1))
 
         dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
-            (1 / H2_ / g2_) * (dt_psi2 - interpolate(crop(dpsi1, 1)))
+            A_[1:2, 1:2] * dt_psi2 + A_[1:2, :1] * interpolate(crop(dpsi1, 1))
         )
 
         dx_psi1, dy_psi1 = grad(psi1)
@@ -345,7 +348,7 @@ def compute_regularization_func(
             fdy_lap_psi2(time)
             + alpha * lap_dy_psi1
             - beta_plane.f0**2
-            * ((1 / H2_ / g2_) * (dy_psi2 - crop(dy_psi1_i, 1)))
+            * (A_[1:2, 1:2] * dy_psi2 + A_[1:2, :1] * crop(dy_psi1_i, 1))
         ) + beta_plane.beta
 
         lap_dx_psi1 = laplacian(dx_psi1_i, dx, dy)
@@ -354,7 +357,7 @@ def compute_regularization_func(
             fdx_lap_psi2(time)
             + alpha * lap_dx_psi1
             - beta_plane.f0**2
-            * ((1 / H2_ / g2_) * (dx_psi2 - crop(dx_psi1_i, 1)))
+            * (A_[1:2, 1:2] * dx_psi2 + A_[1:2, :1] * crop(dx_psi1_i, 1))
         )
 
         adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
@@ -368,9 +371,8 @@ def compute_regularization_func(
 compute_q_rg = lambda psi1: compute_q1_interior(
     psi1,
     torch.zeros_like(psi1),
-    H1_,
-    g1_,
-    g2_,
+    A_[:1, :1],
+    A_[:1, 1:2],
     dx,
     dy,
     beta_plane.f0,
