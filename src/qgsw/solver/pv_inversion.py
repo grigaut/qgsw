@@ -559,7 +559,7 @@ class HomogeneousPVInversionCollinear(HomogeneousPVInversion):
             masks (Masks | None, optional): Masks. Defaults to None.
         """
         BasePVInversion.__init__(self, A[:1, :1], f0, dx, dy, masks)
-        self._A12 = A[0, 1]
+        self._A12 = A[:1, 1:2]
         self._alpha = alpha
         if masks is not None and len(masks.psi_irrbound_xids) > 0:
             raise NotImplementedError
@@ -665,8 +665,8 @@ class InhomogeneousPVInversionCollinear(InhomogeneousPVInversion):
             A, alpha, f0, dx, dy, masks
         )
         self._alpha = alpha
-        self._A11 = A[0, 0]
-        self._A12 = A[0, 1]
+        self._A11 = A[:1, :1]
+        self._A12 = A[:1, 1:2]
         if self._masks is not None and len(self._masks.psi_irrbound_xids) > 0:
             msg = (
                 "Irregular geometries not supported "
