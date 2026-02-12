@@ -358,7 +358,7 @@ def compute_regularization_func(
 
 # PV computation
 
-compute_q = lambda A11, A12: lambda psi1: compute_q1_interior(
+build_compute_q_rg = lambda A11, A12: lambda psi1: compute_q1_interior(
     psi1,
     torch.zeros_like(psi1),
     A11,
@@ -496,13 +496,13 @@ for c in range(n_cycles):
                 basis, alpha, space_slice
             )
 
-            compute_q_ = compute_q(
+            compute_q_rg = build_compute_q_rg(
                 model.A[:1, :1],
                 model.A[:1, 1:2],
             )
-            q0 = crop(compute_q_(psi0), p - 1)
+            q0 = crop(compute_q_rg(psi0), p - 1)
 
-            qs = (compute_q_(p1) for p1 in psis)
+            qs = (compute_q_rg(p1) for p1 in psis)
             q_bcs = [
                 Boundaries.extract(q, p - 2, -(p - 1), p - 2, -(p - 1), 3)
                 for q in qs
