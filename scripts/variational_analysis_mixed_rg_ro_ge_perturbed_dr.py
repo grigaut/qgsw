@@ -273,7 +273,7 @@ y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-H1_, H2_ = H[0], H[1]
+H1_, H2_ = 600, 900  # H[0], H[1]
 g1_, g2_ = g_prime[0], g_prime[1] * 0.1
 
 
@@ -433,10 +433,10 @@ for c in range(n_cycles):
     coefs = coefs.requires_grad_()
 
     if with_alpha:
-        alpha_ = torch.tensor(0, **specs, requires_grad=True)
-        numel = alpha_.numel() + coefs.numel()
+        kappa = torch.tensor(0, **specs, requires_grad=True)
+        numel = kappa.numel() + coefs.numel()
         params = [
-            {"params": [alpha_], "lr": 1e-1, "name": "ɑ"},  # noqa: RUF001
+            {"params": [kappa], "lr": 5e-1, "name": "κ"},
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
@@ -444,7 +444,7 @@ for c in range(n_cycles):
             },
         ]
     else:
-        alpha_ = torch.tensor(0, **specs)
+        kappa = torch.tensor(0, **specs)
         numel = coefs.numel()
         params = [
             {
@@ -471,7 +471,7 @@ for c in range(n_cycles):
         )
     )
     register_params = RegisterParams(
-        alpha=torch.exp(-alpha_) - 1,
+        alpha=torch.exp(2 * kappa) - 1,
         coefs=coefs_scaled.to_dict(),
     )
 
@@ -480,7 +480,7 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
-            alpha = torch.exp(-alpha_) - 1
+            alpha = torch.exp(2 * kappa) - 1
             coefs_scaled = coefs.scale(
                 *(
                     1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
@@ -557,14 +557,15 @@ for c in range(n_cycles):
             f"Cycle {step(c + 1, n_cycles)} | "
             f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:>#10.5g} | "
-            f"Best loss: {register_params.best_loss:>#10.5g}"
+            f"Best loss: {register_params.best_loss:>#10.5g} | "
+            f"{alpha=:#.5g}"
         )
         logger.info(msg)
 
         loss.backward()
 
         if with_alpha:
-            torch.nn.utils.clip_grad_value_([alpha_], clip_value=1.0)
+            torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
