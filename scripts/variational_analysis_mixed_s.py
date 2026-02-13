@@ -9,6 +9,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.taylor.core import TaylorFullFieldBasis
 from qgsw.decomposition.taylor.param_generators import taylor_series
 from qgsw.fields.variables.tuples import UVH
@@ -391,7 +392,7 @@ for c in range(n_cycles):
         2, space_slice_ww.psi.xy.x, space_slice_ww.psi.xy.y
     )
     basis = TaylorFullFieldBasis(space_params, time_params)
-    coefs = basis.generate_random_coefs()
+    coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
     coefs = coefs.requires_grad_()
 
     if with_alpha:

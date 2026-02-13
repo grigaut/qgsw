@@ -266,7 +266,7 @@ y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-H1_, H2_ = H[0], H[1]
+H1_, H2_ = 600, 900  # H[0], H[1]
 g1_, g2_ = g_prime[0], g_prime[1] * 0.1
 
 

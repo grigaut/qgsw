@@ -9,6 +9,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
 from qgsw.fields.variables.tuples import UVH
@@ -445,7 +446,7 @@ for c in range(n_cycles):
         0, 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 4 * 7200
     )
     basis = GaussianExpBasis(space_params, time_params)
-    coefs = basis.generate_random_coefs()
+    coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
     coefs = coefs.requires_grad_()
 
     if with_alpha:
