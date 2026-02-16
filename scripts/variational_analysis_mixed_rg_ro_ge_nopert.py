@@ -436,7 +436,7 @@ for c in range(n_cycles):
         kappa = torch.tensor(0, **specs, requires_grad=True)
         numel = kappa.numel() + coefs.numel()
         params = [
-            {"params": [kappa], "lr": 5e-1, "name": "κ"},
+            {"params": [kappa], "lr": 1e-1, "name": "κ"},
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
@@ -557,8 +557,7 @@ for c in range(n_cycles):
             f"Cycle {step(c + 1, n_cycles)} | "
             f"Optimization step {step(o + 1, optim_max_step)} | "
             f"Loss: {loss_:>#10.5g} | "
-            f"Best loss: {register_params.best_loss:>#10.5g} | "
-            f"{alpha=:#.5g}"
+            f"Best loss: {register_params.best_loss:>#10.5g}"
         )
         logger.info(msg)
 
