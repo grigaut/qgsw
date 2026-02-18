@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
+import xarray
+
 try:
     from typing import Unpack
 except ImportError:
@@ -26,7 +28,9 @@ if TYPE_CHECKING:
 DEFAULT_CMAP = "RdBu_r"
 
 
-def retrieve_imshow_data(data: torch.Tensor | np.ndarray) -> np.ndarray:
+def retrieve_imshow_data(
+    data: torch.Tensor | np.ndarray | xarray.DataArray,
+) -> np.ndarray:
     """Retrieve data for imshow plot.
 
     Args:
@@ -39,6 +43,8 @@ def retrieve_imshow_data(data: torch.Tensor | np.ndarray) -> np.ndarray:
         if data.dtype == torch.bool:
             data = data.to(torch.int8)
         data = data.detach().cpu().numpy()
+    elif isinstance(data, xarray.DataArray):
+        data = data.to_numpy()
     return data.T
 
 
@@ -83,27 +89,23 @@ class ImshowKwargs(TypedDict, total=False):
     vmax: float
 
 
-def imshow(
-    data: torch.Tensor | np.ndarray,
+def _imshow(
+    data: np.ndarray,
     *,
     ax: Axes | None = None,
     title: str | None = None,
     show_cbar: bool = True,
     **kwargs: Unpack[ImshowKwargs],
 ) -> AxesImage:
-    """Wrapper for plt.imshow.
+    """Wrapper for plt.imshow with not centered colorbar.
 
     Args:
-        data (torch.Tensor | np.ndarray): 2D array to plot.
+        data (torch.Tensor | np.ndarray | xarray.DataArray): 2D array to plot.
         ax (Axes | None, optional): Axes to plot on. Defaults to None.
         title (str | None, optional): Title. Defaults to None.
         show_cbar (bool): Whether to show colorbar or not.
         **kwargs: optional arguments to pass to plt.imshow.
     """
-    data = retrieve_imshow_data(data)
-    vmin, vmax = default_clim(data)
-    kwargs.setdefault("vmax", vmax)
-    kwargs.setdefault("vmin", vmin)
     kwargs.setdefault("cmap", DEFAULT_CMAP)
     kwargs.setdefault("origin", "lower")
     if ax is None:
@@ -116,6 +118,63 @@ def imshow(
     if title is not None:
         ax.set_title(title)
     return im
+
+
+def imshow(
+    data: torch.Tensor | np.ndarray | xarray.DataArray,
+    *,
+    ax: Axes | None = None,
+    title: str | None = None,
+    show_cbar: bool = True,
+    **kwargs: Unpack[ImshowKwargs],
+) -> AxesImage:
+    """Wrapper for plt.imshow.
+
+    Args:
+        data (torch.Tensor | np.ndarray | xarray.DataArray): 2D array to plot.
+        ax (Axes | None, optional): Axes to plot on. Defaults to None.
+        title (str | None, optional): Title. Defaults to None.
+        show_cbar (bool): Whether to show colorbar or not.
+        **kwargs: optional arguments to pass to plt.imshow.
+    """
+    data = retrieve_imshow_data(data)
+    vmin, vmax = default_clim(data)
+    kwargs.setdefault("vmax", vmax)
+    kwargs.setdefault("vmin", vmin)
+    return _imshow(
+        data=data,
+        ax=ax,
+        title=title,
+        show_cbar=show_cbar,
+        **kwargs,
+    )
+
+
+def imshow_(
+    data: torch.Tensor | np.ndarray | xarray.DataArray,
+    *,
+    ax: Axes | None = None,
+    title: str | None = None,
+    show_cbar: bool = True,
+    **kwargs: Unpack[ImshowKwargs],
+) -> AxesImage:
+    """Wrapper for plt.imshow with not centered colorbar.
+
+    Args:
+        data (torch.Tensor | np.ndarray | xarray.DataArray): 2D array to plot.
+        ax (Axes | None, optional): Axes to plot on. Defaults to None.
+        title (str | None, optional): Title. Defaults to None.
+        show_cbar (bool): Whether to show colorbar or not.
+        **kwargs: optional arguments to pass to plt.imshow.
+    """
+    data = retrieve_imshow_data(data)
+    return _imshow(
+        data=data,
+        ax=ax,
+        title=title,
+        show_cbar=show_cbar,
+        **kwargs,
+    )
 
 
 class SubplotsKwargs(TypedDict, total=False):
