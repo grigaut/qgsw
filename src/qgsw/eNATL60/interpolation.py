@@ -119,13 +119,23 @@ def build_regridder(
             "lat": (["i", "j"], np.rad2deg(lats)),
         }
     )
+    if (len(ds[LONGITUDE].shape) == 1) and (len(ds[LATITUDE].shape) == 1):
+        lons_, lats_ = xr.broadcast(ds[LONGITUDE], ds[LATITUDE])
+        lons_ref = np.ascontiguousarray(lons_.T).T
+        lats_ref = np.ascontiguousarray(lats_.T).T
+    elif (len(ds[LONGITUDE].shape) == 2) and (len(ds[LATITUDE].shape) == 2):
+        lons_ref = np.ascontiguousarray(ds[LONGITUDE].T).T
+        lats_ref = np.ascontiguousarray(ds[LATITUDE].T).T
+
+    else:
+        msg = "Uncompatible lon/lat shapes."
+        raise ValueError(msg)
     ds_in = xr.Dataset(
         {
-            "lon": (["i", "j"], np.ascontiguousarray(ds[LONGITUDE].T).T),
-            "lat": (["i", "j"], np.ascontiguousarray(ds[LATITUDE].T).T),
+            "lon": (["i", "j"], lons_ref),
+            "lat": (["i", "j"], lats_ref),
         }
     )
-
     return xe.Regridder(
         ds_in,
         ds_out,
