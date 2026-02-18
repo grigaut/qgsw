@@ -116,7 +116,7 @@ def interpolate_era_da(
         xr.DataArray: Interpolated DataArray.
     """
     if TIME in ds.dims and len(ds[TIME]) == 1:  # time before space
-        da = da_era.interp(time=ds[TIME])
-        return da.interp(lon=ds[LONGITUDE], lat=ds[LATITUDE])
-    da = da_era.interp(lon=ds[LONGITUDE], lat=ds[LATITUDE])
-    return da.interp(time=ds[TIME])
+        da = da_era.interp({TIME: ds[TIME]})
+        return da.interp({LONGITUDE: ds[LONGITUDE], LATITUDE: ds[LATITUDE]})
+    da = da_era.interp({LONGITUDE: ds[LONGITUDE], LATITUDE: ds[LATITUDE]})
+    return da.interp({TIME: ds[TIME]})
