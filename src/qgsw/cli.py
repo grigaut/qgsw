@@ -117,7 +117,7 @@ class ScriptArgsVA(ScriptArgs):
         parser.add_argument(
             "-i",
             "--indices",
-            required=True,
+            required=False,
             nargs=4,
             type=int,
             help="Indices (imin, imax, jmin, jmax), "
