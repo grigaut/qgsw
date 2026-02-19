@@ -86,12 +86,12 @@ space = SpaceDiscretization3D.from_config(
     config.model,
 )
 
-space_slice = space.remove_z_h().slice(imin, imax + 1, jmin, jmax + 1)
+space_slice = space.remove_h().slice(imin, imax + 1, jmin, jmax + 1)
 
-space_slice_w = space.remove_z_h().slice(
+space_slice_w = space.remove_h().slice(
     imin - p + 1, imax + p, jmin - p + 1, jmax + p
 )
-space_slice_ww = space.remove_z_h().slice(
+space_slice_ww = space.remove_h().slice(
     imin - p, imax + p + 1, jmin - p, jmax + p + 1
 )
 ## Observations
@@ -219,7 +219,7 @@ def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
 ## Three Layer model
 
 model_3l = QGPSIQ(
-    space_2d=space.remove_z_h(),
+    space_2d=space.remove_h(),
     H=H,
     beta_plane=config.physics.beta_plane,
     g_prime=g_prime,

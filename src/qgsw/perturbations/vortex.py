@@ -16,7 +16,6 @@ except ImportError:
 import torch
 import torch.nn.functional as F  # noqa: N812
 
-from qgsw.exceptions import UnitError
 from qgsw.perturbations.base import (
     BaroclinicPerturbation,
     BarotropicPerturbation,
@@ -65,12 +64,6 @@ class RankineVortex2D:
         Raises:
             UnitError: If the grid has an invalid unit
         """
-        if grid_2d.xy_unit != self._required_xy_unit:
-            msg = (
-                "The grid_2d must have the following xy unit:"
-                f" {self._required_xy_unit.name}"
-            )
-            raise UnitError(msg)
 
     def compute_vortex_scales(
         self,
@@ -196,7 +189,7 @@ class RankineVortex3D(_Perturbation, metaclass=ABCMeta):
         Returns:
             float: Inner vortex gyre radius.
         """
-        return self._2d_vortex.compute_vortex_scales(grid_3d.remove_z_h())[0]
+        return self._2d_vortex.compute_vortex_scales(grid_3d.remove_h())[0]
 
     @classmethod
     def from_config(cls, perturbation_config: PerturbationConfig) -> Self:

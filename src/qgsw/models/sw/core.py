@@ -506,7 +506,7 @@ class SWCollinearSublayer(SWCore[UVHTAlpha, StateUVHAlpha]):
         )
         self._space = keep_top_layer(self._space)
 
-        self._compute_coriolis(self._space.omega.remove_z_h())
+        self._compute_coriolis(self._space.omega.remove_h())
         ##Topography and Ref values
         self._set_ref_variables()
 

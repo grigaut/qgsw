@@ -84,6 +84,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qgsw.spatial.core.grid_conversion import interpolate
+
 try:
     from typing import Self
 except ImportError:
@@ -93,12 +95,10 @@ import torch
 
 from qgsw.spatial.core.grid import Grid2D, Grid3D
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.configs.core import SpaceConfig
     from qgsw.configs.models import ModelConfig
-    from qgsw.spatial.core.coordinates import Coordinates1D
 
 
 class MeshesInstanciationError(Exception):
@@ -169,12 +169,6 @@ class SpaceDiscretization2D:
         v_grid: Grid2D,
     ) -> None:
         """Instantiate the SpaceDiscretization2D."""
-        self._verify_xy_units(
-            omega_xy_unit=omega_grid.xy_unit,
-            h_xy_unit=h_grid.xy_unit,
-            u_xy_unit=u_grid.xy_unit,
-            v_xy_unit=v_grid.xy_unit,
-        )
         self._omega = omega_grid
         self._h = h_grid
         self._u = u_grid
@@ -185,14 +179,8 @@ class SpaceDiscretization2D:
         msg_parts = [
             "2D Space.",
             "└── Dimensions:",
-            (
-                f"     ├── X: {self.nx} points "
-                f"- dx = {self.dx} {self.omega.xy_unit.value}"
-            ),
-            (
-                f"     └── Y: {self.ny} points "
-                f"- dy = {self.dy} {self.omega.xy_unit.value}"
-            ),
+            (f"     ├── X: {self.nx} points - dx = {self.dx}"),
+            (f"     └── Y: {self.ny} points - dy = {self.dy}"),
         ]
         return "\n".join(msg_parts)
 
@@ -230,11 +218,6 @@ class SpaceDiscretization2D:
     def ds(self) -> float:
         """Elementary area surface."""
         return self.dx * self.dy
-
-    @property
-    def xy_unit(self) -> Unit:
-        """X and Y unit."""
-        return self._omega.xy_unit
 
     @property
     def omega(self) -> Grid2D:
@@ -554,89 +537,24 @@ class SpaceDiscretization2D:
         """
         return self._v
 
-    def _verify_xy_units(
-        self,
-        omega_xy_unit: Grid2D,
-        h_xy_unit: Grid2D,
-        u_xy_unit: Grid2D,
-        v_xy_unit: Grid2D,
-    ) -> None:
-        """Verify grids xy units equality.
-
-        Args:
-            omega_xy_unit (Grid2D): Omega xy unit.
-            h_xy_unit (Grid2D): h xy unit.
-            u_xy_unit (Grid2D): u xy unit.
-            v_xy_unit (Grid2D): v xy unit.
-
-        Raises:
-            MeshesInstanciationError: If the unit don't match.
-        """
-        omega_h = omega_xy_unit == h_xy_unit
-        h_u = h_xy_unit == u_xy_unit
-        u_v = u_xy_unit == v_xy_unit
-
-        if omega_h and h_u and u_v:
-            return
-        msg = "All grids xy units must correspond."
-        raise MeshesInstanciationError(msg)
-
-    def add_h(self, h: Coordinates1D) -> SpaceDiscretization3D:
+    def add_h_coords(self, h_1d: torch.Tensor) -> SpaceDiscretization3D:
         """Switch to 3D Grids adding layers thickness.
 
         Args:
-            h (Coordinates1D): Layers thickness coordinates.
+            h_1d (torch.Tensor): Layers thickness coordinates.
 
         Returns:
             SpaceDiscretization3D: 3D Grids.
         """
-        omega_3d = self._omega.add_h(h=h)
-        h_3d = self._h.add_h(h=h)
-        u_3d = self._u.add_h(h=h)
-        v_3d = self._v.add_h(h=h)
+        omega_3d = self._omega.add_h_coords(h_1d=h_1d)
+        h_3d = self._h.add_h_coords(h_1d=h_1d)
+        u_3d = self._u.add_h_coords(h_1d=h_1d)
+        v_3d = self._v.add_h_coords(h_1d=h_1d)
         return SpaceDiscretization3D(
             omega_grid=omega_3d,
             h_grid=h_3d,
             u_grid=u_3d,
             v_grid=v_3d,
-        )
-
-    def add_z(self, z: torch.Tensor) -> SpaceDiscretization3D:
-        """Switch to 3D Grid adding z coordinates.
-
-        Args:
-            z (torch.Tensor): Z coordinates.
-                └── (nl+1, )-shaped
-
-        Returns:
-            SpaceDiscretization3D: 3D Grid.
-        """
-        omega_3d = self.h.add_z(z=z)
-        h_3d = self._h.add_z(z=z)
-        u_3d = self._u.add_z(z=z)
-        v_3d = self._v.add_z(z=z)
-        return SpaceDiscretization3D(
-            omega_grid=omega_3d,
-            h_grid=h_3d,
-            u_grid=u_3d,
-            v_grid=v_3d,
-        )
-
-    def to_shape(self, nx: int, ny: int) -> SpaceDiscretization2D:
-        """Recreate a new Space discretization 2D.
-
-        Args:
-            nx (int): New nx.
-            ny (int): New ny.
-
-        Returns:
-            SpaceDiscretization2D: 2D space discretization with new shape.
-        """
-        return SpaceDiscretization2D(
-            omega_grid=self.omega.to_shape(nx + 1, ny + 1),
-            h_grid=self.h.to_shape(nx, ny),
-            u_grid=self.u.to_shape(nx + 1, ny),
-            v_grid=self.v.to_shape(nx, ny + 1),
         )
 
     def slice(
@@ -652,14 +570,11 @@ class SpaceDiscretization2D:
 
         Returns:
             SpaceDiscretization2D: Slice space, such that
-                x -> X[imin:imax,:] and y -> Y[:,jmin:jmax].
+                x -> X[imin:imax, jmin:jmax] and y -> Y[imin:imax, jmin:jmax].
         """
-        return self.from_tensors(
-            x=self.omega.xy.x[imin:imax, 0],
-            y=self.omega.xy.y[0, jmin:jmax],
-            x_unit=self.xy_unit,
-            y_unit=self.xy_unit,
-        )
+        x_sliced = self.omega.xy.x[imin:imax, jmin:jmax]
+        y_sliced = self.omega.xy.y[imin:imax, jmin:jmax]
+        return self.from_omega_grid(Grid2D(x=x_sliced, y=y_sliced))
 
     @classmethod
     def from_config(cls, grid_config: SpaceConfig) -> Self:
@@ -671,83 +586,89 @@ class SpaceDiscretization2D:
         Returns:
             Self: Corresponding SpaceDiscretization2D.
         """
-        x = torch.linspace(
+        x_1d = torch.linspace(
             grid_config.x_min,
             grid_config.x_max,
             grid_config.nx + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
-        y = torch.linspace(
+        y_1d = torch.linspace(
             grid_config.y_min,
             grid_config.y_max,
             grid_config.ny + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
         )
-        return cls.from_tensors(
-            x=x,
-            y=y,
-            x_unit=grid_config.unit,
-            y_unit=grid_config.unit,
+        return cls.from_coords(
+            x_1d=x_1d,
+            y_1d=y_1d,
         )
 
     @classmethod
-    def from_tensors(
+    def from_coords(
         cls,
         *,
-        x: torch.Tensor,
-        y: torch.Tensor,
-        x_unit: Unit = Unit.M,
-        y_unit: Unit = Unit.M,
+        x_1d: torch.Tensor,
+        y_1d: torch.Tensor,
     ) -> Self:
         """Generate ω, h, u, v grids from coordinates tensors.
 
         Args:
-            x (torch.Tensor): X Coordinates.
+            x_1d (torch.Tensor): X Coordinates.
                 └── (nx, )-shaped
-            y (torch.Tensor): Y Coordinates.
+            y_1d (torch.Tensor): Y Coordinates.
                 └── (ny, )-shaped
-            x_unit (Unit): X unit.
-            y_unit (Unit): Y unit.
 
         Returns:
             Self: 2D Grids.
         """
-        x_centers = 0.5 * (x[1:] + x[:-1])
-        y_centers = 0.5 * (y[1:] + y[:-1])
-
-        omega_grid = Grid2D.from_tensors(
-            x=x,
-            y=y,
-            x_unit=x_unit,
-            y_unit=y_unit,
-        )
-        h_grid = Grid2D.from_tensors(
-            x=x_centers,
-            y=y_centers,
-            x_unit=x_unit,
-            y_unit=y_unit,
-        )
-        u_grid = Grid2D.from_tensors(
-            x=x,
-            y=y_centers,
-            x_unit=x_unit,
-            y_unit=y_unit,
-        )
-        v_grid = Grid2D.from_tensors(
-            x=x_centers,
-            y=y,
-            x_unit=x_unit,
-            y_unit=y_unit,
+        omega_grid = Grid2D.from_coords(
+            x_1d=x_1d,
+            y_1d=y_1d,
         )
 
+        return cls.from_omega_grid(omega_grid)
+
+    @classmethod
+    def from_omega_grid(cls, omega_grid: Grid2D) -> Self:
+        """Instantiate space from omega grid.
+
+        Args:
+            omega_grid (Grid3D): Omega grid.
+
+        Returns:
+            Self: SpaceDiscretization3D.
+        """
+        x, y = omega_grid.xy
+
+        h_grid = Grid2D(x=interpolate(x), y=interpolate(y))
+        u_grid = Grid2D(
+            x=(x[:, 1:] + x[:, :-1]) / 2,
+            y=(y[:, 1:] + y[:, :-1]) / 2,
+        )
+        v_grid = Grid2D(
+            x=(x[1:] + x[:-1]) / 2,
+            y=(y[1:] + y[:-1]) / 2,
+        )
         return cls(
             omega_grid=omega_grid,
             h_grid=h_grid,
             u_grid=u_grid,
             v_grid=v_grid,
         )
+
+    @classmethod
+    def from_psi_grid(cls, psi_grid: Grid2D) -> Self:
+        """Instantiate space from psi grid.
+
+        Args:
+            psi_grid (Grid2D): Psi grid.
+
+        Returns:
+            Self: SpaceDiscretization2D.
+        """
+        return cls.from_omega_grid(psi_grid)
 
 
 class SpaceDiscretization3D:
@@ -821,18 +742,6 @@ class SpaceDiscretization3D:
             u_grid (Grid3D): u grid.
             v_grid (Grid3D): v grid.
         """
-        self._verify_xy_units(
-            omega_xy_unit=omega_grid.xy_unit,
-            h_xy_unit=h_grid.xy_unit,
-            u_xy_unit=u_grid.xy_unit,
-            v_xy_unit=v_grid.xy_unit,
-        )
-        self._verify_zh_units(
-            omega_zh_unit=omega_grid.zh_unit,
-            h_zh_unit=h_grid.zh_unit,
-            u_zh_unit=u_grid.zh_unit,
-            v_zh_unit=v_grid.zh_unit,
-        )
         self._omega = omega_grid
         self._h = h_grid
         self._u = u_grid
@@ -847,14 +756,8 @@ class SpaceDiscretization3D:
         return [
             "3D Space",
             "└── Dimensions:",
-            (
-                f"\t├── X: {self.nx} points "
-                f"- dx = {self.dx} {self.omega.xy_unit.value}"
-            ),
-            (
-                f"\t├── Y: {self.ny} points "
-                f"- dy = {self.dy} {self.omega.xy_unit.value}"
-            ),
+            (f"\t├── X: {self.nx} points - dx = {self.dx} m"),
+            (f"\t├── Y: {self.ny} points - dy = {self.dy} m"),
             f"\t└── H: {self.nl} layer{'s' if self.nl > 1 else ''}",
         ]
 
@@ -886,11 +789,6 @@ class SpaceDiscretization3D:
     def ly(self) -> int:
         """Total length in the y direction (in meters)."""
         return self.h.ly
-
-    @property
-    def lz(self) -> int:
-        """Total length in the z direction (in meters)."""
-        return self.h.lz
 
     @property
     def dx(self) -> float:
@@ -1226,89 +1124,17 @@ class SpaceDiscretization3D:
         """
         return self._v
 
-    def _verify_xy_units(
-        self,
-        omega_xy_unit: Grid2D,
-        h_xy_unit: Grid2D,
-        u_xy_unit: Grid2D,
-        v_xy_unit: Grid2D,
-    ) -> None:
-        """Verify grids xy units equality.
-
-        Args:
-            omega_xy_unit (Grid2D): Omega xy unit.
-            h_xy_unit (Grid2D): h xy unit.
-            u_xy_unit (Grid2D): u xy unit.
-            v_xy_unit (Grid2D): v xy unit.
-
-        Raises:
-            MeshesInstanciationError: If the unit don't match.
-        """
-        omega_h = omega_xy_unit == h_xy_unit
-        h_u = h_xy_unit == u_xy_unit
-        u_v = u_xy_unit == v_xy_unit
-
-        if omega_h and h_u and u_v:
-            return
-        msg = "All grids xy units must correspond."
-        raise MeshesInstanciationError(msg)
-
-    def _verify_zh_units(
-        self,
-        omega_zh_unit: Grid2D,
-        h_zh_unit: Grid2D,
-        u_zh_unit: Grid2D,
-        v_zh_unit: Grid2D,
-    ) -> None:
-        """Verify grids zh units equality.
-
-        Args:
-            omega_zh_unit (Grid2D): Omega zh unit.
-            h_zh_unit (Grid2D): h zh unit.
-            u_zh_unit (Grid2D): u zh unit.
-            v_zh_unit (Grid2D): v zh unit.
-
-        Raises:
-            MeshesInstanciationError: If the unit don't match.
-        """
-        omega_h = omega_zh_unit == h_zh_unit
-        h_u = h_zh_unit == u_zh_unit
-        u_v = u_zh_unit == v_zh_unit
-
-        if omega_h and h_u and u_v:
-            return
-        msg = "All grids zh units must correspond."
-        raise MeshesInstanciationError(msg)
-
-    def remove_z_h(self) -> SpaceDiscretization2D:
+    def remove_h(self) -> SpaceDiscretization2D:
         """Remove z coordinates.
 
         Returns:
             SpaceDiscretization2D: 2D Grid for only X and Y.
         """
         return SpaceDiscretization2D(
-            omega_grid=self._omega.remove_z_h(),
-            h_grid=self._h.remove_z_h(),
-            u_grid=self._u.remove_z_h(),
-            v_grid=self._v.remove_z_h(),
-        )
-
-    def to_shape(self, nx: int, ny: int, nl: int) -> SpaceDiscretization3D:
-        """Recreate a new Space discretization 3D.
-
-        Args:
-            nx (int): New nx.
-            ny (int): New ny.
-            nl (int): New nl.
-
-        Returns:
-            SpaceDiscretization3D: 3D space discretization with new shape.
-        """
-        return SpaceDiscretization3D(
-            omega_grid=self.omega.to_shape(nx + 1, ny + 1, nl),
-            h_grid=self.h.to_shape(nx, ny, nl),
-            u_grid=self.u.to_shape(nx + 1, ny, nl),
-            v_grid=self.v.to_shape(nx, ny + 1, nl),
+            omega_grid=self._omega.remove_h(),
+            h_grid=self._h.remove_h(),
+            u_grid=self._u.remove_h(),
+            v_grid=self._v.remove_h(),
         )
 
     @classmethod
@@ -1326,101 +1152,83 @@ class SpaceDiscretization3D:
         Returns:
             Self: Corresponding 3D Grid.
         """
-        x = torch.linspace(
-            grid_config.x_min,
-            grid_config.x_max,
-            grid_config.nx + 1,
-            dtype=torch.float64,
-            device=DEVICE.get(),
+        dx = (grid_config.x_max - grid_config.x_min) / grid_config.nx
+        x_1d = (
+            torch.arange(
+                0,
+                grid_config.nx + 1,
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            * dx
+            + grid_config.x_min
         )
-        y = torch.linspace(
-            grid_config.y_min,
-            grid_config.y_max,
-            grid_config.ny + 1,
-            dtype=torch.float64,
-            device=DEVICE.get(),
+
+        dy = (grid_config.y_max - grid_config.y_min) / grid_config.ny
+        y_1d = (
+            torch.arange(
+                0,
+                grid_config.ny + 1,
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            * dy
+            + grid_config.y_min
         )
-        return cls.from_tensors(
-            x=x,
-            y=y,
-            h=model_config.h,
-            x_unit=grid_config.unit,
-            y_unit=grid_config.unit,
-            zh_unit=Unit.M,
+        return cls.from_coords(
+            x_1d=x_1d,
+            y_1d=y_1d,
+            h_1d=model_config.h,
         )
 
     @classmethod
-    def from_tensors(
+    def from_coords(
         cls,
         *,
-        x: torch.Tensor,
-        y: torch.Tensor,
-        z: torch.Tensor | None = None,
-        h: torch.Tensor | None = None,
-        x_unit: Unit = Unit.M,
-        y_unit: Unit = Unit.M,
-        zh_unit: Unit = Unit.M,
+        x_1d: torch.Tensor,
+        y_1d: torch.Tensor,
+        h_1d: torch.Tensor,
     ) -> Self:
         """Generate ω, h, u, v grids from coordinates tensors.
 
         Args:
-            x_unit (Unit): X unit.
-            y_unit (Unit): Y unit.
-            zh_unit (Unit): Z and H unit.
-            x (torch.Tensor): X points.
+            x_1d (torch.Tensor): X points.
                 └── (nx, )-shaped
-            y (torch.Tensor): Y points.
+            y_1d (torch.Tensor): Y points.
                 └── (ny, )-shaped
-            z (torch.Tensor | None, optional): Z points, set to None if h
-            is given. Defaults to None.
-                └── (nl+1, )-shaped
-            h (torch.Tensor | None, optional): H points, set to None if z
-            is given. Defaults to None.
+            h_1d (torch.Tensor | None, optional): H points.
                 └── (nl, )-shaped
 
         Returns:
             Self: 3D Grids.
         """
-        x_centers = 0.5 * (x[1:] + x[:-1])
-        y_centers = 0.5 * (y[1:] + y[:-1])
+        omega_grid = Grid3D.from_coords(x_1d=x_1d, y_1d=y_1d, h_1d=h_1d)
 
-        omega_grid = Grid3D.from_tensors(
-            x=x,
-            y=y,
-            z=z,
-            h=h,
-            x_unit=x_unit,
-            y_unit=y_unit,
-            zh_unit=zh_unit,
-        )
-        h_grid = Grid3D.from_tensors(
-            x=x_centers,
-            y=y_centers,
-            z=z,
-            h=h,
-            x_unit=x_unit,
-            y_unit=y_unit,
-            zh_unit=zh_unit,
-        )
-        u_grid = Grid3D.from_tensors(
-            x=x,
-            y=y_centers,
-            z=z,
-            h=h,
-            x_unit=x_unit,
-            y_unit=y_unit,
-            zh_unit=zh_unit,
-        )
-        v_grid = Grid3D.from_tensors(
-            x=x_centers,
-            y=y,
-            z=z,
-            h=h,
-            x_unit=x_unit,
-            y_unit=y_unit,
-            zh_unit=zh_unit,
-        )
+        return cls.from_omega_grid(omega_grid)
 
+    @classmethod
+    def from_omega_grid(cls, omega_grid: Grid3D) -> Self:
+        """Instantiate space from omega grid.
+
+        Args:
+            omega_grid (Grid3D): Omega grid.
+
+        Returns:
+            Self: SpaceDiscretization3D.
+        """
+        x, y, h = omega_grid.xyh
+
+        h_grid = Grid3D(x=interpolate(x), y=interpolate(y), h=h)
+        u_grid = Grid3D(
+            x=(x[:, :, 1:] + x[:, :, :-1]) / 2,
+            y=(y[:, :, 1:] + y[:, :, :-1]) / 2,
+            h=h,
+        )
+        v_grid = Grid3D(
+            x=(x[:, 1:] + x[:, :-1]) / 2,
+            y=(y[:, 1:] + y[:, :-1]) / 2,
+            h=h,
+        )
         return cls(
             omega_grid=omega_grid,
             h_grid=h_grid,
@@ -1428,9 +1236,21 @@ class SpaceDiscretization3D:
             v_grid=v_grid,
         )
 
+    @classmethod
+    def from_psi_grid(cls, psi_grid: Grid3D) -> Self:
+        """Instantiate space from psi grid.
+
+        Args:
+            psi_grid (Grid3D): Psi grid.
+
+        Returns:
+            Self: SpaceDiscretization3D.
+        """
+        return cls.from_omega_grid(psi_grid)
+
 
 def keep_top_layer(space: SpaceDiscretization3D) -> SpaceDiscretization3D:
-    """Keep Only Top Layer.
+    """Keep only top layer.
 
     Args:
         space (SpaceDiscretization3D): Original Space.
@@ -1438,11 +1258,8 @@ def keep_top_layer(space: SpaceDiscretization3D) -> SpaceDiscretization3D:
     Returns:
         SpaceDiscretization3D: Top Layer.
     """
-    return SpaceDiscretization3D.from_tensors(
-        x_unit=space.omega.xy_unit,
-        y_unit=space.omega.xy_unit,
-        zh_unit=space.omega.zh_unit,
-        x=space.omega.xyh.x[0, :, 0],
-        y=space.omega.xyh.y[0, 0, :],
-        h=space.omega.xyh.h[0, 0, 0].unsqueeze(0),
+    return SpaceDiscretization3D.from_coords(
+        x_1d=space.omega.xyh.x[0, :, 0],
+        y_1d=space.omega.xyh.y[0, 0, :],
+        h_1d=space.omega.xyh.h[0, 0, 0].unsqueeze(0),
     )

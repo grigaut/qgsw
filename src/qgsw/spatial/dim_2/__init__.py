@@ -80,8 +80,7 @@ v
 x
 """
 
-from qgsw.spatial.core.coordinates import Coordinates2D
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid import Grid2D
 
-__all__ = ["Coordinates2D", "Grid2D", "SpaceDiscretization2D"]
+__all__ = ["Grid2D", "SpaceDiscretization2D"]

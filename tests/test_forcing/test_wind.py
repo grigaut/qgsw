@@ -5,7 +5,6 @@ import torch
 from qgsw.forcing.wind import CosineZonalWindForcing
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
 
 
 def test_cosine_wind_forcing() -> None:
@@ -38,23 +37,21 @@ def test_cosine_wind_forcing() -> None:
     y_ugrid = 0.5 * (y[1:, :] + y[:-1, :])
     taux = tau0 * torch.cos(2 * torch.pi * (y_ugrid - ly / 2) / ly)
 
-    space = SpaceDiscretization2D.from_tensors(
-        x=torch.linspace(
+    space = SpaceDiscretization2D.from_coords(
+        x_1d=torch.linspace(
             0,
             lx,
             nx + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
         ),
-        y=torch.linspace(
+        y_1d=torch.linspace(
             0,
             ly,
             ny + 1,
             dtype=torch.float64,
             device=DEVICE.get(),
         ),
-        x_unit=Unit.M,
-        y_unit=Unit.M,
     )
     wf = CosineZonalWindForcing(
         space,

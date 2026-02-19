@@ -3,13 +3,11 @@
 import pytest
 import torch
 
-from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
     SpaceDiscretization3D,
 )
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
 
 
 @pytest.fixture
@@ -33,11 +31,9 @@ def test_omega_grid(
     """Verify that omega grid corresponds to the xy grid."""
     X, Y, _ = X_Y_H
     x, y = torch.meshgrid(X, Y, indexing="ij")
-    space = SpaceDiscretization2D.from_tensors(
-        x=X,
-        y=Y,
-        x_unit=Unit.M,
-        y_unit=Unit.M,
+    space = SpaceDiscretization2D.from_coords(
+        x_1d=X,
+        y_1d=Y,
     )
     assert (space.omega.xy.x == x).all()
     assert (space.omega.xy.y == y).all()
@@ -48,21 +44,16 @@ def test_2D_to_3D(  # noqa: N802
 ) -> None:
     """Test 2D to 3D space conversion."""
     X, Y, H = X_Y_H
-    space_2d = SpaceDiscretization2D.from_tensors(
-        x=X,
-        y=Y,
-        x_unit=Unit.M,
-        y_unit=Unit.M,
+    space_2d = SpaceDiscretization2D.from_coords(
+        x_1d=X,
+        y_1d=Y,
     )
-    space_ref = SpaceDiscretization3D.from_tensors(
-        x_unit=Unit.M,
-        y_unit=Unit.M,
-        zh_unit=Unit.M,
-        x=X,
-        y=Y,
-        h=H,
+    space_ref = SpaceDiscretization3D.from_coords(
+        x_1d=X,
+        y_1d=Y,
+        h_1d=H,
     )
-    space_3d = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
+    space_3d = space_2d.add_h_coords(H)
 
     assert (space_3d.omega.xyh.x == space_ref.omega.xyh.x).all()
     assert (space_3d.omega.xyh.y == space_ref.omega.xyh.y).all()
@@ -83,19 +74,14 @@ def test_2D_and_3D_horizontal(  # noqa: N802
 ) -> None:
     """Test 2D to 3D space conversion."""
     X, Y, H = X_Y_H
-    space_2d = SpaceDiscretization2D.from_tensors(
-        x=X,
-        y=Y,
-        x_unit=Unit.M,
-        y_unit=Unit.M,
+    space_2d = SpaceDiscretization2D.from_coords(
+        x_1d=X,
+        y_1d=Y,
     )
-    space_ref = SpaceDiscretization3D.from_tensors(
-        x_unit=Unit.M,
-        y_unit=Unit.M,
-        zh_unit=Unit.M,
-        x=X,
-        y=Y,
-        h=H,
+    space_ref = SpaceDiscretization3D.from_coords(
+        x_1d=X,
+        y_1d=Y,
+        h_1d=H,
     )
     assert (space_2d.omega.xy.x == space_ref.omega.xyh.x).all()
     assert (space_2d.omega.xy.y == space_ref.omega.xyh.y).all()
@@ -112,20 +98,16 @@ def test_slicing(
 ) -> None:
     """Test 2D space slicing."""
     X, Y, _ = X_Y_H
-    space_2d = SpaceDiscretization2D.from_tensors(
-        x=X,
-        y=Y,
-        x_unit=Unit.M,
-        y_unit=Unit.M,
+    space_2d = SpaceDiscretization2D.from_coords(
+        x_1d=X,
+        y_1d=Y,
     )
     imin, imax = 64, 128
     jmin, jmax = 32, 132
     space_sliced = space_2d.slice(imin, imax + 1, jmin, jmax + 1)
-    space_ref = SpaceDiscretization2D.from_tensors(
-        x=space_2d.omega.xy.x[imin : imax + 1, 0],
-        y=space_2d.omega.xy.y[0, jmin : jmax + 1],
-        x_unit=Unit.M,
-        y_unit=Unit.M,
+    space_ref = SpaceDiscretization2D.from_coords(
+        x_1d=space_2d.omega.xy.x[imin : imax + 1, 0],
+        y_1d=space_2d.omega.xy.y[0, jmin : jmax + 1],
     )
     assert (space_sliced.omega.xy.x == space_ref.omega.xy.x).all()
     assert (space_sliced.omega.xy.y == space_ref.omega.xy.y).all()

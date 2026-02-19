@@ -13,10 +13,8 @@ from qgsw.exceptions import (
 from qgsw.logging import getLogger
 from qgsw.masks import Masks
 from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.spatial.core.coordinates import Coordinates1D
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
 
 if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import (
@@ -63,7 +61,7 @@ class ModelParamChecker:
         msg = f"device: {self.device.get()}"
         logger.detail(msg)
         ## Space
-        self._space = space_2d.add_h(Coordinates1D(points=H, unit=Unit.M))
+        self._space = space_2d.add_h_coords(H)
         # Beta-plane
         with logger.section("Setting model parameters..."):
             self._set_beta_plane(beta_plane)

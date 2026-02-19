@@ -5,30 +5,34 @@ import torch
 from qgsw.perturbations.none import NoPerturbation
 from qgsw.spatial.core.grid import Grid3D
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
 
 
 def test_no_perturbation() -> None:
     """Verify that NoPerturbation is null."""
-    grid = Grid3D.from_tensors(
-        x=torch.linspace(
+    dx = 10
+    dy = 10
+    grid = Grid3D.from_coords(
+        x_1d=torch.arange(
             0,
-            1000,
             100,
             device=DEVICE.get(),
             dtype=torch.float64,
-        ),
-        y=torch.linspace(
+        )
+        * dx,
+        y_1d=torch.arange(
             0,
-            1000,
             100,
             device=DEVICE.get(),
             dtype=torch.float64,
+        )
+        * dy,
+        h_1d=torch.linspace(
+            0,
+            200,
+            3,
+            device=DEVICE.get(),
+            dtype=torch.float64,
         ),
-        h=torch.linspace(0, 200, 3, device=DEVICE.get(), dtype=torch.float64),
-        x_unit=Unit.M,
-        y_unit=Unit.M,
-        zh_unit=Unit.M,
     )
 
     perturbation = NoPerturbation()

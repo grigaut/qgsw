@@ -8,7 +8,6 @@ from qgsw.models.qg.uvh.modified.collinear.core import QGCollinearSF
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit
 
 
 @pytest.fixture
@@ -21,11 +20,9 @@ def space_2d() -> SpaceDiscretization2D:
 
     X = torch.linspace(0, lx, nx + 1, dtype=torch.float64, device=DEVICE.get())
     Y = torch.linspace(0, ly, ny + 1, dtype=torch.float64, device=DEVICE.get())
-    return SpaceDiscretization2D.from_tensors(
-        x=X,
-        y=Y,
-        x_unit=Unit.M,
-        y_unit=Unit.M,
+    return SpaceDiscretization2D.from_coords(
+        x_1d=X,
+        y_1d=Y,
     )
 
 
