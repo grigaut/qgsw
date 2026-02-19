@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
-from qgsw.eNATL60.var_keys import LATITUDE, LONGITUDE, MEAN_SEA_LEVEL, TIME
+from qgsw.eNATL60.var_keys import ATMOS_PRESSURE, LATITUDE, LONGITUDE, TIME
 
 
 def load_era_interim_oneyear(folder: Path, year: int = 2010) -> xr.Dataset:
@@ -24,7 +24,7 @@ def load_era_interim_oneyear(folder: Path, year: int = 2010) -> xr.Dataset:
     # and have same name (lon vs lon0, eg)
     var0_file = folder / f"drowned_{varlist[0]}_y{year}.nc"
     ds = xr.open_dataset(var0_file, chunks=chks)
-    ds = ds.rename({"lon": LONGITUDE, "lat": LATITUDE, "MSL": MEAN_SEA_LEVEL})
+    ds = ds.rename({"lon": LONGITUDE, "lat": LATITUDE, "MSL": ATMOS_PRESSURE})
     ds[LONGITUDE] = (
         ds[LONGITUDE] + 180
     ) % 360 - 180  # longitude in [-180, 180]
