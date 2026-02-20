@@ -579,7 +579,7 @@ for c in range(n_cycles):
             model.alpha = alpha
 
             compute_reg = compute_regularization_func(
-                basis, alpha, space_interior, scale=(U * L / T)
+                basis, alpha, space_interior, scale=1 / T**2
             )
 
             compute_q_rg = build_compute_q_rg(
