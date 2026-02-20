@@ -271,7 +271,7 @@ y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
 
-A = compute_A(H[:2, 0, 0], g_prime[:2, 0, 0], **specs)
+A = compute_A(H[:2], g_prime[:2], **specs)
 
 compute_dtq2 = lambda dpsi1, dpsi2: compute_q2_2l_interior(
     dpsi1,

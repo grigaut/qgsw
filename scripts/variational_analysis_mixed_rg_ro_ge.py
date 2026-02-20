@@ -274,7 +274,7 @@ model_3l.set_psi(psi_start)
 y_w = space_slice_w.q.xy.y[0, :].unsqueeze(0)
 beta_effect_w = beta_plane.beta * (y_w - y0)
 
-A = compute_A(H[:2, 0, 0], g_prime[:2, 0, 0], **specs)
+A = compute_A(H[:2], g_prime[:2], **specs)
 
 
 def compute_regularization_func(
