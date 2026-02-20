@@ -8,7 +8,7 @@ class StorageError(Exception):
     """Storage-related exception."""
 
 
-def get_storage_path(key: str = "STORAGE") -> Path:
+def get_path_from_env(key: str = "STORAGE") -> Path:
     """Read .env to find storage path.
 
     Returns:
@@ -30,8 +30,8 @@ def get_absolute_storage_path(path: Path) -> Path:
         Path: Absolute storage path.
     """
     if path.is_absolute():
-        if path.is_relative_to(get_storage_path()):
+        if path.is_relative_to(get_path_from_env()):
             return path
         msg = f"Path {path} is absolute, use relative path instead."
         raise StorageError(msg)
-    return get_storage_path().joinpath(path).absolute()
+    return get_path_from_env().joinpath(path).absolute()
