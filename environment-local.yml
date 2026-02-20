@@ -6,6 +6,8 @@ channels:
 dependencies:
   - python=3.12
   - pip
+  - xesmf
+  - esmpy
   - pip:
     - asttokens==2.4.1
     - certifi==2024.8.30
@@ -79,5 +81,3 @@ dependencies:
     - virtualenv==20.27.1
     - wheel==0.44.0
     - xarray==2024.10.0
-    - xesmf
-    - esmpy
