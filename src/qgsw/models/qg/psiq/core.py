@@ -152,7 +152,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         """Set y0."""
         self._y0 = y0
         # Beta effect
-        y = self.space.q.xyz.y[0, 0, :].unsqueeze(0)
+        y = self.space.q.xyh.y[0, 0, :].unsqueeze(0)
         beta_effect = self.beta_plane.beta * (y - self.y0)
         if hasattr(self, "_state"):
             msg = (

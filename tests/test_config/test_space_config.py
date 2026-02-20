@@ -11,11 +11,11 @@ from qgsw.spatial.core.discretization import SpaceDiscretization2D
 def space_config() -> SpaceConfig:
     """Space configuration."""
     return SpaceConfig(
-        nx=92,
-        ny=74,
+        nx=110,
+        ny=62,
         unit="m",
-        x_min=-23,
-        x_max=502,
+        x_min=-50,
+        x_max=500,
         y_min=0,
         y_max=124,
     )

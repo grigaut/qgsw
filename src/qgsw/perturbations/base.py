@@ -89,10 +89,10 @@ class _Perturbation(NamedObject[PertubationName], metaclass=ABCMeta):
             device=DEVICE.get(),
             dtype=torch.float64,
         )
-        psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
+        psi_2d = self._compute_streamfunction_2d(grid_3d.remove_h())
         psi[0, 0, ...] = psi_2d
         for i in range(1, grid_3d.nl):
-            psi_2d = self._compute_streamfunction_2d(grid_3d.remove_z_h())
+            psi_2d = self._compute_streamfunction_2d(grid_3d.remove_h())
             psi[0, i, ...] = self.layer_ratio * psi_2d
         return psi
 

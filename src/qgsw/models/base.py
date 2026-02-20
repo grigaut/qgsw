@@ -120,7 +120,7 @@ class _Model(
             g_prime=g_prime,
             beta_plane=beta_plane,
         )
-        self._compute_coriolis(self._space.omega.remove_z_h())
+        self._compute_coriolis(self._space.omega.remove_h())
 
     @property
     def courant_number(self) -> float:

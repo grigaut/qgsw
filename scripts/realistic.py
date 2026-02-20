@@ -66,12 +66,12 @@ verbose.display(
 )
 # Land Mask Generation
 
-mask_land = bathy.compute_land_mask(space.h.remove_z_h())
-mask_land_w = bathy.compute_land_mask_w(space.h.remove_z_h())
+mask_land = bathy.compute_land_mask(space.h.remove_h())
+mask_land_w = bathy.compute_land_mask_w(space.h.remove_h())
 
 # coriolis beta plane
 f = coriolis.compute_beta_plane(
-    grid_2d=space.omega.remove_z_h(),
+    grid_2d=space.omega.remove_h(),
     f0=config.physics.f0,
     beta=config.physics.beta,
 )
@@ -100,7 +100,7 @@ param = {
     "slip_coef": config.physics.slip_coef,
     "dt": config.simulation.dt,  # time-step (s)
     "compile": True,
-    "mask": bathy.compute_ocean_mask(space.h.remove_z_h()),
+    "mask": bathy.compute_ocean_mask(space.h.remove_h()),
     "taux": taux[0, 1:-1, :],
     "tauy": tauy[0, :, 1:-1],
 }

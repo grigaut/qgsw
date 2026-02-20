@@ -47,7 +47,7 @@ Bu = compute_burger(
     length_scale=perturbation.compute_scale(space.omega),
 )
 
-grid_2d = space.remove_z_h()
+grid_2d = space.remove_h()
 x, y = grid_2d.omega.xy
 xc, yc = grid_2d.h.xy
 rc = torch.sqrt(xc**2 + yc**2)

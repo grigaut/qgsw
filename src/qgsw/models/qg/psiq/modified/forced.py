@@ -270,7 +270,7 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         ],
     ) -> None:
         self._basis = basis
-        space = self.space.remove_z_h()
+        space = self.space.remove_h()
         self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
         self._fpsi2_dx = basis.localize_dx(space.u.xy.x, space.u.xy.y)
         self._fpsi2_dy = basis.localize_dy(space.v.xy.x, space.v.xy.y)
@@ -640,7 +640,7 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         ],
     ) -> None:
         self._basis = basis
-        space = self.space.remove_z_h()
+        space = self.space.remove_h()
         self._fpsi2 = basis.localize(space.psi.xy.x, space.psi.xy.y)
 
     def __init__(

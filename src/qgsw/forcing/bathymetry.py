@@ -18,7 +18,6 @@ import torch
 import torch.nn.functional as F  # noqa: N812
 
 from qgsw.data.loaders import BathyLoader
-from qgsw.exceptions import UnitError
 from qgsw.specs import DEVICE
 from qgsw.utils.units._units import Unit
 
@@ -78,9 +77,6 @@ class Bathymetry:
         Returns:
             torch.Tensor: Interpolation of bathymetry on the given grid.
         """
-        if grid_2d.xy_unit != self._required_xy_unit:
-            msg = f"Grid2D xy unit must be {self._required_xy_unit}."
-            raise UnitError(msg)
         return self._interpolation(grid_2d.xy)
 
     def compute_land_mask(
