@@ -435,6 +435,11 @@ L: float = dx.item()
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
 
+    if (c + 1) * n_file_per_cycle > len(files):
+        msg = f"Not enough files to perform cycle {c} and above."
+        logger.warning(msg)
+        break
+
     files_for_cycle = files[c * n_file_per_cycle : (c + 1) * n_file_per_cycle]
 
     ds = load_datasets(*sort_files_by_dates(files)[:20], format_func=format_ds)
@@ -452,7 +457,7 @@ for c in range(n_cycles):
         ds["psi_filt"] = xr.apply_ufunc(
             gaussian_filter,
             ds[STREAMFUNCTION].load(),
-            kwargs={"sigma": 7},
+            kwargs={"sigma": 14},
             input_core_dims=[["i", "j"]],
             output_core_dims=[["i", "j"]],
             vectorize=True,
@@ -474,13 +479,13 @@ for c in range(n_cycles):
         ds_interp = ds_interp.load()
 
     psis_ref = [
-        torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0)
+        torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0) / beta_plane.f0
         for p in ds_interp[STREAMFUNCTION].to_numpy()
     ]
 
     with logger.section("Computing psi boundaries..."):
         psis_filt = [
-            torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0)
+            torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0) / beta_plane.f0
             for p in ds_interp["psi_filt"].to_numpy()
         ]
         psi_bcs = [extract_psi_bc(psi) for psi in psis_filt]
@@ -519,7 +524,7 @@ for c in range(n_cycles):
             {"params": [kappa], "lr": 1e-1, "name": "κ"},
             {
                 "params": list(coefs.values()),
-                "lr": 1e1,
+                "lr": 1e0,
                 "name": "Decomposition coefs",
             },
         ]
@@ -529,7 +534,7 @@ for c in range(n_cycles):
         params = [
             {
                 "params": list(coefs.values()),
-                "lr": 1e1,
+                "lr": 1e0,
                 "name": "Decomposition coefs",
             },
         ]
