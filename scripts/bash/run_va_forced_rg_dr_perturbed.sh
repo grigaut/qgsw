@@ -18,7 +18,7 @@ cd $SRCDIR
 
 date
 
-.venv/bin/python3 -u scripts/variational_analysis_forced_rg_dr_perturbed.py $@
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/variational_analysis_forced_rg_dr_perturbed.py $@
 
 date
 
