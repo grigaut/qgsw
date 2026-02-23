@@ -102,7 +102,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
 
         # grid params
-        self.y0 = 0.5 * self._space.ly
+        self.y0 = 0.5 * (self._space.q.xyh.y.max() + self._space.q.xyh.y.min())
 
         # auxillary matrices for elliptic equation
         self.compute_auxillary_matrices()
