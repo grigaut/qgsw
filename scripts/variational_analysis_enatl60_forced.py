@@ -350,7 +350,9 @@ for c in range(n_cycles):
         logger.warning(msg)
         break
 
-    ds = load_datasets(*sort_files_by_dates(files)[:20], format_func=format_ds)
+    files_for_cycle = files[c * n_file_per_cycle : (c + 1) * n_file_per_cycle]
+
+    ds = load_datasets(*files_for_cycle, format_func=format_ds)
 
     msg = f"Cycle {step(c + 1, n_cycles)}: eNATL60 data loaded."
     logger.info(box(msg, style="round"))
@@ -365,7 +367,7 @@ for c in range(n_cycles):
         ds["psi_filt"] = xr.apply_ufunc(
             gaussian_filter,
             ds[STREAMFUNCTION].load(),
-            kwargs={"sigma": 7},
+            kwargs={"sigma": 14},
             input_core_dims=[["i", "j"]],
             output_core_dims=[["i", "j"]],
             vectorize=True,
