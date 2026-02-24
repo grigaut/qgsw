@@ -21,6 +21,6 @@ for arg in "${args[@]}"; do
     cmd+=" $arg"
 done
 
-oarsub -S "$cmd" -n "VA-eNATL60"
+oarsub -S "$cmd" -n "VA-eNATL60-atmp"
 
 exit 0
