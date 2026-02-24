@@ -16,7 +16,10 @@ from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
-from qgsw.eNATL60.fields_computations import compute_stream_function_ssh_only
+from qgsw.eNATL60.fields_computations import (
+    compute_streamfunction_with_atmospheric_pressure,
+)
+from qgsw.eNATL60.forcing import load_era_interim, slice_space, slice_time
 from qgsw.eNATL60.interpolation import (
     build_regridder,
     compute_lonlat_from_regular_xy_grid,
@@ -73,7 +76,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_enatl60",
+    prefix_default="results_enatl60_atmp",
     gamma_default=0.1,
 )
 with_reg = not args.no_reg
@@ -449,10 +452,20 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: eNATL60 data loaded."
     logger.info(box(msg, style="round"))
 
-    ds[STREAMFUNCTION] = compute_stream_function_ssh_only(
+    ds_era = load_era_interim(data_folder / "misc", 2009)
+
+    ds_era = slice_time(ds_era, ds[TIME])
+    ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
+
+    msg = f"Cycle {step(c + 1, n_cycles)}: Atmospheric pressure loaded."
+    logger.info(box(msg, style="round"))
+
+    ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure(
         ds,
+        ds_era,
+        1026.0,
         g_prime[0].item(),
-        remove_avg=True,
+        remove_avgs=True,
     )
 
     with logger.section("Filtering stream function..."):

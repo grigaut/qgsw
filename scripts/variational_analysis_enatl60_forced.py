@@ -92,9 +92,11 @@ n_cycles = args.cycles
 
 ### Data folder
 
-data_folder = get_path_from_env(key="DATA_FOLDER") / "MEANDERS"
+data_folder = get_path_from_env(key="DATA_FOLDER")
 files = list(
-    data_folder.glob("eNATL60-BLB002_1h_2009*_2009*_gridT-2D_2009*-2009*.nc")
+    (data_folder / "MEANDERS").glob(
+        "eNATL60-BLB002_1h_2009*_2009*_gridT-2D_2009*-2009*.nc"
+    )
 )
 
 

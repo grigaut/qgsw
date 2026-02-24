@@ -5,9 +5,8 @@ import xarray as xr
 from qgsw.eNATL60.forcing import interpolate_era_da
 from qgsw.eNATL60.var_keys import (
     ATMOS_PRESSURE,
-    LATITUDE,
-    LONGITUDE,
     SSH,
+    TIME,
 )
 
 
@@ -36,7 +35,7 @@ def compute_streamfunction_with_atmospheric_pressure(
     atmos_p = interpolate_era_da(ds_era[ATMOS_PRESSURE], ds)
     ssh = ds[SSH]
     if remove_avgs:
-        atmos_p_avg = atmos_p.mean(dim=[LONGITUDE, LATITUDE])
+        atmos_p_avg = atmos_p.mean(dim=[d for d in atmos_p.dims if d != TIME])
         atmos_p = atmos_p - atmos_p_avg
         ssh_avg = ssh.mean()
         ssh = ssh - ssh_avg

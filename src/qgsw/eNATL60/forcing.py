@@ -39,7 +39,7 @@ def load_era_interim_oneyear(folder: Path, year: int = 2010) -> xr.Dataset:
     dsu[LATITUDE] = ds[LATITUDE]
     ds = ds.merge(dsu).sortby(LONGITUDE).sortby(LATITUDE)
     ds[TIME] = xr.date_range(f"{year}-01-01T03:00", periods=365 * 8, freq="3h")
-    return ds
+    return ds.set_coords([TIME, LONGITUDE, LATITUDE])
 
 
 def load_era_interim(folder: Path, *years: int) -> xr.Dataset:

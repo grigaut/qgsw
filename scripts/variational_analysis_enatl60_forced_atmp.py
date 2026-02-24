@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 import numpy as np
 import pandas as pd
@@ -14,9 +14,12 @@ from scipy.ndimage import gaussian_filter
 from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
-from qgsw.decomposition.exp_exp.core import GaussianExpBasis
-from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
-from qgsw.eNATL60.fields_computations import compute_stream_function_ssh_only
+from qgsw.decomposition.wavelets.core import WaveletBasis
+from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
+from qgsw.eNATL60.fields_computations import (
+    compute_streamfunction_with_atmospheric_pressure,
+)
+from qgsw.eNATL60.forcing import load_era_interim, slice_space, slice_time
 from qgsw.eNATL60.interpolation import (
     build_regridder,
     compute_lonlat_from_regular_xy_grid,
@@ -35,19 +38,15 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
-    QGPSIQRGPsi2TransportDR,
+    QGPSIQForced,
 )
-from qgsw.models.qg.stretching_matrix import compute_A_tilde
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.pv import (
-    compute_q1_interior,
-)
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad
+from qgsw.solver.finite_diff import laplacian
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
 )
@@ -58,13 +57,6 @@ from qgsw.utils.interpolation import QuadraticInterpolation
 from qgsw.utils.reshaping import crop
 from qgsw.utils.storage import get_path_from_env
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from qgsw.decomposition.base import SpaceTimeDecomposition
-    from qgsw.decomposition.supports.space.base import SpaceSupportFunction
-    from qgsw.decomposition.supports.time.base import TimeSupportFunction
-
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
@@ -73,7 +65,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_enatl60",
+    prefix_default="results_enatl60_forced_atmp",
     gamma_default=0.1,
 )
 with_reg = not args.no_reg
@@ -280,6 +272,8 @@ logger.info(box(msg_simu, msg_area, msg_obs, msg_reg, msg_output, style="="))
 
 H = config.model.h
 g_prime = config.model.g_prime
+H1, H2 = H[0], H[1]
+g1, g2 = g_prime[0], g_prime[1]
 beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
@@ -309,97 +303,13 @@ def set_inhomogeneous_model(model: M) -> M:
     return model
 
 
-model = QGPSIQRGPsi2TransportDR(
+model = QGPSIQForced(
     space_2d=space_interior,
-    H=H[:2],
+    H=H[:1] * H[1:2] / (H[:1] + H[1:2]),
     beta_plane=beta_plane,
-    g_prime=g_prime[:2],
+    g_prime=g_prime[1:2],
 )
-model: QGPSIQRGPsi2TransportDR = set_inhomogeneous_model(model)
-
-## Regularization
-
-
-def compute_regularization_func(
-    psi2_basis: SpaceTimeDecomposition[
-        SpaceSupportFunction, TimeSupportFunction
-    ],
-    alpha: torch.Tensor,
-    space: SpaceDiscretization2D,
-    scale: float,
-) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-    """Build regularization function.
-
-    Args:
-        psi2_basis (SpaceTimeDecomposition): Basis.
-        alpha (torch.Tensor) : Baroclinic radius perturbation.
-        space (SpaceDiscretization2D): Space.
-        scale (float): Regularizaiton scaling value.
-
-    Returns:
-        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-            Regularization function.
-    """
-    A_tilde = compute_A_tilde(H[:2], g_prime[:2], alpha, **specs)
-    A_21 = A_tilde[1:2, :1]
-    A_22 = A_tilde[1:2, 1:2]
-
-    q = space.q.xy
-    x = crop(q.x, 1)
-    y = crop(q.y, 1)
-
-    fpsi2 = psi2_basis.localize(x, y)
-    fdx_psi2 = psi2_basis.localize_dx(x, y)
-    fdy_psi2 = psi2_basis.localize_dy(x, y)
-    flap_psi2 = psi2_basis.localize_laplacian(x, y)
-    fdx_lap_psi2 = psi2_basis.localize_dx_laplacian(x, y)
-    fdy_lap_psi2 = psi2_basis.localize_dy_laplacian(x, y)
-
-    def compute_reg(
-        psi1: torch.Tensor,
-        dpsi1: torch.Tensor,
-        time: torch.Tensor,
-    ) -> torch.Tensor:
-        """Compute regularization term.
-
-        Args:
-            psi1 (torch.Tensor): Top layer stream function.
-            dpsi1 (torch.Tensor): Top layer stream function derivative.
-            time (torch.Tensor): Time.
-
-        Returns:
-            torch.Tensor: ∂ₜq₂ + J(ѱ₂, q₂)
-        """
-        dt_lap_psi2 = flap_psi2.dt(time)
-        dt_psi2 = fpsi2.dt(time)
-
-        dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
-            A_22 * dt_psi2 + A_21 * interpolate(crop(dpsi1, 1))
-        )
-
-        dx_psi1, dy_psi1 = grad(psi1)
-        dx_psi1 /= dx
-        dy_psi1 /= dy
-
-        dx_psi1_i = (dx_psi1[..., 1:] + dx_psi1[..., :-1]) / 2
-        dy_psi1_i = (dy_psi1[..., 1:, :] + dy_psi1[..., :-1, :]) / 2
-
-        dx_psi2 = fdx_psi2(time)
-        dy_psi2 = fdy_psi2(time)
-
-        dy_q2 = (
-            fdy_lap_psi2(time)
-            - beta_plane.f0**2 * (A_22 * dy_psi2 + A_21 * crop(dy_psi1_i, 1))
-        ) + beta_plane.beta
-
-        dx_q2 = fdx_lap_psi2(time) - beta_plane.f0**2 * (
-            A_22 * dx_psi2 + A_21 * crop(dx_psi1_i, 1)
-        )
-
-        adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
-        return ((dt_q2 + adv_q2) / scale).square().sum()
-
-    return compute_reg
+model: QGPSIQForced = set_inhomogeneous_model(model)
 
 
 # PV computation
@@ -408,16 +318,19 @@ def compute_regularization_func(
 y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
 beta_effect = beta_plane.beta * (y_w - model.y0)
 
-build_compute_q_rg = lambda A11, A12: lambda psi1: compute_q1_interior(
-    psi1,
-    torch.zeros_like(psi1),
-    A11,
-    A12,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect[:, 1:-1],
-)
+
+def compute_q_rg(  # noqa: D103
+    psi1: torch.Tensor,
+) -> torch.Tensor:
+    return (
+        interpolate(
+            laplacian(psi1, dx, dy)
+            - beta_plane.f0**2
+            * (1 / (H1 * H2 / (H1 + H2)) / g2)
+            * psi1[..., 1:-1, 1:-1]
+        )
+        + beta_effect[:, 1:-1]
+    )
 
 
 def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
@@ -449,10 +362,20 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: eNATL60 data loaded."
     logger.info(box(msg, style="round"))
 
-    ds[STREAMFUNCTION] = compute_stream_function_ssh_only(
+    ds_era = load_era_interim(data_folder / "misc", 2009)
+
+    ds_era = slice_time(ds_era, ds[TIME])
+    ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
+
+    msg = f"Cycle {step(c + 1, n_cycles)}: Atmospheric pressure loaded."
+    logger.info(box(msg, style="round"))
+
+    ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure(
         ds,
+        ds_era,
+        1026.0,
         g_prime[0].item(),
-        remove_avg=True,
+        remove_avgs=True,
     )
 
     with logger.section("Filtering stream function..."):
@@ -512,53 +435,46 @@ for c in range(n_cycles):
     xx = space_interior.psi.xy.x
     yy = space_interior.psi.xy.y
 
-    space_params, time_params = gaussian_exp_field(
-        0, 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 4 * 7200
+    space_params, time_params = dyadic_decomposition(
+        order=5,
+        xx_ref=space_2d.psi.xy.x,
+        yy_ref=space_2d.psi.xy.y,
+        Lxy_max=900_000,
+        Lt_max=n_steps_per_cyle * dt,
     )
-    basis = GaussianExpBasis(space_params, time_params)
-    coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
+
+    basis = WaveletBasis(space_params, time_params)
+    basis.n_theta = 7
+
+    msg = f"Using basis of order {basis.order}"
+    logger.info(msg)
+
+    coefs = basis.generate_random_coefs()
+    coefs = DecompositionCoefs.zeros_like(coefs)
     coefs = coefs.requires_grad_()
 
-    if with_alpha:
-        kappa = torch.tensor(0, **specs, requires_grad=True)
-        numel = kappa.numel() + coefs.numel()
-        params = [
-            {"params": [kappa], "lr": 1e-1, "name": "κ"},
-            {
-                "params": list(coefs.values()),
-                "lr": 1e0,
-                "name": "Decomposition coefs",
-            },
-        ]
-    else:
-        kappa = torch.tensor(0, **specs)
-        numel = coefs.numel()
-        params = [
-            {
-                "params": list(coefs.values()),
-                "lr": 1e0,
-                "name": "Decomposition coefs",
-            },
-        ]
-
+    numel = coefs.numel()
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
-    optimizer = torch.optim.Adam(params)
+    optimizer = torch.optim.Adam(
+        [
+            {
+                "params": list(coefs.values()),
+                "lr": 1e-2,
+                "name": "Wavelet coefs",
+            }
+        ]
+    )
+
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
     )
     lr_callback = LRChangeCallback(optimizer)
     early_stop = EarlyStop()
 
-    coefs_scaled = coefs.scale(
-        *(
-            1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
-            for k in range(basis.order)
-        )
-    )
+    coefs_scaled = coefs.scale(*(U**2 / L**2 for _ in range(basis.order)))
     register_params = RegisterParams(
-        alpha=torch.exp(2 * kappa) - 1,
         coefs=coefs_scaled.to_dict(),
     )
 
@@ -567,27 +483,14 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
-            alpha = torch.exp(2 * kappa) - 1
             coefs_scaled = coefs.scale(
-                *(
-                    1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
-                    for k in range(basis.order)
-                )
+                *(U**2 / L**2 for _ in range(basis.order))
             )
 
             basis.set_coefs(coefs_scaled)
 
-            model.basis = basis
-            model.alpha = alpha
+            wv = basis.localize(space_interior.q.xy.x, space_interior.q.xy.y)
 
-            compute_reg = compute_regularization_func(
-                basis, alpha, space_interior, scale=1 / T**2
-            )
-
-            compute_q_rg = build_compute_q_rg(
-                model.A[:1, :1],
-                model.A[:1, 1:2],
-            )
             q0 = crop(compute_q_rg(psi0), b - 1)
 
             qs = (compute_q_rg(p1) for p1 in psis_filt)
@@ -603,24 +506,18 @@ for c in range(n_cycles):
             loss = torch.tensor(0, **defaults.get())
 
             for n in range(1, n_steps_per_cyle):
-                psi1_ = model.psi
-                time = model.time.clone()
-
+                model.forcing = wv(model.time)[None, None, ...]
                 model.step()
-
-                psi1 = model.psi
-
-                if with_reg:
-                    dpsi1_ = (psi1 - psi1_) / dt
-                    reg = gamma * (compute_reg(psi1_, dpsi1_, time))
-                    loss += reg
 
                 loss = update_loss(
                     loss,
-                    psi1[0, 0],
+                    model.psi[0, 0],
                     crop(psis_ref[n][0, 0], b),
                     model.time,
                 )
+            if with_reg:
+                for coef in coefs.values():
+                    loss += gamma * coef.square().mean()
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
@@ -629,7 +526,6 @@ for c in range(n_cycles):
 
         register_params.step(
             loss,
-            alpha=alpha,
             coefs=coefs_scaled.to_dict(),
         )
 
@@ -649,9 +545,6 @@ for c in range(n_cycles):
         logger.info(msg)
 
         loss.backward()
-
-        if with_alpha:
-            torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
@@ -673,7 +566,6 @@ for c in range(n_cycles):
             "basis": basis.get_params(),
         },
         "specs": {"max_memory_allocated": max_mem},
-        "alpha": register_params.params["alpha"],
         "coefs": register_params.params["coefs"],
     }
     outputs.append(output)
