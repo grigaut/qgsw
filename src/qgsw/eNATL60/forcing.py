@@ -30,7 +30,7 @@ def load_era_interim_oneyear(folder: Path, year: int = 2010) -> xr.Dataset:
     ) % 360 - 180  # longitude in [-180, 180]
     dsu = xr.merge(
         [
-            xr.open_dataset(folder / f"drowned_{v}_y2010.nc", chunks=chks)
+            xr.open_dataset(folder / f"drowned_{v}_y{year}.nc", chunks=chks)
             for v in varlist[1:]
         ]
     )
