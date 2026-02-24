@@ -197,7 +197,7 @@ if with_obs_track:
         space_interior.psi.xy.x,
         space_interior.psi.xy.y,
         track_width=100000,
-        track_interval=400000,
+        track_interval=600000,
         theta=torch.pi / 12,
         full_coverage_time=20 * 3600 * 24,
     )
