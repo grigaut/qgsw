@@ -15,7 +15,9 @@ from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
-from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
+from qgsw.decomposition.exp_exp.param_generator import (
+    gaussian_exp_field,
+)
 from qgsw.eNATL60.fields_computations import compute_stream_function_ssh_only
 from qgsw.eNATL60.interpolation import (
     build_regridder,
@@ -170,9 +172,10 @@ psi_regridder = build_regridder(ds, lons, lats)
 
 ## Areas
 nx, ny = lats.shape
+xx = torch.tensor(xs.round(), **specs)
 space_2d = SpaceDiscretization2D.from_psi_grid(
     Grid2D(
-        x=torch.tile(torch.arange(nx, **specs).reshape(-1, 1) * dx, (1, ny)),
+        x=xx - xx[0, :],
         y=torch.tensor(ys.round(), **specs),
     )
 )

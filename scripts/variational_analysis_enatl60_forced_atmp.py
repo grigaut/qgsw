@@ -162,9 +162,10 @@ psi_regridder = build_regridder(ds, lons, lats)
 
 ## Areas
 nx, ny = lats.shape
+xx = torch.tensor(xs.round(), **specs)
 space_2d = SpaceDiscretization2D.from_psi_grid(
     Grid2D(
-        x=torch.tile(torch.arange(nx, **specs).reshape(-1, 1) * dx, (1, ny)),
+        x=xx - xx[0, :],
         y=torch.tensor(ys.round(), **specs),
     )
 )
