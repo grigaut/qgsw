@@ -17,6 +17,12 @@ from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
 from qgsw.eNATL60.fields_computations import compute_stream_function_ssh_only
+from qgsw.eNATL60.forcing import (
+    interpolate_era_da,
+    load_era_interim,
+    slice_space,
+    slice_time,
+)
 from qgsw.eNATL60.interpolation import (
     build_regridder,
     compute_lonlat_from_regular_xy_grid,
@@ -26,9 +32,11 @@ from qgsw.eNATL60.loading import load_datasets
 from qgsw.eNATL60.var_keys import (
     LATITUDE,
     LONGITUDE,
+    MERIDIONAL_WIND_10M,
     SSH,
     STREAMFUNCTION,
     TIME,
+    ZONAL_WIND_10M,
 )
 from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
@@ -68,6 +76,7 @@ args = ScriptArgsVAModified.from_cli(
 with_reg = not args.no_reg
 with_alpha = not args.no_alpha
 with_obs_track = args.obs_track
+with_wind = not args.no_wind
 
 specs = defaults.get()
 
@@ -216,7 +225,7 @@ def update_loss(
     f: torch.Tensor,
     f_ref: torch.Tensor,
     time: torch.Tensor,
-) -> None:
+) -> torch.Tensor:
     """Update loss."""
     mask = obs_mask.at_time(time)
     if not mask.any():
@@ -254,6 +263,7 @@ msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
+msg_sf = "Reconstructing ψ using ssh only."
 lon_min = np.rad2deg(lons.min())
 lon_max = np.rad2deg(lons.max())
 lat_min = np.rad2deg(lats.min())
@@ -262,9 +272,24 @@ msg_area = (
     f"Longitudes in [{lon_min:#.3g}°, {lon_max:#.3g}°],"
     f" latitudes in [{lat_min:#.3g}°, {lat_max:#.3g}°]."
 )
+if with_wind:
+    msg_wind = "Using wind from ERA interim DFS5."
+else:
+    msg_wind = "No wind considered."
 msg_output = f"Output will be saved to {output_file}."
 
-logger.info(box(msg_simu, msg_area, msg_obs, msg_reg, msg_output, style="="))
+logger.info(
+    box(
+        msg_simu,
+        msg_sf,
+        msg_area,
+        msg_wind,
+        msg_obs,
+        msg_reg,
+        msg_output,
+        style="=",
+    )
+)
 
 # Parameters
 
@@ -403,6 +428,30 @@ for c in range(n_cycles):
         ]
         psi_bcs = [extract_psi_bc(psi) for psi in psis_filt]
 
+    if with_wind:
+        with logger.section("Loading ERA data..."):
+            ds_era = load_era_interim(data_folder / "misc", 2009)
+
+            ds_era = slice_time(ds_era, ds[TIME])
+            ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
+
+        with logger.section("Loading wind..."):
+            u10 = interpolate_era_da(ds_era[ZONAL_WIND_10M], ds)
+            u10_regridded: xr.DataArray = psi_regridder(u10)
+            v10 = interpolate_era_da(ds_era[MERIDIONAL_WIND_10M], ds)
+            v10_regridded: xr.DataArray = psi_regridder(v10)
+
+            u10_tensor = torch.tensor(u10_regridded.to_numpy(), **specs)
+            v10_tensor = torch.tensor(v10_regridded.to_numpy(), **specs)
+
+            winds = torch.cat(
+                [
+                    crop(u10_tensor, b).unsqueeze(0),
+                    crop(v10_tensor, b).unsqueeze(0),
+                ],
+                dim=0,
+            )
+
     t0 = ds_interp[TIME][0]
     times = (ds_interp[TIME] - t0).dt.total_seconds().to_numpy()
     times = torch.tensor(times, **specs)
@@ -440,20 +489,27 @@ for c in range(n_cycles):
     coefs = basis.generate_random_coefs()
     coefs = DecompositionCoefs.zeros_like(coefs)
     coefs = coefs.requires_grad_()
-
     numel = coefs.numel()
+    params = [
+        {
+            "params": list(coefs.values()),
+            "lr": 1e-2,
+            "name": "Wavelet coefs",
+        },
+    ]
+
+    uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
+    if with_wind:
+        uv10_to_uvsurf = uv10_to_uvsurf.requires_grad_()
+        params += [
+            {"params": [uv10_to_uvsurf], "lr": 1e-2, "name": "Wind conversion"}
+        ]
+        numel += uv10_to_uvsurf.numel()
+
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
 
-    optimizer = torch.optim.Adam(
-        [
-            {
-                "params": list(coefs.values()),
-                "lr": 1e-2,
-                "name": "Wavelet coefs",
-            }
-        ]
-    )
+    optimizer = torch.optim.Adam(params)
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, factor=0.5, patience=5
@@ -464,6 +520,7 @@ for c in range(n_cycles):
     coefs_scaled = coefs.scale(*(U**2 / L**2 for _ in range(basis.order)))
     register_params = RegisterParams(
         coefs=coefs_scaled.to_dict(),
+        uv10_to_uvsurf=uv10_to_uvsurf,
     )
 
     for o in range(optim_max_step):
@@ -471,6 +528,19 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
+            if with_wind:
+                usurf, vsurf = torch.einsum(
+                    "ll,ltxy->ltxy",
+                    uv10_to_uvsurf,
+                    winds,
+                )
+                usurf_i = (usurf[:, 1:, :] + usurf[:, :-1, :]) / 2
+                vsurf_i = (vsurf[:, :, 1:] + vsurf[:, :, :-1]) / 2
+
+                u_mags = torch.sqrt(winds.square().sum(dim=0))
+                u_mag_iu = (u_mags[:, 1:, :] + u_mags[:, :-1, :]) / 2
+                u_mag_iv = (u_mags[:, :, 1:] + u_mags[:, :, :-1]) / 2
+
             coefs_scaled = coefs.scale(
                 *(U**2 / L**2 for _ in range(basis.order))
             )
@@ -491,10 +561,23 @@ for c in range(n_cycles):
             model.set_psiq(crop(psi0[:, :1], b), q0)
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
-            loss = torch.tensor(0, **defaults.get())
+            loss = torch.tensor(0, **specs)
 
             for n in range(1, n_steps_per_cyle):
+                if with_wind:
+                    Cd = 0.0015
+                    rho_air = 1.225
+                    rho_water = config.physics.rho
+
+                    bulk_coef = Cd * rho_air / rho_water
+
+                    model.set_wind_forcing(
+                        bulk_coef * u_mag_iu[n - 1] * usurf_i[n - 1],
+                        bulk_coef * u_mag_iv[n - 1] * vsurf_i[n - 1],
+                    )
+
                 model.forcing = wv(model.time)[None, None, ...]
+
                 model.step()
 
                 loss = update_loss(
@@ -515,6 +598,7 @@ for c in range(n_cycles):
         register_params.step(
             loss,
             coefs=coefs_scaled.to_dict(),
+            uv10_to_uvsurf=uv10_to_uvsurf,
         )
 
         if early_stop.step(loss):
@@ -533,6 +617,9 @@ for c in range(n_cycles):
         logger.info(msg)
 
         loss.backward()
+
+        if with_wind:
+            torch.nn.utils.clip_grad_norm_([uv10_to_uvsurf], max_norm=1.0)
 
         torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
@@ -555,6 +642,7 @@ for c in range(n_cycles):
         },
         "specs": {"max_memory_allocated": max_mem},
         "coefs": register_params.params["coefs"],
+        "uv10_to_uvsurf": register_params.params["uv10_to_uvsurf"],
     }
     outputs.append(output)
 
