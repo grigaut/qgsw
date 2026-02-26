@@ -221,7 +221,7 @@ if with_obs_track:
             "inferred from tracks trajectory."
         )
         logger.warning(box(msg, style="="))
-    n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle - 1, dt, dt)
+    n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle, dt)
     msg_obs = (
         f"Surface observed along satellite tracks, {n_obs} pixels observed."
     )
@@ -679,6 +679,13 @@ for c in range(n_cycles):
             model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
             loss = torch.tensor(0, **specs)
+
+            loss = update_loss(
+                loss,
+                model.psi[0, 0],
+                crop(psis_ref[0][0, 0], b),
+                model.time,
+            )
 
             for n in range(1, n_steps_per_cyle):
                 psi1_ = model.psi

@@ -678,6 +678,13 @@ for c in range(n_cycles):
 
             loss = torch.tensor(0, **specs)
 
+            loss = update_loss(
+                loss,
+                model.psi[0, 0],
+                crop(psis_ref[0][0, 0], b),
+                model.time,
+            )
+
             for n in range(1, n_steps_per_cyle):
                 psi1_ = model.psi
                 time = model.time.clone()
