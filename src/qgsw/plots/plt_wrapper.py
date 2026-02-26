@@ -180,6 +180,8 @@ def imshow_(
 class SubplotsKwargs(TypedDict, total=False):
     """Non-exhaustives kwargs for subplots."""
 
+    figsize: tuple[int, ...]
+
 
 def subplots(
     nrows: int = 1,
