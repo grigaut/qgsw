@@ -530,7 +530,7 @@ for c in range(n_cycles):
         with torch.enable_grad():
             if with_wind:
                 usurf, vsurf = torch.einsum(
-                    "ll,ltxy->ltxy",
+                    "lm,mtxy->ltxy",
                     uv10_to_uvsurf,
                     winds,
                 )
