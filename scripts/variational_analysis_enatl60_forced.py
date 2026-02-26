@@ -313,6 +313,26 @@ def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     return (f - f_ref).square().mean() / f_ref.square().mean()
 
 
+## Bulk formula (from Large & Yeager 2004)
+
+
+def compute_drag_coef(wind_magnitude: torch.Tensor) -> torch.Tensor:
+    """Compute drag coefficient.
+
+    Based on formula from 'Diurnal to decadal global forcing for ocean and
+    sea-ice models: the data sets and flux climatologies'
+    by Large and Yeager (2004)
+
+    Arbitrary threshold of 0.5 added to prevent error from null velocities.
+    """
+    threshold = torch.tensor(0.5, **specs)
+    return 1e-3 * (
+        0.142
+        + 2.7 / torch.maximum(wind_magnitude, threshold)
+        + wind_magnitude / 13.09
+    )
+
+
 # Models
 
 ## Inhomogeneous models
@@ -537,12 +557,21 @@ for c in range(n_cycles):
                     uv10_to_uvsurf,
                     winds,
                 )
-                usurf_i = (usurf[:, 1:, :] + usurf[:, :-1, :]) / 2
-                vsurf_i = (vsurf[:, :, 1:] + vsurf[:, :, :-1]) / 2
 
                 u_mags = torch.sqrt(winds.square().sum(dim=0))
-                u_mag_iu = (u_mags[:, 1:, :] + u_mags[:, :-1, :]) / 2
-                u_mag_iv = (u_mags[:, :, 1:] + u_mags[:, :, :-1]) / 2
+
+                Cd = compute_drag_coef(u_mags)
+
+                rho_air = 1.225
+                rho_water = config.physics.rho
+
+                bulk_coef = Cd * rho_air / rho_water
+
+                tauxs = bulk_coef * u_mags * usurf
+                tauys = bulk_coef * u_mags * vsurf
+
+                tauxs_i = (tauxs[:, 1:, :] + tauxs[:, :-1, :]) / 2
+                tauys_i = (tauxs[:, :, 1:] + tauxs[:, :, :-1]) / 2
 
             coefs_scaled = coefs.scale(
                 *(U**2 / L**2 for _ in range(basis.order))
@@ -575,16 +604,7 @@ for c in range(n_cycles):
 
             for n in range(1, n_steps_per_cyle):
                 if with_wind:
-                    Cd = 0.0015
-                    rho_air = 1.225
-                    rho_water = config.physics.rho
-
-                    bulk_coef = Cd * rho_air / rho_water
-
-                    model.set_wind_forcing(
-                        bulk_coef * u_mag_iu[n - 1] * usurf_i[n - 1],
-                        bulk_coef * u_mag_iv[n - 1] * vsurf_i[n - 1],
-                    )
+                    model.set_wind_forcing(tauxs_i[n - 1], tauys_i[n - 1])
 
                 model.forcing = wv(model.time)[None, None, ...]
 
