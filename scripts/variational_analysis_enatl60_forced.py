@@ -497,8 +497,8 @@ for c in range(n_cycles):
 
     space_params, time_params = dyadic_decomposition(
         order=5,
-        xx_ref=space_2d.psi.xy.x,
-        yy_ref=space_2d.psi.xy.y,
+        xx_ref=xx,
+        yy_ref=yy,
         Lxy_max=900_000,
         Lt_max=n_steps_per_cyle * dt,
     )
