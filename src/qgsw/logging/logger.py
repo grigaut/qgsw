@@ -62,7 +62,7 @@ class Logger(logging.Logger):
         """
         with self.section(
             message=f"{message}...",
-            end_message=f"{message} done",
+            end_message="Done",
             elapsed=True,
         ):
             yield
@@ -99,8 +99,8 @@ class Logger(logging.Logger):
         try:
             yield
         finally:
-            _indent_level.reset(token)
             if end_message is not None:
                 duration = perf_counter() - start
                 suffix = f" ({sec2text(duration)})" if elapsed else ""
                 self.log(level, f"{end_message}{suffix}")
+            _indent_level.reset(token)
