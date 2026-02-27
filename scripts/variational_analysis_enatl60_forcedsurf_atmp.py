@@ -838,6 +838,7 @@ for c in range(n_cycles):
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
             "basis": basis.get_params(),
+            "wv": wv.get_params(),
         },
         "specs": {"max_memory_allocated": max_mem},
         "alpha": register_params.params["alpha"],
