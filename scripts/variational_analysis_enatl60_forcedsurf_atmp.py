@@ -794,6 +794,7 @@ for c in range(n_cycles):
             loss,
             alpha=alpha,
             coefs=coefs_scaled.to_dict(),
+            coefs_wv=coefs_wv_scaled.to_dict(),
             uv10_to_uvsurf=uv10_to_uvsurf,
         )
 
