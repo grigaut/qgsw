@@ -1065,3 +1065,178 @@ class QGPSIQRGPsi2TransportDR(QGPSIQRGPsi2Transport):
         return vort - self.masks.h * self._interpolate(
             self.masks.psi * stretching
         )
+
+
+class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
+    """Mixed model using both alpha and psi2."""
+
+    _forcing: torch.Tensor = None
+
+    @property
+    def forcing(self) -> torch.Tensor:
+        """Forcing term.
+
+        └── (n_ens, nl, nx, ny)-shaped
+        """
+        if self._forcing is None:
+            return torch.zeros_like(self.q)
+        return self._forcing
+
+    @forcing.setter
+    def forcing(self, forcing: torch.Tensor) -> None:
+        self._forcing = forcing
+
+    def _compute_time_derivatives_homogeneous(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute time derivatives for homogeneous problem.
+
+        Args:
+            prognostic (PSIQ): prognostic tuple.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi, q = prognostic
+        div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_homogeneous(psi)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
+        dq = (-div_flux + fcg_drag + forcing + self.forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=True,
+        )
+        return PSIQ(dpsi, dq)
+
+    def _compute_time_derivatives_inhomogeneous(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute time derivatives for inhomogeneous problem.
+
+        Args:
+            prognostic (PSIQ): Homogeneous contribution
+                of prognostic variables.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi_i, q_i = prognostic
+        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
+        psi = psi_i + psi_bc
+        q = q_i + q_bc
+        advection_psi_q = self._compute_advection_inhomogeneous(
+            PSIQ(psi, q), self._pv_bc
+        )
+        div_flux = advection_psi_q
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
+        dq = (-div_flux + fcg_drag + forcing + self.forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=False,
+        )
+        if self.time_stepper == "rk3":
+            # Boundary condition interpolation
+            self._rk3_step += 1
+            if self._rk3_step == 1:
+                coef = 1
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 2:
+                coef = 1 / 2
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 3:
+                # There won't be any additional step.
+                ...
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+        return PSIQ(dpsi, dq)
+
+    def _compute_time_derivatives_mean_flow(
+        self,
+        prognostic: PSIQ,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute time derivatives for inhomogeneous problem.
+
+        Args:
+            prognostic (PSIQ): Homogeneous contribution
+                of prognostic variables.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi_pert_i, q_pert_i = prognostic
+        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
+        psi = psi_pert_i + psi_bc + self._sf_bar
+        q = q_pert_i + q_bc + self._pv_bar
+        advection_psi_q = self._compute_advection_inhomogeneous(
+            PSIQ(psi, q), self._pv_bc + self._pv_bar_bc
+        )
+        div_flux = advection_psi_q
+        if self.time_stepper == "rk3":
+            if self._rk3_step == 0:
+                coef = 0
+            elif self._rk3_step == 1:
+                coef = 1
+            elif self._rk3_step == 2:
+                coef = 1 / 2
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+            dt = self.dt
+            t = self.time.item() + coef * dt
+            q_bar_t_dt = self._pv_bar_interp(t + dt)
+            q_bar_t = self._pv_bar_interp(t)
+            dt_q_bar = (q_bar_t_dt - q_bar_t) / dt
+        else:
+            dt = self.dt
+            t = self.time.item()
+            dt_q_bar = (self._pv_bar_interp(t + dt) - self._pv_bar) / dt
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
+        dq = (
+            -(div_flux + dt_q_bar) + fcg_drag + forcing + self.forcing
+        ) * self.masks.h
+        dq_i = self._interpolate(dq)
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=False,
+        )
+        if self.time_stepper == "rk3":
+            # Boundary condition interpolation
+            self._rk3_step += 1
+            if self._rk3_step == 1:
+                coef = 1
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 2:
+                coef = 1 / 2
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 3:
+                # There won't be any additional step.
+                ...
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+        return PSIQ(dpsi, dq)
