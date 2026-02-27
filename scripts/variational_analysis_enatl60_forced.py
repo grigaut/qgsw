@@ -414,7 +414,7 @@ for c in range(n_cycles):
         remove_avg=True,
     )
 
-    with logger.section("Filtering stream function..."):
+    with logger.timeit("Filtering stream function"):
         ds["psi_filt"] = xr.apply_ufunc(
             gaussian_filter,
             ds[STREAMFUNCTION].load(),
@@ -424,7 +424,7 @@ for c in range(n_cycles):
             vectorize=True,
         )
 
-    with logger.section("Interpolating stream function..."):
+    with logger.timeit("Interpolating stream function"):
         regridded_psi: xr.DataArray = psi_regridder(ds[STREAMFUNCTION])
         regridded_psi_filt: xr.DataArray = psi_regridder(ds["psi_filt"])
         ds_interp = xr.Dataset(
@@ -444,7 +444,7 @@ for c in range(n_cycles):
         for p in ds_interp[STREAMFUNCTION].to_numpy()
     ]
 
-    with logger.section("Computing psi boundaries..."):
+    with logger.timeit("Computing psi boundaries"):
         psis_filt = [
             torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0) / beta_plane.f0
             for p in ds_interp["psi_filt"].to_numpy()
@@ -452,13 +452,13 @@ for c in range(n_cycles):
         psi_bcs = [extract_psi_bc(psi) for psi in psis_filt]
 
     if with_wind:
-        with logger.section("Loading ERA data..."):
+        with logger.timeit("Loading ERA data"):
             ds_era = load_era_interim(data_folder / "misc", 2009)
 
             ds_era = slice_time(ds_era, ds[TIME])
             ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
 
-        with logger.section("Loading wind..."):
+        with logger.timeit("Loading wind"):
             u10 = interpolate_era_da(ds_era[ZONAL_WIND_10M], ds)
             u10_regridded: xr.DataArray = psi_regridder(u10)
             v10 = interpolate_era_da(ds_era[MERIDIONAL_WIND_10M], ds)
