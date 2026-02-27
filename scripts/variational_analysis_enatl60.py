@@ -670,7 +670,7 @@ for c in range(n_cycles):
                 tauys = bulk_coef * u_mags * vsurf
 
                 tauxs_i = (tauxs[:, 1:, :] + tauxs[:, :-1, :]) / 2
-                tauys_i = (tauxs[:, :, 1:] + tauxs[:, :, :-1]) / 2
+                tauys_i = (tauys[:, :, 1:] + tauys[:, :, :-1]) / 2
 
             alpha = torch.exp(2 * kappa) - 1
             coefs_scaled = coefs.scale(

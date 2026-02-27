@@ -571,7 +571,7 @@ for c in range(n_cycles):
                 tauys = bulk_coef * u_mags * vsurf
 
                 tauxs_i = (tauxs[:, 1:, :] + tauxs[:, :-1, :]) / 2
-                tauys_i = (tauxs[:, :, 1:] + tauxs[:, :, :-1]) / 2
+                tauys_i = (tauys[:, :, 1:] + tauys[:, :, :-1]) / 2
 
             coefs_scaled = coefs.scale(
                 *(U**2 / L**2 for _ in range(basis.order))
