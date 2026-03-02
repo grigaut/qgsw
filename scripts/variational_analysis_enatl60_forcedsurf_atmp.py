@@ -511,7 +511,7 @@ for c in range(n_cycles):
     ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure(
         ds,
         ds_era,
-        1026.0,
+        config.physics.rho,
         g_prime[0].item(),
         remove_avgs=True,
     )
