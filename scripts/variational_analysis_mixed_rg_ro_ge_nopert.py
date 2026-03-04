@@ -429,7 +429,7 @@ for c in range(n_cycles):
     yy = space_slice.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
-        0, 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 4 * 7200
+        0, 3, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * 7200
     )
     basis = GaussianExpBasis(space_params, time_params)
     coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
@@ -439,7 +439,7 @@ for c in range(n_cycles):
         kappa = torch.tensor(0, **specs, requires_grad=True)
         numel = kappa.numel() + coefs.numel()
         params = [
-            {"params": [kappa], "lr": 1e-1, "name": "κ"},
+            {"params": [kappa], "lr": 1e-2, "name": "κ"},
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
@@ -473,8 +473,9 @@ for c in range(n_cycles):
             for k in range(basis.order)
         )
     )
+    epsilon = 0.1
     register_params = RegisterParams(
-        alpha=torch.exp(2 * kappa) - 1,
+        alpha=torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1,
         coefs=coefs_scaled.to_dict(),
     )
 
@@ -483,7 +484,7 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
-            alpha = torch.exp(2 * kappa) - 1
+            alpha = torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1
             coefs_scaled = coefs.scale(
                 *(
                     1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
@@ -559,8 +560,8 @@ for c in range(n_cycles):
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
             f"Optimization step {step(o + 1, optim_max_step)} | "
-            f"Loss: {loss_:>#12.7g} | "
-            f"Best loss: {register_params.best_loss:>#12.7g}"
+            f"Loss: {loss_:>#10.5g} | "
+            f"Best loss: {register_params.best_loss:>#10.5g}"
         )
         logger.info(msg)
 

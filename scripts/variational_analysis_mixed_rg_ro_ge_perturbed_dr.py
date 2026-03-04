@@ -473,8 +473,9 @@ for c in range(n_cycles):
             for k in range(basis.order)
         )
     )
+    epsilon = 0.1
     register_params = RegisterParams(
-        alpha=torch.exp(2 * kappa) - 1,
+        alpha=torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1,
         coefs=coefs_scaled.to_dict(),
     )
 
@@ -483,7 +484,7 @@ for c in range(n_cycles):
         model.reset_time()
 
         with torch.enable_grad():
-            alpha = torch.exp(2 * kappa) - 1
+            alpha = torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1
             coefs_scaled = coefs.scale(
                 *(
                     1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
