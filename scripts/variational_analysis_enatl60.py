@@ -759,8 +759,8 @@ for c in range(n_cycles):
         msg = (
             f"Cycle {step(c + 1, n_cycles)} | "
             f"Optimization step {step(o + 1, optim_max_step)} | "
-            f"Loss: {loss_:>#12.7g} | "
-            f"Best loss: {register_params.best_loss:>#12.7g}"
+            f"Loss: {loss_:>#10.5g} | "
+            f"Best loss: {register_params.best_loss:>#10.5g}"
         )
         logger.info(msg)
 
