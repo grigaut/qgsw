@@ -48,25 +48,41 @@ def retrieve_imshow_data(
     return data.T
 
 
-def default_clim(data: np.ndarray) -> tuple[float, float]:
+def default_clim(
+    data: np.ndarray, *, robust: bool = False
+) -> tuple[float, float]:
     """Compute default colorbar limit values.
 
     Args:
         data (np.ndarray): Data for which to compute colorbar limits.
+        robust (bool, optional): If True, vmax will be computed from the
+            0.98-th quantile of the absolute value of the data,
+            and from its from the max of its absolute value if False.
+            Defaults to False.
+        robust
 
     Returns:
         tuple[float, float]: Colorbar limits as (vmin, vmax).
     """
-    vmax = np.max(np.abs(data))
+    vmax = np.quantile(np.abs(data), 0.98) if robust else np.max(np.abs(data))
     return -vmax, vmax
 
 
-def retrieve_colorbar(im: AxesImage, ax: Axes) -> Colorbar:
+class CbarKwargs(TypedDict, total=False):
+    """Non-exhaustives kwargs for plt.colorbar."""
+
+    extendrect: bool
+
+
+def retrieve_colorbar(
+    im: AxesImage, ax: Axes, **kwargs: Unpack[CbarKwargs]
+) -> Colorbar:
     """Retrieve colorbar axes from axes.
 
     Args:
         im (AxesImage): Image to associate colorbar with.
         ax (Axes): Axes to retrieve colorbar from.
+        **kwargs: optional arguments to pass to plt.colorbar.
 
     Returns:
         Axes: Colorbar axes.
@@ -76,8 +92,7 @@ def retrieve_colorbar(im: AxesImage, ax: Axes) -> Colorbar:
     except AttributeError:
         div = make_axes_locatable(ax)
         cax = div.append_axes("right", size="5%", pad="3%")
-
-        ax.cbar = ax.figure.colorbar(im, cax=cax)
+        ax.cbar = ax.figure.colorbar(im, cax=cax, **kwargs)
         return ax.cbar
 
 
@@ -87,6 +102,7 @@ class ImshowKwargs(TypedDict, total=False):
     cmap: str
     vmin: float
     vmax: float
+    cbar_kwargs: CbarKwargs
 
 
 def _imshow(
@@ -108,12 +124,13 @@ def _imshow(
     """
     kwargs.setdefault("cmap", DEFAULT_CMAP)
     kwargs.setdefault("origin", "lower")
+    cbar_kwargs = kwargs.pop("cbar_kwargs", {})
     if ax is None:
         ax = plt.subplot()
 
     im = ax.imshow(data, **kwargs)
     if show_cbar:
-        cbar = retrieve_colorbar(im, ax)
+        cbar = retrieve_colorbar(im, ax, **cbar_kwargs)
         cbar.update_normal(im)
     if title is not None:
         ax.set_title(title)
@@ -126,6 +143,7 @@ def imshow(
     ax: Axes | None = None,
     title: str | None = None,
     show_cbar: bool = True,
+    robust: bool = False,
     **kwargs: Unpack[ImshowKwargs],
 ) -> AxesImage:
     """Wrapper for plt.imshow.
@@ -134,11 +152,16 @@ def imshow(
         data (torch.Tensor | np.ndarray | xarray.DataArray): 2D array to plot.
         ax (Axes | None, optional): Axes to plot on. Defaults to None.
         title (str | None, optional): Title. Defaults to None.
-        show_cbar (bool): Whether to show colorbar or not.
+        show_cbar (bool, optional): Whether to show colorbar or not.
+            Defaults to True.
+        robust (bool, optional): If True, vmax will be computed from the
+            0.98-th quantile of the absolute value of the data,
+            and from its from the max of its absolute value if False.
+            Defaults to False.
         **kwargs: optional arguments to pass to plt.imshow.
     """
     data = retrieve_imshow_data(data)
-    vmin, vmax = default_clim(data)
+    vmin, vmax = default_clim(data, robust=robust)
     kwargs.setdefault("vmax", vmax)
     kwargs.setdefault("vmin", vmin)
     return _imshow(
