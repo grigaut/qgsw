@@ -70,6 +70,7 @@ class ScriptArgsVA(ScriptArgs):
     comparison: int
     cycles: int
     prefix: str
+    optim: int
     no_wind: bool = False
     obs_track: bool = False
 
@@ -80,6 +81,7 @@ class ScriptArgsVA(ScriptArgs):
         comparison_default: int = 1,
         cycles_default: int = 3,
         prefix_default: str = "results",
+        optim_default: int = 200,
     ) -> Self:
         """Instantiate script arguments from CLI.
 
@@ -90,6 +92,8 @@ class ScriptArgsVA(ScriptArgs):
                 for number of cycles. Defaults to 3.
             prefix_default (str, optional): Default value for
                 output file prefix. Defaults to "results".
+            optim_default (int, optional): max number of optimisation steps.
+                Defaults ot 200.
 
         Returns:
             Self: ScriptArgsVA.
@@ -105,6 +109,7 @@ class ScriptArgsVA(ScriptArgs):
         cls._add_prefix(parser, prefix_default)
         cls._add_wind(parser)
         cls._add_obs_track(parser)
+        cls._add_optim_max_step(parser, optim_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -203,6 +208,24 @@ class ScriptArgsVA(ScriptArgs):
             help="Enable observations tracks.",
         )
 
+    @classmethod
+    def _add_optim_max_step(
+        cls, parser: argparse.ArgumentParser, default: int
+    ) -> None:
+        """Specify number of optimization steps to perform.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (int): Default value.
+        """
+        parser.add_argument(
+            "--optim",
+            "-o",
+            type=int,
+            default=default,
+            help="Max optimization steps.",
+        )
+
     def _build_suffix(self) -> list[str]:
         return [
             "_nowind" if self.no_wind else "",
@@ -210,6 +233,7 @@ class ScriptArgsVA(ScriptArgs):
             f"_c{self.comparison}"
             if (not self.obs_track) and (self.comparison != 1)
             else "",
+            f"_o{self.optim}" if (self.optim != 200) else "",
         ]
 
     def complete_prefix(self) -> str:
@@ -235,6 +259,7 @@ class ScriptArgsVARegularized(ScriptArgsVA):
         comparison_default: int = 1,
         cycles_default: int = 3,
         prefix_default: str = "results",
+        optim_default: int = 200,
         gamma_default: float = 0,
     ) -> Self:
         """Instantiate script arguments from CLI.
@@ -247,6 +272,8 @@ class ScriptArgsVARegularized(ScriptArgsVA):
             prefix_default (str, optional): Default value for
                 output file prefix. Defaults to "results".
             gamma_default (float): Default value for gamme. Defaults to 0.
+            optim_default (int, optional): max number of optimisation steps.
+                Defaults ot 200.
 
         Returns:
             Self: ScriptArgsVA.
@@ -264,6 +291,7 @@ class ScriptArgsVARegularized(ScriptArgsVA):
         cls._add_reg(parser)
         cls._add_gamma(parser, gamma_default)
         cls._add_obs_track(parser)
+        cls._add_optim_max_step(parser, optim_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -324,6 +352,7 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
         cycles_default: int = 3,
         prefix_default: str = "results",
         gamma_default: float = 0,
+        optim_default: int = 200,
     ) -> Self:
         """Instantiate script arguments from CLI.
 
@@ -335,6 +364,8 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
             prefix_default (str, optional): Default value for
                 output file prefix. Defaults to "results".
             gamma_default (float): Default value for gamme. Defaults to 0.
+            optim_default (int, optional): max number of optimisation steps.
+                Defaults ot 200.
 
         Returns:
             Self: ScriptArgsVA.
@@ -353,6 +384,7 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
         cls._add_gamma(parser, gamma_default)
         cls._add_alpha(parser)
         cls._add_obs_track(parser)
+        cls._add_optim_max_step(parser, optim_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod

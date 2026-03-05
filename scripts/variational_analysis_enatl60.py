@@ -104,7 +104,7 @@ output_dir = config.io.output.directory
 # Simulation parameters
 
 dt = 7200
-optim_max_step = 200
+optim_max_step = args.optim
 n_file_per_cycle = 20
 n_steps_per_cyle = 240
 comparison_interval = args.comparison
