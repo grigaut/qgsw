@@ -110,6 +110,9 @@ n_steps_per_cyle = 240
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
+sigma_bc = 14
+sigma_ic = 7
+
 ## Load eNATL60 grid
 
 ### Data folder
@@ -515,14 +518,26 @@ for c in range(n_cycles):
     )
 
     with logger.timeit("Filtering stream function"):
-        ds["psi_filt"] = xr.apply_ufunc(
+        msg = f"Using σ={sigma_ic} for initial condition"  # noqa: RUF001
+        logger.info(msg)
+        psi0_filt_da = xr.apply_ufunc(
             gaussian_filter,
-            ds[STREAMFUNCTION].load(),
-            kwargs={"sigma": 14},
+            ds[STREAMFUNCTION][0].load(),
+            kwargs={"sigma": sigma_ic},
             input_core_dims=[["i", "j"]],
             output_core_dims=[["i", "j"]],
             vectorize=True,
         )
+        msg = f"Using σ={sigma_bc} for boundary conditions"  # noqa: RUF001
+        ds["psi_filt"] = xr.apply_ufunc(
+            gaussian_filter,
+            ds[STREAMFUNCTION].load(),
+            kwargs={"sigma": sigma_bc},
+            input_core_dims=[["i", "j"]],
+            output_core_dims=[["i", "j"]],
+            vectorize=True,
+        )
+        logger.info(msg)
 
     with logger.timeit("Interpolating stream function"):
         regridded_psi: xr.DataArray = psi_regridder(ds[STREAMFUNCTION])
@@ -573,7 +588,12 @@ for c in range(n_cycles):
     times = (ds_interp[TIME] - t0).dt.total_seconds().to_numpy()
     times = torch.tensor(times, **specs)
 
-    psi0 = psis_filt[0]
+    psi0 = (
+        torch.tensor(psi_regridder(psi0_filt_da).data, **specs)
+        .unsqueeze(0)
+        .unsqueeze(0)
+        / beta_plane.f0
+    )
     psi0_mean: float = psi0.mean()
 
     U: float = psi0_mean / L
@@ -792,6 +812,9 @@ for c in range(n_cycles):
             "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
             "basis": basis.get_params(),
+            "sigma_bc": sigma_bc,
+            "sigma_ic": sigma_ic,
+            "dt": dt,
         },
         "specs": {"max_memory_allocated": max_mem},
         "alpha": register_params.params["alpha"],

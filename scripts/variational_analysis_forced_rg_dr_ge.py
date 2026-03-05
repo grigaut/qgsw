@@ -107,7 +107,7 @@ if with_obs_track:
             "inferred from tracks trajectory."
         )
         logger.warning(box(msg, style="="))
-    n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle - 1, dt, dt)
+    n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle, dt)
     msg_obs = (
         f"Surface observed along satellite tracks, {n_obs} pixels observed."
     )
