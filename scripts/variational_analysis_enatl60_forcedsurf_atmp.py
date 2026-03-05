@@ -675,8 +675,9 @@ for c in range(n_cycles):
         )
     )
     coefs_wv_scaled = coefs_wv.scale(*(U**2 / L**2 for _ in range(wv.order)))
+    epsilon = 0.1
     register_params = RegisterParams(
-        alpha=torch.exp(2 * kappa) - 1,
+        alpha=torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1,
         coefs=coefs_scaled.to_dict(),
         coefs_wv=coefs_wv_scaled.to_dict(),
         uv10_to_uvsurf=uv10_to_uvsurf,
@@ -717,7 +718,7 @@ for c in range(n_cycles):
 
             fwv = wv.localize(space_interior.q.xy.x, space_interior.q.xy.y)
 
-            alpha = torch.exp(2 * kappa) - 1
+            alpha = torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1
             coefs_scaled = coefs.scale(
                 *(
                     1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
