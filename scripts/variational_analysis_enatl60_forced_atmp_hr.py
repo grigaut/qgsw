@@ -99,8 +99,8 @@ n_steps_per_cyle = (240 - 1) * 4
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
-sigma_bc = 14
-sigma_ic = 14
+sigma_bc = 7
+sigma_ic = 7
 
 ## Load eNATL60 grid
 
@@ -149,7 +149,7 @@ files = sort_files_by_dates(files)
 ds = load_datasets(files[0], format_func=format_ds)
 
 ### Compute longitude / latitudes
-dx = dy = 10000
+dx = dy = 5000
 lons, lats = compute_lonlat_from_regular_xy_grid(
     ds[LONGITUDE],
     ds[LATITUDE],
@@ -213,7 +213,7 @@ if with_obs_track:
             "inferred from tracks trajectory."
         )
         logger.warning(box(msg, style="="))
-    n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle // 4, 4 * dt)
+    n_obs = obs_mask.compute_obs_nb(240, 7200)
     msg_obs = (
         f"Surface observed along satellite tracks, {n_obs} pixels observed."
     )

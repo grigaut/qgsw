@@ -1,0 +1,51 @@
+[io]
+name = "Double gyre SW long HR"
+[io.output]
+type = "quantity"
+save = true
+quantity = 100
+directory = "doublegyre_sw_long_hr"
+
+[physics]
+rho = 1000
+slip_coef = 1.0
+f0 = 9.375e-5           # mean coriolis (s^-1)
+beta = 1.754e-11        # coriolis gradient (m^-1 s^-1)
+bottom_drag_coefficient = 3.60577e-8
+
+[simulation]
+type = "simple-run"
+duration = 31536000000
+dt = 1500
+
+[model]
+type = "SWFilterBarotropicSpectral"
+prefix = "results_step_"
+layers = [
+    400,
+    1100,
+    2600,
+]
+reduced_gravity = [
+    9.81,
+    0.025,
+    0.0125,
+]
+
+[space]
+nx = 256
+ny = 512
+unit = "m"
+x_min = 0.0
+x_max = 2560000.0
+y_min = 0.0
+y_max = 5120000.0
+
+[windstress]
+type = "cosine"
+magnitude = 0.08 # (Pa m-1 kg s-2)
+drag_coefficient = 1.3e-3
+
+[perturbation]
+type = "none"
+perturbation_magnitude = 0.001

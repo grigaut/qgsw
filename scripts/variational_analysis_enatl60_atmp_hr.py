@@ -110,8 +110,8 @@ n_steps_per_cyle = (240 - 1) * 4
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
-sigma_bc = 14
-sigma_ic = 14
+sigma_bc = 7
+sigma_ic = 7
 
 ## Load eNATL60 grid
 
@@ -160,7 +160,7 @@ files = sort_files_by_dates(files)
 ds = load_datasets(files[0], format_func=format_ds)
 
 ### Compute longitude / latitudes
-dx = dy = 10000
+dx = dy = 5000
 lons, lats = compute_lonlat_from_regular_xy_grid(
     ds[LONGITUDE],
     ds[LATITUDE],
@@ -224,7 +224,7 @@ if with_obs_track:
             "inferred from tracks trajectory."
         )
         logger.warning(box(msg, style="="))
-    n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle // 4, 4 * dt)
+    n_obs = obs_mask.compute_obs_nb(240, 7200)
     msg_obs = (
         f"Surface observed along satellite tracks, {n_obs} pixels observed."
     )
@@ -610,7 +610,7 @@ for c in range(n_cycles):
     yy = space_interior.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
-        0, 3, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * dt
+        0, 3 * 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * dt
     )
     basis = GaussianExpBasis(space_params, time_params)
     coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
@@ -818,6 +818,8 @@ for c in range(n_cycles):
             "sigma_bc": sigma_bc,
             "sigma_ic": sigma_ic,
             "dt": dt,
+            "dx": dx,
+            "dy": dy,
         },
         "optim": {
             "max_steps": optim_max_step,

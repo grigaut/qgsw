@@ -12,9 +12,9 @@ load_env "$SRCDIR"
 
 # Set walltime based on --long and --contiguous flags
 if [ "$long" = true ]; then
-    walltime=16
+    walltime=80
 else
-    walltime=4
+    walltime=20
 fi
 build_oar_opts "$walltime"
 
