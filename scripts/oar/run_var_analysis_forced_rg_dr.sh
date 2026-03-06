@@ -1,5 +1,5 @@
 #!/bin/bash
-SRCDIR=$HOME/qgsw
+SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SCRIPT="scripts/bash/run_va_forced_rg_dr.sh"
 NAME="Forced"
 source "$SRCDIR/scripts/oar/lib.sh"

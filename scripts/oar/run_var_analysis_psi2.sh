@@ -1,5 +1,5 @@
 #!/bin/bash
-SRCDIR=$HOME/qgsw
+SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SCRIPT="scripts/bash/run_va_psi2.sh"
 NAME="Psi2-check"
 source "$SRCDIR/scripts/oar/lib.sh"

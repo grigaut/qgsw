@@ -1,5 +1,5 @@
 #!/bin/bash
-SRCDIR=$HOME/qgsw
+SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SCRIPT="scripts/bash/run_va_enatl60_forced_atmp_hr.sh"
 NAME="eNATL60-AtmP-Forced-HR"
 source "$SRCDIR/scripts/oar/lib.sh"

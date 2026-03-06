@@ -1,5 +1,5 @@
 #!/bin/bash
-SRCDIR=$HOME/qgsw
+SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SCRIPT="scripts/bash/run_va_enatl60.sh"
 NAME="eNATL60-SurfML"
 source "$SRCDIR/scripts/oar/lib.sh"
