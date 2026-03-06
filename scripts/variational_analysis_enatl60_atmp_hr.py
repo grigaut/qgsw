@@ -110,8 +110,8 @@ n_steps_per_cyle = (240 - 1) * 4
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
-sigma_bc = 14
-sigma_ic = 14
+sigma_bc = 7
+sigma_ic = 7
 
 ## Load eNATL60 grid
 
@@ -160,7 +160,7 @@ files = sort_files_by_dates(files)
 ds = load_datasets(files[0], format_func=format_ds)
 
 ### Compute longitude / latitudes
-dx = dy = 5000  # 10000
+dx = dy = 5000
 lons, lats = compute_lonlat_from_regular_xy_grid(
     ds[LONGITUDE],
     ds[LATITUDE],
