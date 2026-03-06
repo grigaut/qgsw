@@ -18,7 +18,7 @@ cd $SRCDIR
 
 date
 
-LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/variational_analysis_mixed_rg_ro_ge_nopert.py $@
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/variational_analysis_surfml.py $@
 
 date
 
