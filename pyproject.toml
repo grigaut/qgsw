@@ -1,6 +1,6 @@
 [project]
 name = "qgsw"
-version = "13.0.0"
+version = "14.0.0"
 description = ""
 authors = [{name="Gaétan Rigaut, email=<gaetanrigaut.s@.com>"}, {name="Louis Thiry"}]
 readme = "README.md"
