@@ -106,7 +106,7 @@ output_dir = config.io.output.directory
 dt = 1800
 optim_max_step = args.optim
 n_file_per_cycle = 20
-n_steps_per_cyle = (240-1)*4
+n_steps_per_cyle = (240 - 1) * 4
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
@@ -610,7 +610,7 @@ for c in range(n_cycles):
     yy = space_interior.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
-        0, 3*2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * dt
+        0, 3 * 4, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * dt
     )
     basis = GaussianExpBasis(space_params, time_params)
     coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
@@ -741,10 +741,10 @@ for c in range(n_cycles):
                 psi1_ = model.psi
                 time = model.time.clone()
 
-                if with_wind and (n-1)%4==0:
+                if with_wind and (n - 1) % 4 == 0:
                     model.set_wind_forcing(
-                        tauxs_i[int((n-1)//4)],
-                        tauys_i[int((n-1)//4)],
+                        tauxs_i[int((n - 1) // 4)],
+                        tauys_i[int((n - 1) // 4)],
                     )
 
                 model.step()
@@ -760,7 +760,7 @@ for c in range(n_cycles):
                     loss = update_loss(
                         loss,
                         psi1[0, 0],
-                        crop(psis_ref[int(n//4)][0, 0], b),
+                        crop(psis_ref[int(n // 4)][0, 0], b),
                         model.time,
                     )
 
@@ -818,7 +818,7 @@ for c in range(n_cycles):
             "sigma_bc": sigma_bc,
             "sigma_ic": sigma_ic,
             "dt": dt,
-	    "dx": dx,
+            "dx": dx,
             "dy": dy,
         },
         "optim": {
