@@ -1,44 +1,53 @@
 #!/bin/bash
 SRCDIR=$HOME/qgsw
+SCRIPT="scripts/bash/run_va_psi2.sh"
+NAME="Psi2-check"
+source "$SRCDIR/scripts/oar/lib.sh"
+
 cd $SRCDIR
-chmod +x scripts/bash/run_va_psi2.sh
+chmod +x $SCRIPT
 
-# Check for --contiguous flag
-contiguous=false
-args=()
+parse_common_flags "$@"
+load_env "$SRCDIR"
 
-for arg in "$@"; do
-    if [ "$arg" == "--contiguous" ]; then
-        contiguous=true
-    else
-        args+=("$arg")
-    fi
-done
+# Set walltime based on --long and --contiguous flags
+if [ "$long" = true ] && [ "$contiguous" = true ]; then
+    walltime=60
+elif [ "$contiguous" = true ]; then
+    walltime=16
+elif [ "$long" = true ]; then
+    walltime=16
+else
+    walltime=4
+fi
+build_oar_opts "$walltime"
 
 # Build base command with filtered arguments
-cmd="./scripts/bash/run_va_psi2.sh"
+cmd="./$SCRIPT"
 for arg in "${args[@]}"; do
     cmd+=" $arg"
 done
 
+# Append extra python args based on flags
+optim_args=""
+if [ "$long" = true ]; then
+    optim_args+=" -o 800"
+fi
+
 # Build the four command variants
-cmd1="${cmd} --indices 32 96 64 192"
-cmd2="${cmd} --indices 32 96 256 384"
-cmd3="${cmd} --indices 112 176 64 192"
-cmd4="${cmd} --indices 112 176 256 384"
+cmd1="${cmd}${optim_args} --indices 32 96 64 192"
+cmd2="${cmd}${optim_args} --indices 32 96 256 384"
+cmd3="${cmd}${optim_args} --indices 112 176 64 192"
+cmd4="${cmd}${optim_args} --indices 112 176 256 384"
 
 if [ "$contiguous" = true ]; then
-    # OAR options
-    OAR_OPTS="-q production -l gpu=1,walltime=12 -O logs/OAR.%jobid%.stdout -E logs/OAR.%jobid%.stderr --notify mail:gaetan.rigaut@inria.fr"
-    # Run commands sequentially in a single oarsub
     combined_cmd="$cmd1 ; $cmd2 ; $cmd3 ; $cmd4"
-    oarsub $OAR_OPTS "$combined_cmd" -n "VA-psi2-contiguous"
+    oarsub "${OAR_OPTS[@]}" -n "${NAME}-contiguous" "$combined_cmd"
 else
-    # Run commands as separate jobs
-    oarsub -S "$cmd1" -n "VA-psi2-[32 96 64 192]"
-    oarsub -S "$cmd2" -n "VA-psi2-[32 96 256 384]"
-    oarsub -S "$cmd3" -n "VA-psi2-[112 176 64 192]"
-    oarsub -S "$cmd4" -n "VA-psi2-[112 176 256 384]"
+    oarsub "${OAR_OPTS[@]}" -n "${NAME}-[32 96 64 192]"    "$cmd1"
+    oarsub "${OAR_OPTS[@]}" -n "${NAME}-[32 96 256 384]"   "$cmd2"
+    oarsub "${OAR_OPTS[@]}" -n "${NAME}-[112 176 64 192]"  "$cmd3"
+    oarsub "${OAR_OPTS[@]}" -n "${NAME}-[112 176 256 384]" "$cmd4"
 fi
 
 exit 0

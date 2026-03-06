@@ -1,8 +1,8 @@
 #!/bin/bash
 SRCDIR=$HOME/qgsw
-SCRIPT="scripts/bash/run_va_mixed_rg_ro_ge_nopert.sh"
-NAME="SurfML-nopert"
-source "$SRCDIR/scripts/bash/lib.sh"
+SCRIPT="scripts/bash/run_va_surfml.sh"
+NAME="SurfML"
+source "$SRCDIR/scripts/oar/lib.sh"
 
 cd $SRCDIR
 chmod +x $SCRIPT
@@ -13,10 +13,12 @@ load_env "$SRCDIR"
 # Set walltime based on --long and --contiguous flags
 if [ "$long" = true ] && [ "$contiguous" = true ]; then
     walltime=60
+elif [ "$contiguous" = true ]; then
+    walltime=16
 elif [ "$long" = true ]; then
-    walltime=24
+    walltime=16
 else
-    walltime=6
+    walltime=4
 fi
 build_oar_opts "$walltime"
 
@@ -27,16 +29,16 @@ for arg in "${args[@]}"; do
 done
 
 # Append extra python args based on flags
-extra_py_args=""
+optim_args=""
 if [ "$long" = true ]; then
-    extra_py_args+=" -o 800"
+    optim_args+=" -o 800"
 fi
 
 # Build the four command variants
-cmd1="${cmd}${extra_py_args} --indices 32 96 64 192"
-cmd2="${cmd}${extra_py_args} --indices 32 96 256 384"
-cmd3="${cmd}${extra_py_args} --indices 112 176 64 192"
-cmd4="${cmd}${extra_py_args} --indices 112 176 256 384"
+cmd1="${cmd}${optim_args} --indices 32 96 64 192"
+cmd2="${cmd}${optim_args} --indices 32 96 256 384"
+cmd3="${cmd}${optim_args} --indices 112 176 64 192"
+cmd4="${cmd}${optim_args} --indices 112 176 256 384"
 
 if [ "$contiguous" = true ]; then
     combined_cmd="$cmd1 ; $cmd2 ; $cmd3 ; $cmd4"

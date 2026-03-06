@@ -56,7 +56,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_mixed_rg_ro_ge_perturbed_dr",
+    prefix_default="results_surfml_perturbed",
     gamma_default=0.1,
 )
 with_reg = not args.no_reg
