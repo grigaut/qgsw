@@ -111,7 +111,7 @@ comparison_interval = args.comparison
 n_cycles = args.cycles
 
 sigma_bc = 14
-sigma_ic = 7
+sigma_ic = 14
 
 ## Load eNATL60 grid
 
