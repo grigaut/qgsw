@@ -459,9 +459,12 @@ for c in range(n_cycles):
         "cycle": c,
         "config": {
             "comparison_interval": comparison_interval,
-            "optimization_steps": [optim_max_step],
             "no-wind": args.no_wind,
             "basis": basis.get_params(),
+        },
+        "optim": {
+            "max_steps": optim_max_step,
+            "nb_steps": o,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
