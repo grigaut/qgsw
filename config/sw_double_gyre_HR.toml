@@ -1,0 +1,57 @@
+[io]
+name = "Three layers SW long"
+[io.output]
+save=true
+type = "interval"           # "interval"
+# quantity = 100
+interval_duration = 86_400  # seconds
+directory = "sw_double_gyre_long_hr"
+
+[physics]
+rho = 1000
+slip_coef = 1.0
+f0 = 9.375e-5           # mean coriolis (s^-1)
+beta = 1.754e-11
+bottom_drag_coefficient = 3.60577e-8
+Ro = 0.1
+
+[simulation]
+type = "simple-run"
+duration = 31_536_000   # seconds
+dt = 200                 # in seconds
+[simulation.startup]
+file = "data/double_gyre_long_final.pt"
+config = "data/double_gyre_long_config.toml"
+
+[model]
+type = "SWFilterBarotropicSpectral"
+name = "SW-HR"
+prefix = "results_step_"
+layers = [
+    400,
+    1100,
+    2600,
+]
+reduced_gravity = [
+    9.81,
+    0.025,
+    0.0125
+]
+
+[space]
+nx = 256
+ny = 512
+unit = "m"
+x_min = 0
+x_max = 2560000
+y_min = 0
+y_max = 5120000
+
+[windstress]
+type = "cosine"
+magnitude = 0.08
+drag_coefficient = 0.0013
+
+[perturbation]
+type = "none"
+perturbation_magnitude = 1e-3
