@@ -25,7 +25,7 @@ build_oar_opts() {
 build_oar_opts_hr() {
     local walltime=$1
     OAR_OPTS=(
-        -p "host='abacus11-%'"
+        -p "cluster='abacus1' OR cluster='abacus2' OR cluster='abacus11'"
         -q production
         -l "gpu=1,walltime=${walltime}"
         -O logs/OAR.%jobid%.stdout
