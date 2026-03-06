@@ -610,7 +610,7 @@ for c in range(n_cycles):
     yy = space_interior.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
-        0, 3 * 4, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * dt
+        0, 3 * 2, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * dt
     )
     basis = GaussianExpBasis(space_params, time_params)
     coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
