@@ -42,7 +42,7 @@ cmd4="${cmd}${optim_args} --indices 112 176 256 384"
 
 if [ "$contiguous" = true ]; then
     combined_cmd="$cmd1 ; $cmd2 ; $cmd3 ; $cmd4"
-    echo oarsub "${OAR_OPTS[@]}" -n "${NAME}-contiguous" "$combined_cmd"
+    oarsub "${OAR_OPTS[@]}" -n "${NAME}-contiguous" "$combined_cmd"
 else
     oarsub "${OAR_OPTS[@]}" -n "${NAME}-[32 96 64 192]"    "$cmd1"
     oarsub "${OAR_OPTS[@]}" -n "${NAME}-[32 96 256 384]"   "$cmd2"
