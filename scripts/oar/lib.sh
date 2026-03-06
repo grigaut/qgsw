@@ -22,6 +22,20 @@ build_oar_opts() {
     fi
 }
 
+build_oar_opts_hr() {
+    local walltime=$1
+    OAR_OPTS=(
+        -p "host='abacus20-1'"
+        -q production
+        -l "gpu=1,walltime=${walltime}"
+        -O logs/OAR.%jobid%.stdout
+        -E logs/OAR.%jobid%.stderr
+    )
+    if [ -n "$NOTIFY_EMAIL" ]; then
+        OAR_OPTS+=(--notify "mail:${NOTIFY_EMAIL}")
+    fi
+}
+
 parse_common_flags() {
     contiguous=false
     long=false

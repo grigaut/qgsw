@@ -16,7 +16,7 @@ if [ "$long" = true ]; then
 else
     walltime=20
 fi
-build_oar_opts "$walltime"
+build_oar_opts_hr "$walltime"
 
 # Build base command with filtered arguments
 cmd="./$SCRIPT"
