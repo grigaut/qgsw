@@ -12,13 +12,13 @@ lscpu | grep 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1'
 
 echo JOB ID : $OAR_JOB_ID
 
-SRCDIR=$HOME/qgsw
+SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
 cd $SRCDIR
 
 date
 
-LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/variational_analysis_mixed_s.py $@
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/variational_analysis_surfml_perturbed.py $@
 
 date
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-SCRIPT="scripts/bash/run_va_forced_rg_dr_perturbed.sh"
-NAME="Forced-perturbed"
+SCRIPT="scripts/bash/run_va_surfml_perturbed.sh"
+NAME="SurfML-perturbed"
 source "$SRCDIR/scripts/oar/lib.sh"
 
 cd $SRCDIR
