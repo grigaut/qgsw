@@ -85,7 +85,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVAModified.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_enatl60_forcedsurf_atmp",
+    prefix_default="results_enatl60_forcedsurfml_atmp",
     gamma_default=0.1,
 )
 with_reg = not args.no_reg
@@ -610,7 +610,7 @@ for c in range(n_cycles):
     yy = space_interior.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
-        0, 4, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 8 * 7200
+        0, 3, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * dt
     )
     basis = GaussianExpBasis(space_params, time_params)
     coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
@@ -800,9 +800,6 @@ for c in range(n_cycles):
                     crop(psis_ref[n][0, 0], b),
                     model.time,
                 )
-            if with_reg:
-                for coef in coefs.values():
-                    loss += 1 * coef.square().mean()
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
