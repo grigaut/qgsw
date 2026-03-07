@@ -599,8 +599,6 @@ for c in range(n_cycles):
     U: float = psi0_mean / L
     T = L / U
 
-    psi_bc = extract_psi_bc(psi0)
-
     msg = f"Cycle {step(c + 1, n_cycles)}: eNATL60 data loaded and processed."
     logger.info(box(msg, style="round"))
 
