@@ -361,7 +361,7 @@ model = QGPSIQForced(
     g_prime=g_prime[1:2],
 )
 model: QGPSIQForced = set_inhomogeneous_model(model)
-
+model.wind_scaling = H[:1].item()
 
 # PV computation
 
