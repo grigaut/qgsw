@@ -44,10 +44,18 @@ def gaussian_exp_field(
     centers = [(x.item(), y.item()) for x, y in itertools.product(xc, yc)]
 
     sx = (
-        (xx_ref[1, 0] - xx_ref[0, 0]).cpu().item() * spacing / 2 / sqrt(log(2))
+        (xx_ref[1, 0] - xx_ref[0, 0]).cpu().item()
+        * sqrt(2)
+        * spacing
+        / 2
+        / sqrt(log(2))
     )
     sy = (
-        (yy_ref[0, 1] - yy_ref[0, 0]).cpu().item() * spacing / 2 / sqrt(log(2))
+        (yy_ref[0, 1] - yy_ref[0, 0]).cpu().item()
+        * sqrt(2)
+        * spacing
+        / 2
+        / sqrt(log(2))
     )
 
     space = {
