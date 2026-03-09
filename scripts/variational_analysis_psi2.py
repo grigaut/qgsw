@@ -410,6 +410,7 @@ for c in range(n_cycles):
         "optim": {
             "max_steps": optim_max_step,
             "nb_steps": o,
+            "loss": best_loss,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
