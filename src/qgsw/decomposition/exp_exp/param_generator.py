@@ -67,7 +67,7 @@ def gaussian_exp_field(
         }
     }
     time = {}
-    sigma_t = l_t / 2 / sqrt(log(2))
+    sigma_t = l_t / 2 / sqrt(log(2)) * sqrt(2)
     # Compute required number of time patches
     nt = int(Lt_max // l_t) + 1
     # Compute required offset to center patches on the domain
