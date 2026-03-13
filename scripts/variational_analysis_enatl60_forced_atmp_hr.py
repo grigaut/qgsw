@@ -626,6 +626,7 @@ for c in range(n_cycles):
                 model.psi[0, 0],
                 crop(psis_ref[0][0, 0], b),
                 model.time,
+                variance=var_ref,
             )
 
             for n in range(1, n_steps_per_cyle):

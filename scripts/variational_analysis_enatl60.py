@@ -553,6 +553,8 @@ for c in range(n_cycles):
         for p in ds_interp[STREAMFUNCTION].to_numpy()
     ]
 
+    var_ref = torch.stack([crop(psi[0, 0], b) for psi in psis_ref]).var()
+
     with logger.timeit("Computing psi boundaries"):
         psis_filt = [
             torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0) / beta_plane.f0
@@ -733,6 +735,7 @@ for c in range(n_cycles):
                 model.psi[0, 0],
                 crop(psis_ref[0][0, 0], b),
                 model.time,
+                variance=var_ref,
             )
 
             for n in range(1, n_steps_per_cyle):
@@ -756,6 +759,7 @@ for c in range(n_cycles):
                     psi1[0, 0],
                     crop(psis_ref[n][0, 0], b),
                     model.time,
+                    variance=var_ref,
                 )
 
         if torch.isnan(loss.detach()):

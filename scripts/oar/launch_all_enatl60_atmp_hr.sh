@@ -14,6 +14,6 @@ cd $SRCDIR
 
 # Forced
 
-./scripts/oar/run_var_analysis_enatl60_forced_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=1 "$@"
+./scripts/oar/run_var_analysis_enatl60_forced_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=10 "$@"
 
 ./scripts/oar/run_var_analysis_enatl60_forced_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --no-reg "$@"

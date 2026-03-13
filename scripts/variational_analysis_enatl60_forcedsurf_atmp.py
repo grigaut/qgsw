@@ -804,6 +804,7 @@ for c in range(n_cycles):
                     psi1[0, 0],
                     crop(psis_ref[n][0, 0], b),
                     model.time,
+                    variance=var_ref,
                 )
 
         if torch.isnan(loss.detach()):
