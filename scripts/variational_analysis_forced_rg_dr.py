@@ -48,7 +48,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVARegularized.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_reg",
+    prefix_default="results_forced_rg_dr",
     gamma_default=1e3,
 )
 with_reg = not args.no_reg
