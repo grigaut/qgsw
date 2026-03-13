@@ -374,7 +374,7 @@ for c in range(n_cycles):
         [
             {
                 "params": list(coefs.values()),
-                "lr": 1e-3,
+                "lr": 1e-2,
                 "name": "Wavelet coefs",
             }
         ]
