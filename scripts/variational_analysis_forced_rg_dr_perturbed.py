@@ -131,6 +131,8 @@ def update_loss(
     f: torch.Tensor,
     f_ref: torch.Tensor,
     time: torch.Tensor,
+    *,
+    variance: float | torch.Tensor = 1,
 ) -> None:
     """Update loss."""
     mask = obs_mask.at_time(time)
@@ -138,7 +140,7 @@ def update_loss(
         return loss
     f_sliced = f.flatten()[mask.flatten()]
     f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + mse(f_sliced, f_ref_sliced)
+    return loss + mse(f_sliced, f_ref_sliced) / variance
 
 
 ## Regularization
@@ -213,9 +215,9 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 ## Error
 
 
-def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
+def mse(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
     """RMSE."""
-    return (f - f_ref).square().mean() / f_ref.square().mean()
+    return (f - f_ref).square().mean()
 
 
 # Models
@@ -340,6 +342,8 @@ for c in range(n_cycles):
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
+    var_ref = torch.stack([crop(psi[0, 0], p) for psi in psis]).var()
+
     space_params, time_params = dyadic_decomposition(
         order=5,
         xx_ref=space_slice.psi.xy.x,
@@ -415,6 +419,7 @@ for c in range(n_cycles):
                     model.psi[0, 0],
                     crop(psis[n][0, 0], p),
                     model.time,
+                    variance=var_ref,
                 )
             if with_reg:
                 for coef in coefs.values():

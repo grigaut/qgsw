@@ -244,14 +244,16 @@ def update_loss(
     f: torch.Tensor,
     f_ref: torch.Tensor,
     time: torch.Tensor,
-) -> torch.Tensor:
+    *,
+    variance: float | torch.Tensor = 1,
+) -> None:
     """Update loss."""
     mask = obs_mask.at_time(time)
     if not mask.any():
         return loss
     f_sliced = f.flatten()[mask.flatten()]
     f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + mse(f_sliced, f_ref_sliced)
+    return loss + mse(f_sliced, f_ref_sliced) / variance
 
 
 ## Regularization
@@ -322,9 +324,9 @@ slip_coef = config.physics.slip_coef
 ## Error
 
 
-def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
+def mse(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
     """RMSE."""
-    return (f - f_ref).square().mean() / f_ref.square().mean()
+    return (f - f_ref).square().mean()
 
 
 ## Bulk formula (from Large & Yeager 2004)
@@ -559,6 +561,8 @@ for c in range(n_cycles):
         for p in ds_interp[STREAMFUNCTION].to_numpy()
     ]
 
+    var_ref = torch.stack([crop(psi[0, 0], b) for psi in psis_ref]).var()
+
     with logger.timeit("Computing psi boundaries"):
         psis_filt = [
             torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0) / beta_plane.f0
@@ -733,6 +737,7 @@ for c in range(n_cycles):
                 model.psi[0, 0],
                 crop(psis_ref[0][0, 0], b),
                 model.time,
+                variance=var_ref,
             )
 
             for n in range(1, n_steps_per_cyle):

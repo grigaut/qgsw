@@ -9,6 +9,7 @@ import torch
 
 from qgsw.cli import ScriptArgsVAModified
 from qgsw.configs.core import Configuration
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
 from qgsw.fields.variables.tuples import UVH
@@ -22,7 +23,6 @@ from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
-from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization3D,
 )
@@ -122,6 +122,8 @@ def update_loss(
     f: torch.Tensor,
     f_ref: torch.Tensor,
     time: torch.Tensor,
+    *,
+    variance: float | torch.Tensor = 1,
 ) -> None:
     """Update loss."""
     mask = obs_mask.at_time(time)
@@ -129,7 +131,7 @@ def update_loss(
         return loss
     f_sliced = f.flatten()[mask.flatten()]
     f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + mse(f_sliced, f_ref_sliced)
+    return loss + mse(f_sliced, f_ref_sliced) / variance
 
 
 ## Regularization
@@ -206,9 +208,9 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 ## Error
 
 
-def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
+def mse(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
     """RMSE."""
-    return (f - f_ref).square().mean() / f_ref.square().mean()
+    return (f - f_ref).square().mean()
 
 
 # Models
@@ -262,11 +264,6 @@ def extract_psi_w(psi: torch.Tensor) -> torch.Tensor:
     return psi[..., psi_slices_w[0], psi_slices_w[1]]
 
 
-def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
-    """Extract psi."""
-    return Boundaries.extract(psi, p, -p - 1, p, -p - 1, 2)
-
-
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
     times = [model_3l.time.clone()]
@@ -281,21 +278,22 @@ for c in range(n_cycles):
         times.append(model_3l.time.clone())
 
         psi = extract_psi_w(model_3l.psi[:, :2])
-        psi_bc = extract_psi_bc(psi)
 
         psis.append(psi)
 
     msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
     logger.info(box(msg, style="round"))
 
-    xx = space_slice_ww.psi.xy.x
-    yy = space_slice_ww.psi.xy.y
+    var_ref = torch.stack([crop(psi[0, 0], p) for psi in psis]).var()
+
+    xx = space_slice.psi.xy.x
+    yy = space_slice.psi.xy.y
 
     space_params, time_params = gaussian_exp_field(
         0, 3, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * 7200
     )
     basis = GaussianExpBasis(space_params, time_params)
-    coefs = basis.generate_random_coefs()
+    coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
     coefs = coefs.requires_grad_()
 
     if with_alpha:
@@ -357,7 +355,7 @@ for c in range(n_cycles):
 
                 loss = update_loss(
                     loss,
-                    crop(psi2, p),
+                    psi2,
                     crop(psis[n][0, 1], p),
                     times[n] - times[0],
                 )
