@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import sqrt
 from pathlib import Path
 from typing import TypeVar
 
@@ -47,7 +48,7 @@ torch.set_grad_enabled(False)
 args = ScriptArgsVARegularized.from_cli(
     comparison_default=1,
     cycles_default=3,
-    prefix_default="results_forced_rg_dr",
+    prefix_default="results_forced_reg",
     gamma_default=1e3,
 )
 with_reg = not args.no_reg
@@ -138,7 +139,11 @@ def update_loss(
         return loss
     f_sliced = f.flatten()[mask.flatten()]
     f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + mse(f_sliced, f_ref_sliced)
+    return (
+        loss
+        + mse(f_sliced, f_ref_sliced)
+        / (f_ref_sliced - f_ref_sliced.mean()).square().mean()
+    )
 
 
 ## Regularization
@@ -217,7 +222,7 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 
 def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     """RMSE."""
-    return (f - f_ref).square().mean() / f_ref.square().mean()
+    return (f - f_ref).square().mean()  # / f_ref.square().mean()
 
 
 # Models
@@ -369,7 +374,7 @@ for c in range(n_cycles):
         [
             {
                 "params": list(coefs.values()),
-                "lr": 1e-2,
+                "lr": 1e-3,
                 "name": "Wavelet coefs",
             }
         ]
@@ -413,8 +418,14 @@ for c in range(n_cycles):
                     model.time,
                 )
             if with_reg:
-                for coef in coefs.values():
-                    loss += gamma * coef.square().mean()
+                for lvl, coef in coefs.items():
+                    sigma_x = space_params[lvl]["sigma_x"] / dx
+                    sigma_y = space_params[lvl]["sigma_y"] / dy
+                    loss += (
+                        gamma
+                        * sqrt(sigma_x * sigma_y) ** (-5 / 3)
+                        * coef.square().mean()
+                    )
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."

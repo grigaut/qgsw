@@ -43,20 +43,11 @@ def gaussian_exp_field(
 
     centers = [(x.item(), y.item()) for x, y in itertools.product(xc, yc)]
 
-    sx = (
-        (xx_ref[1, 0] - xx_ref[0, 0]).cpu().item()
-        * sqrt(2)
-        * spacing
-        / 2
-        / sqrt(log(2))
-    )
-    sy = (
-        (yy_ref[0, 1] - yy_ref[0, 0]).cpu().item()
-        * sqrt(2)
-        * spacing
-        / 2
-        / sqrt(log(2))
-    )
+    l_x = (xx_ref[1, 0] - xx_ref[0, 0]).cpu().item() * spacing
+    l_y = (yy_ref[0, 1] - yy_ref[0, 0]).cpu().item() * spacing
+
+    sx = l_x / sqrt(2 * log(2))
+    sy = l_y / sqrt(2 * log(2))
 
     space = {
         0: {
@@ -67,7 +58,7 @@ def gaussian_exp_field(
         }
     }
     time = {}
-    sigma_t = l_t / 2 / sqrt(log(2)) * sqrt(2)
+    sigma_t = l_t / sqrt(2 * log(2))
     # Compute required number of time patches
     nt = int(Lt_max // l_t) + 1
     # Compute required offset to center patches on the domain

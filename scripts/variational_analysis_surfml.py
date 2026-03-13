@@ -147,7 +147,11 @@ def update_loss(
         return loss
     f_sliced = f.flatten()[mask.flatten()]
     f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + mse(f_sliced, f_ref_sliced)
+    return (
+        loss
+        + mse(f_sliced, f_ref_sliced)
+        / (f_ref_sliced - f_ref_sliced.mean()).square().mean()
+    )
 
 
 ## Regularization
@@ -224,7 +228,7 @@ psi_start = P.compute_p(covphys.to_cov(uvh0, dx, dy))[0] / beta_plane.f0
 
 def mse(f: torch.Tensor, f_ref: torch.Tensor) -> float:
     """RMSE."""
-    return (f - f_ref).square().mean() / f_ref.square().mean()
+    return (f - f_ref).square().mean()  # / f_ref.square().mean()
 
 
 # Models
@@ -591,6 +595,7 @@ for c in range(n_cycles):
         "optim": {
             "max_steps": optim_max_step,
             "nb_steps": o,
+            "loss": best_loss,
         },
         "specs": {"max_memory_allocated": max_mem},
         "coords": (imin, imax, jmin, jmax),
