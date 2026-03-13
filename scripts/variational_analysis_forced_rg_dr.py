@@ -468,11 +468,13 @@ for c in range(n_cycles):
         "config": {
             "comparison_interval": comparison_interval,
             "no-wind": args.no_wind,
+            "obstrack": args.obs_track,
+            "gamma": args.gamma if with_reg else 0,
             "basis": basis.get_params(),
         },
         "optim": {
             "max_steps": optim_max_step,
-            "nb_steps": o,
+            "nb_steps": o + 1,
             "loss": best_loss,
         },
         "specs": {"max_memory_allocated": max_mem},
