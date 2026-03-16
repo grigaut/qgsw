@@ -256,7 +256,7 @@ def update_loss(
         return loss
     f_sliced = f.flatten()[mask.flatten()]
     f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + mse(f_sliced, f_ref_sliced) / variance
+    return loss + (f_sliced - f_ref_sliced).square().sum() / variance
 
 
 ## Regularization
@@ -322,14 +322,6 @@ g_prime = config.model.g_prime
 beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
-
-
-## Error
-
-
-def mse(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
-    """RMSE."""
-    return (f - f_ref).square().mean()
 
 
 ## Bulk formula (from Large & Yeager 2004)
@@ -797,7 +789,7 @@ for c in range(n_cycles):
 
                 if with_reg:
                     dpsi1_ = (psi1 - psi1_) / dt
-                    reg = 0.0001 * (compute_reg(psi1_, dpsi1_, time))
+                    reg = 0.1 * (compute_reg(psi1_, dpsi1_, time))
                     loss += reg
 
                 loss = update_loss(
@@ -812,7 +804,7 @@ for c in range(n_cycles):
                     sigma_x = space_params[lvl]["sigma_x"] / dx
                     sigma_y = space_params[lvl]["sigma_y"] / dy
                     loss += (
-                        10
+                        1e4
                         * sqrt(sigma_x * sigma_y) ** (-5 / 3)
                         * coef.square().mean()
                     )

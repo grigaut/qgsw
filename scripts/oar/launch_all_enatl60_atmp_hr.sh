@@ -4,9 +4,9 @@ cd $SRCDIR
 
 # SurfML
 
-./scripts/oar/run_var_analysis_enatl60_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=0.0001 "$@"
+./scripts/oar/run_var_analysis_enatl60_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=0.1 "$@"
 
-./scripts/oar/run_var_analysis_enatl60_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=0.0001 --no-alpha "$@"
+./scripts/oar/run_var_analysis_enatl60_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=0.1 --no-alpha "$@"
 
 ./scripts/oar/run_var_analysis_enatl60_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --no-reg "$@"
 
@@ -14,6 +14,6 @@ cd $SRCDIR
 
 # Forced
 
-./scripts/oar/run_var_analysis_enatl60_forced_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=10 "$@"
+./scripts/oar/run_var_analysis_enatl60_forced_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=1e7 "$@"
 
 ./scripts/oar/run_var_analysis_enatl60_forced_atmp_hr.sh --config=config/variational_analysis.toml -v --obs-track --no-reg "$@"
