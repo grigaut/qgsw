@@ -316,7 +316,7 @@ for c in range(n_cycles):
         optimizer, factor=0.5, patience=5
     )
     lr_callback = LRChangeCallback(optimizer)
-    early_stop = EarlyStop()
+    early_stop = EarlyStop(eps=1e-8)
 
     coefs_scaled = coefs.scale(
         *(
@@ -399,6 +399,7 @@ for c in range(n_cycles):
             "obstrack": args.obs_track,
             "gamma": args.gamma if with_reg else 0,
             "basis": basis.get_params(),
+            "numel": numel,
         },
         "optim": {
             "max_steps": optim_max_step,

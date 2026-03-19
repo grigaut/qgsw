@@ -587,6 +587,7 @@ for c in range(n_cycles):
             "obstrack": args.obs_track,
             "gamma": args.gamma if with_reg else 0,
             "basis": basis.get_params(),
+            "numel": numel,
         },
         "optim": {
             "max_steps": optim_max_step,
