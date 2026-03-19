@@ -64,7 +64,10 @@ def default_clim(
     Returns:
         tuple[float, float]: Colorbar limits as (vmin, vmax).
     """
-    vmax = np.quantile(np.abs(data), 0.98) if robust else np.max(np.abs(data))
+    data_ = data[~np.isnan(data)]
+    vmax = (
+        np.quantile(np.abs(data_), 0.98) if robust else np.max(np.abs(data_))
+    )
     return -vmax, vmax
 
 
