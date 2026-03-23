@@ -208,7 +208,7 @@ if with_obs_track:
     )
     if comparison_interval != 1:
         msg = (
-            "Using Satellite track, comparison interval"
+            "Using Satellite track, comparison interval "
             "inferred from tracks trajectory."
         )
         logger.warning(box(msg, style="="))
