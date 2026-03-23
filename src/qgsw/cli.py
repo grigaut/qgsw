@@ -73,6 +73,7 @@ class ScriptArgsVA(ScriptArgs):
     optim: int
     no_wind: bool = False
     obs_track: bool = False
+    separation: int = 0
 
     @classmethod
     def from_cli(
@@ -110,6 +111,7 @@ class ScriptArgsVA(ScriptArgs):
         cls._add_wind(parser)
         cls._add_obs_track(parser)
         cls._add_optim_max_step(parser, optim_default)
+        cls._add_separation(parser)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -226,6 +228,21 @@ class ScriptArgsVA(ScriptArgs):
             help="Max optimization steps.",
         )
 
+    @classmethod
+    def _add_separation(cls, parser: argparse.ArgumentParser) -> None:
+        """Specify number of step to perform to separate cycles.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (int): Default value.
+        """
+        parser.add_argument(
+            "--separation",
+            "-s",
+            type=int,
+            help="NUmber of step to separate cycles.",
+        )
+
     def _build_suffix(self) -> list[str]:
         return [
             "_nowind" if self.no_wind else "",
@@ -234,6 +251,7 @@ class ScriptArgsVA(ScriptArgs):
             if (not self.obs_track) and (self.comparison != 1)
             else "",
             f"_o{self.optim}" if (self.optim != 200) else "",
+            f"_s{self.separation}" if (self.separation != 0) else "",
         ]
 
     def complete_prefix(self) -> str:
@@ -292,6 +310,7 @@ class ScriptArgsVARegularized(ScriptArgsVA):
         cls._add_gamma(parser, gamma_default)
         cls._add_obs_track(parser)
         cls._add_optim_max_step(parser, optim_default)
+        cls._add_separation(parser)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -385,6 +404,7 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
         cls._add_alpha(parser)
         cls._add_obs_track(parser)
         cls._add_optim_max_step(parser, optim_default)
+        cls._add_separation(parser)
         return cls(**vars(parser.parse_args()))
 
     @classmethod

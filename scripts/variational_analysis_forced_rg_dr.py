@@ -172,6 +172,8 @@ msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
+if args.separation:
+    msg_simu += f"\nCycles are separated by {sec2text(args.separation * dt)}."
 msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
 msg_output = f"Output will be saved to {output_file}."
 
@@ -465,6 +467,7 @@ for c in range(n_cycles):
             "gamma": args.gamma if with_reg else 0,
             "basis": basis.get_params(),
             "numel": numel,
+            "separation_steps": args.separation,
         },
         "optim": {
             "max_steps": optim_max_step,
@@ -477,6 +480,12 @@ for c in range(n_cycles):
     }
     outputs.append(output)
 
-torch.save(outputs, output_file)
-msg = f"Outputs saved to {output_file}"
-logger.info(box(msg, style="="))
+    torch.save(outputs, output_file)
+    msg = f"Outputs saved to {output_file}"
+    logger.info(box(msg, style="="))
+
+    for _ in range(args.separation):
+        model_3l.step()
+    if args.separation > 0:
+        msg = f"Performed {args.separation} steps before next cycle."
+        logger.info(box(msg, style="="))
