@@ -37,7 +37,7 @@ if [ "$long_optim" = true ]; then
     optim_args+=" -o 800"
 fi
 if [ "$long" = true ]; then
-    optim_args+=" -c 12"
+    optim_args+=" --cycles 12"
 fi
 
 # Build the four command variants
