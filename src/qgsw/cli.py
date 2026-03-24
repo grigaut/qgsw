@@ -240,6 +240,7 @@ class ScriptArgsVA(ScriptArgs):
             "--separation",
             "-s",
             type=int,
+            default=0,
             help="NUmber of step to separate cycles.",
         )
 
