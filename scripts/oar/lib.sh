@@ -63,3 +63,29 @@ parse_common_flags() {
         z1=true; z2=true; z3=true; z4=true
     fi
 }
+
+parse_enatl60_flags() {
+    contiguous=false
+    long_optim=false
+    any_season=false
+    summer=false
+    autumn=false
+    winter=false
+    spring=false
+    args=()
+    for arg in "$@"; do
+        case "$arg" in
+            --contiguous)  contiguous=true ;;
+            --long-optim)  long_optim=true ;;
+            --summer)      summer=true ; any_season=true ;;
+            --autumn)      autumn=true ; any_season=true ;;
+            --winter)      winter=true ; any_season=true ;;
+            --spring)      spring=true ; any_season=true ;;
+            *)             args+=("$arg") ;;
+        esac
+    done
+    # If no zone specified, enable all
+    if [ "$any_season" = false ]; then
+        summer=true
+    fi
+}
