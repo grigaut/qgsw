@@ -120,8 +120,8 @@ n_cycles = args.cycles
 
 separation = int(args.separation * dt / 3600 / 24)
 
-sigma_bc = 14
-sigma_ic = 14
+sigma_bc = 10
+sigma_ic = 10
 
 ## Load eNATL60 grid
 
