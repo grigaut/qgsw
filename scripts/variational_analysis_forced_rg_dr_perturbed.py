@@ -172,7 +172,7 @@ msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
-if args.separation:
+if args.separation != 0:
     msg_simu += f"\nCycles are separated by {sec2text(args.separation * dt)}."
 msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
 msg_output = f"Output will be saved to {output_file}."

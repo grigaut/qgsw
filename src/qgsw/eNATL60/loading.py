@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+import pandas as pd
 import xarray as xr
 
 if TYPE_CHECKING:
@@ -66,6 +68,22 @@ def format_dataset(ds: xr.Dataset) -> xr.Dataset:
     if "time_centered" in ds.coords:
         ds = ds.reset_coords("time_centered", drop=True)
     return ds
+
+
+def sort_files_by_dates(*filepaths: Path) -> np.ndarray:
+    """Sort file names by dates."""
+    times = retrieve_dates(*filepaths).to_numpy()
+    args = np.argsort(times)
+    return np.array(filepaths)[args]  # .tolist()
+
+
+def retrieve_dates(*filepaths: Path) -> pd.DatetimeIndex:
+    """Parse files dates.
+
+    Returns:
+        list[int]: List of dates from the filepaths.
+    """
+    return pd.to_datetime([f.name[-20:-12] for f in filepaths])  # .to_numpy()
 
 
 def load_datasets(

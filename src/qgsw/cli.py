@@ -1,5 +1,7 @@
 """Command Line Interface."""
 
+from __future__ import annotations
+
 import argparse
 import pathlib
 from dataclasses import dataclass
@@ -74,6 +76,7 @@ class ScriptArgsVA(ScriptArgs):
     no_wind: bool = False
     obs_track: bool = False
     separation: int = 0
+    season: str = None
 
     @classmethod
     def from_cli(
@@ -83,6 +86,7 @@ class ScriptArgsVA(ScriptArgs):
         cycles_default: int = 3,
         prefix_default: str = "results",
         optim_default: int = 200,
+        season_default: str | None = None,
     ) -> Self:
         """Instantiate script arguments from CLI.
 
@@ -94,7 +98,9 @@ class ScriptArgsVA(ScriptArgs):
             prefix_default (str, optional): Default value for
                 output file prefix. Defaults to "results".
             optim_default (int, optional): max number of optimisation steps.
-                Defaults ot 200.
+                Defaults to 200.
+            season_default (str | None, optional): Default season.
+                Defaults to None.
 
         Returns:
             Self: ScriptArgsVA.
@@ -112,6 +118,7 @@ class ScriptArgsVA(ScriptArgs):
         cls._add_obs_track(parser)
         cls._add_optim_max_step(parser, optim_default)
         cls._add_separation(parser)
+        cls._add_season(parser, season_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -234,14 +241,31 @@ class ScriptArgsVA(ScriptArgs):
 
         Args:
             parser (argparse.ArgumentParser): Arguments parser.
-            default (int): Default value.
         """
         parser.add_argument(
             "--separation",
             "-s",
             type=int,
             default=0,
-            help="NUmber of step to separate cycles.",
+            help="Number of step to separate cycles.",
+        )
+
+    @classmethod
+    def _add_season(
+        cls, parser: argparse.ArgumentParser, default: str | None
+    ) -> None:
+        """Specify season.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (str | None): Default season.
+        """
+        parser.add_argument(
+            "--season",
+            type=str,
+            default=default,
+            choices=["summer", "autumn", "winter", "spring"],
+            help="Season.",
         )
 
     def _build_suffix(self) -> list[str]:
@@ -253,6 +277,7 @@ class ScriptArgsVA(ScriptArgs):
             else "",
             f"_o{self.optim}" if (self.optim != 200) else "",
             f"_s{self.separation}" if (self.separation != 0) else "",
+            f"_{self.season}" if (self.season is not None) else "",
         ]
 
     def complete_prefix(self) -> str:
@@ -280,6 +305,7 @@ class ScriptArgsVARegularized(ScriptArgsVA):
         prefix_default: str = "results",
         optim_default: int = 200,
         gamma_default: float = 0,
+        season_default: str | None = None,
     ) -> Self:
         """Instantiate script arguments from CLI.
 
@@ -293,6 +319,8 @@ class ScriptArgsVARegularized(ScriptArgsVA):
             gamma_default (float): Default value for gamme. Defaults to 0.
             optim_default (int, optional): max number of optimisation steps.
                 Defaults ot 200.
+            season_default (str | None, optional): Default season.
+                Defaults to None.
 
         Returns:
             Self: ScriptArgsVA.
@@ -312,6 +340,7 @@ class ScriptArgsVARegularized(ScriptArgsVA):
         cls._add_obs_track(parser)
         cls._add_optim_max_step(parser, optim_default)
         cls._add_separation(parser)
+        cls._add_season(parser, season_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
@@ -373,6 +402,7 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
         prefix_default: str = "results",
         gamma_default: float = 0,
         optim_default: int = 200,
+        season_default: str | None = None,
     ) -> Self:
         """Instantiate script arguments from CLI.
 
@@ -386,6 +416,8 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
             gamma_default (float): Default value for gamme. Defaults to 0.
             optim_default (int, optional): max number of optimisation steps.
                 Defaults ot 200.
+            season_default (str | None, optional): Default season.
+                Defaults to None.
 
         Returns:
             Self: ScriptArgsVA.
@@ -406,6 +438,7 @@ class ScriptArgsVAModified(ScriptArgsVARegularized):
         cls._add_obs_track(parser)
         cls._add_optim_max_step(parser, optim_default)
         cls._add_separation(parser)
+        cls._add_season(parser, season_default)
         return cls(**vars(parser.parse_args()))
 
     @classmethod
