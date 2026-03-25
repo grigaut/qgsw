@@ -838,6 +838,8 @@ for c in range(n_cycles):
             "sigma_bc": sigma_bc,
             "sigma_ic": sigma_ic,
             "dt": dt,
+            "separation_steps": args.separation,
+            "season": args.season,
             "dx": dx,
             "dy": dy,
         },
