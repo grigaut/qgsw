@@ -8,7 +8,7 @@ from typing import TypeVar
 
 import torch
 
-from qgsw.cli import ScriptArgsVARegularized
+from qgsw.cli import ScriptsArgsParser
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets import (
@@ -45,12 +45,12 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVARegularized.from_cli(
-    comparison_default=1,
-    cycles_default=3,
+args = ScriptsArgsParser.va_setup(
     prefix_default="results_forced_rg_dr_perturbed",
-    gamma_default=1e3,
 )
+args.add_regularization(gamma_default=1e9)
+args.add_indices()
+args.retrieve()
 with_reg = not args.no_reg
 with_obs_track = args.obs_track
 

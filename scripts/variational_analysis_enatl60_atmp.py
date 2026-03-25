@@ -10,7 +10,7 @@ import torch
 import xarray as xr
 from scipy.ndimage import gaussian_filter
 
-from qgsw.cli import ScriptArgsVAModified
+from qgsw.cli import ScriptsArgsParser
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
@@ -84,13 +84,14 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVAModified.from_cli(
-    comparison_default=1,
-    cycles_default=3,
+
+args = ScriptsArgsParser.va_setup(
     prefix_default="results_enatl60_atmp",
-    gamma_default=0.1,
-    season_default="summer",
 )
+args.add_regularization(gamma_default=0.1)
+args.add_alpha()
+args.add_season(default="summer")
+args.retrieve()
 with_reg = not args.no_reg
 with_alpha = not args.no_alpha
 with_obs_track = args.obs_track
@@ -295,7 +296,9 @@ msg_simu = (
     f"steps with up to {optim_max_step} optimization steps."
 )
 if args.separation != 0:
-    msg_simu += f"\nCycles are separated by {sec2text(separation * 3600)}."
+    msg_simu += (
+        f"\nCycles are separated by {sec2text(separation * 24 * 3600)}."
+    )
 msg_season = f"Season: {args.season}."
 msg_sf = "Reconstructing ψ using atmospheric pressure and ssh."
 lon_min = np.rad2deg(lons.min())
