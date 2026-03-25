@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import sqrt
 from pathlib import Path
 from typing import TypeVar
 
@@ -417,8 +418,14 @@ for c in range(n_cycles):
                     variance=var_ref,
                 )
             if with_reg:
-                for coef in coefs.values():
-                    loss += gamma * coef.square().mean()
+                for lvl, coef in coefs.items():
+                    sigma_x = space_params[lvl]["sigma_x"] / dx
+                    sigma_y = space_params[lvl]["sigma_y"] / dy
+                    loss += (
+                        gamma
+                        * sqrt(sigma_x * sigma_y) ** (-5 / 3)
+                        * coef.square().mean()
+                    )
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
