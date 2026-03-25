@@ -281,6 +281,10 @@ msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
+if args.separation != 0:
+    msg_simu += (
+        f"\nCycles are separated by {sec2text(separation * 24 * 3600)}."
+    )
 msg_season = f"Season: {args.season}."
 msg_sf = "Reconstructing ψ using atmospheric pressure and ssh."
 lon_min = np.rad2deg(lons.min())
