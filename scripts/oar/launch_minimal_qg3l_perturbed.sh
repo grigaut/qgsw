@@ -10,4 +10,4 @@ cd $SRCDIR
 
 # Forced
 
-./scripts/oar/run_var_analysis_forced_rg_dr_perturbed.sh --config=config/variational_analysis.toml -v --obs-track --gamma=1e7 "$@"
+./scripts/oar/run_var_analysis_forced_rg_dr_perturbed.sh --config=config/variational_analysis.toml -v --obs-track --gamma=1e9 "$@"
