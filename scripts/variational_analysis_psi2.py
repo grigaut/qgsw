@@ -7,7 +7,7 @@ from typing import TypeVar
 
 import torch
 
-from qgsw.cli import ScriptArgsVAModified
+from qgsw.cli import ScriptsArgsParser
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
@@ -35,14 +35,11 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVAModified.from_cli(
-    comparison_default=1,
-    cycles_default=3,
+args = ScriptsArgsParser.va_setup(
     prefix_default="results_psi2",
-    gamma_default=1,
 )
-with_reg = not args.no_reg
-with_alpha = not args.no_alpha
+args.add_indices()
+args.retrieve()
 with_obs_track = args.obs_track
 
 specs = defaults.get()
@@ -134,23 +131,6 @@ def update_loss(
     return loss + (f_sliced - f_ref_sliced).square().sum() / variance
 
 
-## Regularization
-
-gamma = args.gamma / comparison_interval
-
-if with_reg:
-    msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
-    if gamma != args.gamma:
-        msg_reg += (
-            f" (rescaled from ɣ = {args.gamma:#5.3g} to"  # noqa: RUF001
-            " account for observations sparsity)."
-        )
-    else:
-        msg_reg += "."
-else:
-    msg_reg = "No regularization."
-
-
 ## Output
 prefix = args.complete_prefix()
 filename = f"{prefix}_{imin}_{imax}_{jmin}_{jmax}.pt"
@@ -167,7 +147,7 @@ if args.separation != 0:
 msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
 msg_output = f"Output will be saved to {output_file}."
 
-logger.info(box(msg_simu, msg_area, msg_obs, msg_reg, msg_output, style="="))
+logger.info(box(msg_simu, msg_area, msg_obs, msg_output, style="="))
 
 # Parameters
 
@@ -291,24 +271,14 @@ for c in range(n_cycles):
     coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
     coefs = coefs.requires_grad_()
 
-    if with_alpha:
-        numel = coefs.numel()
-        params = [
-            {
-                "params": list(coefs.values()),
-                "lr": 1e0,
-                "name": "Decomposition coefs",
-            },
-        ]
-    else:
-        numel = coefs.numel()
-        params = [
-            {
-                "params": list(coefs.values()),
-                "lr": 1e0,
-                "name": "Decomposition coefs",
-            },
-        ]
+    numel = coefs.numel()
+    params = [
+        {
+            "params": list(coefs.values()),
+            "lr": 1e0,
+            "name": "Decomposition coefs",
+        },
+    ]
 
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
@@ -399,7 +369,6 @@ for c in range(n_cycles):
             "comparison_interval": comparison_interval,
             "no-wind": args.no_wind,
             "obstrack": args.obs_track,
-            "gamma": args.gamma if with_reg else 0,
             "basis": basis.get_params(),
             "numel": numel,
             "separation_steps": args.separation,

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 import torch
 
-from qgsw.cli import ScriptArgsVAModified
+from qgsw.cli import ScriptsArgsParser
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
@@ -53,12 +53,13 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVAModified.from_cli(
-    comparison_default=1,
-    cycles_default=3,
-    prefix_default="results_surfml",
-    gamma_default=0.1,
+args = ScriptsArgsParser.va_setup(
+    prefix_default="results_surfml_perturbed",
 )
+args.add_regularization(gamma_default=1e2)
+args.add_alpha()
+args.add_indices()
+args.retrieve()
 with_reg = not args.no_reg
 with_alpha = not args.no_alpha
 with_obs_track = args.obs_track

@@ -10,7 +10,7 @@ import torch
 import xarray as xr
 from scipy.ndimage import gaussian_filter
 
-from qgsw.cli import ScriptArgsVAModified
+from qgsw.cli import ScriptsArgsParser
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets.core import WaveletBasis
@@ -73,15 +73,13 @@ torch.set_grad_enabled(False)
 
 ## Config
 
-args = ScriptArgsVAModified.from_cli(
-    comparison_default=1,
-    cycles_default=3,
+args = ScriptsArgsParser.va_setup(
     prefix_default="results_enatl60_forced_atmp_hr",
-    gamma_default=0.1,
-    season_default="summer",
 )
+args.add_regularization(gamma_default=1e4)
+args.add_season(default="summer")
+args.retrieve()
 with_reg = not args.no_reg
-with_alpha = not args.no_alpha
 with_obs_track = args.obs_track
 with_wind = not args.no_wind
 
