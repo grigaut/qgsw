@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TypeVar
 
 import numpy as np
-import pandas as pd
 import torch
 import xarray as xr
 from scipy.ndimage import gaussian_filter
@@ -16,6 +15,7 @@ from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
+from qgsw.eNATL60 import seasons
 from qgsw.eNATL60.fields_computations import (
     compute_streamfunction_with_atmospheric_pressure,
 )
@@ -30,7 +30,11 @@ from qgsw.eNATL60.interpolation import (
     compute_lonlat_from_regular_xy_grid,
     lonlat_to_xy,
 )
-from qgsw.eNATL60.loading import load_datasets
+from qgsw.eNATL60.loading import (
+    load_datasets,
+    retrieve_dates,
+    sort_files_by_dates,
+)
 from qgsw.eNATL60.var_keys import (
     LATITUDE,
     LONGITUDE,
@@ -74,6 +78,7 @@ args = ScriptArgsVAModified.from_cli(
     cycles_default=3,
     prefix_default="results_enatl60_forced_atmp_hr",
     gamma_default=0.1,
+    season_default="summer",
 )
 with_reg = not args.no_reg
 with_alpha = not args.no_alpha
@@ -99,6 +104,8 @@ n_steps_per_cyle = (240 - 1) * 4
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
+separation = int(args.separation * dt / 3600 / 24)
+
 sigma_bc = 7
 sigma_ic = 7
 
@@ -106,19 +113,23 @@ sigma_ic = 7
 
 ### Data folder
 
-data_folder = get_path_from_env(key="DATA_FOLDER")
-files = list(
-    (data_folder / "MEANDERS").glob(
-        "eNATL60-BLB002_1h_2009*_2009*_gridT-2D_2009*-2009*.nc"
-    )
-)
+data_folder = get_path_from_env(key="eNATL60_FOLDER")
+files = list((data_folder / "MEANDERS" / "gridT").glob("*.nc"))
 
+files = sort_files_by_dates(*files)
 
-def sort_files_by_dates(file_paths: list[Path]) -> list[Path]:
-    """Sort file names by dates."""
-    times = pd.to_datetime([f.name[-20:-12] for f in file_paths])
-    args = np.argsort(times)
-    return np.array(files)[args].tolist()
+season = {
+    "summer": seasons.SUMMER,
+    "autumn": seasons.AUTUMN,
+    "winter": seasons.WINTER,
+    "spring": seasons.SPRING,
+}
+
+in_season = retrieve_dates(*files.tolist()).month.isin(season[args.season])
+if ((in_season[1:]) & (~in_season[:-1])).sum() + int(in_season[0]) > 1:
+    msg = "Non-time-contiguous data for this season in provided dataset."
+    raise ValueError(msg)
+files = files[in_season]
 
 
 def format_ds(ds: xr.Dataset) -> xr.Dataset:
@@ -144,7 +155,6 @@ def format_ds(ds: xr.Dataset) -> xr.Dataset:
 
 
 ### Load only one file to access grid informations
-files = sort_files_by_dates(files)
 
 ds = load_datasets(files[0], format_func=format_ds)
 
@@ -273,6 +283,7 @@ msg_simu = (
     f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
     f"steps with up to {optim_max_step} optimization steps."
 )
+msg_season = f"Season: {args.season}."
 msg_sf = "Reconstructing ψ using atmospheric pressure and ssh."
 lon_min = np.rad2deg(lons.min())
 lon_max = np.rad2deg(lons.max())
@@ -291,6 +302,7 @@ msg_output = f"Output will be saved to {output_file}."
 logger.info(
     box(
         msg_simu,
+        msg_season,
         msg_sf,
         msg_area,
         msg_wind,
@@ -395,12 +407,15 @@ L: float = dx.item()
 for c in range(n_cycles):
     torch.cuda.reset_peak_memory_stats()
 
-    if (c + 1) * n_file_per_cycle > len(files):
+    start_cycle = c * n_file_per_cycle + c * separation
+    end_cycle = (c + 1) * n_file_per_cycle + c * separation
+
+    if end_cycle > len(files):
         msg = f"Not enough files to perform cycle {c} and above."
         logger.warning(msg)
         break
 
-    files_for_cycle = files[c * n_file_per_cycle : (c + 1) * n_file_per_cycle]
+    files_for_cycle = files[start_cycle:end_cycle]
 
     ds = load_datasets(*files_for_cycle, format_func=format_ds)
 
@@ -408,7 +423,13 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     with logger.timeit("Loading ERA data"):
-        ds_era = load_era_interim(data_folder / "misc", 2009)
+        dates = retrieve_dates(*files.tolist())
+        years = dates.year.unique().to_list()
+        if dates.min().month == 1 and dates.min().day == 1:
+            years.insert(0, dates.min().year - 1)
+        msg = f"Loading data for years: {', '.join([str(y) for y in years])}"
+        logger.info(msg)
+        ds_era = load_era_interim(data_folder / "misc", *years)
 
         ds_era = slice_time(ds_era, ds[TIME])
         ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
@@ -710,6 +731,6 @@ for c in range(n_cycles):
     }
     outputs.append(output)
 
-torch.save(outputs, output_file)
-msg = f"Outputs saved to {output_file}"
-logger.info(box(msg, style="="))
+    torch.save(outputs, output_file)
+    msg = f"Outputs saved to {output_file}"
+    logger.info(box(msg, style="="))
