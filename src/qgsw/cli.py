@@ -446,7 +446,7 @@ class ScriptsArgsParser:
         return self.prefix + "".join(self._build_suffix())
 
     @classmethod
-    def va_setup(cls, prefix_default: str) -> Self:
+    def va_setup(cls, prefix_default: str, cycles_default: int = 3) -> Self:
         """Pre-setup parser for variationla assimilaiton scripts."""
         obj = cls()
         obj.add_config()
@@ -455,7 +455,7 @@ class ScriptsArgsParser:
         obj.add_comparison_interval(default=1)
         obj.add_wind()
         obj.add_obs_track()
-        obj.add_cycles(default=3)
+        obj.add_cycles(default=cycles_default)
         obj.add_optim_max_step(default=200)
         obj.add_separation(default=0)
         return obj
