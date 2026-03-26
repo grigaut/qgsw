@@ -18,7 +18,7 @@ dt = 200.0
 type = "SWFilterBarotropicSpectral"
 prefix = "results_step_"
 name = "SW-HR"
-layers = [ 200.0, 1300.0, 2600.0,]
+layers = [ 400.0, 1100.0, 2600.0,]
 reduced_gravity = [ 9.81, 0.025, 0.0125,]
 
 [space]
