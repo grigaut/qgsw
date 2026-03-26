@@ -119,8 +119,8 @@ n_cycles = args.cycles
 
 separation = int(args.separation * dt / 3600 / 24)
 
-sigma_bc = 14
-sigma_ic = 14
+sigma_bc = 16
+sigma_ic = 16
 
 ## Load eNATL60 grid
 
@@ -500,7 +500,7 @@ outputs = []
 
 L: float = dx.item()
 
-for c in range(n_cycles):
+for c in [1, 0, 2, 3]:
     torch.cuda.reset_peak_memory_stats()
 
     start_cycle = c * n_file_per_cycle + c * separation
