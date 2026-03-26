@@ -667,7 +667,7 @@ for c in range(n_cycles):
             {"params": [kappa], "lr": 1e-1, "name": "κ"},
             {
                 "params": list(coefs.values()),
-                "lr": 2e0,
+                "lr": 1e0,
                 "name": "Decomposition coefs",
             },
             {
@@ -682,7 +682,7 @@ for c in range(n_cycles):
         params = [
             {
                 "params": list(coefs.values()),
-                "lr": 2e0,
+                "lr": 1e0,
                 "name": "Decomposition coefs",
             },
             {
