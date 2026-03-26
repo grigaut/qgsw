@@ -50,12 +50,12 @@ if [ "$contiguous" = true ]; then
     [ "$spring" = true ] && combined_cmd+="${cmd4} ; "
     # Strip trailing " ; "
     combined_cmd="${combined_cmd% ; }"
-    echo "${OAR_OPTS[@]}" -n "${NAME}-contiguous" "$combined_cmd"
+    oarsub "${OAR_OPTS[@]}" -n "${NAME}-contiguous" "$combined_cmd"
 else
-    [ "$summer" = true ] && echo "${OAR_OPTS[@]}" -n "${NAME}-Summer"    "$cmd1"
-    [ "$autumn" = true ] && echo "${OAR_OPTS[@]}" -n "${NAME}-Autumn"   "$cmd2"
-    [ "$winter" = true ] && echo "${OAR_OPTS[@]}" -n "${NAME}-Winter"  "$cmd3"
-    [ "$spring" = true ] && echo "${OAR_OPTS[@]}" -n "${NAME}-Spring" "$cmd4"
+    [ "$summer" = true ] && oarsub "${OAR_OPTS[@]}" -n "${NAME}-Summer"    "$cmd1"
+    [ "$autumn" = true ] && oarsub "${OAR_OPTS[@]}" -n "${NAME}-Autumn"   "$cmd2"
+    [ "$winter" = true ] && oarsub "${OAR_OPTS[@]}" -n "${NAME}-Winter"  "$cmd3"
+    [ "$spring" = true ] && oarsub "${OAR_OPTS[@]}" -n "${NAME}-Spring" "$cmd4"
 fi
 
 exit 0
