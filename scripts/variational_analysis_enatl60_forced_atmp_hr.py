@@ -425,7 +425,7 @@ for c in range(n_cycles):
     logger.info(box(msg, style="round"))
 
     with logger.timeit("Loading ERA data"):
-        dates = retrieve_dates(*files.tolist())
+        dates = retrieve_dates(*files_for_cycle.tolist())
         years = dates.year.unique().to_list()
         if dates.min().month == 1 and dates.min().day == 1:
             years.insert(0, dates.min().year - 1)
