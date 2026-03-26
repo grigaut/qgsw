@@ -88,7 +88,7 @@ torch.set_grad_enabled(False)
 ## Config
 
 args = ScriptsArgsParser.va_setup(
-    prefix_default="results_enatl60_atmp_hr",
+    prefix_default="results_enatl60_forcedsurf_atmp",
 )
 args.add_regularization(gamma_default=1)
 args.add_alpha()
