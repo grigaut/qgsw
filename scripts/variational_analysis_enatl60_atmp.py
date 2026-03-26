@@ -500,7 +500,7 @@ outputs = []
 
 L: float = dx.item()
 
-for c in range(n_cycles):
+for c in range(3, n_cycles):
     torch.cuda.reset_peak_memory_stats()
 
     start_cycle = c * n_file_per_cycle + c * separation
@@ -644,7 +644,7 @@ for c in range(n_cycles):
             {"params": [kappa], "lr": 1e-1, "name": "κ"},
             {
                 "params": list(coefs.values()),
-                "lr": 1e0,
+                "lr": 2e0,
                 "name": "Decomposition coefs",
             },
         ]
@@ -654,7 +654,7 @@ for c in range(n_cycles):
         params = [
             {
                 "params": list(coefs.values()),
-                "lr": 1e0,
+                "lr": 2e0,
                 "name": "Decomposition coefs",
             },
         ]

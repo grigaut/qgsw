@@ -667,12 +667,12 @@ for c in range(n_cycles):
             {"params": [kappa], "lr": 1e-1, "name": "κ"},
             {
                 "params": list(coefs.values()),
-                "lr": 1e0,
+                "lr": 2e0,
                 "name": "Decomposition coefs",
             },
             {
                 "params": list(coefs_wv.values()),
-                "lr": 1e-2,
+                "lr": 1e-1,
                 "name": "Wavelet coefs",
             },
         ]
@@ -682,12 +682,12 @@ for c in range(n_cycles):
         params = [
             {
                 "params": list(coefs.values()),
-                "lr": 1e0,
+                "lr": 2e0,
                 "name": "Decomposition coefs",
             },
             {
                 "params": list(coefs_wv.values()),
-                "lr": 1e-2,
+                "lr": 1e-1,
                 "name": "Wavelet coefs",
             },
         ]

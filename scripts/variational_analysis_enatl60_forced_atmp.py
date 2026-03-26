@@ -560,7 +560,7 @@ for c in range(n_cycles):
     params = [
         {
             "params": list(coefs.values()),
-            "lr": 1e-2,
+            "lr": 1e-1,
             "name": "Wavelet coefs",
         },
     ]
