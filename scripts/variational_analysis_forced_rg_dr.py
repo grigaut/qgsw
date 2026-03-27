@@ -428,6 +428,11 @@ for c in range(n_cycles):
             logger.warning(box(msg, style="="))
             break
 
+        if torch.isnan(model.psi).any():
+            msg = "Streamfunction has diverged."
+            logger.warning(box(msg, style="="))
+            break
+
         register_params.step(loss, coefs=coefs_scaled.to_dict())
 
         if early_stop.step(loss):

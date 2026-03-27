@@ -678,7 +678,7 @@ for c in range(n_cycles):
             break
 
         if torch.isnan(model.psi).any():
-            msg = "Model field has diverged."
+            msg = "Streamfunction has diverged."
             logger.warning(box(msg, style="="))
             break
 
