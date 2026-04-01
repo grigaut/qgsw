@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
@@ -334,7 +335,6 @@ logger.info(
 
 H = config.model.h
 g_prime = config.model.g_prime
-beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
 

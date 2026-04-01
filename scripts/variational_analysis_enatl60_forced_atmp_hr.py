@@ -322,7 +322,6 @@ H = config.model.h
 g_prime = config.model.g_prime
 H1, H2 = H[0], H[1]
 g1, g2 = g_prime[0], g_prime[1]
-beta_plane = config.physics.beta_plane
 bottom_drag_coef = config.physics.bottom_drag_coefficient
 slip_coef = config.physics.slip_coef
 
