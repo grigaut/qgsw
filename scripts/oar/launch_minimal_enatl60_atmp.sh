@@ -10,7 +10,7 @@ cd $SRCDIR
 
 # Forced
 
-./scripts/oar/run_var_analysis_enatl60_forced_atmp.sh --config=config/enatl60.toml -v --obs-track --gamma=1e4 "$@"
+./scripts/oar/run_var_analysis_enatl60_forced_atmp.sh --config=config/enatl60.toml -v --obs-track --gamma=1e5 "$@"
 
 # Forced + SurfML
 
