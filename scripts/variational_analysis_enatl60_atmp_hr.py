@@ -639,7 +639,7 @@ for c in range(n_cycles):
         kappa = torch.tensor(0, **specs, requires_grad=True)
         numel = kappa.numel() + coefs.numel()
         params = [
-            {"params": [kappa], "lr": 1e-1, "name": "κ"},
+            {"params": [kappa], "lr": 1e-2, "name": "κ"},
             {
                 "params": list(coefs.values()),
                 "lr": 1e0,
