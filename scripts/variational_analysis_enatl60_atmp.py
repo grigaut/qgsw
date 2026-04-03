@@ -17,7 +17,7 @@ from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
 from qgsw.eNATL60 import seasons
 from qgsw.eNATL60.fields_computations import (
-    compute_streamfunction_with_atmospheric_pressure,
+    compute_streamfunction_with_atmospheric_pressure_,
 )
 from qgsw.eNATL60.forcing import (
     interpolate_era_da,
@@ -529,7 +529,7 @@ for c in range(n_cycles):
         ds_era = slice_time(ds_era, ds[TIME])
         ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
 
-    ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure(
+    ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure_(
         ds,
         ds_era,
         config.physics.rho,
