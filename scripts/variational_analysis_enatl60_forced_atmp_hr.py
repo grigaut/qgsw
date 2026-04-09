@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import sqrt
 from pathlib import Path
 from typing import TypeVar
 
@@ -17,7 +18,7 @@ from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
 from qgsw.eNATL60 import seasons
 from qgsw.eNATL60.fields_computations import (
-    compute_streamfunction_with_atmospheric_pressure,
+    compute_streamfunction_with_atmospheric_pressure_xy_avg,
 )
 from qgsw.eNATL60.forcing import (
     interpolate_era_da,
@@ -436,12 +437,14 @@ for c in range(n_cycles):
         ds_era = slice_time(ds_era, ds[TIME])
         ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
 
-    ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure(
-        ds,
-        ds_era,
-        config.physics.rho,
-        g_prime[0].item(),
-        remove_avgs=True,
+    ds[STREAMFUNCTION] = (
+        compute_streamfunction_with_atmospheric_pressure_xy_avg(
+            ds,
+            ds_era,
+            config.physics.rho,
+            g_prime[0].item(),
+            remove_avgs=True,
+        )
     )
 
     with logger.timeit("Filtering stream function"):
@@ -645,27 +648,33 @@ for c in range(n_cycles):
             )
 
             for n in range(1, n_steps_per_cyle):
-                if with_wind and (n - 1) % 4 == 0:
+                if with_wind and (n - 1) % 2 == 0:
                     model.set_wind_forcing(
-                        tauxs_i[int((n - 1) // 4)],
-                        tauys_i[int((n - 1) // 4)],
+                        tauxs_i[int((n - 1) // 2)],
+                        tauys_i[int((n - 1) // 2)],
                     )
 
                 model.forcing = wv(model.time)[None, None, ...]
 
                 model.step()
 
-                if n % 4 == 0:
+                if n % 2 == 0:
                     loss = update_loss(
                         loss,
                         model.psi[0, 0],
-                        crop(psis_ref[int(n // 4)][0, 0], b),
+                        crop(psis_ref[int(n // 2)][0, 0], b),
                         model.time,
                         variance=var_ref,
                     )
             if with_reg:
-                for coef in coefs.values():
-                    loss += gamma * coef.square().mean()
+                for lvl, coef in coefs.items():
+                    sigma_x = space_params[lvl]["sigma_x"] / dx
+                    sigma_y = space_params[lvl]["sigma_y"] / dy
+                    loss += (
+                        gamma
+                        * sqrt(sigma_x * sigma_y) ** (-5 / 3)
+                        * coef.square().mean()
+                    )
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."

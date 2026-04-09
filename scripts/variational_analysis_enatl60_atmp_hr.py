@@ -17,7 +17,7 @@ from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
 from qgsw.eNATL60 import seasons
 from qgsw.eNATL60.fields_computations import (
-    compute_streamfunction_with_atmospheric_pressure,
+    compute_streamfunction_with_atmospheric_pressure_xy_avg,
 )
 from qgsw.eNATL60.forcing import (
     interpolate_era_da,
@@ -528,12 +528,14 @@ for c in range(n_cycles):
         ds_era = slice_time(ds_era, ds[TIME])
         ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
 
-    ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure(
-        ds,
-        ds_era,
-        config.physics.rho,
-        g_prime[0].item(),
-        remove_avgs=True,
+    ds[STREAMFUNCTION] = (
+        compute_streamfunction_with_atmospheric_pressure_xy_avg(
+            ds,
+            ds_era,
+            config.physics.rho,
+            g_prime[0].item(),
+            remove_avgs=True,
+        )
     )
 
     with logger.timeit("Filtering stream function"):
@@ -761,10 +763,10 @@ for c in range(n_cycles):
                 psi1_ = model.psi
                 time = model.time.clone()
 
-                if with_wind and (n - 1) % 4 == 0:
+                if with_wind and (n - 1) % 2 == 0:
                     model.set_wind_forcing(
-                        tauxs_i[int((n - 1) // 4)],
-                        tauys_i[int((n - 1) // 4)],
+                        tauxs_i[int((n - 1) // 2)],
+                        tauys_i[int((n - 1) // 2)],
                     )
 
                 model.step()
@@ -774,13 +776,13 @@ for c in range(n_cycles):
                 if with_reg:
                     dpsi1_ = (psi1 - psi1_) / dt
                     reg = gamma * (compute_reg(psi1_, dpsi1_, time))
-                    loss += reg / 4
+                    loss += reg / 2
 
-                if n % 4 == 0:
+                if n % 2 == 0:
                     loss = update_loss(
                         loss,
                         psi1[0, 0],
-                        crop(psis_ref[int(n // 4)][0, 0], b),
+                        crop(psis_ref[int(n // 2)][0, 0], b),
                         model.time,
                         variance=var_ref,
                     )
