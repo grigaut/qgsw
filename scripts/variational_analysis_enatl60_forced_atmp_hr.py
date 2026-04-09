@@ -96,10 +96,10 @@ output_dir = config.io.output.directory
 
 # Simulation parameters
 
-dt = 1800
+dt = 3600
 optim_max_step = args.optim
 n_file_per_cycle = 20
-n_steps_per_cyle = (240 - 1) * 4
+n_steps_per_cyle = (240 - 1) * 2
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
@@ -158,7 +158,7 @@ def format_ds(ds: xr.Dataset) -> xr.Dataset:
 ds = load_datasets(files[0], format_func=format_ds)
 
 ### Compute longitude / latitudes
-dx = dy = 5000
+dx = dy = 10000
 lons, lats = compute_lonlat_from_regular_xy_grid(
     ds[LONGITUDE],
     ds[LATITUDE],
