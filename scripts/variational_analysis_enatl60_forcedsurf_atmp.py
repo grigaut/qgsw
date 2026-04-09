@@ -20,7 +20,7 @@ from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
 from qgsw.eNATL60 import seasons
 from qgsw.eNATL60.fields_computations import (
-    compute_streamfunction_with_atmospheric_pressure,
+    compute_streamfunction_with_atmospheric_pressure_xy_avg,
 )
 from qgsw.eNATL60.forcing import (
     interpolate_era_da,
@@ -531,12 +531,14 @@ for c in range(n_cycles):
         ds_era = slice_time(ds_era, ds[TIME])
         ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
 
-    ds[STREAMFUNCTION] = compute_streamfunction_with_atmospheric_pressure(
-        ds,
-        ds_era,
-        config.physics.rho,
-        g_prime[0].item(),
-        remove_avgs=True,
+    ds[STREAMFUNCTION] = (
+        compute_streamfunction_with_atmospheric_pressure_xy_avg(
+            ds,
+            ds_era,
+            config.physics.rho,
+            g_prime[0].item(),
+            remove_avgs=True,
+        )
     )
 
     with logger.timeit("Filtering stream function"):
@@ -814,7 +816,7 @@ for c in range(n_cycles):
 
                 if with_reg:
                     dpsi1_ = (psi1 - psi1_) / dt
-                    reg = 0.1 * (compute_reg(psi1_, dpsi1_, time))
+                    reg = 0.001 * (compute_reg(psi1_, dpsi1_, time))
                     loss += reg
 
                 loss = update_loss(
@@ -829,7 +831,7 @@ for c in range(n_cycles):
                     sigma_x = space_params[lvl]["sigma_x"] / dx
                     sigma_y = space_params[lvl]["sigma_y"] / dy
                     loss += (
-                        1e4
+                        1e3
                         * sqrt(sigma_x * sigma_y) ** (-5 / 3)
                         * coef.square().mean()
                     )
