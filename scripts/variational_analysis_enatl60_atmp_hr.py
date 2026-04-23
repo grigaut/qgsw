@@ -112,7 +112,7 @@ output_dir = config.io.output.directory
 dt = 3600
 optim_max_step = args.optim
 n_file_per_cycle = 20
-n_steps_per_cyle = (240 - 1) * 2
+n_steps_per_cyle = 240 * 2 - 1
 comparison_interval = args.comparison
 n_cycles = args.cycles
 
