@@ -786,6 +786,9 @@ for c in range(n_cycles):
                         model.time,
                         variance=var_ref,
                     )
+            if not with_reg:
+                for coef in coefs_scaled.values():
+                    loss += gamma * coef.square().mean()
 
         if torch.isnan(loss.detach()):
             msg = "Loss has diverged."
