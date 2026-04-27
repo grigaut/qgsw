@@ -31,6 +31,7 @@ class ScriptsArgsParser:
     has_gamma = False
     has_no_reg = False
     has_no_alpha = False
+    has_reg_exp = False
 
     @property
     def config(self) -> Path:
@@ -148,6 +149,15 @@ class ScriptsArgsParser:
             "Alpha not tracked.",
         )
         return self.namespace.no_alpha
+
+    @property
+    def reg_exp(self) -> float:
+        """reg_exp."""
+        self._check_attr(
+            self.has_reg_exp,
+            "reg_exp not tracked.",
+        )
+        return self.namespace.reg_exp
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -397,6 +407,17 @@ class ScriptsArgsParser:
         )
         self.has_no_alpha = True
 
+    def add_reg_exp(self, default: float = 2) -> None:
+        """Add regularization exponent."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--reg-exp",
+            type=float,
+            default=default,
+            help="Regularization exponent value.",
+        )
+        self.has_reg_exp = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_args(namespace=self.namespace)
@@ -435,6 +456,7 @@ class ScriptsArgsParser:
             f"_{self.season}"
             if (self.has_season and self.season is not None)
             else "",
+            f"_re{self.reg_exp}" if (self.has_reg_exp) else "",
         ]
 
     def complete_prefix(self) -> str:
