@@ -80,6 +80,7 @@ args = ScriptsArgsParser.va_setup(
 )
 args.add_regularization(gamma_default=1e4)
 args.add_season(default="summer")
+args.add_reg_exp(default=2)
 args.retrieve()
 with_reg = not args.no_reg
 with_obs_track = args.obs_track
@@ -672,7 +673,7 @@ for c in range(n_cycles):
                     sigma_y = space_params[lvl]["sigma_y"] / dy
                     loss += (
                         gamma
-                        * sqrt(sigma_x * sigma_y) ** (-5 / 3)
+                        * sqrt(sigma_x * sigma_y) ** (-args.reg_exp)
                         * coef.square().mean()
                     )
 

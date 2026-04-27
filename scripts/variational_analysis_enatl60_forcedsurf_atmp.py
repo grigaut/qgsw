@@ -94,6 +94,7 @@ args = ScriptsArgsParser.va_setup(
 args.add_regularization(gamma_default=1)
 args.add_alpha()
 args.add_season(default="summer")
+args.add_reg_exp(default=2)
 args.retrieve()
 with_reg = not args.no_reg
 with_alpha = not args.no_alpha
@@ -121,8 +122,8 @@ n_cycles = args.cycles
 
 separation = int(args.separation * dt / 3600 / 24)
 
-sigma_bc = 16
-sigma_ic = 16
+sigma_bc = 14
+sigma_ic = 14
 
 ## Load eNATL60 grid
 
@@ -644,10 +645,10 @@ for c in range(n_cycles):
     yy = space_interior.psi.xy.y
 
     space_params, time_params = dyadic_decomposition(
-        order=5,
+        order=5 - 3,
         xx_ref=xx,
         yy_ref=yy,
-        Lxy_max=900_000,
+        Lxy_max=900_000 / 2**3,
         Lt_max=n_steps_per_cyle * dt,
     )
 
@@ -832,7 +833,7 @@ for c in range(n_cycles):
                     sigma_y = space_params[lvl]["sigma_y"] / dy
                     loss += (
                         1e3
-                        * sqrt(sigma_x * sigma_y) ** (-5 / 3)
+                        * sqrt(sigma_x * sigma_y) ** (-args.reg_exp)
                         * coef.square().mean()
                     )
 
