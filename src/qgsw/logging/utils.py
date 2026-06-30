@@ -128,13 +128,16 @@ def step(current: int, total: int | None = None) -> str:
     return c_str.zfill(len(t_str)) + "/" + t_str
 
 
-def sec2text(time: float, *, squeeze_unit: bool = False) -> str:
+def sec2text(
+    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+) -> str:
     """Convert time in seconds to text.
 
     Args:
         time (float): Time in seconds.
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
+        round_res (bool, optional): Whether to round result or not.
 
     Returns:
         str: Text.
@@ -142,17 +145,22 @@ def sec2text(time: float, *, squeeze_unit: bool = False) -> str:
     if time < 60:
         s = "s" if time >= 2 else ""
         unit = "s" if squeeze_unit else f"second{s}"
+        if round_res:
+            return f"{round(time)} {unit}"
         return f"{time:.1f} {unit}"
-    return min2text(time / 60, squeeze_unit=squeeze_unit)
+    return min2text(time / 60, squeeze_unit=squeeze_unit, round_res=round_res)
 
 
-def min2text(time: float, *, squeeze_unit: bool = False) -> str:
+def min2text(
+    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+) -> str:
     """Convert time in minutes to text.
 
     Args:
         time (float): Time in minutes.
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
+        round_res (bool, optional): Whether to round result or not.
 
     Returns:
         str: Text.
@@ -160,17 +168,24 @@ def min2text(time: float, *, squeeze_unit: bool = False) -> str:
     if time < 60:
         s = "s" if time >= 2 else ""
         unit = "min" if squeeze_unit else f"minute{s}"
+        if round_res:
+            return f"{round(time)} {unit}"
         return f"{time:.1f} {unit}"
-    return hours2text(time / 60, squeeze_unit=squeeze_unit)
+    return hours2text(
+        time / 60, squeeze_unit=squeeze_unit, round_res=round_res
+    )
 
 
-def hours2text(time: float, *, squeeze_unit: bool = False) -> str:
+def hours2text(
+    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+) -> str:
     """Convert time in hours to text.
 
     Args:
         time (float): Time in hours.
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
+        round_res (bool, optional): Whether to round result or not.
 
     Returns:
         str: Text.
@@ -178,23 +193,30 @@ def hours2text(time: float, *, squeeze_unit: bool = False) -> str:
     if time < 24:
         s = "s" if time >= 2 else ""
         unit = "h" if squeeze_unit else f"hour{s}"
+        if round_res:
+            return f"{round(time)} {unit}"
         return f"{time:.1f} {unit}"
-    return days2text(time / 24, squeeze_unit=squeeze_unit)
+    return days2text(time / 24, squeeze_unit=squeeze_unit, round_res=round_res)
 
 
-def days2text(time: float, *, squeeze_unit: bool = False) -> str:
+def days2text(
+    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+) -> str:
     """Convert time in days to text.
 
     Args:
         time (float): Time in days.
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
+        round_res (bool, optional): Whether to round result or not.
 
     Returns:
         str: Text.
     """
     s = "s" if time >= 2 else ""
     unit = "d" if squeeze_unit else f"day{s}"
+    if round_res:
+        return f"{round(time)} {unit}"
     return f"{time:.1f} {unit}"
 
 
