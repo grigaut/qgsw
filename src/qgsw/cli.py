@@ -151,7 +151,7 @@ class ScriptsArgsParser:
         return self.namespace.no_alpha
 
     @property
-    def reg_exp(self) -> float:
+    def reg_exp(self) -> int:
         """reg_exp."""
         self._check_attr(
             self.has_reg_exp,
@@ -407,12 +407,12 @@ class ScriptsArgsParser:
         )
         self.has_no_alpha = True
 
-    def add_reg_exp(self, default: float = 2) -> None:
+    def add_reg_exp(self, default: int = 2) -> None:
         """Add regularization exponent."""
         self._check_unretrieved()
         self.parser.add_argument(
             "--reg-exp",
-            type=float,
+            type=int,
             default=default,
             help="Regularization exponent value.",
         )
