@@ -65,6 +65,8 @@ def default_clim(
         tuple[float, float]: Colorbar limits as (vmin, vmax).
     """
     data_ = data[~np.isnan(data)]
+    if data_.shape == (0,):
+        return -1, 1
     vmax = (
         np.quantile(np.abs(data_), 0.98) if robust else np.max(np.abs(data_))
     )
@@ -207,6 +209,7 @@ class SubplotsKwargs(TypedDict, total=False):
     """Non-exhaustives kwargs for subplots."""
 
     figsize: tuple[int, ...]
+    dpi: int
 
 
 def subplots(
@@ -267,15 +270,10 @@ def set_coltitles(
     if len(colnames) != (n := axs.shape[1]):
         msg = f"There must be exactly {n} column names."
         raise ValueError(msg)
-    kwargs.setdefault("xy", (0.5, 1))
-    kwargs.setdefault("xycoords", "axes fraction")
-    kwargs.setdefault("textcoords", "offset points")
-    kwargs.setdefault("ha", "center")
-    kwargs.setdefault("va", "baseline")
     col_titles: list[Annotation] = []
     for ax, col in zip(axs[0], colnames):
         ax: Axes
-        col_titles.append(ax.annotate(col, xytext=(0, pad), **kwargs))
+        col_titles.append(ax.set_title(col, pad=pad, **kwargs))
     return col_titles
 
 
@@ -328,7 +326,6 @@ def clamp_ylims(bottom: float, top: float, ax: Axes) -> None:
         top (float): Top value.
         ax (Axes): Axes.
     """
-    ax.relim()
     ax.autoscale_view()
 
     _, my = ax.margins()
@@ -352,15 +349,22 @@ def set_ylims(bottom: float, top: float, ax: Axes) -> None:
     """
     ax.relim()
     ax.autoscale_view()
-
     _, my = ax.margins()
 
-    y0 = bottom
-    y1 = top
+    padded_bottom, padded_top = ax.get_ylim()
+
+    # Recover the unpadded data range from the already-margined limits
+    # padded = data ± my * dy  →  dy = padded_dy / (1 + 2*my)
+    padded_dy = padded_top - padded_bottom
+    data_dy = padded_dy / (1 + 2 * my)
+    data_bottom = padded_bottom + my * data_dy
+    data_top = padded_top - my * data_dy
+
+    y0 = bottom if bottom is not None else data_bottom
+    y1 = top if top is not None else data_top
 
     dy = y1 - y0
     pad = my * dy
-
     ax.set_ylim(y0 - pad, y1 + pad)
 
 
@@ -371,7 +375,7 @@ class SuptitleKwargs(TypedDict, total=False):
 def blittable_suptitle(
     text: str,
     fig: Figure,
-    ax: Axes,
+    ax_ref: Axes,
     **kwargs: Unpack[SuptitleKwargs],
 ) -> Text:
     """Set the figure suptitle through ax.text.
@@ -382,7 +386,7 @@ def blittable_suptitle(
     Args:
         text (str): Suptitle text.
         fig (Figure): Figure to add suptitle to.
-        ax (Axes): Ax to use for the suptitle.
+        ax_ref (Axes): Reference axes.
         **kwargs: Keywords arguments to pass to ax.text.
 
     Returns:
@@ -404,7 +408,7 @@ def blittable_suptitle(
     temp_suptitle.remove()
     fig._suptitle = None  # noqa: SLF001
 
-    suptitle = ax.text(
+    suptitle = ax_ref.text(
         position[0],
         position[1],
         text,
