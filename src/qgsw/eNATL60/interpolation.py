@@ -128,7 +128,7 @@ def build_regridder(
         lats_ref = np.ascontiguousarray(ds[LATITUDE].T).T
 
     else:
-        msg = "Uncompatible lon/lat shapes."
+        msg = "Incompatible lon/lat shapes."
         raise ValueError(msg)
     ds_in = xr.Dataset(
         {
