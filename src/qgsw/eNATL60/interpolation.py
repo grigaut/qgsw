@@ -58,11 +58,7 @@ def compute_lonlat_from_regular_xy_grid(
 
     lat_offset = (lat_range - nlat * dlat) / 2
 
-    lats_ = np.arange(
-        lat_min + lat_offset,
-        lat_max,
-        dlat,
-    )
+    lats_ = np.arange(0, int(nlat) + 1) * dlat + lat_min + lat_offset
 
     dlons = dx / EARTH_RADIUS / np.cos(lats_)
     dlon_max = np.max(dlons)
