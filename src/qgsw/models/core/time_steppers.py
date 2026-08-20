@@ -3,9 +3,9 @@
 from collections.abc import Callable
 from typing import TypeVar, Union
 
-from qgsw.fields.variables.tuples import PSIQ, UVH
+from qgsw.fields.variables.tuples import PSIQ, PSIQSST, UVH
 
-Prognostic = TypeVar("Prognostic", bound=Union[UVH, PSIQ])
+Prognostic = TypeVar("Prognostic", bound=Union[UVH, PSIQ, PSIQSST])
 
 AVAILABLE = ["rk3", "euler"]
 
