@@ -11,8 +11,13 @@ from qgsw.fields.variables.physical import (
     PressureTilde,
     SurfaceHeightAnomaly,
 )
-from qgsw.fields.variables.state import StatePSIQ, StateUVH, StateUVHAlpha
-from qgsw.fields.variables.tuples import PSIQ, UVH
+from qgsw.fields.variables.state import (
+    StatePSIQ,
+    StatePSIQSST,
+    StateUVH,
+    StateUVHAlpha,
+)
+from qgsw.fields.variables.tuples import PSIQ, PSIQSST, UVH
 from qgsw.specs import DEVICE
 
 
@@ -103,6 +108,66 @@ def test_psiq_init_update() -> None:
 
     assert (state.psi.get() == psi).all()
     assert (state.q.get() == q).all()
+
+
+def test_psiqsst_init_update() -> None:
+    """Test state initialization and updates."""
+    n_ens = 1
+    nl = 2
+    nx = 10
+    ny = 10
+    state = StatePSIQSST.steady(
+        n_ens,
+        nl,
+        nx,
+        ny,
+        dtype=torch.float64,
+        device=DEVICE.get(),
+    )
+
+    psi = state.psi.get()
+    q = state.q.get()
+    sst = state.sst.get()
+
+    assert psi.shape == (n_ens, nl, nx + 1, ny + 1)
+    assert q.shape == (n_ens, nl, nx, ny)
+    assert sst.shape == (n_ens, nl, nx, ny)
+
+    assert (psi == 0).all()
+    assert (q == 0).all()
+    assert (sst == PSIQSST.steady_sst_value).all()
+
+    psi = torch.clone(psi) + 1
+    q = torch.clone(q) + 2
+    sst = torch.clone(sst) + 3
+
+    state.update_psiqsst(PSIQSST(psi, q, sst))
+
+    assert (state.psi.get() == psi).all()
+    assert (state.q.get() == q).all()
+    assert (state.sst.get() == sst).all()
+
+    psi += 1
+    q += 2
+    sst += 3
+
+    state.update_psiqsst(PSIQSST(psi, q, sst))
+
+    assert (state.psi.get() == psi).all()
+    assert (state.q.get() == q).all()
+    assert (state.sst.get() == sst).all()
+
+    sst = torch.clone(sst) + 3
+
+    state.update_sst(sst)
+
+    assert (state.sst.get() == sst).all()
+
+    sst += 3
+
+    state.update_sst(sst)
+
+    assert (state.sst.get() == sst).all()
 
 
 def test_state_alpha_updates() -> None:

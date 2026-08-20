@@ -22,15 +22,19 @@ from qgsw.fields.variables.prognostic import (
     LayerDepthAnomaly,
     MeridionalVelocity,
     PrognosticPotentialVorticity,
+    PrognosticSST,
     PrognosticStreamFunction,
     Time,
     ZonalVelocity,
 )
 from qgsw.fields.variables.tuples import (
     PSIQ,
+    PSIQSST,
+    PSIQSSTT,
     PSIQT,
     UVH,
     UVHT,
+    PSIQSSTTAlpha,
     PSIQTAlpha,
     UVHTAlpha,
 )
@@ -44,7 +48,7 @@ if TYPE_CHECKING:
     )
 
 
-T = TypeVar("T", bound=Union[PSIQT, UVHT])
+T = TypeVar("T", bound=Union[PSIQT, PSIQSSTT, UVHT])
 
 
 class BaseState(ABC, Generic[T]):
@@ -264,12 +268,14 @@ class BaseStateUVH(BaseState[TUVHT], Generic[TUVHT], metaclass=ABCMeta):
 
 TPSIQT = TypeVar("TPSIQT", bound=PSIQT)
 
+TPSIQSSTT = TypeVar("TPSIQSSTT", bound=PSIQSSTT)
+
 
 class BaseStatePSIQ(BaseState[TPSIQT], Generic[TPSIQT], metaclass=ABCMeta):
     """Base State for PSIQ models."""
 
     def __init__(self, prognostic: TPSIQT) -> None:
-        """Instantaite the state.
+        """Instantiate the state.
 
         Args:
             prognostic (TPSIQT): Prognostic tuple.
@@ -296,6 +302,67 @@ class BaseStatePSIQ(BaseState[TPSIQT], Generic[TPSIQT], metaclass=ABCMeta):
 
         Args:
             psiq (PSIQ): Prognostic psi and q.
+        """
+
+
+class BaseStatePSIQSST(
+    BaseState[TPSIQSSTT],
+    Generic[TPSIQSSTT],
+    metaclass=ABCMeta,
+):
+    """Base State for PSIQ models."""
+
+    def __init__(self, prognostic: TPSIQSSTT) -> None:
+        """Instantiate the state.
+
+        Args:
+            prognostic (TPSIQSSTT): Prognostic tuple.
+        """
+        super().__init__(prognostic)
+        self._psi = PrognosticStreamFunction(prognostic.psi)
+        self._q = PrognosticPotentialVorticity(prognostic.q)
+        self._sst = PrognosticPotentialVorticity(prognostic.sst)
+        self._prog_vars[PrognosticStreamFunction.get_name()] = self._psi
+        self._prog_vars[PrognosticPotentialVorticity.get_name()] = self._q
+        self._prog_vars[PrognosticSST.get_name()] = self._sst
+
+    @property
+    def psi(self) -> PrognosticStreamFunction:
+        """Prognostic stream function."""
+        return self._psi
+
+    @property
+    def q(self) -> PrognosticPotentialVorticity:
+        """Prognostic potential vorticity."""
+        return self._q
+
+    @property
+    def sst(self) -> PrognosticSST:
+        """Prognostic sea surface temperature."""
+        return self._sst
+
+    @abstractmethod
+    def update_psiq(self, psiq: PSIQ) -> None:
+        """Update psi and q.
+
+        Args:
+            psiq (PSIQ): Prognostic psi and q.
+        """
+
+    @abstractmethod
+    def update_sst(self, sst: torch.Tensor) -> None:
+        """Update sst.
+
+        Args:
+            sst (torch.Tensor): Prognostic sea surface temperature.
+        """
+
+    @abstractmethod
+    def update_psiqsst(self, psiqsst: PSIQSST) -> None:
+        """Update psi, q and sst.
+
+        Args:
+            psiqsst (PSIQSST): Prognostic psi, q and sst.
         """
 
 
@@ -363,20 +430,126 @@ class StatePSIQ(BaseStatePSIQ[PSIQT]):
 
     @classmethod
     def from_tensors(
-        cls,
-        psi: torch.Tensor,
-        q: torch.Tensor,
+        cls, psi: torch.Tensor, q: torch.Tensor, t: torch.Tensor
     ) -> Self:
         """Instantiate the state from tensors.
 
         Args:
             psi (torch.Tensor): Stream function.
             q (torch.Tensor): POtential vorticity.
+            t (torch.Tensor): Time.
 
         Returns:
-            Self: StateUVH.
+            Self: StatePSIQ.
         """
-        return cls(PSIQ(psi, q))
+        return cls(PSIQ(psi, q, t))
+
+
+class StatePSIQSST(BaseStatePSIQSST[PSIQSSTT]):
+    """State: wrapper for PSIQSSTT state variables.
+
+    This wrapper links psiq variables to diagnostic variables.
+    Diagnostic variables can be bound to the state so that they are updated
+    only when the state has changed.
+    """
+
+    def _update_prognostic_vars(self, prognostic: PSIQSSTT) -> None:
+        self._t.update(prognostic.t)
+        self._psi.update(prognostic.psi)
+        self._q.update(prognostic.q)
+        self._sst.update(prognostic.sst)
+
+    def update_psiq(self, psiq: PSIQ) -> None:
+        """Update psi and q.
+
+        Args:
+            psiq (PSIQ): Prognostic psi and q.
+        """
+        self.prognostic = PSIQSSTT.from_psiqsst(
+            self.t.get(), PSIQSST.from_psiq(psiq, self.sst.get())
+        )
+
+    def update_psiqsst(self, psiqsst: PSIQSST) -> None:
+        """Update psi, q, and sst.
+
+        Args:
+            psiqsst (PSIQSST): Prognostic psi, q, and sst.
+        """
+        self.prognostic = PSIQSSTT.from_psiqsst(self.t.get(), psiqsst)
+
+    def update_sst(self, sst: torch.Tensor) -> None:
+        """Update sst.
+
+        Args:
+            sst (torch.Tensor): Sea surface temperature.
+        """
+        self.prognostic = PSIQSSTT.from_psiqsst(
+            self.t.get(), PSIQSST(self.psi.get(), self.q.get(), sst)
+        )
+
+    def update_time(self, time: torch.Tensor) -> None:
+        """Update only the value of time.
+
+        Args:
+            time (torch.Tensor): Time.
+        """
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
+        prognostic = PSIQSSTT.from_psiqsst(
+            time,
+            self.prognostic.psiqsst,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    @classmethod
+    def steady(
+        cls,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> Self:
+        """Instantiate a steady state with zero-filled prognostic variables.
+
+        Args:
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
+
+        Returns:
+            Self: StatePSIQSST.
+        """
+        return cls(
+            PSIQSSTT.steady(n_ens, nl, nx, ny, dtype=dtype, device=device)
+        )
+
+    @classmethod
+    def from_tensors(
+        cls,
+        psi: torch.Tensor,
+        q: torch.Tensor,
+        sst: torch.Tensor,
+        t: torch.Tensor,
+    ) -> Self:
+        """Instantiate the state from tensors.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+            q (torch.Tensor): POtential vorticity.
+            sst (torch.Tensor): Sea surface temperature.
+            t (torch.Tensor): Time.
+
+        Returns:
+            Self: StatePSIQSST.
+        """
+        return cls(PSIQSSTT(psi, q, sst, t))
 
 
 class StatePSIQAlpha(BaseStatePSIQ[PSIQTAlpha]):
@@ -510,6 +683,168 @@ class StatePSIQAlpha(BaseStatePSIQ[PSIQTAlpha]):
             Self: StatePSIQTAlpha.
         """
         return cls(PSIQTAlpha(psi, q, t, alpha))
+
+
+class StatePSIQSSTAlpha(BaseStatePSIQSST[PSIQSSTTAlpha]):
+    """State: wrapper for PSIQTAlpha state variables.
+
+    This wrapper links psiq variables to diagnostic variables.
+    Diagnostic variables can be bound to the state so that they are updated
+    only when the state has changed.
+    """
+
+    def __init__(self, prognostic: PSIQSSTTAlpha) -> None:
+        """Instantiate StatePSIQSSTAlpha.
+
+        Args:
+            prognostic (PSIQSSTTAlpha): Core prognostic variables.
+        """
+        super().__init__(prognostic)
+        self._alpha = CollinearityCoefficient(prognostic.alpha)
+        self._prog_vars[CollinearityCoefficient.get_name()] = self._alpha
+
+    @property
+    def alpha(self) -> CollinearityCoefficient:
+        """Collinearity coefficient."""
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: torch.Tensor) -> None:
+        self.update_alpha(alpha)
+
+    def _update_prognostic_vars(self, prognostic: PSIQTAlpha) -> None:
+        """Update the prognostic variables.
+
+        Args:
+            prognostic (PSIQTAlpha): Prognostic tuple for psi and q.
+        """
+        self._t.update(prognostic.t)
+        self._psi.update(prognostic.psi)
+        self._q.update(prognostic.q)
+        self._sst.update(prognostic.sst)
+        self._alpha.update(prognostic.alpha)
+
+    def update_alpha(self, alpha: torch.Tensor) -> None:
+        """Update only the value of alpha.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+        """
+        for var in filter(lambda v: v.require_alpha, self.diag_vars.values()):
+            var.outdated()
+        prognostic = PSIQSSTTAlpha.from_psiqsst(
+            self.t.get(),
+            alpha,
+            self.prognostic.psiqsst,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    def update_psiq(self, psiq: PSIQ) -> None:
+        """Update psi and q only.
+
+        Args:
+            psiq (PSIQ): Prognostic psi and q.
+        """
+        self.prognostic = PSIQSSTTAlpha.from_psiqsst(
+            self.t.get(),
+            self.alpha.get(),
+            PSIQSST.from_psiq(psiq, self.sst.get()),
+        )
+
+    def update_psiqsst(self, psiqsst: PSIQSST) -> None:
+        """Update psi, q and sst only.
+
+        Args:
+            psiqsst (PSIQSST): Prognostic psi, q and sst.
+        """
+        self.prognostic = PSIQSSTTAlpha.from_psiqsst(
+            self.t.get(),
+            self.alpha.get(),
+            psiqsst,
+        )
+
+    def update_sst(self, sst: torch.Tensor) -> None:
+        """Update sst only.
+
+        Args:
+            sst (torch.Tensor): Sea surface temperature.
+        """
+        self.prognostic = PSIQSSTTAlpha.from_psiqsst(
+            self.t.get(),
+            self.alpha.get(),
+            PSIQSST.from_psiq(self.psi.get(), sst),
+        )
+
+    def update_time(self, time: torch.Tensor) -> None:
+        """Update only the value of time.
+
+        Args:
+            time (torch.Tensor): Time.
+        """
+        for var in filter(lambda v: v.require_time, self.diag_vars.values()):
+            var.outdated()
+        prognostic = PSIQSSTTAlpha.from_psiqsst(
+            time,
+            self.alpha.get(),
+            self.prognostic.psiqsst,
+        )
+        self._prog = prognostic
+        self._update_prognostic_vars(prognostic)
+
+    @classmethod
+    def steady(
+        cls,
+        n_ens: int,
+        nl: int,
+        nx: int,
+        ny: int,
+        *,
+        dtype: torch.dtype = None,
+        device: torch.device = None,
+    ) -> Self:
+        """Instantiate a steady state with zero-filled prognostic variables.
+
+        Args:
+            alpha (torch.Tensor): Collinearity coefficient.
+            n_ens (int): Number of ensembles.
+            nl (int): Number of layers.
+            nx (int): Number of points in the x direction.
+            ny (int): Number of points in the y direction.
+            dtype (torch.dtype, optional): Data type. Defaults to None.
+            device (torch.device, optional): Device to use. Defaults to None.
+
+        Returns:
+            Self: StatePSIQTAlpha.
+        """
+        return cls(
+            PSIQSSTTAlpha.steady(
+                n_ens, nl, nx, ny, dtype=dtype, device=device
+            ),
+        )
+
+    @classmethod
+    def from_tensors(
+        cls,
+        psi: torch.Tensor,
+        q: torch.Tensor,
+        sst: torch.Tensor,
+        t: torch.Tensor,
+        alpha: torch.Tensor,
+    ) -> Self:
+        """Instantiate the state from tensors.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+            q (torch.Tensor): Potential vorticity.
+            sst (torch.Tensor): Sea surface temperature.
+            t (torch.Tensor): Time.
+            alpha (torch.Tensor): Collinearity coefficient.
+
+        Returns:
+            Self: StatePSIQTAlpha.
+        """
+        return cls(PSIQSSTTAlpha(psi, q, sst, t, alpha))
 
 
 class StateUVH(BaseStateUVH[UVHT]):
