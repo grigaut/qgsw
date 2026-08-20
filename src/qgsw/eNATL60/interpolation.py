@@ -98,6 +98,8 @@ def build_regridder(
     ds: xr.Dataset,
     lons: np.ndarray,
     lats: np.ndarray,
+    *,
+    method: str = "bilinear",
 ) -> xe.Regridder:
     """Build regridder for interpolation.
 
@@ -105,6 +107,8 @@ def build_regridder(
         ds (xr.Dataset): Dataset with reference lon / lat.
         lons (np.ndarray): Longitudes to interpolate onto.
         lats (np.ndarray): Latitudes to interpolate onto.
+        method (str, optional): Regridding method to pass to xe.Regridder.
+            Defaults to 'bilinear'.
 
     Returns:
         xe.Regridder: Regridder.
@@ -135,6 +139,6 @@ def build_regridder(
     return xe.Regridder(
         ds_in,
         ds_out,
-        "bilinear",
+        method=method,
         periodic=False,
     )
