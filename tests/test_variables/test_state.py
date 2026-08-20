@@ -131,7 +131,7 @@ def test_psiqsst_init_update() -> None:
 
     assert psi.shape == (n_ens, nl, nx + 1, ny + 1)
     assert q.shape == (n_ens, nl, nx, ny)
-    assert sst.shape == (n_ens, nl, nx, ny)
+    assert sst.shape == (n_ens, 1, nx, ny)
 
     assert (psi == 0).all()
     assert (q == 0).all()
