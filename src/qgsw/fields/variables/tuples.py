@@ -61,6 +61,16 @@ class BaseTuple:
         """Substraction."""
         return self.__add__(-1 * other)
 
+    @property
+    def shape(self) -> dict[str, torch.Size]:
+        """Tensors shapes."""
+        return {f: getattr(self, f).shape for f in self._fields}
+
+    @property
+    def shapes(self) -> dict[str, torch.Size]:
+        """Tensors shapes."""
+        return self.shape
+
 
 P = TypeVar("P", bound=BaseTuple)
 
@@ -563,7 +573,7 @@ class PSIQSSTT(BasePSIQSST, _PSIQSSTT):
 
     @property
     def psiqsst(self) -> PSIQSSTT:
-        """PSIQ."""
+        """PSIQSST."""
         return PSIQSST(self.psi, self.q, self.sst)
 
     def __mul__(self, other: float) -> PSIQT:
