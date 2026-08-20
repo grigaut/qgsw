@@ -466,7 +466,7 @@ class StatePSIQSST(BaseStatePSIQSST[PSIQSSTT]):
             psiq (PSIQ): Prognostic psi and q.
         """
         self.prognostic = PSIQSSTT.from_psiqsst(
-            self.t.get(), PSIQSST.from_psiq(psiq, self.sst.get())
+            self.t.get(), PSIQSST.from_psiq(self.sst.get(), psiq)
         )
 
     def update_psiqsst(self, psiqsst: PSIQSST) -> None:
