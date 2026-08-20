@@ -384,11 +384,13 @@ class MagnitudeSquaredCoherence:
         Returns:
             torch.Tensor: Magnitude squared coherence of f1 and f2.
         """
-        csd_f1f2 = self.csd.iso_spec(f1, f2, scale_fft=False)
+        csd_f1f2 = self.csd.spec(f1, f2, scale_fft=False)
         psd_f1 = self.csd.iso_spec(f1, f1, scale_fft=False)
         psd_f2 = self.csd.iso_spec(f2, f2, scale_fft=False)
 
-        return torch.abs(csd_f1f2) ** 2 / (psd_f1 * psd_f2)
+        return self.csd.isotropize(torch.abs(csd_f1f2) ** 2) / (
+            psd_f1 * psd_f2
+        )
 
     def iso_spec_w(
         self,
