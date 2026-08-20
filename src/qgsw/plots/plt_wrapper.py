@@ -210,6 +210,8 @@ class SubplotsKwargs(TypedDict, total=False):
 
     figsize: tuple[int, ...]
     dpi: int
+    sharey: bool
+    sharex: bool
 
 
 def subplots(
