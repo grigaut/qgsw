@@ -66,3 +66,12 @@ class PrognosticPotentialVorticity(PrognosticVariable):
     _unit = Unit.S_1
     _name = "q"
     _description = "Potential vorticity"
+
+
+class PrognosticSST(PrognosticVariable):
+    """Prognostic sea surface temperature."""
+
+    _scope = Scope.POINT_WISE
+    _unit = Unit.T
+    _name = "sst"
+    _description = "Sea surface temperature"
