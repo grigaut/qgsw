@@ -373,7 +373,7 @@ class PSIQSST(BasePSIQSST, _PSIQSST):
         )
         sst = (
             torch.ones(
-                (n_ens, nl, nx, ny),
+                (n_ens, 1, nx, ny),
                 dtype=dtype,
                 device=device,
             )
