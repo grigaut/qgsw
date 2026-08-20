@@ -1068,7 +1068,7 @@ class QGPSIQRGPsi2TransportDR(QGPSIQRGPsi2Transport):
 
 
 class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
-    """Mixed model using both alpha and psi2."""
+    """Mixed model using both alpha and psi2 along with an external forcing."""
 
     _forcing: torch.Tensor = None
 
