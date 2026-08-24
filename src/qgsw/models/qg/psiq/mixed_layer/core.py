@@ -23,9 +23,11 @@ from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
+from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import laplacian, nabla4
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
+from qgsw.utils.interpolation import LinearInterpolation
 from qgsw.utils.tensor_operations import as_singe_value_tensor
 
 if TYPE_CHECKING:
@@ -254,20 +256,29 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
 
     def _set_state(self) -> None:
         """Set the state."""
-        with torch.no_grad():
-            self._state = StatePSIQSST.steady(
-                n_ens=self.n_ens,
-                nl=self.space.nl,
-                nx=self.space.nx,
-                ny=self.space.ny,
-                dtype=self.dtype,
-                device=self.device.get(),
-            )
-            self._sst_mean = (self._state.sst.get() * self.masks.h).mean()
-            self._state.update_sst(self._state.sst.get() - self._sst_mean)
+        self._state = StatePSIQSST.steady(
+            n_ens=self.n_ens,
+            nl=self.space.nl,
+            nx=self.space.nx,
+            ny=self.space.ny,
+            dtype=self.dtype,
+            device=self.device.get(),
+        )
+        self._sst_mean = (self._state.sst.get() * self.masks.h).mean()
+        self._state.update_sst(self._state.sst.get() - self._sst_mean)
         self._set_io(self._state)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
+
+    def set_mean_flow(
+        self,
+        sf_bar_interp: LinearInterpolation[torch.Tensor],
+        pv_bar_interp: LinearInterpolation[torch.Tensor],
+        sf_bar_bc_interp: LinearInterpolation[Boundaries],
+        pv_bar_bc_interp: LinearInterpolation[Boundaries],
+    ) -> None:
+        """Not implemented."""
+        raise NotImplementedError
 
     def set_wind_forcing(
         self,
@@ -561,6 +572,8 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         u, v = self._grad_perp(psi)
         u /= self.space.dy
         v /= self.space.dx
+
+        ## Compute dq
         div_flux_q = self._compute_advection_homogeneous(u, v, q)
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
@@ -571,7 +584,16 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
             + fcg_drag
             + self.beta_plane.f0 / self.H * (e[:, :-1] - e[:, 1:])
         ) * self.masks.h
+        dq_i = self._interpolate(dq)
 
+        ## Compute dψ
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=True,
+        )
+
+        ## Compute dSST
         u_ml = u[:, :1] + self._uw * self.masks.u
         v_ml = v[:, :1] + self._vw * self.masks.v
 
@@ -607,12 +629,6 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
             + fluxes
             + diffusion
         ) * self.masks.h
-        dq_i = self._interpolate(dq)
-        # Solve Helmholtz equation
-        dpsi = self._solver_homogeneous.compute_stream_function(
-            dq_i,
-            ensure_mass_conservation=True,
-        )
         return PSIQSST(dpsi, dq, dsst)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -634,19 +650,30 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
                 └──  dsst : (n_ens, nl, nx, ny)-shaped
         """
         psi_i, q_i, sst_anom = prognostic
+        ## Reconstruct ψ and q
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
         q = q_i + q_bc
         u, v = self._grad_perp(psi)
         u /= self.space.dy
         v /= self.space.dx
+
+        ## Compute dq
         div_flux_q = self._compute_advection_inhomogeneous(
             u, v, q, self._pv_bc
         )
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         dq = (-div_flux_q + fcg_drag) * self.masks.h
+        dq_i = self._interpolate(dq)
 
+        ## Compute dψ
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=False,
+        )
+        ## Compute dSST
         u_ml = u[:, :1] + self._uw * self.masks.u
         v_ml = v[:, :1] + self._vw * self.masks.v
 
@@ -683,12 +710,7 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
             + diffusion
         ) * self.masks.h
 
-        dq_i = self._interpolate(dq)
-        # Solve Helmholtz equation
-        dpsi = self._solver_homogeneous.compute_stream_function(
-            dq_i,
-            ensure_mass_conservation=False,
-        )
+        ## Adjust boundaries
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
             self._rk3_step += 1
