@@ -47,7 +47,7 @@ T = TypeVar("T", bound=BasePSIQ)
 logger = getLogger(__name__)
 
 
-class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
+class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
     """Finite volume multi-layer QG solver with mixed layer."""
 
     _H_ml = torch.tensor(100, **defaults.get())  # Mixed layer depth in meters
@@ -963,7 +963,7 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         return QGPSIQVariableSet.get_variable_set(space, physics, model)
 
 
-class QGPSIQML(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
+class QGPSIQSST(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
     """Quasi Geostrophic Model with mixed layer and SST."""
 
     _type = ModelName.QUASI_GEOSTROPHIC_ML
