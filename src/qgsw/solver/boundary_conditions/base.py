@@ -39,8 +39,15 @@ class Boundaries:
 
     def __add__(self, other: Boundaries) -> Boundaries:
         """Add two boundary conditions."""
-        if not isinstance(other, Boundaries):
+        if not isinstance(other, (Boundaries, float, int, torch.Tensor)):
             return NotImplemented
+        if isinstance(other, (float, int, torch.Tensor)):
+            return Boundaries(
+                top=self.top + other,
+                bottom=self.bottom + other,
+                left=self.left + other,
+                right=self.right + other,
+            )
         return Boundaries(
             top=self.top + other.top,
             bottom=self.bottom + other.bottom,
@@ -50,8 +57,15 @@ class Boundaries:
 
     def __radd__(self, other: Boundaries) -> Boundaries:
         """Add two boundary conditions."""
-        if not isinstance(other, Boundaries):
+        if not isinstance(other, (Boundaries, float, int, torch.Tensor)):
             return NotImplemented
+        if isinstance(other, (float, int, torch.Tensor)):
+            return Boundaries(
+                top=self.top + other,
+                bottom=self.bottom + other,
+                left=self.left + other,
+                right=self.right + other,
+            )
         return Boundaries(
             top=self.top + other.top,
             bottom=self.bottom + other.bottom,
@@ -61,8 +75,15 @@ class Boundaries:
 
     def __sub__(self, other: Boundaries) -> Boundaries:
         """Subtract two boundary conditions."""
-        if not isinstance(other, Boundaries):
+        if not isinstance(other, (Boundaries, float, int, torch.tensor)):
             return NotImplemented
+        if isinstance(other, (float, int, torch.Tensor)):
+            return Boundaries(
+                top=self.top - other,
+                bottom=self.bottom - other,
+                left=self.left - other,
+                right=self.right - other,
+            )
         return Boundaries(
             top=self.top - other.top,
             bottom=self.bottom - other.bottom,
