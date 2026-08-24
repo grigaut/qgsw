@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeVar
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 
 from qgsw.exceptions import InvalidLayerNumberError
 from qgsw.fields.variables.state import (
@@ -21,19 +22,22 @@ from qgsw.models.core import time_steppers
 from qgsw.models.io import IO
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
-from qgsw.solver.finite_diff import laplacian
+from qgsw.solver.finite_diff import laplacian, nabla4
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import defaults
+from qgsw.utils.tensor_operations import as_singe_value_tensor
 
 if TYPE_CHECKING:
     from qgsw.configs.models import ModelConfig
     from qgsw.configs.physics import PhysicsConfig
     from qgsw.configs.space import SpaceConfig
     from qgsw.fields.variables.base import DiagnosticVariable
+    from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.solver.boundary_conditions.base import Boundaries
     from qgsw.solver.pv_inversion import (
         BasePVInversion,
     )
+    from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.utils.interpolation import LinearInterpolation
 
 T = TypeVar("T", bound=BasePSIQ)
@@ -45,10 +49,48 @@ logger = getLogger(__name__)
 class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
     """Finite volume multi-layer QG solver with mixed layer."""
 
-    H_ml = torch.tensor(100, **defaults.get())  # Mixed layer depth in meters
-    K2 = torch.tensor(380, **defaults.get())  # See Kravtsov, 2022
+    _H_ml = torch.tensor(100, **defaults.get())  # Mixed layer depth in meters
+    _K2 = torch.tensor(380, **defaults.get())  # See Hogg, 2014
+    _K4 = torch.tensor(4e10, **defaults.get())  # See Hogg, 2014
+    _lambd = torch.tensor(35, **defaults.get())  # See Hogg, 2014
+    _heat_cap = torch.tensor(4000, **defaults.get())  # See Kravtsov, 2022
+    _rho0 = torch.tensor(1000, **defaults.get())
+    _defaut_temp_atm = torch.tensor(
+        282.6, **defaults.get()
+    )  # See Kravtsov, 2022
+    sigma = torch.tensor(5.6704e-8, **defaults.get())  # Stefan-Boltzmann
     temp_1_offset = 2
     delta_temp_1 = 8
+
+    def __init__(
+        self,
+        *,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,
+        beta_plane: BetaPlane,
+        g_prime: torch.Tensor,
+        optimize=True,  # noqa: ANN001
+    ) -> None:
+        """Model Instantiation.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
+            optimize (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        super().__init__(
+            space_2d=space_2d,
+            H=H,
+            beta_plane=beta_plane,
+            g_prime=g_prime,
+            optimize=optimize,
+        )
+        self.temp_atm = self._defaut_temp_atm
 
     @property
     def psi(self) -> torch.Tensor:
@@ -72,6 +114,11 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
 
         └── (n_ens, nl, nx, ny)-shaped.
         """
+        return self._state.sst.get() + self._sst_mean
+
+    @property
+    def sst_anom(self) -> torch.Tensor:
+        """SST anomaly."""
         return self._state.sst.get()
 
     @property
@@ -123,6 +170,82 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
             raise ValueError(msg)
         return PSIQ(self.psi, self.q) - self.mean_flow
 
+    @property
+    def K2(self) -> torch.Tensor:  # noqa: N802
+        """Diffusion coefficient [m².s⁻¹]."""
+        return self._K2
+
+    @K2.setter
+    def K2(self, value: float | torch.Tensor) -> None:  # noqa: N802
+        self._K2 = as_singe_value_tensor(value)
+
+    @property
+    def K4(self) -> torch.Tensor:  # noqa: N802
+        """4th order diffusion coefficient [m⁴.s⁻¹]."""
+        return self._K4
+
+    @K4.setter
+    def K4(self, value: float | torch.Tensor) -> None:  # noqa: N802
+        self._K4 = as_singe_value_tensor(value)
+
+    @property
+    def H_ml(self) -> torch.Tensor:  # noqa: N802
+        """Mixed layer depth [m]."""
+        return self._H_ml
+
+    @H_ml.setter
+    def H_ml(self, value: float | torch.Tensor) -> None:  # noqa: N802
+        self._H_ml = as_singe_value_tensor(value)
+
+    @property
+    def lambd(self) -> torch.Tensor:
+        """Sensible / latent heat flux coefficient [W.m⁻².K⁻¹]."""
+        return self._lambd
+
+    @lambd.setter
+    def lambd(self, value: float | torch.Tensor) -> torch.Tensor:
+        self._lambd = as_singe_value_tensor(value)
+
+    @property
+    def temp_atm(self) -> torch.Tensor:
+        """Atmosphere temperature."""
+        return self._temp_atm
+
+    @temp_atm.setter
+    def temp_atm(self, value: float | torch.Tensor) -> None:
+        if not isinstance(value, torch.Tensor):
+            value = as_singe_value_tensor(value)
+        if value.numel() == 1:
+            self._temp_atm = (
+                torch.ones_like(
+                    self.space.h.xyh.x[:1].tile(self.n_ens, 1, 1, 1)
+                )
+                * value.squeeze()
+            )
+            return
+        if value.shape != (s := self.q[:, :1, ...].shape):
+            msg = f"Atmosphere temperature field should be {s}-shaped."
+            raise ValueError(msg)
+        self._temp_atm = value
+
+    @property
+    def rho0(self) -> torch.Tensor:
+        """Reference density [kg.m⁻³]."""
+        return self._rho0
+
+    @rho0.setter
+    def rho0(self, value: float | torch.Tensor) -> None:
+        self._rho0 = as_singe_value_tensor(value)
+
+    @property
+    def heat_cap(self) -> torch.Tensor:
+        """Heat capacity [J.kg⁻¹.K⁻¹]."""
+        return self._heat_cap
+
+    @heat_cap.setter
+    def heat_cap(self, value: float | torch.Tensor) -> None:
+        self._heat_cap = as_singe_value_tensor(value)
+
     def _set_io(self, state: StatePSIQSST) -> None:
         self._io = IO(state.t, state.psi, state.q, state.sst)
 
@@ -137,6 +260,8 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
                 dtype=self.dtype,
                 device=self.device.get(),
             )
+            self._sst_mean = (self._state.sst.get() * self.masks.h).mean()
+            self._state.update_sst(self._state.sst.get() - self._sst_mean)
         self._set_io(self._state)
         q = self._compute_q_from_psi(self.psi)
         self._state.update_psiq(PSIQ(self.psi, q))
@@ -199,10 +324,13 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
 
         pv_bc = self._pv_bc_interp(time)
-        sst_bc = self._sst_bc_interp(time)
+        sst_bc: Boundaries = self._sst_bc_interp(time) - self._sst_mean
         if self.wide:
-            if pv_bc.width != 3:
-                msg = "For wide boundary, pv_bc must be 3 points wide."
+            if pv_bc.width != 3 or sst_bc.width != 3:
+                msg = (
+                    "For wide boundary, pv_bc and sst_bc must"
+                    " be 3 points wide."
+                )
                 raise ValueError(msg)
             self._pv_bc = pv_bc
             self._sst_bc = sst_bc
@@ -210,56 +338,14 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
                 self._pv_bar = self._pv_bar_interp(time)
                 self._pv_bar_bc = self._pv_bar_bc_interp(time)
                 self._pv_bc -= self._pv_bar_bc
-                self._sst_bar = self._sst_bar_interp(time)
-                self._sst_bar_bc = self._sst_bar_bc_interp(time)
-                self._sst_bc -= self._sst_bar_bc
 
         else:
             self._pv_bc = pv_bc.get_band(0)
+            self._sst_bc = sst_bc.get_band(0)
             if self._with_mean_flow:
                 self._pv_bar = self._pv_bar_interp(time)
                 self._pv_bar_bc = self._pv_bar_bc_interp(time).get_band(0)
                 self._pv_bc -= self._pv_bar_bc
-
-    def set_mean_flow(
-        self,
-        sf_bar_interp: LinearInterpolation[torch.Tensor],
-        pv_bar_interp: LinearInterpolation[torch.Tensor],
-        sst_bar_interp: LinearInterpolation[torch.Tensor],
-        sf_bar_bc_interp: LinearInterpolation[Boundaries],
-        pv_bar_bc_interp: LinearInterpolation[Boundaries],
-        sst_bar_bc_interp: LinearInterpolation[Boundaries],
-    ) -> None:
-        """Set the mean flow.
-
-        Args:
-            sf_bar_interp (LinearInterpolation[torch.Tensor]): Mean stream
-                function flow.
-            pv_bar_interp (LinearInterpolation[torch.Tensor]): Associated mean
-                potential vorticity flow.
-            sst_bar_interp (LinearInterpolation[torch.Tensor]): Mean
-                SST flow.
-            sf_bar_bc_interp (LinearInterpolation[Boundaries]): Boundary
-                conditions for stream function's mean flow.
-            pv_bar_bc_interp (LinearInterpolation[Boundaries]): Boundary
-                conditions for potential vorticity's mean flow.
-            sst_bar_bc_interp (LinearInterpolation[Boundaries]): Boundary
-                conditions for SST's mean flow.
-        """
-        raise NotImplementedError
-        if not self.with_bc:
-            msg = (
-                "Mean flow only works with inhomogeneous boundary conditions."
-            )
-            raise ValueError(msg)
-        self._with_mean_flow = True
-        self._sf_bar_interp = sf_bar_interp
-        self._pv_bar_interp = pv_bar_interp
-        self._sst_bar_interp = sst_bar_interp
-        self._sf_bar_bc_interp = sf_bar_bc_interp
-        self._pv_bar_bc_interp = pv_bar_bc_interp
-        self._sst_bar_bc_interp = sst_bar_bc_interp
-        self._set_boundaries(self.time.item())
 
     def _compute_advection_homogeneous(
         self,
@@ -379,6 +465,77 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
             return self._compute_time_derivatives_inhomogeneous(prognostic)
         return self._compute_time_derivatives_homogeneous(prognostic)
 
+    def compute_fluxes(
+        self,
+        sst_anom: torch.Tensor,
+        *,
+        with_atm_convective: bool = False,
+        with_radiative: bool = False,
+    ) -> torch.Tensor:
+        """Compute fluxes.
+
+        Args:
+            sst_anom (torch.Tensor): SST anomaly field.
+            with_atm_convective (bool, optional): Whether to include
+                atmospheric convective fluxes. Defaults to False.
+            with_radiative (bool, optional): Whether to include radiative
+                fluxes. Defaults to False.
+
+        Returns:
+            torch.Tensor: Fluxes.
+        """
+        forcing = torch.zeros_like(sst_anom)
+        factor = 1 / self.rho0 / self.heat_cap / self.H_ml
+        sst = sst_anom + self._sst_mean
+        if with_atm_convective:
+            forcing += -self.lambd * (sst - self.temp_atm)
+        if with_radiative:
+            forcing += self.sigma * ((self.temp_atm) ** 4 - (sst) ** 4)
+        return forcing * factor
+
+    def compute_diffusion(
+        self,
+        sst_anom: torch.Tensor,
+        sst_anom_bcs: Boundaries | None = None,
+        *,
+        with_2nd_order: bool = True,
+        with_4th_order: bool = True,
+    ) -> torch.Tensor:
+        """Compute diffusion.
+
+        Args:
+            sst_anom (torch.Tensor): SST anomaly field.
+            sst_anom_bcs (torch.Tensor | None): SST anomaly boundaries.
+                If None, padding will be done through boundray replication.
+                Defaults to None.
+            with_2nd_order (bool, optional): Whether to include 2nd order
+                diffusion. Defaults to True.
+            with_4th_order (bool, optional): Whether to include 4th order
+                diffusion. Defaults to True.
+
+        Returns:
+            torch.Tensor: _description_
+        """
+        diffusion = torch.zeros_like(sst_anom)
+        dx, dy = self.space.dx, self.space.dy
+        if with_2nd_order:
+            if sst_anom_bcs is None:
+                padded = F.pad(sst_anom, (1, 1, 1, 1), mode="replicate")
+            else:
+                padded = sst_anom_bcs.get_band(0).expand(sst_anom)
+            diffusion += laplacian(padded, dx, dy) * self.K2
+        if with_4th_order:
+            if sst_anom_bcs is None:
+                padded = F.pad(sst_anom, (2, 2, 2, 2), mode="replicate")
+            else:
+                padded_in = sst_anom_bcs.get_band(0).expand(sst_anom)
+                if sst_anom_bcs.width >= 2:
+                    padded = sst_anom_bcs.get_band(1).expand(padded_in)
+                else:
+                    padded = F.pad(padded_in, (1, 1, 1, 1), mode="replicate")
+            diffusion -= nabla4(padded, dx, dy) * self.K4
+        return diffusion
+
     def _compute_time_derivatives_homogeneous(
         self,
         prognostic: PSIQSST,
@@ -397,7 +554,7 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
                 └──  dq : (n_ens, nl, nx, ny)-shaped
                 └──  dsst : (n_ens, nl, nx, ny)-shaped
         """
-        psi, q, sst = prognostic
+        psi, q, sst_anom = prognostic
         u, v = self._grad_perp(psi)
         u /= self.space.dy
         v /= self.space.dx
@@ -405,7 +562,7 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
 
-        e = self.compute_entrainments(sst)
+        e = self.compute_entrainments(sst_anom)
         dq = (
             -div_flux_q
             + fcg_drag
@@ -415,29 +572,37 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         u_ml = u[:, :1] + self._uw * self.masks.u
         v_ml = v[:, :1] + self._vw * self.masks.v
 
-        div_flux_sst = self._compute_advection_homogeneous(u_ml, v_ml, sst)
+        div_flux_sst = self._compute_advection_homogeneous(
+            u_ml,
+            v_ml,
+            sst_anom,
+        )
 
-        temp_1 = torch.mean(sst * self.masks.h) - self.temp_1_offset
+        temp_1_anom = torch.mean(sst_anom) - self.temp_1_offset
 
         heat_flux = torch.where(
             self._wek > 0,
-            -self._wek * (sst - temp_1) / self.H_ml,
+            -self._wek * (sst_anom - temp_1_anom) / self.H_ml,
             0,
         )
-        diffusion = (
-            laplacian(
-                torch.nn.functional.pad(
-                    sst,
-                    (1, 1, 1, 1),
-                    mode="replicate",
-                ),
-                self.space.dx,
-                self.space.dy,
-            )
-            * self.K2
+
+        fluxes = self.compute_fluxes(
+            sst_anom,
+            with_atm_convective=False,
+            with_radiative=False,
         )
+        diffusion = self.compute_diffusion(
+            sst_anom,
+            with_2nd_order=True,
+            with_4th_order=True,
+        )
+
         dsst = (
-            -div_flux_sst + self._wek * sst / self.H_ml + heat_flux + diffusion
+            -div_flux_sst
+            + self._wek * sst_anom / self.H_ml
+            + heat_flux
+            + fluxes
+            + diffusion
         ) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
@@ -465,7 +630,7 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
                 └──  dq : (n_ens, nl, nx, ny)-shaped
                 └──  dsst : (n_ens, nl, nx, ny)-shaped
         """
-        psi_i, q_i, sst = prognostic
+        psi_i, q_i, sst_anom = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
         q = q_i + q_bc
@@ -483,22 +648,36 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         v_ml = v[:, :1] + self._vw * self.masks.v
 
         div_flux_sst = self._compute_advection_inhomogeneous(
-            u_ml, v_ml, sst, self._sst_bc
+            u_ml,
+            v_ml,
+            sst_anom,
+            self._sst_bc,
         )
 
-        temp_1 = torch.mean(sst * self.masks.h) - self.temp_1_offset
+        temp_1_anom = torch.mean(sst_anom) - self.temp_1_offset
 
         heat_flux = torch.where(
             self._wek > 0,
-            -self._wek * (sst - temp_1) / self.H_ml,
+            -self._wek * (sst_anom - temp_1_anom) / self.H_ml,
             0,
         )
-        diffusion = (
-            laplacian(self._sst_bc.expand(sst), self.space.dx, self.space.dy)
-            * self.K2
+        fluxes = self.compute_fluxes(
+            sst_anom,
+            with_atm_convective=False,
+            with_radiative=False,
+        )
+        diffusion = self.compute_diffusion(
+            sst_anom,
+            self._sst_bc,
+            with_2nd_order=True,
+            with_4th_order=True,
         )
         dsst = (
-            -div_flux_sst + self._wek * sst / self.H_ml + heat_flux + diffusion
+            -div_flux_sst
+            + self._wek * sst_anom / self.H_ml
+            + heat_flux
+            + fluxes
+            + diffusion
         ) * self.masks.h
 
         dq_i = self._interpolate(dq)
@@ -589,7 +768,8 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         Args:
             sst (torch.Tensor): Sea surface temperature tensor.
         """
-        self._state.update_sst(sst)
+        self._sst_mean = torch.mean(sst * self.masks.h)
+        self._state.update_sst(sst - self._sst_mean)
 
     def set_psiq(self, psi: torch.Tensor, q: torch.Tensor) -> None:
         """Set both psi and q.
@@ -625,7 +805,7 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
 
     def compute_entrainments(
         self,
-        sst: torch.Tensor,
+        sst_anom: torch.Tensor,
     ) -> torch.Tensor:
         """Compute entrainments.
 
@@ -633,13 +813,13 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         Zero entrainment is assumed for layers below layer 1.
 
         Args:
-            sst (torch.Tensor): Sea surface temperature.
+            sst_anom (torch.Tensor): Sea surface temperature.
 
         Returns:
             torch.Tensor: Entrainments vector.
         """
-        temp_1 = torch.mean(sst) - self.temp_1_offset
-        delta_temp_ml = sst - temp_1
+        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        delta_temp_ml = sst_anom - temp_1_anom
         e_ml = self._wek
         e1 = torch.where(
             self._wek > 0, 0, delta_temp_ml / self.delta_temp_1 * self._wek
@@ -757,9 +937,10 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.update_psiqsst(self.update(self._state.prognostic.psiqsst))
-        t1 = torch.mean(self.sst) - 2
-        sst = torch.where(self.sst >= t1, self.sst, t1)
-        self._state.update_sst(sst)
+        sst_anom = self.sst_anom
+        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        sst_anom = torch.where(sst_anom >= temp_1_anom, sst_anom, temp_1_anom)
+        self._state.update_sst(sst_anom)
 
     @classmethod
     def get_variable_set(
