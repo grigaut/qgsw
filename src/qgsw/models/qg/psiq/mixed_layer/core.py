@@ -197,6 +197,8 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
     @H_ml.setter
     def H_ml(self, value: float | torch.Tensor) -> None:  # noqa: N802
         self._H_ml = as_singe_value_tensor(value)
+        msg = f"Mixed layer depth set to {self.H_ml.item()} m"
+        logger.info(msg)
 
     @property
     def lambd(self) -> torch.Tensor:
