@@ -577,7 +577,6 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         div_flux_q = self._compute_advection_homogeneous(u, v, q)
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
-
         e = self.compute_entrainments(sst_anom)
         dq = (
             -div_flux_q
@@ -664,7 +663,12 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         )
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        dq = (-div_flux_q + fcg_drag) * self.masks.h
+        e = self.compute_entrainments(sst_anom)
+        dq = (
+            -div_flux_q
+            + fcg_drag
+            + self.beta_plane.f0 / self.H * (e[:, :-1] - e[:, 1:])
+        ) * self.masks.h
         dq_i = self._interpolate(dq)
 
         ## Compute dψ
