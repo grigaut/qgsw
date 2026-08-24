@@ -20,6 +20,7 @@ from qgsw.fields.variables.tuples import (
 from qgsw.logging import getLogger
 from qgsw.models.core import time_steppers
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
 from qgsw.solver.finite_diff import laplacian, nabla4
@@ -960,3 +961,9 @@ class QGPSIQMLCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
             dict[str, DiagnosticVariable]: Variables dictionnary.
         """
         return QGPSIQVariableSet.get_variable_set(space, physics, model)
+
+
+class QGPSIQML(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
+    """Quasi Geostrophic Model with mixed layer and SST."""
+
+    _type = ModelName.QUASI_GEOSTROPHIC_ML
