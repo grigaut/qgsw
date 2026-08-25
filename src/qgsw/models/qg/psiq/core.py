@@ -320,6 +320,12 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
 
+    def reset_time(self) -> None:
+        """Reset time."""
+        _Model.reset_time(self)
+        if self.with_bc:
+            self._set_boundaries(self.time.item())
+
     def _set_flux(self) -> None:
         """Set the fluxes utils."""
         if self.with_bc:
@@ -576,7 +582,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         if isinstance(taux, float):
             self._taux = (
                 torch.ones(
-                    (self.n_ens, 1, self.space.nx, self.space.ny + 1),
+                    (self.space.nx, self.space.ny + 1),
                     dtype=torch.float64,
                     device=DEVICE.get(),
                 )
@@ -587,7 +593,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         if isinstance(tauy, float):
             self._tauy = (
                 torch.ones(
-                    (self.n_ens, 1, self.space.nx + 1, self.space.ny),
+                    (self.space.nx + 1, self.space.ny),
                     dtype=torch.float64,
                     device=DEVICE.get(),
                 )
