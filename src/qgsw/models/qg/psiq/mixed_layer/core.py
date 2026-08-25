@@ -127,6 +127,11 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         return self._state.sst.get()
 
     @property
+    def sst_mean(self) -> torch.Tensor:
+        """SST mean."""
+        return self._sst_mean
+
+    @property
     def q_anom(self) -> torch.Tensor:
         """Potential Vorticity anomaly.
 
