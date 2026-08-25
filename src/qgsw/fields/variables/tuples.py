@@ -328,7 +328,7 @@ class PSIQ(BasePSIQ, _PSIQ):
 class PSIQSST(BasePSIQSST, _PSIQSST):
     """Stream function, potential vorticity and sst."""
 
-    steady_sst_value: int = 18
+    steady_sst_value: int = 9 + 273.15  # Kelvin
 
     @property
     def psiq(self) -> PSIQ:
