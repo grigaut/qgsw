@@ -783,6 +783,20 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         self._sst_mean = torch.mean(sst * self.masks.h)
         self._state.update_sst(sst - self._sst_mean)
 
+    def set_sst_anom(
+        self,
+        sst_anom: torch.Tensor,
+        sst_mean: float | torch.Tensor,
+    ) -> None:
+        """Set the SST anomaly.
+
+        Args:
+            sst_anom (torch.Tensor): Sea surface temperature anomaly tensor.
+            sst_mean (float|torch.Tensor): Sea surface temperature mean tensor.
+        """
+        self._sst_mean = as_singe_value_tensor(sst_mean)
+        self._state.update_sst(sst_anom)
+
     def set_psiq(self, psi: torch.Tensor, q: torch.Tensor) -> None:
         """Set both psi and q.
 
