@@ -300,7 +300,7 @@ class QGPSIQSSTPsi2TransportDR(
             sst_anom,
         )
 
-        temp_1_anom = torch.mean(sst_anom) - self.temp_1_offset
+        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
 
         heat_flux = torch.where(
             self._wek > 0,
@@ -388,7 +388,7 @@ class QGPSIQSSTPsi2TransportDR(
             self._sst_bc,
         )
 
-        temp_1_anom = torch.mean(sst_anom) - self.temp_1_offset
+        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
 
         heat_flux = torch.where(
             self._wek > 0,
