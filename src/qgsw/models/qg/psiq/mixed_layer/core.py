@@ -9,13 +9,14 @@ import torch.nn.functional as F  # noqa: N812
 
 from qgsw.exceptions import InvalidLayerNumberError
 from qgsw.fields.variables.state import (
+    BaseStatePSIQSST,
     StatePSIQSST,
 )
 from qgsw.fields.variables.tuples import (
     PSIQ,
     PSIQSST,
     PSIQSSTT,
-    BasePSIQ,
+    BasePSIQSST,
 )
 from qgsw.logging import getLogger
 from qgsw.models.core import time_steppers
@@ -43,13 +44,14 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
     from qgsw.utils.interpolation import LinearInterpolation
 
-T = TypeVar("T", bound=BasePSIQ)
+T = TypeVar("T", bound=BasePSIQSST)
+State = TypeVar("State", bound=BaseStatePSIQSST)
 
 
 logger = getLogger(__name__)
 
 
-class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
+class QGPSIQSSTCore(QGPSIQCore[T, State]):
     """Finite volume multi-layer QG solver with mixed layer."""
 
     _H_ml = torch.tensor(100, **defaults.get())  # Mixed layer depth in meters
@@ -251,7 +253,7 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
     def heat_cap(self, value: float | torch.Tensor) -> None:
         self._heat_cap = as_singe_value_tensor(value)
 
-    def _set_io(self, state: StatePSIQSST) -> None:
+    def _set_io(self, state: State) -> None:
         self._io = IO(state.t, state.psi, state.q, state.sst)
 
     def _set_state(self) -> None:
@@ -632,8 +634,8 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
 
     def _compute_time_derivatives_inhomogeneous(
         self,
-        prognostic: PSIQ,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        prognostic: PSIQSST,
+    ) -> PSIQSST:
         """Compute time derivatives for inhomogeneous problem.
 
         Args:
@@ -940,28 +942,6 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         psi_bc = self._solver_inhomogeneous.psiq_bc.psi
         return PSIQSST(psiqsst_i.psi + psi_bc, psiqsst_i.q, psiqsst_i.sst)
 
-    def _update_mean_flow(self, prognostic: PSIQ) -> PSIQ:
-        """Update prognostic tuple.
-
-        Args:
-            prognostic (PSIQ): Prognostic variable to advect.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            PSIQ: Updated prognostic variable to advect.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-        """
-        prognostic_pert = prognostic - self.mean_flow
-        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
-        prognostic_i = PSIQ(prognostic_pert.psi - psi_bc, prognostic_pert.q)
-        psiq_i = self._timestep(prognostic_i)
-        self._set_boundaries(self.time.item())
-        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
-        psi_bar, q_bar = self.mean_flow
-        return PSIQ(psiq_i.psi + psi_bc + psi_bar, psiq_i.q + q_bar)
-
     @torch.enable_grad()
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
@@ -991,7 +971,7 @@ class QGPSIQSSTCore(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
         return QGPSIQVariableSet.get_variable_set(space, physics, model)
 
 
-class QGPSIQSST(QGPSIQCore[PSIQSSTT, StatePSIQSST]):
+class QGPSIQSST(QGPSIQSSTCore[PSIQSSTT, StatePSIQSST]):
     """Quasi Geostrophic Model with mixed layer and SST."""
 
     _type = ModelName.QUASI_GEOSTROPHIC_ML
