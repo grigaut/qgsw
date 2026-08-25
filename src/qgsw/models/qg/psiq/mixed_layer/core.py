@@ -380,30 +380,6 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
             v[..., 1:-1],
         )
 
-    def _compute_sst_advection_homogeneous(
-        self, psi: torch.Tensor, sst: torch.Tensor
-    ) -> torch.Tensor:
-        """Compute advection pv advection for homogeneous problem.
-
-        Args:
-            psi (torch.Tensor): Top layer stream function.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
-            sst (torch.Tensor): Surface stream function.
-                └── (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            torch.Tensor: RHS: ∇·(u_ML x SST)
-                └──  (n_ens, nl, nx, ny)-shaped
-        """
-        u, v = self._grad_perp(psi)
-        u /= self.space.dy
-        v /= self.space.dx
-        return self.div_flux(
-            sst,
-            (u[:, :1] + self._uw)[..., 1:-1, :],
-            (v[:, :1] + self._vw)[..., 1:-1],
-        )
-
     def _compute_advection_inhomogeneous(
         self,
         u: torch.Tensor,
