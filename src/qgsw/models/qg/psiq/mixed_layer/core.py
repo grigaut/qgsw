@@ -816,7 +816,8 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
             q (torch.Tensor): Potential vorticity tensor.
             sst (torch.Tensor): Sea surface temperature tensor.
         """
-        self._state.update_psiqsst(PSIQSST(psi, q, sst))
+        self._sst_mean = torch.mean(sst)
+        self._state.update_psiqsst(PSIQSST(psi, q, sst - self.sst_mean))
 
     def set_psiqanom(self, psi: torch.Tensor, q: torch.Tensor) -> None:
         """Set both psi and q.
