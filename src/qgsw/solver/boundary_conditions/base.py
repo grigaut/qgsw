@@ -75,7 +75,7 @@ class Boundaries:
 
     def __sub__(self, other: Boundaries) -> Boundaries:
         """Subtract two boundary conditions."""
-        if not isinstance(other, (Boundaries, float, int, torch.tensor)):
+        if not isinstance(other, (Boundaries, float, int, torch.Tensor)):
             return NotImplemented
         if isinstance(other, (float, int, torch.Tensor)):
             return Boundaries(
