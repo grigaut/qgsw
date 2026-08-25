@@ -941,7 +941,7 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         """
         psi_bc = self._solver_inhomogeneous.psiq_bc.psi
         psi, q, sst = prognostic
-        prognostic_i = PSIQ(psi - psi_bc, q, sst)
+        prognostic_i = PSIQSST(psi - psi_bc, q, sst)
         psiqsst_i = self._timestep(prognostic_i)
         self._set_boundaries(self.time.item())
         psi_bc = self._solver_inhomogeneous.psiq_bc.psi
