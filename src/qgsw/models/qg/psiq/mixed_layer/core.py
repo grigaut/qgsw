@@ -516,20 +516,18 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         diffusion = torch.zeros_like(sst_anom)
         dx, dy = self.space.dx, self.space.dy
         if with_2nd_order:
-            if sst_anom_bcs is None:
-                padded = F.pad(sst_anom, (1, 1, 1, 1), mode="replicate")
-            else:
+            if sst_anom_bcs is not None:
                 padded = sst_anom_bcs.get_band(0).expand(sst_anom)
+            else:
+                padded = F.pad(sst_anom, (1, 1, 1, 1), mode="replicate")
             diffusion += laplacian(padded, dx, dy) * self.K2
         if with_4th_order:
-            if sst_anom_bcs is None:
-                padded = F.pad(sst_anom, (2, 2, 2, 2), mode="replicate")
+            if sst_anom_bcs is not None:
+                bc_b0 = sst_anom_bcs.get_band(0)
+                bc_b1 = sst_anom_bcs.get_band(1)
+                padded = bc_b1.expand(bc_b0.expand(sst_anom))
             else:
-                padded_in = sst_anom_bcs.get_band(0).expand(sst_anom)
-                if sst_anom_bcs.width >= 2:
-                    padded = sst_anom_bcs.get_band(1).expand(padded_in)
-                else:
-                    padded = F.pad(padded_in, (1, 1, 1, 1), mode="replicate")
+                padded = F.pad(sst_anom, (2, 2, 2, 2), mode="replicate")
             diffusion -= nabla4(padded, dx, dy) * self.K4
         return diffusion
 
@@ -685,10 +683,11 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         )
         diffusion = self.compute_diffusion(
             sst_anom,
-            self._sst_bc,
+            sst_anom_bcs=None,
             with_2nd_order=True,
             with_4th_order=True,
         )
+        self.diff = diffusion
         dsst = (
             -div_flux_sst
             + self._wek * sst_anom / self.H_ml
