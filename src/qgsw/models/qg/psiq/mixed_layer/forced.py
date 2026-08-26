@@ -34,9 +34,7 @@ if TYPE_CHECKING:
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
-class QGPSIQSSTPsi2TransportDR(
-    QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]
-):
+class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
     """QG model with mixed layer and Psi2 transport with deformation radius."""
 
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
