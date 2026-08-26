@@ -49,7 +49,10 @@ def retrieve_imshow_data(
 
 
 def default_clim(
-    data: np.ndarray, *, robust: bool = False
+    data: np.ndarray,
+    *,
+    robust: bool = False,
+    center_cbar: bool = True,
 ) -> tuple[float, float]:
     """Compute default colorbar limit values.
 
@@ -59,7 +62,8 @@ def default_clim(
             0.98-th quantile of the absolute value of the data,
             and from its from the max of its absolute value if False.
             Defaults to False.
-        robust
+        center_cbar (bool, optional): If True, the colorbar will be centered.
+            Defaults to True.
 
     Returns:
         tuple[float, float]: Colorbar limits as (vmin, vmax).
@@ -67,10 +71,16 @@ def default_clim(
     data_ = data[~np.isnan(data)]
     if data_.shape == (0,):
         return -1, 1
-    vmax = (
-        np.quantile(np.abs(data_), 0.98) if robust else np.max(np.abs(data_))
-    )
-    return -vmax, vmax
+    if center_cbar:
+        vmax = (
+            np.quantile(np.abs(data_), 0.98)
+            if robust
+            else np.max(np.abs(data_))
+        )
+        return -vmax, vmax
+    vmax = np.quantile(0.98) if robust else np.max(data_)
+    vmin = np.quantile(0.02) if robust else np.min(data_)
+    return vmin, vmax
 
 
 class CbarKwargs(TypedDict, total=False):
@@ -149,6 +159,7 @@ def imshow(
     title: str | None = None,
     show_cbar: bool = True,
     robust: bool = False,
+    center_cbar: bool = True,
     **kwargs: Unpack[ImshowKwargs],
 ) -> AxesImage:
     """Wrapper for plt.imshow.
@@ -163,10 +174,12 @@ def imshow(
             0.98-th quantile of the absolute value of the data,
             and from its from the max of its absolute value if False.
             Defaults to False.
+        center_cbar (bool, optional): If True, the colorbar will be centered.
+            Defaults to True.
         **kwargs: optional arguments to pass to plt.imshow.
     """
     data = retrieve_imshow_data(data)
-    vmin, vmax = default_clim(data, robust=robust)
+    vmin, vmax = default_clim(data, robust=robust, center_cbar=center_cbar)
     kwargs.setdefault("vmax", vmax)
     kwargs.setdefault("vmin", vmin)
     return _imshow(

@@ -320,6 +320,12 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             else:
                 self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
 
+    def reset_time(self) -> None:
+        """Reset time."""
+        _Model.reset_time(self)
+        if self.with_bc:
+            self._set_boundaries(self.time.item())
+
     def _set_flux(self) -> None:
         """Set the fluxes utils."""
         if self.with_bc:
@@ -567,24 +573,37 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
     ) -> None:
         """Set the wind forcing.
 
-        WARNING: Both taux and tauy are padded on the right.
-
         Args:
             taux (torch.Tensor): Wind stress in the x direction.
                 └── (n_ens, nl, nx, ny)-shaped
             tauy (torch.Tensor): Wind stress in the y direction.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        if isinstance(taux, float) and isinstance(tauy, float):
-            self._curl_tau = torch.zeros(
-                (self.n_ens, 1, self.space.nx, self.space.ny),
-                dtype=torch.float64,
-                device=DEVICE.get(),
+        if isinstance(taux, float):
+            self._taux = (
+                torch.ones(
+                    (self.space.nx, self.space.ny + 1),
+                    dtype=torch.float64,
+                    device=DEVICE.get(),
+                )
+                * taux
             )
-            return
+        else:
+            self._taux = taux
+        if isinstance(tauy, float):
+            self._tauy = (
+                torch.ones(
+                    (self.space.nx + 1, self.space.ny),
+                    dtype=torch.float64,
+                    device=DEVICE.get(),
+                )
+                * tauy
+            )
+        else:
+            self._tauy = tauy
         curl_tau = (
-            torch.diff(tauy, dim=-2) / self._space.dx
-            - torch.diff(taux, dim=-1) / self._space.dy
+            torch.diff(self._tauy, dim=-2) / self._space.dx
+            - torch.diff(self._taux, dim=-1) / self._space.dy
         )
         self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
 

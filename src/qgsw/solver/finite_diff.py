@@ -57,6 +57,34 @@ def laplacian(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
     ) / dy**2
 
 
+def nabla4(f: torch.Tensor, dx: float, dy: float) -> torch.Tensor:
+    """5-points discrete ∇⁴ 2D operator.
+
+    Args:
+        f (torch.Tensor): Tensor to differentiate.
+            └── (..., nx, ny)-shaped
+        dx (float): Step in the x direction.
+        dy (float): Step in the y direction.
+
+    Returns:
+        torch.Tensor: Resulting field.
+            └── (..., nx-2, ny-2)-shaped
+    """
+    return (
+        f[..., 4:, 2:-2]
+        - 4 * f[..., 3:-1, 2:-2]
+        + 6 * f[..., 2:-2, 2:-2]
+        - 4 * f[..., 1:-3, 2:-2]
+        + f[..., :-4, 2:-2]
+    ) / dx**4 + (
+        f[..., 2:-2, 4:]
+        - 4 * f[..., 2:-2, 3:-1]
+        + 6 * f[..., 2:-2, 2:-2]
+        - 4 * f[..., 2:-2, 1:-3]
+        + f[..., 2:-2, :-4]
+    ) / dy**4
+
+
 def laplacian_h(f, dx, dy):
     return F.pad(
         (f[..., 2:, 1:-1] + f[..., :-2, 1:-1] - 2 * f[..., 1:-1, 1:-1]) / dx**2

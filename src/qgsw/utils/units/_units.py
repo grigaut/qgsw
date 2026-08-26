@@ -20,6 +20,7 @@ class Unit(str, Enum):
     M1S_1 = "m.s⁻¹"
     M2S_1 = "m².s⁻¹"
     M2S_2 = "m².s⁻²"
+    T = "°C"
 
     def __repr__(self) -> str:
         """String representation of unit."""
