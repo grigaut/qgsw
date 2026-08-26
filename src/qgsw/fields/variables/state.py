@@ -749,7 +749,7 @@ class StatePSIQSSTAlpha(BaseStatePSIQSST[PSIQSSTTAlpha]):
         self.prognostic = PSIQSSTTAlpha.from_psiqsst(
             self.t.get(),
             self.alpha.get(),
-            PSIQSST.from_psiq(psiq, self.sst.get()),
+            PSIQSST.from_psiq(self.sst.get(), psiq),
         )
 
     def update_psiqsst(self, psiqsst: PSIQSST) -> None:
@@ -773,7 +773,7 @@ class StatePSIQSSTAlpha(BaseStatePSIQSST[PSIQSSTTAlpha]):
         self.prognostic = PSIQSSTTAlpha.from_psiqsst(
             self.t.get(),
             self.alpha.get(),
-            PSIQSST.from_psiq(self.psi.get(), sst),
+            PSIQSST(self.psi.get(), self.q.get(), sst),
         )
 
     def update_time(self, time: torch.Tensor) -> None:
