@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import IO, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import torch
 
@@ -15,6 +15,7 @@ from qgsw.fields.variables.tuples import (
     PSIQSSTT,
     PSIQSSTTAlpha,
 )
+from qgsw.models.io import IO
 from qgsw.models.qg.psiq.mixed_layer.core import QGPSIQSSTCore
 from qgsw.models.qg.stretching_matrix import compute_A_tilde
 from qgsw.solver.finite_diff import laplacian
@@ -84,7 +85,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         try:
             return self._state.alpha.get()
         except AttributeError:
-            return torch.zeros_like(self.psi)
+            return torch.tensor(0, **defaults.get())
 
     @alpha.setter
     def alpha(self, alpha: torch.Tensor) -> None:
@@ -275,7 +276,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         dq = (
             -div_flux_q
             + fcg_drag
-            + self.beta_plane.f0 / self.H * (e[:, :-1] - e[:, 1:])
+            + self.beta_plane.f0 / self.H[:1] * (e[:, :-1] - e[:, 1:])
         ) * self.masks.h
 
         dt_psi2 = self.compute_psi_2_dt(self._substep_time)
@@ -328,18 +329,18 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
 
     def _compute_time_derivatives_inhomogeneous(
         self,
-        prognostic: PSIQ,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        prognostic: PSIQSST,
+    ) -> PSIQSST:
         """Compute time derivatives for inhomogeneous problem.
 
         Args:
-            prognostic (PSIQ): Homogeneous contribution
+            prognostic (PSIQSST): Homogeneous contribution
                 of prognostic variables.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  q : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+            PSIQSST: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
@@ -363,7 +364,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         dq = (
             -div_flux_q
             + fcg_drag
-            + self.beta_plane.f0 / self.H * (e[:, :-1] - e[:, 1:])
+            + self.beta_plane.f0 / self.H[:1] * (e[:, :-1] - e[:, 1:])
         ) * self.masks.h
         dt_psi2 = self.compute_psi_2_dt(self._substep_time)
         dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
@@ -429,3 +430,34 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
                 msg = "SSPRK3 should only perform 3 steps."
                 raise ValueError(msg)
         return PSIQSST(dpsi, dq, dsst)
+
+    def compute_entrainments(
+        self,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute entrainments.
+
+        See "Formulation and users’ guide for Q-GCM, Hogg et al, 2014".
+        Zero entrainment is assumed for layers below layer 1.
+
+        Args:
+            sst_anom (torch.Tensor): Sea surface temperature.
+
+        Returns:
+            torch.Tensor: Entrainments vector.
+        """
+        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        delta_temp_ml = sst_anom - temp_1_anom
+        e_ml = self._wek
+        e1 = torch.where(
+            self._wek > 0, 0, delta_temp_ml / self.delta_temp_1 * self._wek
+        )
+        e1 += torch.where(
+            delta_temp_ml >= 0,
+            0,
+            self.H_ml / self.dt * delta_temp_ml / self.delta_temp_1,
+        )
+        return torch.cat(
+            [e_ml, e1 - torch.mean(e1)],
+            dim=1,
+        )
