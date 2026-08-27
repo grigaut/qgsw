@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, TypeVar
 import numpy as np
 import torch
 import xarray as xr
-from scipy.ndimage import gaussian_filter
 
 from qgsw.cli import ScriptsArgsParser
 from qgsw.configs.core import Configuration
@@ -18,12 +17,6 @@ from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
 from qgsw.eNATL60 import seasons
 from qgsw.eNATL60.fields_computations import (
     compute_streamfunction_with_atmospheric_pressure_xy_avg,
-)
-from qgsw.eNATL60.forcing import (
-    interpolate_era_da,
-    load_era_interim,
-    slice_space,
-    slice_time,
 )
 from qgsw.eNATL60.interpolation import (
     build_regridder,
@@ -36,6 +29,7 @@ from qgsw.eNATL60.loading import (
     sort_files_by_dates,
 )
 from qgsw.eNATL60.var_keys import (
+    ATMOS_PRESSURE,
     LATITUDE,
     LONGITUDE,
     MERIDIONAL_WIND_10M,
@@ -59,6 +53,12 @@ from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.pv import (
     compute_q1_interior,
 )
+from qgsw.scripts.eNATL60 import (
+    da_to_tensor,
+    filter_streamfunction,
+    format_ds,
+    load_netcdfs,
+)
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import grad
 from qgsw.spatial.core.discretization import (
@@ -81,176 +81,6 @@ if TYPE_CHECKING:
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
 
-## Config
-
-
-args = ScriptsArgsParser.va_setup(
-    prefix_default="results_enatl60_atmp",
-    cycles_default=4,
-)
-args.add_regularization(gamma_default=0.1)
-args.add_alpha()
-args.add_season(default="summer")
-args.retrieve()
-with_reg = not args.no_reg
-with_alpha = not args.no_alpha
-with_obs_track = args.obs_track
-with_wind = not args.no_wind
-
-specs = defaults.get()
-
-setup_root_logger(args.verbose)
-logger = getLogger(__name__)
-
-ROOT_PATH = Path(__file__).parent.parent
-config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
-
-output_dir = config.io.output.directory
-
-# Simulation parameters
-
-dt = 3600
-optim_max_step = args.optim
-n_file_per_cycle = 20
-n_steps_per_cyle = 240 * 2 - 1
-comparison_interval = args.comparison
-n_cycles = args.cycles
-
-separation = int(args.separation * dt / 3600 / 24)
-
-sigma_bc = 10
-sigma_ic = 10
-
-## Load eNATL60 grid
-
-### Data folder
-
-data_folder = get_path_from_env(key="eNATL60_FOLDER")
-files = list((data_folder / "MEANDERS" / "gridT").glob("*.nc"))
-
-files = sort_files_by_dates(*files)
-
-season = {
-    "summer": seasons.SUMMER,
-    "autumn": seasons.AUTUMN,
-    "winter": seasons.WINTER,
-    "spring": seasons.SPRING,
-}
-
-in_season = retrieve_dates(*files.tolist()).month.isin(season[args.season])
-if ((in_season[1:]) & (~in_season[:-1])).sum() + int(in_season[0]) > 1:
-    msg = "Non-time-contiguous data for this season in provided dataset."
-    raise ValueError(msg)
-files = files[in_season]
-
-
-def format_ds(ds: xr.Dataset) -> xr.Dataset:
-    """Format Dataset."""
-    # Drop useless variables
-    if "axis_nbounds" in ds.dims:
-        ds = ds.drop_dims("axis_nbounds")
-    if "time_centered" in ds.coords:
-        ds = ds.reset_coords("time_centered", drop=True)
-    # Rename
-    ds = ds.rename(
-        {
-            "time_counter": TIME,
-            "nav_lon": LONGITUDE,
-            "nav_lat": LATITUDE,
-            "x": "i",
-            "y": "j",
-            "sossheig": SSH,
-            "sosstsst": SST,
-        }
-    )
-    ds = ds.transpose(TIME, "i", "j")
-    return ds.set_coords([LONGITUDE, LATITUDE])
-
-
-### Load only one file to access grid informations
-
-ds = load_datasets(files[0], format_func=format_ds)
-
-### Compute longitude / latitudes
-dx = dy = 10000
-lons, lats = compute_lonlat_from_regular_xy_grid(
-    ds[LONGITUDE],
-    ds[LATITUDE],
-    dx=dx,
-    dy=dy,
-)
-xs, ys = lonlat_to_xy(lons, lats)
-
-### Compute β-plane parameters
-
-lat0 = (lats.max() + lats.min()) / 2
-beta_plane = BetaPlane(
-    f0=2 * EARTH_ANGULAR_ROTATION * np.sin(lat0),
-    beta=2 * EARTH_ANGULAR_ROTATION * np.cos(lat0) / EARTH_RADIUS,
-)
-
-### Build regridder
-
-psi_regridder = build_regridder(ds, lons, lats)
-sst_regridder = build_regridder(ds, interpolate(lons), interpolate(lats))
-
-
-## Areas
-nx, ny = lats.shape
-xx = torch.tensor(xs.round(), **specs)
-space_2d = SpaceDiscretization2D.from_psi_grid(
-    Grid2D(
-        x=xx - xx[0, :],
-        y=torch.tensor(ys.round(), **specs),
-    )
-)
-### Boundaries offset
-
-b = 4
-
-space_interior = space_2d.slice(
-    b,
-    space_2d.psi.xy.x.shape[0] - b,
-    b,
-    space_2d.psi.xy.x.shape[1] - b,
-)
-
-nx = space_interior.nx
-ny = space_interior.ny
-dx = space_interior.dx
-dy = space_interior.dy
-
-## Observations
-
-if with_obs_track:
-    obs_mask = SatelliteTrackMask(
-        space_interior.psi.xy.x,
-        space_interior.psi.xy.y,
-        track_width=100000,
-        track_interval=600000,
-        theta=torch.pi / 12,
-        full_coverage_time=20 * 3600 * 24,
-    )
-    if comparison_interval != 1:
-        msg = (
-            "Using Satellite track, comparison interval "
-            "inferred from tracks trajectory."
-        )
-        logger.warning(box(msg, style="="))
-    n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle, dt)
-    msg_obs = (
-        f"Surface observed along satellite tracks, {n_obs} pixels observed."
-    )
-else:
-    obs_mask = FullDomainMask(
-        space_interior.psi.xy.x,
-        space_interior.psi.xy.y,
-        dt=comparison_interval * dt,
-    )
-    msg_obs = (
-        f"Full surface observed every {sec2text(comparison_interval * dt)}"
-    )
-
 
 def update_loss(
     loss: torch.Tensor,
@@ -269,74 +99,24 @@ def update_loss(
     return loss + (f_sliced - f_ref_sliced).square().sum() / variance
 
 
-## Regularization
+### Boundaries offset
 
-gamma = args.gamma / comparison_interval
-
-if with_reg:
-    msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
-    if gamma != args.gamma:
-        msg_reg += (
-            f" (rescaled from ɣ = {args.gamma:#5.3g} to"  # noqa: RUF001
-            " account for observations sparsity)."
-        )
-    else:
-        msg_reg += "."
-else:
-    msg_reg = "No regularization."
+b = 4
 
 
-## Output
-prefix = args.complete_prefix()
-filename = f"{prefix}.pt"
-output_file = output_dir.joinpath(filename)
+def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
+    """Extract psi."""
+    return Boundaries.extract(psi, b, -b - 1, b, -b - 1, 2)
 
-## Logs
 
-msg_simu = (
-    f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
-    f"steps with up to {optim_max_step} optimization steps."
-)
-if args.separation != 0:
-    msg_simu += (
-        f"\nCycles are separated by {sec2text(separation * 24 * 3600)}."
-    )
-msg_season = f"Season: {args.season}."
-msg_sf = "Reconstructing ψ using atmospheric pressure and ssh."
-lon_min = np.rad2deg(lons.min())
-lon_max = np.rad2deg(lons.max())
-lat_min = np.rad2deg(lats.min())
-lat_max = np.rad2deg(lats.max())
-msg_area = (
-    f"Longitudes in [{lon_min:#.3g}°, {lon_max:#.3g}°],"
-    f" latitudes in [{lat_min:#.3g}°, {lat_max:#.3g}°]."
-)
-if with_wind:
-    msg_wind = "Using wind from ERA interim DFS5."
-else:
-    msg_wind = "No wind considered."
-msg_output = f"Output will be saved to {output_file}."
+def extract_q_bc(q: torch.Tensor) -> Boundaries:
+    """Extract q."""
+    return Boundaries.extract(q, b - 2, -(b - 1), b - 2, -(b - 1), 3)
 
-logger.info(
-    box(
-        msg_simu,
-        msg_season,
-        msg_sf,
-        msg_area,
-        msg_wind,
-        msg_obs,
-        msg_reg,
-        msg_output,
-        style="=",
-    )
-)
 
-# Parameters
-
-H = config.model.h
-g_prime = config.model.g_prime
-bottom_drag_coef = config.physics.bottom_drag_coefficient
-slip_coef = config.physics.slip_coef
+def extract_sst_bc(sst: torch.Tensor) -> Boundaries:
+    """Extract SST."""
+    return Boundaries.extract(sst, b - 1, -b, b - 1, -b, 3)
 
 
 ## Bulk formula (from Large & Yeager 2004)
@@ -359,12 +139,6 @@ def compute_drag_coef(wind_magnitude: torch.Tensor) -> torch.Tensor:
     )
 
 
-# Models
-
-## Inhomogeneous models
-M = TypeVar("M", bound=QGPSIQCore)
-
-
 def set_inhomogeneous_model(model: M) -> M:
     """Set up inhomogeneous model."""
     model.masks = Masks.empty_tensor(nx, ny, device=specs["device"])
@@ -374,16 +148,6 @@ def set_inhomogeneous_model(model: M) -> M:
     model.dt = dt
     return model
 
-
-model = QGPSIQSSTRGSI(
-    space_2d=space_interior,
-    H=H[:2],
-    beta_plane=beta_plane,
-    g_prime=g_prime[:2],
-)
-model: QGPSIQSSTRGSI = set_inhomogeneous_model(model)
-model.H_ml = 10
-model.temp_1_offset = 4
 
 ## Regularization
 
@@ -470,436 +234,597 @@ def compute_regularization_func(
     return compute_reg
 
 
-# PV computation
+if __name__ == "__main__":
+    ## Config
 
-
-y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
-beta_effect = beta_plane.beta * (y_w - model.y0)
-
-build_compute_q_rg = lambda A11, A12: (
-    lambda psi1: compute_q1_interior(
-        psi1,
-        torch.zeros_like(psi1),
-        A11,
-        A12,
-        dx,
-        dy,
-        beta_plane.f0,
-        beta_effect[:, 1:-1],
+    args = ScriptsArgsParser.va_setup(
+        prefix_default="results_enatl60_atmp",
+        cycles_default=4,
     )
-)
+    args.add_regularization(gamma_default=0.1)
+    args.add_alpha()
+    args.add_season(default="summer")
+    args.retrieve()
+    with_reg = not args.no_reg
+    with_alpha = not args.no_alpha
+    with_obs_track = args.obs_track
+    with_wind = not args.no_wind
 
+    specs = defaults.get()
 
-def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
-    """Extract psi."""
-    return Boundaries.extract(psi, b, -b - 1, b, -b - 1, 2)
+    setup_root_logger(args.verbose)
+    logger = getLogger(__name__)
 
+    ROOT_PATH = Path(__file__).parent.parent
+    config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 
-def extract_q_bc(q: torch.Tensor) -> Boundaries:
-    """Extract q."""
-    return Boundaries.extract(q, b - 2, -(b - 1), b - 2, -(b - 1), 3)
+    output_dir = config.io.output.directory
 
+    # Simulation parameters
 
-def extract_sst_bc(sst: torch.Tensor) -> Boundaries:
-    """Extract SST."""
-    return Boundaries.extract(sst, b - 1, -b, b - 1, -b, 3)
+    dt = 3600
+    optim_max_step = args.optim
+    n_file_per_cycle = 20
+    n_steps_per_cyle = 240 * 2 - 1
+    comparison_interval = args.comparison
+    n_cycles = args.cycles
 
+    separation = int(args.separation * dt / 3600 / 24)
 
-outputs = []
+    sigma_bc = 10
+    sigma_ic = 10
 
-L: float = dx.item()
+    ## Load eNATL60 grid
 
-for c in range(n_cycles):
-    torch.cuda.reset_peak_memory_stats()
+    ### Data folder
 
-    start_cycle = c * n_file_per_cycle + c * separation
-    end_cycle = (c + 1) * n_file_per_cycle + c * separation
+    data_folder = get_path_from_env(key="eNATL60_FOLDER")
+    files = list((data_folder / "MEANDERS" / "gridT").glob("*.nc"))
 
-    if end_cycle > len(files):
-        msg = f"Not enough files to perform cycle {c} and above."
-        logger.warning(msg)
-        break
+    files = sort_files_by_dates(*files)
 
-    files_for_cycle = files[start_cycle:end_cycle]
+    season = {
+        "summer": seasons.SUMMER,
+        "autumn": seasons.AUTUMN,
+        "winter": seasons.WINTER,
+        "spring": seasons.SPRING,
+    }
 
-    ds = load_datasets(*files_for_cycle, format_func=format_ds)
+    in_season = retrieve_dates(*files.tolist()).month.isin(season[args.season])
+    if ((in_season[1:]) & (~in_season[:-1])).sum() + int(in_season[0]) > 1:
+        msg = "Non-time-contiguous data for this season in provided dataset."
+        raise ValueError(msg)
+    files = files[in_season]
 
-    msg = f"Cycle {step(c + 1, n_cycles)}: eNATL60 data loaded."
-    logger.info(box(msg, style="round"))
+    ### Load only one file to access grid informations
 
-    with logger.timeit("Loading ERA data"):
-        dates = retrieve_dates(*files_for_cycle.tolist())
-        years = dates.year.unique().to_list()
-        if dates.min().month == 1 and dates.min().day == 1:
-            years.insert(0, dates.min().year - 1)
-        msg = f"Loading data for years: {', '.join([str(y) for y in years])}"
-        logger.info(msg)
-        ds_era = load_era_interim(data_folder / "misc", *years)
+    ds = load_datasets(files[0], format_func=format_ds)
 
-        ds_era = slice_time(ds_era, ds[TIME])
-        ds_era = slice_space(ds_era, ds[LONGITUDE], ds[LATITUDE])
+    ### Compute longitude / latitudes
+    dx = dy = 10000
+    lons, lats = compute_lonlat_from_regular_xy_grid(
+        ds[LONGITUDE],
+        ds[LATITUDE],
+        dx=dx,
+        dy=dy,
+    )
+    xs, ys = lonlat_to_xy(lons, lats)
 
-    ds[STREAMFUNCTION] = (
-        compute_streamfunction_with_atmospheric_pressure_xy_avg(
-            ds,
-            ds_era,
-            config.physics.rho,
-            g_prime[0].item(),
-            remove_avgs=True,
+    ### Compute β-plane parameters
+
+    lat0 = (lats.max() + lats.min()) / 2
+    beta_plane = BetaPlane(
+        f0=2 * EARTH_ANGULAR_ROTATION * np.sin(lat0),
+        beta=2 * EARTH_ANGULAR_ROTATION * np.cos(lat0) / EARTH_RADIUS,
+    )
+    f0 = beta_plane.f0
+
+    ### Build regridder
+
+    psi_regridder = build_regridder(ds, lons, lats)
+    sst_regridder = build_regridder(ds, interpolate(lons), interpolate(lats))
+
+    ## Areas
+    nx, ny = lats.shape
+    xx = torch.tensor(xs.round(), **specs)
+    space_2d = SpaceDiscretization2D.from_psi_grid(
+        Grid2D(
+            x=xx - xx[0, :],
+            y=torch.tensor(ys.round(), **specs),
         )
     )
 
-    with logger.timeit("Filtering stream function"):
-        msg = f"Using σ={sigma_ic} for initial condition"  # noqa: RUF001
-        logger.info(msg)
-        psi0_filt_da = xr.apply_ufunc(
-            gaussian_filter,
-            ds[STREAMFUNCTION][0].load(),
-            kwargs={"sigma": sigma_ic},
-            input_core_dims=[["i", "j"]],
-            output_core_dims=[["i", "j"]],
+    space_interior = space_2d.slice(
+        b,
+        space_2d.psi.xy.x.shape[0] - b,
+        b,
+        space_2d.psi.xy.x.shape[1] - b,
+    )
+
+    nx = space_interior.nx
+    ny = space_interior.ny
+    dx = space_interior.dx
+    dy = space_interior.dy
+
+    ## Observations
+
+    if with_obs_track:
+        obs_mask = SatelliteTrackMask(
+            space_interior.psi.xy.x,
+            space_interior.psi.xy.y,
+            track_width=100000,
+            track_interval=600000,
+            theta=torch.pi / 12,
+            full_coverage_time=20 * 3600 * 24,
         )
-        msg = f"Using σ={sigma_bc} for boundary conditions"  # noqa: RUF001
-        ds["psi_filt"] = xr.apply_ufunc(
-            gaussian_filter,
-            ds[STREAMFUNCTION].load(),
-            kwargs={"sigma": sigma_bc},
-            input_core_dims=[["i", "j"]],
-            output_core_dims=[["i", "j"]],
-        )
-        logger.info(msg)
-
-    with logger.timeit("Interpolating stream function"):
-        regridded_psi: xr.DataArray = psi_regridder(ds[STREAMFUNCTION])
-        regridded_psi_filt: xr.DataArray = psi_regridder(ds["psi_filt"])
-        ds_psi_interp = xr.Dataset(
-            {
-                LONGITUDE: (["i", "j"], lons),
-                LATITUDE: (["i", "j"], lats),
-                STREAMFUNCTION: ([TIME, "i", "j"], regridded_psi.data),
-                "psi_filt": ([TIME, "i", "j"], regridded_psi_filt.data),
-            },
-            regridded_psi_filt.coords,
-        )
-        ds_psi_interp = ds_psi_interp.set_coords([LONGITUDE, LATITUDE])
-        ds_psi_interp = ds_psi_interp.load()
-
-    psis_ref = [
-        torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0) / beta_plane.f0
-        for p in ds_psi_interp[STREAMFUNCTION].to_numpy()
-    ]
-
-    var_ref = torch.stack([crop(psi[0, 0], b) for psi in psis_ref]).var()
-
-    with logger.timeit("Computing psi boundaries"):
-        psis_filt = [
-            torch.tensor(p, **specs).unsqueeze(0).unsqueeze(0) / beta_plane.f0
-            for p in ds_psi_interp["psi_filt"].to_numpy()
-        ]
-        psi_bcs = [extract_psi_bc(psi) for psi in psis_filt]
-
-    with logger.timeit("Interpolating SST"):
-        regridded_sst: xr.DataArray = sst_regridder(ds[SST])
-        ds_sst_interp = xr.Dataset(
-            {
-                LONGITUDE: (["i", "j"], interpolate(lons)),
-                LATITUDE: (["i", "j"], interpolate(lats)),
-                SST: ([TIME, "i", "j"], regridded_sst.data),
-            },
-            regridded_sst.coords,
-        )
-        ds_sst_interp = ds_sst_interp.set_coords([LONGITUDE, LATITUDE])
-        ds_sst_interp = ds_sst_interp.load()
-
-    with logger.timeit("Computing SST boundaries"):
-        ssts = [
-            torch.tensor(sst, **specs).unsqueeze(0).unsqueeze(0) + 273.15
-            for sst in ds_sst_interp[SST].to_numpy()
-        ]
-        sst_bcs = [extract_sst_bc(sst) for sst in ssts]
-
-    if with_wind:
-        with logger.timeit("Loading wind"):
-            u10 = interpolate_era_da(ds_era[ZONAL_WIND_10M], ds)
-            u10_regridded: xr.DataArray = psi_regridder(u10)
-            v10 = interpolate_era_da(ds_era[MERIDIONAL_WIND_10M], ds)
-            v10_regridded: xr.DataArray = psi_regridder(v10)
-
-            u10_tensor = torch.tensor(u10_regridded.to_numpy(), **specs)
-            v10_tensor = torch.tensor(v10_regridded.to_numpy(), **specs)
-
-            winds = torch.cat(
-                [
-                    crop(u10_tensor, b).unsqueeze(0),
-                    crop(v10_tensor, b).unsqueeze(0),
-                ],
-                dim=0,
+        if comparison_interval != 1:
+            msg = (
+                "Using Satellite track, comparison interval "
+                "inferred from tracks trajectory."
             )
-
-    t0 = ds_psi_interp[TIME][0]
-    times = (ds_psi_interp[TIME] - t0).dt.total_seconds().to_numpy()
-    times = torch.tensor(times, **specs)
-
-    psi0 = (
-        torch.tensor(psi_regridder(psi0_filt_da).data, **specs)
-        .unsqueeze(0)
-        .unsqueeze(0)
-        / beta_plane.f0
-    )
-    psi0_mean: float = psi0.mean()
-
-    sst0 = (
-        torch.tensor(ds_sst_interp[SST][0].data, **specs)
-        .unsqueeze(0)
-        .unsqueeze(0)
-    )
-
-    U: float = psi0_mean / L
-    T = L / U
-
-    msg = f"Cycle {step(c + 1, n_cycles)}: eNATL60 data loaded and processed."
-    logger.info(box(msg, style="round"))
-
-    psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-    sst_bc_interp = QuadraticInterpolation(times, sst_bcs)
-
-    xx = space_interior.psi.xy.x
-    yy = space_interior.psi.xy.y
-
-    space_params, time_params = gaussian_exp_field(
-        0, 3, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * 7200
-    )
-    basis = GaussianExpBasis(space_params, time_params)
-    coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
-    coefs = coefs.requires_grad_()
-
-    if with_alpha:
-        kappa = torch.tensor(0, **specs, requires_grad=True)
-        numel = kappa.numel() + coefs.numel()
-        params = [
-            {"params": [kappa], "lr": 1e-2, "name": "κ"},
-            {
-                "params": list(coefs.values()),
-                "lr": 1e0,
-                "name": "Decomposition coefs",
-            },
-        ]
+            logger.warning(box(msg, style="="))
+        n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle, dt)
+        msg_obs = (
+            "Surface observed along satellite tracks,"
+            f" {n_obs} pixels observed."
+        )
     else:
-        kappa = torch.tensor(0, **specs)
-        numel = coefs.numel()
-        params = [
-            {
-                "params": list(coefs.values()),
-                "lr": 1e0,
-                "name": "Decomposition coefs",
-            },
-        ]
-    uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
+        obs_mask = FullDomainMask(
+            space_interior.psi.xy.x,
+            space_interior.psi.xy.y,
+            dt=comparison_interval * dt,
+        )
+        msg_obs = (
+            f"Full surface observed every {sec2text(comparison_interval * dt)}"
+        )
 
-    msg = f"Control vector contains {numel} elements."
-    logger.info(box(msg, style="round"))
+    ## Regularization
 
-    optimizer = torch.optim.Adam(params)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, factor=0.5, patience=5
+    gamma = args.gamma / comparison_interval
+
+    if with_reg:
+        msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
+        if gamma != args.gamma:
+            msg_reg += (
+                f" (rescaled from ɣ = {args.gamma:#5.3g} to"  # noqa: RUF001
+                " account for observations sparsity)."
+            )
+        else:
+            msg_reg += "."
+    else:
+        msg_reg = "No regularization."
+
+    ## Output
+    prefix = args.complete_prefix()
+    filename = f"{prefix}.pt"
+    output_file = output_dir.joinpath(filename)
+
+    ## Logs
+
+    msg_simu = (
+        f"Performing {n_cycles} cycles of {n_steps_per_cyle} "
+        f"steps with up to {optim_max_step} optimization steps."
     )
-    lr_callback = LRChangeCallback(optimizer)
-    early_stop = EarlyStop()
+    if args.separation != 0:
+        msg_simu += (
+            f"\nCycles are separated by {sec2text(separation * 24 * 3600)}."
+        )
+    msg_season = f"Season: {args.season}."
+    msg_sf = "Reconstructing ψ using atmospheric pressure and ssh."
+    lon_min = np.rad2deg(lons.min())
+    lon_max = np.rad2deg(lons.max())
+    lat_min = np.rad2deg(lats.min())
+    lat_max = np.rad2deg(lats.max())
+    msg_area = (
+        f"Longitudes in [{lon_min:#.3g}°, {lon_max:#.3g}°],"
+        f" latitudes in [{lat_min:#.3g}°, {lat_max:#.3g}°]."
+    )
+    if with_wind:
+        msg_wind = "Using wind from ERA interim DFS5."
+    else:
+        msg_wind = "No wind considered."
+    msg_output = f"Output will be saved to {output_file}."
 
-    coefs_scaled = coefs.scale(
-        *(
-            1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
-            for k in range(basis.order)
+    logger.info(
+        box(
+            msg_simu,
+            msg_season,
+            msg_sf,
+            msg_area,
+            msg_wind,
+            msg_obs,
+            msg_reg,
+            msg_output,
+            style="=",
         )
     )
-    epsilon = 0.1
-    register_params = RegisterParams(
-        alpha=torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1,
-        coefs=coefs_scaled.to_dict(),
-        uv10_to_uvsurf=uv10_to_uvsurf,
+
+    # Parameters
+
+    H = config.model.h
+    g_prime = config.model.g_prime
+    bottom_drag_coef = config.physics.bottom_drag_coefficient
+    slip_coef = config.physics.slip_coef
+
+    # Models
+
+    ## Inhomogeneous models
+    M = TypeVar("M", bound=QGPSIQCore)
+
+    model = QGPSIQSSTRGSI(
+        space_2d=space_interior,
+        H=H[:2],
+        beta_plane=beta_plane,
+        g_prime=g_prime[:2],
+    )
+    model: QGPSIQSSTRGSI = set_inhomogeneous_model(model)
+    model.H_ml = 10
+    model.temp_1_offset = 4
+
+    # PV computation
+
+    y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
+    beta_effect = beta_plane.beta * (y_w - model.y0)
+
+    build_compute_q_rg = lambda A11, A12: (
+        lambda psi1: compute_q1_interior(
+            psi1,
+            torch.zeros_like(psi1),
+            A11,
+            A12,
+            dx,
+            dy,
+            beta_plane.f0,
+            beta_effect[:, 1:-1],
+        )
     )
 
-    for o in range(optim_max_step):
-        optimizer.zero_grad()
-        model.reset_time()
+    outputs = []
 
-        with torch.enable_grad():
-            if with_wind:
-                usurf, vsurf = torch.einsum(
-                    "lm,mtxy->ltxy",
-                    uv10_to_uvsurf,
-                    winds,
-                )
+    L: float = dx.item()
 
-                u_mags = torch.sqrt(winds.square().sum(dim=0))
+    for c in range(n_cycles):
+        torch.cuda.reset_peak_memory_stats()
 
-                Cd = compute_drag_coef(u_mags)
+        start_cycle = c * n_file_per_cycle + c * separation
+        end_cycle = (c + 1) * n_file_per_cycle + c * separation
 
-                rho_air = 1.225
-                rho_water = config.physics.rho
+        if end_cycle > len(files):
+            msg = f"Not enough files to perform cycle {c} and above."
+            logger.warning(msg)
+            break
 
-                bulk_coef = Cd * rho_air / rho_water
+        files_for_cycle = files[start_cycle:end_cycle]
 
-                tauxs = bulk_coef * u_mags * usurf
-                tauys = bulk_coef * u_mags * vsurf
-
-                tauxs_i = (tauxs[:, 1:, :] + tauxs[:, :-1, :]) / 2
-                tauys_i = (tauys[:, :, 1:] + tauys[:, :, :-1]) / 2
-
-            alpha = torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1
-            coefs_scaled = coefs.scale(
-                *(
-                    1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
-                    for k in range(basis.order)
+        with load_netcdfs(
+            files_for_cycle.tolist(), data_folder / "misc", load_wind=with_wind
+        ) as ds:
+            ds[STREAMFUNCTION] = (
+                compute_streamfunction_with_atmospheric_pressure_xy_avg(
+                    ds[SSH],
+                    ds[ATMOS_PRESSURE],
+                    1000,
+                    9.81,
+                    remove_avgs=True,
                 )
             )
 
-            basis.set_coefs(coefs_scaled)
-
-            model.basis = basis
-            model.alpha = alpha
-
-            compute_reg = compute_regularization_func(
-                basis, alpha, space_interior, scale=1 / T**2
+            psi0_filt_da, psis_filt_da = filter_streamfunction(
+                ds[STREAMFUNCTION],
+                sigma_ic,
+                sigma_bc,
             )
+            ds["psi_filt"] = psis_filt_da
 
-            compute_q_rg = build_compute_q_rg(
-                model.A[:1, :1],
-                model.A[:1, 1:2],
+            with logger.timeit("Interpolating dataset"):
+                psi0_filt_da: xr.DataArray = psi_regridder(
+                    psi0_filt_da, output_chunks=(-1, -1)
+                )
+                ds_interp: xr.Dataset = psi_regridder(
+                    ds[
+                        [STREAMFUNCTION, "psi_filt"]
+                        + [ZONAL_WIND_10M, MERIDIONAL_WIND_10M] * with_wind
+                    ],
+                    output_chunks=(-1, -1),
+                )
+                ds_interp[LONGITUDE] = (["i", "j"], lons)
+                ds_interp[LATITUDE] = (["i", "j"], lats)
+
+            with logger.timeit("Interpolating SST"):
+                regridded_sst: xr.DataArray = sst_regridder(
+                    ds[SST], output_chunks=(-1, -1)
+                )
+                ds_sst_interp = xr.Dataset(
+                    {
+                        LONGITUDE: (["i", "j"], interpolate(lons)),
+                        LATITUDE: (["i", "j"], interpolate(lats)),
+                        SST: regridded_sst,
+                    },
+                    regridded_sst.coords,
+                )
+                ds_sst_interp = ds_sst_interp.set_coords([LONGITUDE, LATITUDE])
+
+        with logger.timeit("Building tensors"):
+            psi0 = da_to_tensor(psi0_filt_da, **specs) / f0
+            psis = da_to_tensor(ds_interp[STREAMFUNCTION], **specs) / f0
+            psis_f = da_to_tensor(ds_interp["psi_filt"], **specs) / f0
+            ssts = da_to_tensor(ds_sst_interp[SST], **specs) + 273.15
+            t0 = ds_interp[TIME][0]
+            times = (ds_interp[TIME] - t0).dt.total_seconds().to_numpy()
+            times = torch.tensor(times, **specs)
+        with logger.timeit("Retrieving boundaries"):
+            psi_bcs = [extract_psi_bc(p) for p in psis_f]
+            sst_bcs = [extract_sst_bc(s) for s in ssts]
+
+        if with_wind:
+            winds = crop(
+                torch.stack(
+                    [
+                        torch.tensor(
+                            ds_interp[ZONAL_WIND_10M].to_numpy(), **specs
+                        ),
+                        torch.tensor(
+                            ds_interp[MERIDIONAL_WIND_10M].to_numpy(), **specs
+                        ),
+                    ],
+                    dim=0,
+                ),
+                b,
             )
-            q0 = crop(compute_q_rg(psi0), b - 1)
+        psi0_mean = psi0.mean()
+        var_ref = crop(psis[:, 0, 0], b).var()
+        U: float = psi0_mean / L
+        T = L / U
 
-            qs = (compute_q_rg(p1) for p1 in psis_filt)
-            q_bcs = [
-                Boundaries.extract(q, b - 2, -(b - 1), b - 2, -(b - 1), 3)
-                for q in qs
+        s = step(c + 1, n_cycles)
+        msg = f"Cycle {s}: eNATL60 data loaded and processed."
+        logger.info(box(msg, style="round"))
+
+        psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
+        sst_bc_interp = QuadraticInterpolation(times, sst_bcs)
+
+        xx = space_interior.psi.xy.x
+        yy = space_interior.psi.xy.y
+
+        space_params, time_params = gaussian_exp_field(
+            0, 3, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * 7200
+        )
+        basis = GaussianExpBasis(space_params, time_params)
+        coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
+        coefs = coefs.requires_grad_()
+
+        if with_alpha:
+            kappa = torch.tensor(0, **specs, requires_grad=True)
+            numel = kappa.numel() + coefs.numel()
+            params = [
+                {"params": [kappa], "lr": 1e-2, "name": "κ"},
+                {
+                    "params": list(coefs.values()),
+                    "lr": 1e0,
+                    "name": "Decomposition coefs",
+                },
             ]
-            q_bc_interp = QuadraticInterpolation(times, q_bcs)
+        else:
+            kappa = torch.tensor(0, **specs)
+            numel = coefs.numel()
+            params = [
+                {
+                    "params": list(coefs.values()),
+                    "lr": 1e0,
+                    "name": "Decomposition coefs",
+                },
+            ]
+        uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
 
-            model.set_psiqsst(crop(psi0[:, :1], b), q0, crop(sst0, b))
-            model.set_boundary_maps(psi_bc_interp, q_bc_interp, sst_bc_interp)
+        msg = f"Control vector contains {numel} elements."
+        logger.info(box(msg, style="round"))
 
-            loss = torch.tensor(0, **specs)
+        optimizer = torch.optim.Adam(params)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, factor=0.5, patience=5
+        )
+        lr_callback = LRChangeCallback(optimizer)
+        early_stop = EarlyStop()
 
-            loss = update_loss(
-                loss,
-                model.psi[0, 0],
-                crop(psis_ref[0][0, 0], b),
-                model.time,
-                variance=var_ref,
+        coefs_scaled = coefs.scale(
+            *(
+                1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
+                for k in range(basis.order)
             )
-
-            for n in range(1, n_steps_per_cyle):
-                psi1_ = model.psi
-                time = model.time.clone()
-
-                if n % 2 == 1 and with_wind:
-                    model.set_wind_forcing(
-                        tauxs_i[(n - 1) // 2], tauys_i[(n - 1) // 2]
-                    )
-
-                model.step()
-                if torch.isnan(model.psi).any():
-                    msg = f"NaN in stream function at {o=} in step {n=}"
-                    raise OverflowError(msg)
-                psi1 = model.psi
-
-                if with_reg:
-                    dpsi1_ = (psi1 - psi1_) / dt
-                    reg = gamma * (compute_reg(psi1_, dpsi1_, time))
-                    loss += reg
-                if n % 2 == 0:
-                    loss = update_loss(
-                        loss,
-                        psi1[0, 0],
-                        crop(psis_ref[n // 2][0, 0], b),
-                        model.time,
-                        variance=var_ref,
-                    )
-                if n % 20 == 0:
-                    loss += (
-                        100
-                        * (
-                            (model.sst - crop(ssts[n // 2], b)).square().sum()
-                            / crop(ssts[n // 2], b).square().sum()
-                        ).sqrt()
-                    )
-
-        if torch.isnan(loss.detach()):
-            msg = "Loss has diverged."
-            logger.warning(box(msg, style="="))
-            break
-
-        if torch.isnan(model.psi).any():
-            msg = "Streamfunction has diverged."
-            logger.warning(box(msg, style="="))
-            break
-
-        register_params.step(
-            loss,
-            alpha=alpha,
+        )
+        epsilon = 0.1
+        register_params = RegisterParams(
+            alpha=torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1,
             coefs=coefs_scaled.to_dict(),
             uv10_to_uvsurf=uv10_to_uvsurf,
         )
 
-        if early_stop.step(loss):
-            msg = f"Convergence reached after {o + 1} iterations."
+        for o in range(optim_max_step):
+            optimizer.zero_grad()
+            model.reset_time()
+
+            with torch.enable_grad():
+                if with_wind:
+                    usurf, vsurf = torch.einsum(
+                        "lm,mtxy->ltxy",
+                        uv10_to_uvsurf,
+                        winds,
+                    )
+
+                    u_mags = torch.sqrt(winds.square().sum(dim=0))
+
+                    Cd = compute_drag_coef(u_mags)
+
+                    rho_air = 1.225
+                    rho_water = config.physics.rho
+
+                    bulk_coef = Cd * rho_air / rho_water
+
+                    tauxs = bulk_coef * u_mags * usurf
+                    tauys = bulk_coef * u_mags * vsurf
+
+                    tauxs_i = (tauxs[:, 1:, :] + tauxs[:, :-1, :]) / 2
+                    tauys_i = (tauys[:, :, 1:] + tauys[:, :, :-1]) / 2
+
+                alpha = torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1
+                coefs_scaled = coefs.scale(
+                    *(
+                        1e-1 * psi0_mean / (n_steps_per_cyle * dt) ** k
+                        for k in range(basis.order)
+                    )
+                )
+
+                basis.set_coefs(coefs_scaled)
+
+                model.basis = basis
+                model.alpha = alpha
+
+                compute_reg = compute_regularization_func(
+                    basis, alpha, space_interior, scale=1 / T**2
+                )
+
+                compute_q_rg = build_compute_q_rg(
+                    model.A[:1, :1],
+                    model.A[:1, 1:2],
+                )
+                q0 = crop(compute_q_rg(psi0), b - 1)
+
+                qs = (compute_q_rg(p1) for p1 in psis_f)
+
+                q_bcs = [
+                    Boundaries.extract(q, b - 2, -(b - 1), b - 2, -(b - 1), 3)
+                    for q in qs
+                ]
+                q_bc_interp = QuadraticInterpolation(times, q_bcs)
+
+                model.set_psiqsst(crop(psi0[:, :1], b), q0, crop(ssts[0], b))
+                model.set_boundary_maps(
+                    psi_bc_interp, q_bc_interp, sst_bc_interp
+                )
+
+                loss = torch.tensor(0, **specs)
+
+                loss = update_loss(
+                    loss,
+                    model.psi[0, 0],
+                    crop(psis[0][0, 0], b),
+                    model.time,
+                    variance=var_ref,
+                )
+
+                for n in range(1, n_steps_per_cyle):
+                    psi1_ = model.psi
+                    time = model.time.clone()
+
+                    if n % 2 == 1 and with_wind:
+                        model.set_wind_forcing(
+                            tauxs_i[(n - 1) // 2], tauys_i[(n - 1) // 2]
+                        )
+
+                    model.step()
+                    if torch.isnan(model.psi).any():
+                        msg = f"NaN in stream function at {o=} in step {n=}"
+                        raise OverflowError(msg)
+                    psi1 = model.psi
+
+                    if with_reg:
+                        dpsi1_ = (psi1 - psi1_) / dt
+                        reg = gamma * (compute_reg(psi1_, dpsi1_, time))
+                        loss += reg
+                    if n % 2 == 0:
+                        loss = update_loss(
+                            loss,
+                            psi1[0, 0],
+                            crop(psis[n // 2][0, 0], b),
+                            model.time,
+                            variance=var_ref,
+                        )
+                    if n % 20 == 0:
+                        loss += (
+                            100
+                            * (
+                                (model.sst - crop(ssts[n // 2], b))
+                                .square()
+                                .sum()
+                                / crop(ssts[n // 2], b).square().sum()
+                            ).sqrt()
+                        )
+
+            if torch.isnan(loss.detach()):
+                msg = "Loss has diverged."
+                logger.warning(box(msg, style="="))
+                break
+
+            if torch.isnan(model.psi).any():
+                msg = "Streamfunction has diverged."
+                logger.warning(box(msg, style="="))
+                break
+
+            register_params.step(
+                loss,
+                alpha=alpha,
+                coefs=coefs_scaled.to_dict(),
+                uv10_to_uvsurf=uv10_to_uvsurf,
+            )
+
+            if early_stop.step(loss):
+                msg = f"Convergence reached after {o + 1} iterations."
+                logger.info(msg)
+                break
+
+            loss_ = loss.cpu().item()
+
+            msg = (
+                f"Cycle {step(c + 1, n_cycles)} | "
+                f"Optimization step {step(o + 1, optim_max_step)} | "
+                f"Loss: {loss_:>#10.5g} | "
+                f"Best loss: {register_params.best_loss:>#10.5g}"
+            )
             logger.info(msg)
-            break
 
-        loss_ = loss.cpu().item()
+            loss.backward()
 
-        msg = (
-            f"Cycle {step(c + 1, n_cycles)} | "
-            f"Optimization step {step(o + 1, optim_max_step)} | "
-            f"Loss: {loss_:>#10.5g} | "
-            f"Best loss: {register_params.best_loss:>#10.5g}"
-        )
-        logger.info(msg)
+            if with_alpha:
+                torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
 
-        loss.backward()
+            torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
-        if with_alpha:
-            torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
+            optimizer.step()
+            scheduler.step(loss)
+            lr_callback.step()
 
-        torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
+        best_loss = register_params.best_loss
+        msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
+        max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
+        msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
+        logger.info(box(msg, msg_mem, style="round"))
+        output = {
+            "cycle": c,
+            "config": {
+                "comparison_interval": comparison_interval,
+                "no-wind": args.no_wind,
+                "obstrack": args.obs_track,
+                "gamma": args.gamma if with_reg else 0,
+                "basis": basis.get_params(),
+                "numel": numel,
+                "sigma_bc": sigma_bc,
+                "sigma_ic": sigma_ic,
+                "dt": dt,
+                "separation_steps": args.separation,
+                "season": args.season,
+            },
+            "optim": {
+                "max_steps": optim_max_step,
+                "nb_steps": o + 1,
+                "loss": best_loss,
+            },
+            "specs": {"max_memory_allocated": max_mem},
+            "alpha": register_params.params["alpha"],
+            "coefs": register_params.params["coefs"],
+            "uv10_to_uvsurf": register_params.params["uv10_to_uvsurf"],
+        }
+        outputs.append(output)
 
-        optimizer.step()
-        scheduler.step(loss)
-        lr_callback.step()
-
-    best_loss = register_params.best_loss
-    msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
-    max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
-    msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
-    logger.info(box(msg, msg_mem, style="round"))
-    output = {
-        "cycle": c,
-        "config": {
-            "comparison_interval": comparison_interval,
-            "no-wind": args.no_wind,
-            "obstrack": args.obs_track,
-            "gamma": args.gamma if with_reg else 0,
-            "basis": basis.get_params(),
-            "numel": numel,
-            "sigma_bc": sigma_bc,
-            "sigma_ic": sigma_ic,
-            "dt": dt,
-            "separation_steps": args.separation,
-            "season": args.season,
-        },
-        "optim": {
-            "max_steps": optim_max_step,
-            "nb_steps": o + 1,
-            "loss": best_loss,
-        },
-        "specs": {"max_memory_allocated": max_mem},
-        "alpha": register_params.params["alpha"],
-        "coefs": register_params.params["coefs"],
-        "uv10_to_uvsurf": register_params.params["uv10_to_uvsurf"],
-    }
-    outputs.append(output)
-
-    torch.save(outputs, output_file)
-    msg = f"Outputs saved to {output_file}"
-    logger.info(box(msg, style="="))
+        torch.save(outputs, output_file)
+        msg = f"Outputs saved to {output_file}"
+        logger.info(box(msg, style="="))
