@@ -13,46 +13,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def open_dataset(filepath: Path) -> xr.Dataset:
-    """Open a xarray dataset from a single file.
-
-    Args:
-        filepath (Path): Filepath to read the dataset from.
-
-    Raises:
-        ValueError: If the dataset suffix is not recognized.
-
-    Returns:
-        xr.Dataset: Dataset.
-    """
-    if filepath.suffix == ".zarr":
-        return xr.open_zarr(filepath)
-    if filepath.suffix == ".nc":
-        return xr.open_dataset(filepath)
-
-    msg = "Unrecognised filepath type."
-    raise ValueError(msg)
-
-
-def open_datasets(
-    *filepaths: Path, concat_dim: str = "time_counter"
-) -> xr.Dataset:
-    """Open multiple datasets and combine them into a single one.
-
-    Args:
-        *filepaths (Path): Filepaths.
-        concat_dim (str, optional): Dimension along which to concatenate.
-            Defaults to "time_counter".
-
-    Returns:
-        xr.Dataset: Dataset.
-    """
-    return xr.combine_nested(
-        [open_dataset(f) for f in filepaths],
-        concat_dim=concat_dim,
-    ).sortby(concat_dim)
-
-
 def format_dataset(ds: xr.Dataset) -> xr.Dataset:
     """Format a dataset.
 
@@ -90,6 +50,7 @@ def load_datasets(
     *filepaths: Path,
     concat_dim: str = "time_counter",
     format_func: Callable[[xr.Dataset], xr.Dataset] = format_dataset,
+    chunks: str | dict | None = "auto",
 ) -> xr.Dataset:
     """Load (open and format) a dataset.
 
@@ -98,9 +59,10 @@ def load_datasets(
         concat_dim (str, optional): Dimension along which to concatenate
             datasets. Defaults to "time_counter".
         format_func (Callable[[xr.Dataset],xr.Dataset]): formating function.
+        chunks (str|dict|None, optional): Chunks. Defaults to "auto".
 
     Returns:
         xr.Dataset: Dataset.
     """
-    ds = open_datasets(*filepaths, concat_dim=concat_dim)
+    ds = xr.open_mfdataset(filepaths, chunks=chunks).sortby(concat_dim)
     return format_func(ds)
