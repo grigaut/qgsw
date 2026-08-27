@@ -2,17 +2,14 @@
 
 import xarray as xr
 
-from qgsw.eNATL60.forcing import interpolate_era_da
 from qgsw.eNATL60.var_keys import (
-    ATMOS_PRESSURE,
-    SSH,
     TIME,
 )
 
 
 def compute_streamfunction_with_atmospheric_pressure(
-    ds: xr.Dataset,
-    ds_era: xr.Dataset,
+    da_ssh: xr.DataArray,
+    da_atmp: xr.DataArray,
     rho0: float = 1026.0,
     g: float = 9.81,
     *,
@@ -21,8 +18,8 @@ def compute_streamfunction_with_atmospheric_pressure(
     """Compute surface streamfunction.
 
     Args:
-        ds (xr.Dataset): Sea surface height.
-        ds_era (xr.Dataset): Atmospheric datas.
+        da_ssh (xr.DataArray): Sea surface height.
+        da_atmp (xr.DataArray): Atmospheric pressure.
         rho0 (float, optional): Sea density. Defaults to 1026.0.
         g (float, optional): Gravity constant. Defaults to 9.81.
         remove_avgs (bool, optional): Whether to remove atmospheric pressure
@@ -32,19 +29,15 @@ def compute_streamfunction_with_atmospheric_pressure(
     Returns:
         xr.DataArray: _description_
     """
-    atmos_p = interpolate_era_da(ds_era[ATMOS_PRESSURE], ds)
-    ssh = ds[SSH]
     if remove_avgs:
-        atmos_p_avg = atmos_p.mean(dim=[d for d in atmos_p.dims if d != TIME])
-        atmos_p = atmos_p - atmos_p_avg
-        ssh_avg = ssh.mean()
-        ssh = ssh - ssh_avg
-    return atmos_p / rho0 + g * ssh
+        atmos_p_avg = da_atmp.mean(dim=[d for d in da_atmp.dims if d != TIME])
+        return (da_atmp - atmos_p_avg) / rho0 + g * (da_ssh - da_ssh.mean())
+    return da_atmp / rho0 + g * da_ssh
 
 
 def compute_streamfunction_with_atmospheric_pressure_txy_avg(
-    ds: xr.Dataset,
-    ds_era: xr.Dataset,
+    da_ssh: xr.DataArray,
+    da_atmp: xr.DataArray,
     rho0: float = 1026.0,
     g: float = 9.81,
     *,
@@ -53,8 +46,8 @@ def compute_streamfunction_with_atmospheric_pressure_txy_avg(
     """Compute surface streamfunction.
 
     Args:
-        ds (xr.Dataset): Sea surface height.
-        ds_era (xr.Dataset): Atmospheric datas.
+        da_ssh (xr.DataArray): Sea surface height.
+        da_atmp (xr.DataArray): Atmospheric pressure.
         rho0 (float, optional): Sea density. Defaults to 1026.0.
         g (float, optional): Gravity constant. Defaults to 9.81.
         remove_avgs (bool, optional): Whether to remove atmospheric pressure
@@ -64,19 +57,15 @@ def compute_streamfunction_with_atmospheric_pressure_txy_avg(
     Returns:
         xr.DataArray: _description_
     """
-    atmos_p = interpolate_era_da(ds_era[ATMOS_PRESSURE], ds)
-    ssh = ds[SSH]
     if remove_avgs:
-        atmos_p_avg = atmos_p.mean()
-        atmos_p = atmos_p - atmos_p_avg
-        ssh_avg = ssh.mean()
-        ssh = ssh - ssh_avg
-    return atmos_p / rho0 + g * ssh
+        return (da_atmp - da_atmp.mean()) / rho0 + g * (da_ssh - da_ssh.mean())
+
+    return (da_atmp) / rho0 + g * da_ssh
 
 
 def compute_streamfunction_with_atmospheric_pressure_xy_avg(
-    ds: xr.Dataset,
-    ds_era: xr.Dataset,
+    da_ssh: xr.DataArray,
+    da_atmp: xr.DataArray,
     rho0: float = 1026.0,
     g: float = 9.81,
     *,
@@ -85,8 +74,8 @@ def compute_streamfunction_with_atmospheric_pressure_xy_avg(
     """Compute surface streamfunction.
 
     Args:
-        ds (xr.Dataset): Sea surface height.
-        ds_era (xr.Dataset): Atmospheric datas.
+        da_ssh (xr.DataArray): Sea surface height.
+        da_atmp (xr.DataArray): Atmospheric pressure.
         rho0 (float, optional): Sea density. Defaults to 1026.0.
         g (float, optional): Gravity constant. Defaults to 9.81.
         remove_avgs (bool, optional): Whether to remove atmospheric pressure
@@ -96,18 +85,15 @@ def compute_streamfunction_with_atmospheric_pressure_xy_avg(
     Returns:
         xr.DataArray: _description_
     """
-    atmos_p = interpolate_era_da(ds_era[ATMOS_PRESSURE], ds)
-    ssh = ds[SSH]
     if remove_avgs:
-        atmos_p_avg = atmos_p.mean(dim=[d for d in atmos_p.dims if d != TIME])
-        atmos_p = atmos_p - atmos_p_avg
-        ssh_avg = ssh.mean(dim=[d for d in ssh.dims if d != TIME])
-        ssh = ssh - ssh_avg
-    return atmos_p / rho0 + g * ssh
+        atmos_p_avg = da_atmp.mean(dim=[d for d in da_atmp.dims if d != TIME])
+        ssh_avg = da_ssh.mean(dim=[d for d in da_ssh.dims if d != TIME])
+        return (da_atmp - atmos_p_avg) / rho0 + g * (da_ssh - ssh_avg)
+    return da_atmp / rho0 + g * da_ssh
 
 
 def compute_stream_function_ssh_only(
-    ds: xr.Dataset,
+    da_ssh: xr.DataArray,
     g: float = 9.81,
     *,
     remove_avg: bool = False,
@@ -115,8 +101,7 @@ def compute_stream_function_ssh_only(
     """Compute surface streamfunction.
 
     Args:
-        ds (xr.Dataset): Sea surface height.
-        ds_era (xr.Dataset): Atmospheric datas.
+        da_ssh (xr.DataArray): Sea surface height.
         rho0 (float, optional): Sea density. Defaults to 1026.0.
         g (float, optional): Gravity constant. Defaults to 9.81.
         remove_avg (bool, optional): Whether to remove ssh average or not.
@@ -125,8 +110,6 @@ def compute_stream_function_ssh_only(
     Returns:
         xr.DataArray: _description_
     """
-    ssh = ds[SSH]
     if remove_avg:
-        ssh_avg = ssh.mean()
-        ssh = ssh - ssh_avg
-    return g * ssh
+        return g * (da_ssh - da_ssh.mean())
+    return g * da_ssh
