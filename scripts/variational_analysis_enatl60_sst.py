@@ -437,7 +437,7 @@ if __name__ == "__main__":
         yy = space_interior.psi.xy.y
 
         space_params, time_params = gaussian_exp_field(
-            0, 3, xx, yy, n_steps_per_cyle * dt, n_steps_per_cyle / 6 * 7200
+            0, 3, xx, yy, 240 * 7200, 240 / 6 * 7200
         )
         basis = GaussianExpBasis(space_params, time_params)
         coefs = DecompositionCoefs.zeros_like(basis.generate_random_coefs())
@@ -584,7 +584,7 @@ if __name__ == "__main__":
                             model.sst[0, 0],
                             crop(ssts[n // 2], b),
                             variance=crop(ssts[n // 2], b).square().sum()
-                            / 100,
+                            / 10000,
                         )
 
             if torch.isnan(loss.detach()):
