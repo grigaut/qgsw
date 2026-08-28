@@ -88,7 +88,7 @@ def load_netcdfs(
             years.insert(0, dates.min().year - 1)
         msg = f"Loading data for years: {', '.join([str(y) for y in years])}"
         logger.info(msg)
-        with load_era_interim(era_folder, 2009) as ds_era:
+        with load_era_interim(era_folder, *years) as ds_era:
             ds_era_sliced = slice_time(ds_era, ds[TIME])
             ds_era_sliced = slice_space(
                 ds_era_sliced, ds[LONGITUDE], ds[LATITUDE]
