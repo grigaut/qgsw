@@ -1,11 +1,16 @@
 """Forcing-related tools."""
 
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, overload
 
 import numpy as np
 import xarray as xr
 
 from qgsw.eNATL60.var_keys import ATMOS_PRESSURE, LATITUDE, LONGITUDE, TIME
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def load_era_interim_oneyear(folder: Path, year: int = 2010) -> xr.Dataset:
@@ -28,11 +33,9 @@ def load_era_interim_oneyear(folder: Path, year: int = 2010) -> xr.Dataset:
     ds[LONGITUDE] = (
         ds[LONGITUDE] + 180
     ) % 360 - 180  # longitude in [-180, 180]
-    dsu = xr.merge(
-        [
-            xr.open_dataset(folder / f"drowned_{v}_y{year}.nc", chunks=chks)
-            for v in varlist[1:]
-        ]
+    dsu = xr.open_mfdataset(
+        [folder / f"drowned_{v}_y{year}.nc" for v in varlist[1:]],
+        chunks="auto",
     )
     dsu = dsu.rename({"lon0": LONGITUDE, "lat0": LATITUDE})
     dsu[LONGITUDE] = ds[LONGITUDE]
@@ -102,21 +105,42 @@ def slice_space(
     return ds_era.sel(lon=slice(lon_min, lon_max), lat=slice(lat_min, lat_max))
 
 
-def interpolate_era_da(
+@overload
+def interpolate_era(
+    da_era: xr.Dataset,
+    time_da: ...,
+    lon_da: ...,
+    lat_da: ...,
+) -> xr.Dataset: ...
+@overload
+def interpolate_era(
     da_era: xr.DataArray,
-    ds: xr.Dataset,
-) -> xr.DataArray:
+    time_da: ...,
+    lon_da: ...,
+    lat_da: ...,
+) -> xr.DataArray: ...
+
+
+def interpolate_era(
+    da_era: xr.Dataset | xr.DataArray,
+    da_time: xr.DataArray,
+    da_lon: xr.DataArray,
+    da_lat: xr.DataArray,
+) -> xr.Dataset | xr.DataArray:
     """Interpolate atmospheric variable "da_era" on the grid of "ds".
 
     Args:
         da_era (xr.DataArray): ERA DataArray.
-        ds (xr.Dataset): Dataset to match coordinates.
+        da_time (xr.DataArray): Time DataArray.
+        da_lon (xr.DataArray): Longitude DataArray.
+        da_lat (xr.DataArray): Latitude DataArray.
+
 
     Returns:
         xr.DataArray: Interpolated DataArray.
     """
-    if TIME in ds.dims and len(ds[TIME]) == 1:  # time before space
-        da = da_era.interp({TIME: ds[TIME]})
-        return da.interp({LONGITUDE: ds[LONGITUDE], LATITUDE: ds[LATITUDE]})
-    da = da_era.interp({LONGITUDE: ds[LONGITUDE], LATITUDE: ds[LATITUDE]})
-    return da.interp({TIME: ds[TIME]})
+    if len(da_time) == 1:  # time before space
+        da = da_era.interp({TIME: da_time})
+        return da.interp({LONGITUDE: da_lon, LATITUDE: da_lat})
+    da = da_era.interp({LONGITUDE: da_lon, LATITUDE: da_lat})
+    return da.interp({TIME: da_time})
