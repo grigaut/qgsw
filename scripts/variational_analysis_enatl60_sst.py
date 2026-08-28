@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 import numpy as np
 import torch
@@ -39,12 +39,12 @@ from qgsw.eNATL60.var_keys import (
     TIME,
     ZONAL_WIND_10M,
 )
+from qgsw.eNATL60.wind import compute_windstress
 from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.psiq.mixed_layer.forced import QGPSIQSSTRGSI
-from qgsw.models.qg.stretching_matrix import compute_A_tilde
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
@@ -53,14 +53,19 @@ from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.pv import (
     compute_q1_interior,
 )
+from qgsw.scripts.boundaries import (
+    extract_psi_bc,
+    extract_q_bc,
+    extract_sst_bc,
+)
 from qgsw.scripts.eNATL60 import (
     da_to_tensor,
     filter_streamfunction,
     format_ds,
     load_netcdfs,
 )
-from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad
+from qgsw.scripts.loss import update_loss
+from qgsw.scripts.regularization import compute_regularization_func
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
 )
@@ -71,168 +76,13 @@ from qgsw.utils.interpolation import QuadraticInterpolation
 from qgsw.utils.reshaping import crop
 from qgsw.utils.storage import get_path_from_env
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from qgsw.decomposition.base import SpaceTimeDecomposition
-    from qgsw.decomposition.supports.space.base import SpaceSupportFunction
-    from qgsw.decomposition.supports.time.base import TimeSupportFunction
-
 torch.backends.cudnn.deterministic = True
 torch.set_grad_enabled(False)
-
-
-def update_loss(
-    loss: torch.Tensor,
-    f: torch.Tensor,
-    f_ref: torch.Tensor,
-    time: torch.Tensor,
-    *,
-    variance: float | torch.Tensor = 1,
-) -> None:
-    """Update loss."""
-    mask = obs_mask.at_time(time)
-    if not mask.any():
-        return loss
-    f_sliced = f.flatten()[mask.flatten()]
-    f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + (f_sliced - f_ref_sliced).square().sum() / variance
 
 
 ### Boundaries offset
 
 b = 4
-
-
-def extract_psi_bc(psi: torch.Tensor) -> Boundaries:
-    """Extract psi."""
-    return Boundaries.extract(psi, b, -b - 1, b, -b - 1, 2)
-
-
-def extract_q_bc(q: torch.Tensor) -> Boundaries:
-    """Extract q."""
-    return Boundaries.extract(q, b - 2, -(b - 1), b - 2, -(b - 1), 3)
-
-
-def extract_sst_bc(sst: torch.Tensor) -> Boundaries:
-    """Extract SST."""
-    return Boundaries.extract(sst, b - 1, -b, b - 1, -b, 3)
-
-
-## Bulk formula (from Large & Yeager 2004)
-
-
-def compute_drag_coef(wind_magnitude: torch.Tensor) -> torch.Tensor:
-    """Compute drag coefficient.
-
-    Based on formula from 'Diurnal to decadal global forcing for ocean and
-    sea-ice models: the data sets and flux climatologies'
-    by Large and Yeager (2004)
-
-    Arbitrary threshold of 0.5 added to prevent error from null velocities.
-    """
-    threshold = torch.tensor(0.5, **specs)
-    return 1e-3 * (
-        0.142
-        + 2.7 / torch.maximum(wind_magnitude, threshold)
-        + wind_magnitude / 13.09
-    )
-
-
-def set_inhomogeneous_model(model: M) -> M:
-    """Set up inhomogeneous model."""
-    model.masks = Masks.empty_tensor(nx, ny, device=specs["device"])
-    model.bottom_drag_coef = 0
-    model.wide = True
-    model.slip_coef = slip_coef
-    model.dt = dt
-    return model
-
-
-## Regularization
-
-
-def compute_regularization_func(
-    psi2_basis: SpaceTimeDecomposition[
-        SpaceSupportFunction, TimeSupportFunction
-    ],
-    alpha: torch.Tensor,
-    space: SpaceDiscretization2D,
-    scale: float,
-) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-    """Build regularization function.
-
-    Args:
-        psi2_basis (SpaceTimeDecomposition): Basis.
-        alpha (torch.Tensor) : Baroclinic radius perturbation.
-        space (SpaceDiscretization2D): Space.
-        scale (float): Regularizaiton scaling value.
-
-    Returns:
-        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-            Regularization function.
-    """
-    A_tilde = compute_A_tilde(H[:2], g_prime[:2], alpha, **specs)
-    A_21 = A_tilde[1:2, :1]
-    A_22 = A_tilde[1:2, 1:2]
-
-    q = space.q.xy
-    x = crop(q.x, 1)
-    y = crop(q.y, 1)
-
-    fpsi2 = psi2_basis.localize(x, y)
-    fdx_psi2 = psi2_basis.localize_dx(x, y)
-    fdy_psi2 = psi2_basis.localize_dy(x, y)
-    flap_psi2 = psi2_basis.localize_laplacian(x, y)
-    fdx_lap_psi2 = psi2_basis.localize_dx_laplacian(x, y)
-    fdy_lap_psi2 = psi2_basis.localize_dy_laplacian(x, y)
-
-    def compute_reg(
-        psi1: torch.Tensor,
-        dpsi1: torch.Tensor,
-        time: torch.Tensor,
-    ) -> torch.Tensor:
-        """Compute regularization term.
-
-        Args:
-            psi1 (torch.Tensor): Top layer stream function.
-            dpsi1 (torch.Tensor): Top layer stream function derivative.
-            time (torch.Tensor): Time.
-
-        Returns:
-            torch.Tensor: ∂ₜq₂ + J(ѱ₂, q₂)
-        """
-        dt_lap_psi2 = flap_psi2.dt(time)
-        dt_psi2 = fpsi2.dt(time)
-
-        dt_q2 = dt_lap_psi2 - beta_plane.f0**2 * (
-            A_22 * dt_psi2 + A_21 * interpolate(crop(dpsi1, 1))
-        )
-
-        dx_psi1, dy_psi1 = grad(psi1)
-        dx_psi1 /= dx
-        dy_psi1 /= dy
-
-        dx_psi1_i = (dx_psi1[..., 1:] + dx_psi1[..., :-1]) / 2
-        dy_psi1_i = (dy_psi1[..., 1:, :] + dy_psi1[..., :-1, :]) / 2
-
-        dx_psi2 = fdx_psi2(time)
-        dy_psi2 = fdy_psi2(time)
-
-        dy_q2 = (
-            fdy_lap_psi2(time)
-            - beta_plane.f0**2 * (A_22 * dy_psi2 + A_21 * crop(dy_psi1_i, 1))
-        ) + beta_plane.beta
-
-        dx_q2 = fdx_lap_psi2(time) - beta_plane.f0**2 * (
-            A_22 * dx_psi2 + A_21 * crop(dx_psi1_i, 1)
-        )
-
-        adv_q2 = -dy_psi2 * dx_q2 + dx_psi2 * dy_q2
-        return ((dt_q2 + adv_q2) / scale).square().sum()
-
-    return compute_reg
-
 
 if __name__ == "__main__":
     ## Config
@@ -446,10 +296,18 @@ if __name__ == "__main__":
     bottom_drag_coef = config.physics.bottom_drag_coefficient
     slip_coef = config.physics.slip_coef
 
-    # Models
+    # Model
 
-    ## Inhomogeneous models
     M = TypeVar("M", bound=QGPSIQCore)
+
+    def set_inhomogeneous_model(model: M) -> M:
+        """Set up inhomogeneous model."""
+        model.masks = Masks.empty_tensor(nx, ny, device=specs["device"])
+        model.bottom_drag_coef = 0
+        model.wide = True
+        model.slip_coef = slip_coef
+        model.dt = dt
+        return model
 
     model = QGPSIQSSTRGSI(
         space_2d=space_interior,
@@ -553,23 +411,17 @@ if __name__ == "__main__":
             times = (ds_interp[TIME] - t0).dt.total_seconds().to_numpy()
             times = torch.tensor(times, **specs)
         with logger.timeit("Retrieving boundaries"):
-            psi_bcs = [extract_psi_bc(p) for p in psis_f]
-            sst_bcs = [extract_sst_bc(s) for s in ssts]
+            psi_bcs = [extract_psi_bc(p, b) for p in psis_f]
+            sst_bcs = [extract_sst_bc(s, b) for s in ssts]
 
         if with_wind:
-            winds = crop(
-                torch.stack(
-                    [
-                        torch.tensor(
-                            ds_interp[ZONAL_WIND_10M].to_numpy(), **specs
-                        ),
-                        torch.tensor(
-                            ds_interp[MERIDIONAL_WIND_10M].to_numpy(), **specs
-                        ),
-                    ],
-                    dim=0,
-                ),
-                b,
+            u10 = ds_interp[ZONAL_WIND_10M].to_numpy()
+            v10 = ds_interp[MERIDIONAL_WIND_10M].to_numpy()
+            uv10 = torch.stack(
+                [
+                    crop(torch.tensor(u10, **specs), b),
+                    crop(torch.tensor(v10, **specs), b),
+                ],
             )
         psi0_mean = psi0.mean()
         var_ref = crop(psis[:, 0, 0], b).var()
@@ -645,26 +497,12 @@ if __name__ == "__main__":
 
             with torch.enable_grad():
                 if with_wind:
-                    usurf, vsurf = torch.einsum(
-                        "lm,mtxy->ltxy",
+                    tauxs_i, tauys_i = compute_windstress(
+                        uv10,
                         uv10_to_uvsurf,
-                        winds,
+                        rho_water=config.physics.rho,
+                        rho_air=1.225,
                     )
-
-                    u_mags = torch.sqrt(winds.square().sum(dim=0))
-
-                    Cd = compute_drag_coef(u_mags)
-
-                    rho_air = 1.225
-                    rho_water = config.physics.rho
-
-                    bulk_coef = Cd * rho_air / rho_water
-
-                    tauxs = bulk_coef * u_mags * usurf
-                    tauys = bulk_coef * u_mags * vsurf
-
-                    tauxs_i = (tauxs[:, 1:, :] + tauxs[:, :-1, :]) / 2
-                    tauys_i = (tauys[:, :, 1:] + tauys[:, :, :-1]) / 2
 
                 alpha = torch.exp(epsilon * kappa + kappa * kappa.abs()) - 1
                 coefs_scaled = coefs.scale(
@@ -680,7 +518,13 @@ if __name__ == "__main__":
                 model.alpha = alpha
 
                 compute_reg = compute_regularization_func(
-                    basis, alpha, space_interior, scale=1 / T**2
+                    basis,
+                    H,
+                    g_prime,
+                    alpha,
+                    space_interior,
+                    beta_plane,
+                    scale=1 / T**2,
                 )
 
                 compute_q_rg = build_compute_q_rg(
@@ -691,10 +535,7 @@ if __name__ == "__main__":
 
                 qs = (compute_q_rg(p1) for p1 in psis_f)
 
-                q_bcs = [
-                    Boundaries.extract(q, b - 2, -(b - 1), b - 2, -(b - 1), 3)
-                    for q in qs
-                ]
+                q_bcs = [extract_q_bc(q, b) for q in qs]
                 q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
                 model.set_psiqsst(crop(psi0[:, :1], b), q0, crop(ssts[0], b))
@@ -708,7 +549,7 @@ if __name__ == "__main__":
                     loss,
                     model.psi[0, 0],
                     crop(psis[0][0, 0], b),
-                    model.time,
+                    mask=obs_mask.at_time(model.time),
                     variance=var_ref,
                 )
 
@@ -736,18 +577,16 @@ if __name__ == "__main__":
                             loss,
                             psi1[0, 0],
                             crop(psis[n // 2][0, 0], b),
-                            model.time,
+                            mask=obs_mask.at_time(model.time),
                             variance=var_ref,
                         )
                     if n % 20 == 0:
-                        loss += (
-                            100
-                            * (
-                                (model.sst - crop(ssts[n // 2], b))
-                                .square()
-                                .sum()
-                                / crop(ssts[n // 2], b).square().sum()
-                            ).sqrt()
+                        loss = update_loss(
+                            loss,
+                            model.sst[0, 0],
+                            crop(ssts[n // 2], b),
+                            variance=crop(ssts[n // 2], b).square().sum()
+                            / 100,
                         )
 
             if torch.isnan(loss.detach()):
