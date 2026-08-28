@@ -271,6 +271,8 @@ class Boundaries:
         jmin: int,
         jmax: int,
         width: int = 1,
+        *,
+        clone: bool = False,
     ) -> Self:
         """Extract boundary conditions from a field.
 
@@ -297,6 +299,8 @@ class Boundaries:
             jmin (int): Minimum index in the y direction.
             jmax (int): Maximum index in the y direction.
             width (int, optional): Width of the boundary. Defaults to 1.
+            clone (bool, optional): Whether to clone extracted data.
+                Defaults to False.
 
         Returns:
             Self: Extracted boundaries.
@@ -307,6 +311,29 @@ class Boundaries:
         """
         w = width
         imin, imax, jmin, jmax = cls._compute_ij(field, imin, imax, jmin, jmax)
+        if clone:
+            return cls(
+                top=field[
+                    ...,
+                    imin - (w - 1) : imax + (w - 1),
+                    jmax - 1 : jmax + w - 1,
+                ].clone(),
+                bottom=field[
+                    ...,
+                    imin - (w - 1) : imax + (w - 1),
+                    jmin - (w - 1) : jmin + 1,
+                ].clone(),
+                left=field[
+                    ...,
+                    imin - (w - 1) : imin + 1,
+                    jmin - (w - 1) : jmax + (w - 1),
+                ].clone(),
+                right=field[
+                    ...,
+                    imax - 1 : imax + w - 1,
+                    jmin - (w - 1) : jmax + (w - 1),
+                ].clone(),
+            )
         return cls(
             top=field[
                 ..., imin - (w - 1) : imax + (w - 1), jmax - 1 : jmax + w - 1
