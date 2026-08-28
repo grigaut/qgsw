@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, overload
 
 import numpy as np
 import xarray as xr
@@ -11,7 +10,6 @@ import xarray as xr
 from qgsw.eNATL60.var_keys import ATMOS_PRESSURE, LATITUDE, LONGITUDE, TIME
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
     from pathlib import Path
 
 
@@ -47,10 +45,7 @@ def load_era_interim_oneyear(folder: Path, year: int = 2010) -> xr.Dataset:
     return ds.set_coords([TIME, LONGITUDE, LATITUDE])
 
 
-@contextmanager
-def load_era_interim(
-    folder: Path, *years: int
-) -> Generator[xr.Dataset, Any, None]:
+def load_era_interim(folder: Path, *years: int) -> xr.Dataset:
     """Load atmospheric field over multiple years.
 
     Args:
@@ -60,14 +55,10 @@ def load_era_interim(
     Returns:
         xr.Dataset: Dataset.
     """
-    ds = xr.concat(
+    return xr.concat(
         [load_era_interim_oneyear(folder, y) for y in years],
         dim=TIME,
     )
-    try:
-        yield ds
-    finally:
-        ds.close()
 
 
 def slice_time(ds_era: xr.Dataset, times: xr.DataArray) -> xr.Dataset:
