@@ -319,8 +319,6 @@ if __name__ == "__main__":
     model.H_ml = 10
     model.temp_1_offset = 4
 
-    # PV computation
-
     y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
     beta_effect = beta_plane.beta * (y_w - model.y0)
 
@@ -361,8 +359,8 @@ if __name__ == "__main__":
                 compute_streamfunction_with_atmospheric_pressure_xy_avg(
                     ds[SSH],
                     ds[ATMOS_PRESSURE],
-                    1000,
-                    9.81,
+                    config.physics.rho,
+                    g_prime[0].item(),
                     remove_avgs=True,
                 )
             )
