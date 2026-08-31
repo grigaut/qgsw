@@ -8,9 +8,7 @@ from typing import TypeVar
 import numpy as np
 import torch
 import xarray as xr
-from matplotlib import pyplot as plt
 
-from qgsw import plots
 from qgsw.cli import ScriptsArgsParser
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
@@ -621,18 +619,6 @@ if __name__ == "__main__":
                             variance=crop(ssts[n // 2], b).square().sum()
                             / 500000,
                         )
-                if o % 10 == 0:
-                    fig, axs = plots.subplots(1, 2)
-                    plots.imshow(model.psi[0, 0], ax=axs[0, 0])
-                    plots.imshow(
-                        model.sst[0, 0],
-                        ax=axs[0, 1],
-                        center_cbar=False,
-                        cmap="magma",
-                    )
-                    plots.set_coltitles(["Stream function", "SST"], axs)
-                    plt.tight_layout()
-                    plt.savefig(f"output/images/SST/state_{o}.png")
 
                 loss = obs_loss + sst_loss + reg_loss
 
