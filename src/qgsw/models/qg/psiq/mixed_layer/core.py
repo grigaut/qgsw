@@ -64,7 +64,7 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         282.6, **defaults.get()
     )  # See Kravtsov, 2022
     sigma = torch.tensor(5.6704e-8, **defaults.get())  # Stefan-Boltzmann
-    temp_1_offset = 2
+    _temp_1_offset = torch.tensor(2, **defaults.get())
     delta_temp_1 = 8
 
     def __init__(
@@ -206,8 +206,20 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
     @H_ml.setter
     def H_ml(self, value: float | torch.Tensor) -> None:  # noqa: N802
         self._H_ml = as_singe_value_tensor(value)
-        msg = f"Mixed layer depth set to {self.H_ml.item()} m"
-        logger.info(msg)
+        msg = f"Mixed layer depth set to {self.H_ml.item():>#10.5g} m"
+        logger.detail(msg)
+
+    @property
+    def temp_1_offset(self) -> torch.Tensor:
+        """Offset between surface temperature and layer 1 temperature."""
+        return self._temp_1_offset
+
+    @temp_1_offset.setter
+    def temp_1_offset(self, value: float | torch.Tensor) -> None:
+        self._temp_1_offset = as_singe_value_tensor(value)
+        temp = self.temp_1_offset.item()
+        msg = f"Temperature offset set to {temp:>#10.5g} °C."
+        logger.detail(msg)
 
     @property
     def lambd(self) -> torch.Tensor:
