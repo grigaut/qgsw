@@ -100,7 +100,9 @@ class Logger(logging.Logger):
             yield
         finally:
             if end_message is not None:
-                duration = perf_counter() - start
-                suffix = f" ({sec2text(duration)})" if elapsed else ""
+                suffix = ""
+                if elapsed:
+                    duration = perf_counter() - start
+                    suffix = f" ({sec2text(duration)})"
                 self.log(level, f"{end_message}{suffix}")
             _indent_level.reset(token)

@@ -64,7 +64,7 @@ from qgsw.scripts.eNATL60 import (
     format_ds,
     load_netcdfs,
 )
-from qgsw.scripts.loss import update_loss
+from qgsw.scripts.loss import eval_loss, update_loss
 from qgsw.scripts.regularization import compute_regularization_func
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -340,6 +340,12 @@ if __name__ == "__main__":
     L: float = dx.item()
 
     for c in range(n_cycles):
+        losses = {
+            "obs_losses": [],
+            "sst_losses": [],
+            "reg_losses": [],
+        }
+
         torch.cuda.reset_peak_memory_stats()
 
         start_cycle = c * n_file_per_cycle + c * separation
@@ -445,9 +451,13 @@ if __name__ == "__main__":
 
         if with_alpha:
             kappa = torch.tensor(0, **specs, requires_grad=True)
-            numel = kappa.numel() + coefs.numel()
+            mu = torch.tensor(0, **specs, requires_grad=True)
+            theta0 = torch.tensor(0, **specs, requires_grad=True)
+            numel = kappa.numel() + mu.numel() + theta0.numel() + coefs.numel()
             params = [
                 {"params": [kappa], "lr": 1e-2, "name": "κ"},
+                {"params": [mu], "lr": 1e0, "name": "µ"},
+                {"params": [theta0], "lr": 1e-1, "name": "θ₀"},
                 {
                     "params": list(coefs.values()),
                     "lr": 1e0,
@@ -456,6 +466,8 @@ if __name__ == "__main__":
             ]
         else:
             kappa = torch.tensor(0, **specs)
+            mu = torch.tensor(0, **specs)
+            theta0 = torch.tensor(0, **specs)
             numel = coefs.numel()
             params = [
                 {
@@ -494,6 +506,9 @@ if __name__ == "__main__":
             model.reset_time()
 
             with torch.enable_grad():
+                model.H_ml = 55 + 45 * 2 / torch.pi * torch.atan(mu)
+                model.temp_1_offset = 5 + 3 * 2 / torch.pi * torch.atan(theta0)
+
                 if with_wind:
                     tauxs_i, tauys_i = compute_windstress(
                         uv10,
@@ -541,10 +556,20 @@ if __name__ == "__main__":
                     psi_bc_interp, q_bc_interp, sst_bc_interp
                 )
 
-                loss = torch.tensor(0, **specs)
+                obs_loss = torch.tensor(0, **specs)
+                sst_loss = torch.tensor(0, **specs)
+                if with_reg:
+                    reg_loss = torch.tensor(0, **specs)
+                val_losses = [
+                    eval_loss(
+                        model.psi[0, 0],
+                        crop(psis[0][0, 0], b),
+                        variance=var_ref,
+                    )
+                ]
 
-                loss = update_loss(
-                    loss,
+                obs_loss = update_loss(
+                    obs_loss,
                     model.psi[0, 0],
                     crop(psis[0][0, 0], b),
                     mask=obs_mask.at_time(model.time),
@@ -561,6 +586,7 @@ if __name__ == "__main__":
                         )
 
                     model.step()
+
                     if torch.isnan(model.psi).any():
                         msg = f"NaN in stream function at {o=} in step {n=}"
                         raise OverflowError(msg)
@@ -569,23 +595,36 @@ if __name__ == "__main__":
                     if with_reg:
                         dpsi1_ = (psi1 - psi1_) / dt
                         reg = gamma * (compute_reg(psi1_, dpsi1_, time))
-                        loss += reg
+                        reg_loss += reg
                     if n % 2 == 0:
-                        loss = update_loss(
-                            loss,
+                        obs_loss = update_loss(
+                            obs_loss,
                             psi1[0, 0],
                             crop(psis[n // 2][0, 0], b),
                             mask=obs_mask.at_time(model.time),
                             variance=var_ref,
                         )
+                        val_losses.append(
+                            eval_loss(
+                                model.psi[0, 0],
+                                crop(psis[0][0, 0], b),
+                                variance=var_ref,
+                            )
+                        )
                     if n % 20 == 0:
-                        loss = update_loss(
-                            loss,
+                        sst_loss = update_loss(
+                            sst_loss,
                             model.sst[0, 0],
                             crop(ssts[n // 2], b),
                             variance=crop(ssts[n // 2], b).square().sum()
-                            / 10000,
+                            / 500000,
                         )
+
+                loss = obs_loss + sst_loss + reg_loss
+
+            losses["obs_losses"].append(obs_loss.detach().item())
+            losses["sst_losses"].append(sst_loss.detach().item())
+            losses["reg_losses"].append(reg_loss.detach().item())
 
             if torch.isnan(loss.detach()):
                 msg = "Loss has diverged."
@@ -599,6 +638,7 @@ if __name__ == "__main__":
 
             register_params.step(
                 loss,
+                val_losses=[e.detach().item() for e in val_losses],
                 alpha=alpha,
                 coefs=coefs_scaled.to_dict(),
                 uv10_to_uvsurf=uv10_to_uvsurf,
@@ -619,10 +659,19 @@ if __name__ == "__main__":
             )
             logger.info(msg)
 
+            msg = (
+                f"\tObs: {obs_loss.detach().item():>#10.5g}"
+                f"| SST: {sst_loss.detach().item():>#10.5g}"
+                f"| Reg: {reg_loss.detach().item():>#10.5g}"
+            )
+            logger.detail(msg)
+
             loss.backward()
 
             if with_alpha:
                 torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
+                torch.nn.utils.clip_grad_value_([mu], clip_value=1.0)
+                torch.nn.utils.clip_grad_value_([theta0], clip_value=1.0)
 
             torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
@@ -655,6 +704,8 @@ if __name__ == "__main__":
                 "nb_steps": o + 1,
                 "loss": best_loss,
             },
+            "losses": losses,
+            "val_loss": register_params.params["val_losses"],
             "specs": {"max_memory_allocated": max_mem},
             "alpha": register_params.params["alpha"],
             "coefs": register_params.params["coefs"],
