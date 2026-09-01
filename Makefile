@@ -26,24 +26,34 @@ DEV_REQUIREMENTS:=requirements-dev.txt
 # Logs
 LOGS:=logs
 
+MAMBA_CHECK := $(shell mambqa -h >/dev/null 2>&1 && echo "yes" || echo "no")
+
+ifeq ($(MAMBA_CHECK),yes)
+    PKG_MANAGER := mamba
+else
+    PKG_MANAGER := $(CONDA_EXE)
+endif
+
+
 all:
 	@${MAKE} install-dev
 	@chmod +x scripts/oar/*.sh
 	@chmod +x scripts/bash/*.sh
+
 
 clean:
 	@${MAKE} clean-venv
 	@${MAKE} clean-logs
 
 clean-venv:
-	@${CONDA_EXE} env remove --prefix ${VENV}
+	@${PKG_MANAGER} env remove --prefix ${VENV}
 
 clean-logs:
 	@rm logs/*
 
 
 ${VENV}:
-	@${CONDA_EXE} env create --file=${ENVIRONMENT_FILE} --prefix=${VENV}
+	@${PKG_MANAGER} env create --file=${ENVIRONMENT_FILE} --prefix=${VENV}
 
 venv: ${VENV}
 
