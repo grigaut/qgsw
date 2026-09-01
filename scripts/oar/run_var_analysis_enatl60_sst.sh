@@ -1,7 +1,7 @@
 #!/bin/bash
 SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-SCRIPT="scripts/bash/run_va_enatl60_atmp_hr.sh"
-NAME="eNATL60-AtmP-SurfML-HR"
+SCRIPT="scripts/bash/run_va_enatl60_sst.sh"
+NAME="eNATL60-SST"
 source "$SRCDIR/scripts/oar/lib.sh"
 
 cd $SRCDIR
