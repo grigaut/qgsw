@@ -37,7 +37,7 @@ class OptimizableFunction(Generic[Param, T]):
         if torch.__version__[0] == "2":
             msg = f"Compiling {func.__name__} using torch.compile."
             logger.detail(msg)
-            self._core = torch.compile(func)
+            self._core = torch.compile(func, backend="aot_eager")
         else:
             self._func = func
             self._core = self._trace
