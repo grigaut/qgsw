@@ -10,8 +10,8 @@ else
 	BIN = ${VENV}/bin/
 endif
 VENV := .venv
-ENV_LOCAL := environment-local.yml
-ENV_G5000 := environment-g5000.yml
+ENV_LOCAL := environment.yml
+ENV_G5000 := environment.yml
 ifeq (${ENVIRONMENT}, local)
 	ENVIRONMENT_FILE = ${ENV_LOCAL}
 else ifeq (${ENVIRONMENT}, grid5000)
