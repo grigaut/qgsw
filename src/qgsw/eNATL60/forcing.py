@@ -92,14 +92,14 @@ def slice_space(
     Returns:
         xr.Dataset: Sliced ERA dataset.
     """
-    era_dlon = np.abs(
-        ds_era[LONGITUDE].values[1:] - ds_era[LONGITUDE].values[:-1]
-    ).max()
+    era_dlon = (
+        (ds_era[LONGITUDE][1:] - ds_era[LONGITUDE][:-1]).abs().max().numpy()
+    )
     lon_min = lons.min() - era_dlon
     lon_max = lons.max() + era_dlon
-    era_dlat = np.abs(
-        ds_era[LATITUDE].values[1:] - ds_era[LATITUDE].values[:-1]
-    ).max()
+    era_dlat = (
+        (ds_era[LATITUDE][1:] - ds_era[LATITUDE][:-1]).abs().max().numpy()
+    )
     lat_min = lats.min() - era_dlat
     lat_max = lats.max() + era_dlat
     return ds_era.sel(lon=slice(lon_min, lon_max), lat=slice(lat_min, lat_max))

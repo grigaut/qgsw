@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 try:
     from typing import Self
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     )
 
 
-T = TypeVar("T", bound=Union[PSIQT, PSIQSSTT, UVHT])
+T = TypeVar("T", bound=PSIQT | PSIQSSTT | UVHT)
 
 
 class BaseState(ABC, Generic[T]):

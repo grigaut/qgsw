@@ -6,17 +6,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Union
 
-from qgsw.configs.io import IOConfig
-from qgsw.configs.models import CoefConfig, ModelConfig
-from qgsw.configs.perturbation import PerturbationConfig
-from qgsw.configs.physics import PhysicsConfig
-from qgsw.configs.simulations import (
-    AssimilationSimulationConfig,
-    ModelRunSimulationConfig,
-)
-from qgsw.configs.space import SpaceConfig
-from qgsw.configs.windstress import WindStressConfig
-
 try:
     from typing import Self
 except ImportError:
@@ -24,6 +13,17 @@ except ImportError:
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from qgsw.configs.io import IOConfig
+    from qgsw.configs.models import CoefConfig, ModelConfig
+    from qgsw.configs.perturbation import PerturbationConfig
+    from qgsw.configs.physics import PhysicsConfig
+    from qgsw.configs.simulations import (
+        AssimilationSimulationConfig,
+        ModelRunSimulationConfig,
+    )
+    from qgsw.configs.space import SpaceConfig
+    from qgsw.configs.windstress import WindStressConfig
 
 import toml
 from pydantic import (
