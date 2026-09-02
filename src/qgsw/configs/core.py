@@ -1,35 +1,34 @@
 """Configurations."""
 
-# ruff: noqa: TC001, UP007
+# ruff: noqa: TCH001, TCH003, UP007
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import Union
 
 try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from qgsw.configs.io import IOConfig
-    from qgsw.configs.models import CoefConfig, ModelConfig
-    from qgsw.configs.perturbation import PerturbationConfig
-    from qgsw.configs.physics import PhysicsConfig
-    from qgsw.configs.simulations import (
-        AssimilationSimulationConfig,
-        ModelRunSimulationConfig,
-    )
-    from qgsw.configs.space import SpaceConfig
-    from qgsw.configs.windstress import WindStressConfig
+from pathlib import Path
 
 import toml
 from pydantic import (
     BaseModel,
     Field,
 )
+
+from qgsw.configs.io import IOConfig
+from qgsw.configs.models import CoefConfig, ModelConfig
+from qgsw.configs.perturbation import PerturbationConfig
+from qgsw.configs.physics import PhysicsConfig
+from qgsw.configs.simulations import (
+    AssimilationSimulationConfig,
+    ModelRunSimulationConfig,
+)
+from qgsw.configs.space import SpaceConfig
+from qgsw.configs.windstress import WindStressConfig
 
 
 class Configuration(BaseModel):
