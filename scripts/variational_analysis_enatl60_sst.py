@@ -215,7 +215,8 @@ if __name__ == "__main__":
             logger.warning(box(msg, style="="))
         n_obs = obs_mask.compute_obs_nb(240, 7200)
         msg_obs = (
-            "Surface observed along satellite tracks," f" {n_obs} pixels observed."
+            "Surface observed along satellite tracks,"
+            f" {n_obs} pixels observed."
         )
     else:
         obs_mask = FullDomainMask(
@@ -223,7 +224,9 @@ if __name__ == "__main__":
             space_interior.psi.xy.y,
             dt=comparison_interval * dt,
         )
-        msg_obs = f"Full surface observed every {sec2text(comparison_interval * dt)}"
+        msg_obs = (
+            f"Full surface observed every {sec2text(comparison_interval * dt)}"
+        )
 
     ## Regularization
 
@@ -253,7 +256,9 @@ if __name__ == "__main__":
         f"steps with up to {optim_max_step} optimization steps."
     )
     if args.separation != 0:
-        msg_simu += f"\nCycles are separated by {sec2text(separation * 24 * 3600)}."
+        msg_simu += (
+            f"\nCycles are separated by {sec2text(separation * 24 * 3600)}."
+        )
     msg_season = f"Season: {args.season}."
     msg_sf = "Reconstructing ψ using atmospheric pressure and ssh."
     lon_min = np.rad2deg(lons.min())
@@ -549,7 +554,9 @@ if __name__ == "__main__":
                 q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
                 model.set_psiqsst(crop(psi0[:, :1], b), q0, crop(ssts[0], b))
-                model.set_boundary_maps(psi_bc_interp, q_bc_interp, sst_bc_interp)
+                model.set_boundary_maps(
+                    psi_bc_interp, q_bc_interp, sst_bc_interp
+                )
 
                 obs_loss = torch.tensor(0, **specs)
                 sst_loss = torch.tensor(0, **specs)
@@ -611,7 +618,8 @@ if __name__ == "__main__":
                             sst_loss,
                             model.sst[0, 0],
                             crop(ssts[n // 2], b),
-                            variance=crop(ssts[n // 2], b).square().sum() / 500000,
+                            variance=crop(ssts[n // 2], b).square().sum()
+                            / 500000,
                         )
 
                 loss = obs_loss + sst_loss + reg_loss
