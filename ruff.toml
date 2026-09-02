@@ -20,7 +20,9 @@ ignore = [
     "COM812",
     "N803",
     "N806",
-    "PLR2004"
+    "PLR2004",
+    "CPY001",
+    "PLR0917"
 ]
 unfixable = [
     # Remove unused-imports
