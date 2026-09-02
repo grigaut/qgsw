@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path  # noqa: TC003
 from typing import TYPE_CHECKING, Literal, Union
 
 from pydantic import (
@@ -20,6 +19,8 @@ from qgsw.simulation.names import SimulationName
 from qgsw.utils.named_object import NamedObjectConfig
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from qgsw.configs.models import ModelConfig
 
 

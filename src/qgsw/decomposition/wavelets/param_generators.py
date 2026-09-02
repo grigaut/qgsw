@@ -85,7 +85,7 @@ def dyadic_decomposition(
             xc = [x0 + offset_x * 0.5 + i * l_xy for i in range(nx)]
             yc = [y0 + offset_y * 0.5 + i * l_xy for i in range(ny)]
 
-            xyc = [(x, y) for x, y in itertools.product(xc, yc)]
+            xyc = list(itertools.product(xc, yc))
 
             space[p] = {
                 "centers": xyc,
@@ -199,7 +199,7 @@ def linear_decomposition(
             xc = [x0 + offset_x * 0.5 + i * l_xy for i in range(nx)]
             yc = [y0 + offset_y * 0.5 + i * l_xy for i in range(ny)]
 
-            xyc = [(x, y) for x, y in itertools.product(xc, yc)]
+            xyc = list(itertools.product(xc, yc))
 
             space[p] = {
                 "centers": xyc,

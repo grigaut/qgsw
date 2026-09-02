@@ -10,7 +10,7 @@ def in_notebook() -> bool:
         bool: True if run within a Jupyter notebook.
     """
     try:
-        from IPython import get_ipython  # noqa: PLC0415
+        from IPython import get_ipython
 
         return get_ipython() is not None
     except ImportError:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 import torch
 from pydantic import (
@@ -12,7 +13,9 @@ from pydantic import (
 )
 
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit  # noqa: TC001
+
+if TYPE_CHECKING:
+    from qgsw.utils.units._units import Unit
 
 
 class SpaceConfig(BaseModel):

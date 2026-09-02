@@ -1,11 +1,11 @@
 """Schemes for Time-integration."""
 
 from collections.abc import Callable
-from typing import TypeVar, Union
+from typing import TypeVar
 
 from qgsw.fields.variables.tuples import PSIQ, PSIQSST, UVH
 
-Prognostic = TypeVar("Prognostic", bound=Union[UVH, PSIQ, PSIQSST])
+Prognostic = TypeVar("Prognostic", bound=UVH | PSIQ | PSIQSST)
 
 AVAILABLE = ["rk3", "euler"]
 

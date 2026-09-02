@@ -1,5 +1,5 @@
 line-length = 79
-target-version = "py39"
+target-version = "py312"
 extend-exclude = ["*.ipynb"]
 
 [lint]
@@ -22,7 +22,9 @@ ignore = [
     "N806",
     "PLR2004",
     "CPY001",
-    "PLR0917"
+    "UP035",
+    "UP007",
+    "B905"
 ]
 unfixable = [
     # Remove unused-imports
@@ -32,7 +34,7 @@ unfixable = [
     # Use {key} in {dict} instead of {key} in {dict}.keys()
     "SIM118",
     # move to type-checking block
-    "TC001",
+    # "TC001",
     # found comented-out code
     "ERA001",
 ]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
 import torch
@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from qgsw.specs._utils import Device
 
 Prognostic = TypeVar("Prognostic", bound=BaseTuple)
-AdvectedPrognostic = TypeVar("AdvectedPrognostic", bound=Union[UVH, PSIQ])
+AdvectedPrognostic = TypeVar("AdvectedPrognostic", bound=UVH | PSIQ)
 State = TypeVar("State", bound=BaseState)
 PrognosticUVH = TypeVar("PrognosticUVH", bound=BaseUVH)
 PrognosticPSIQ = TypeVar("PrognosticPSIQ", bound=BasePSIQ)
