@@ -3,28 +3,10 @@
 import nox
 
 
-@nox.session(venv_backend="conda")
-def g5000(session: nox.Session) -> None:
-    """Session from environment-g5000.yml."""
-    session.run(
-        "conda",
-        "env",
-        "update",
-        "--prefix",
-        session.virtualenv.location,
-        "--file",
-        "environment-g5000.yml",
-    )
-    session.install("pytest")
-    session.install("pytest-sugar")
-    session.install(".")
-    session.run("pytest")
-
-
 @nox.session()
 @nox.session(venv_backend="conda")
 def local(session: nox.Session) -> None:
-    """Session from environment-local.yml."""
+    """Session from environment.yml."""
     session.run(
         "conda",
         "env",
@@ -32,7 +14,7 @@ def local(session: nox.Session) -> None:
         "--prefix",
         session.virtualenv.location,
         "--file",
-        "environment-local.yml",
+        "environment.yml",
     )
     session.install("pytest")
     session.install("pytest-sugar")
