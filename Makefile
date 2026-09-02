@@ -9,13 +9,15 @@ ifeq ($(OS), Windows_NT)
 else
 	BIN = ${VENV}/bin/
 endif
-VENV := .venv
+
 ENV_LOCAL := environment.yml
 ENV_G5000 := environment.yml
 ifeq (${ENVIRONMENT}, local)
 	ENVIRONMENT_FILE = ${ENV_LOCAL}
+	VENV := .venv
 else ifeq (${ENVIRONMENT}, grid5000)
 	ENVIRONMENT_FILE = ${ENV_G5000}
+	VENV := ${G5K_STORAGE}/.venv
 endif
 # Binaries
 PYTHON:= ${BIN}/python
@@ -26,7 +28,7 @@ DEV_REQUIREMENTS:=requirements-dev.txt
 # Logs
 LOGS:=logs
 
-MAMBA_CHECK := $(shell mambqa -h >/dev/null 2>&1 && echo "yes" || echo "no")
+MAMBA_CHECK := $(shell mamba -h >/dev/null 2>&1 && echo "yes" || echo "no")
 
 ifeq ($(MAMBA_CHECK),yes)
     PKG_MANAGER := mamba
