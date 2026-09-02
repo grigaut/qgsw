@@ -8,6 +8,7 @@ dependencies:
   - pip
   - xesmf
   - esmpy
+  - dask
   - pip:
     - asttokens==2.4.1
     - certifi==2024.8.30
