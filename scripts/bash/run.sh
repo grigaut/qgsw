@@ -19,6 +19,8 @@ cd $SRCDIR
 
 date
 
+echo Running: \".venv/bin/python3 -u scripts/run.py $@\"
+
 LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/run.py $@
 
 date

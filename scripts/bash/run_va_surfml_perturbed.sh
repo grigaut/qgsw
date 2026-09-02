@@ -18,6 +18,8 @@ cd $SRCDIR
 
 date
 
+echo Running: \".venv/bin/python3 -u scripts/variational_analysis_surfml_perturbed.py $@\"
+
 LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/variational_analysis_surfml_perturbed.py $@
 
 date

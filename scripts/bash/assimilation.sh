@@ -19,6 +19,8 @@ cd $SRCDIR
 
 date
 
+echo Running: \".venv/bin/python3 -u scripts/assimilation.py $@\"
+
 .venv/bin/python3 -u scripts/assimilation.py $@
 
 date
