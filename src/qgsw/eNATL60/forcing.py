@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, overload
 
+import dask.array as dar
 import numpy as np
 import xarray as xr
 
@@ -92,14 +93,10 @@ def slice_space(
     Returns:
         xr.Dataset: Sliced ERA dataset.
     """
-    era_dlon = (
-        (ds_era[LONGITUDE][1:] - ds_era[LONGITUDE][:-1]).abs().max().numpy()
-    )
+    era_dlon = dar.abs(ds_era[LONGITUDE].diff(dim=LONGITUDE)).max()
     lon_min = lons.min() - era_dlon
     lon_max = lons.max() + era_dlon
-    era_dlat = (
-        (ds_era[LATITUDE][1:] - ds_era[LATITUDE][:-1]).abs().max().numpy()
-    )
+    era_dlat = dar.abs(ds_era[LATITUDE].diff(dim=LATITUDE)).max()
     lat_min = lats.min() - era_dlat
     lat_max = lats.max() + era_dlat
     return ds_era.sel(lon=slice(lon_min, lon_max), lat=slice(lat_min, lat_max))
