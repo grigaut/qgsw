@@ -24,7 +24,9 @@ ignore = [
     "CPY001",
     "UP035",
     "UP007",
-    "B905"
+    "B905",
+    "UP046",
+    "UP047",
 ]
 unfixable = [
     # Remove unused-imports

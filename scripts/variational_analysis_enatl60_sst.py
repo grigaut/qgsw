@@ -64,7 +64,7 @@ from qgsw.scripts.eNATL60 import (
     format_ds,
     load_netcdfs,
 )
-from qgsw.scripts.loss import eval_loss, update_loss
+from qgsw.scripts.loss import rmse, update_loss
 from qgsw.scripts.regularization import compute_regularization_func
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -563,10 +563,9 @@ if __name__ == "__main__":
                 if with_reg:
                     reg_loss = torch.tensor(0, **specs)
                 val_losses = [
-                    eval_loss(
+                    rmse(
                         model.psi[0, 0],
                         crop(psis[0][0, 0], b),
-                        variance=var_ref,
                     )
                 ]
 
@@ -607,10 +606,9 @@ if __name__ == "__main__":
                             variance=var_ref,
                         )
                         val_losses.append(
-                            eval_loss(
+                            rmse(
                                 model.psi[0, 0],
                                 crop(psis[0][0, 0], b),
-                                variance=var_ref,
                             )
                         )
                     if n % 20 == 0:
