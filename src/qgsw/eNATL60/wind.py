@@ -49,7 +49,7 @@ def compute_windstress(
     if uv10_to_uvsurf is None:
         uv10_to_uvsurf = torch.eye(2, **specs.from_tensor(uv10))
     usurf, vsurf = torch.einsum(
-        "lm,mtxy->ltxy",
+        "lm,m...->l...",
         uv10_to_uvsurf,
         uv10,
     )
@@ -63,7 +63,7 @@ def compute_windstress(
     tauxs = bulk_coef * u_mags * usurf
     tauys = bulk_coef * u_mags * vsurf
 
-    tauxs_i = (tauxs[:, 1:, :] + tauxs[:, :-1, :]) / 2
-    tauys_i = (tauys[:, :, 1:] + tauys[:, :, :-1]) / 2
+    tauxs_i = (tauxs[..., 1:, :] + tauxs[..., :-1, :]) / 2
+    tauys_i = (tauys[..., :, 1:] + tauys[..., :, :-1]) / 2
 
     return tauxs_i, tauys_i
