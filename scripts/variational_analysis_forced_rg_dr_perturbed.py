@@ -490,7 +490,10 @@ for c in range(n_cycles):
     }
     outputs.append(output)
 
-    torch.save(outputs, output_file)
+    torch.save(
+        {"params": args.namespace.__dict__, "results": outputs},
+        output_file,
+    )
     msg = f"Outputs saved to {output_file}"
     logger.info(box(msg, style="="))
 
