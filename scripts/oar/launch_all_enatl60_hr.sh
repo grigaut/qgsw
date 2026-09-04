@@ -18,4 +18,4 @@ cd $SRCDIR
 
 ./scripts/oar/run_var_analysis_enatl60_forced_atmp_hr.sh --config=config/enatl60.toml -v --obs-track --gamma=1e3 "$@"
 
-./scripts/oar/run_var_analysis_enatl60_forced_sst_hr.sh --config=config/enatl60.toml -v --obs-track --gamma=1e3 --gamma-sst=0.01"$@"
+./scripts/oar/run_var_analysis_enatl60_forced_sst_hr.sh --config=config/enatl60.toml -v --obs-track --gamma=1e3 --gamma-sst=0.01 "$@"
