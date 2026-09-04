@@ -16,6 +16,8 @@ from qgsw.fields.variables.tuples import (
     PSIQSSTTAlpha,
 )
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
+from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.psiq.mixed_layer.core import QGPSIQSSTCore
 from qgsw.models.qg.stretching_matrix import compute_A_tilde
 from qgsw.solver.finite_diff import laplacian
@@ -39,6 +41,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
     """QG model with mixed layer and Psi2 transport with deformation radius."""
 
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
+    _type = ModelName.QUASI_GEOSTROPHIC_ML
 
     def __init__(
         self,
@@ -462,3 +465,187 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             [e_ml, e1 - torch.mean(e1)],
             dim=1,
         )
+
+
+class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
+    """QGPSIQSSTRGSI with advected SST."""
+
+    _H_ml = None
+    _temp_1_offset = None
+
+    def set_wind_forcing(
+        self,
+        taux: torch.Tensor | float,
+        tauy: torch.Tensor | float,
+    ) -> None:
+        """Set the wind forcing.
+
+        Args:
+            taux (torch.Tensor): Wind stress in the x direction.
+                └── (n_ens, nl, nx, ny)-shaped
+            tauy (torch.Tensor): Wind stress in the y direction.
+                └── (n_ens, nl, nx, ny)-shaped
+        """
+        QGPSIQCore.set_wind_forcing(self, taux, tauy)
+
+    def _compute_time_derivatives_homogeneous(
+        self,
+        prognostic: PSIQSST,
+    ) -> PSIQSST:
+        """Compute time derivatives for homogeneous problem.
+
+        Args:
+            prognostic (PSIQSST): prognostic tuple.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+                └──  sst : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            PSIQSST: dpsi, dq, sst
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+                └──  dsst : (n_ens, nl, nx, ny)-shaped
+        """
+        psi, q, sst_anom = prognostic
+        u, v = self._grad_perp(psi)
+        u /= self.space.dy
+        v /= self.space.dx
+
+        ## Compute dq
+        div_flux_q = self._compute_advection_homogeneous(u, v, q)
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_homogeneous(psi)
+        dq = (-div_flux_q + fcg_drag) * self.masks.h
+
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
+        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
+
+        ## Compute dψ
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=True,
+        )
+
+        ## Compute dSST
+        u_ml = u[:, :1]
+        v_ml = v[:, :1]
+
+        div_flux_sst = self._compute_advection_homogeneous(
+            u_ml,
+            v_ml,
+            sst_anom,
+        )
+
+        diffusion = self.compute_diffusion(
+            sst_anom,
+            with_2nd_order=True,
+            with_4th_order=True,
+        )
+
+        dsst = (-div_flux_sst + diffusion) * self.masks.h
+        return PSIQSST(dpsi, dq, dsst)
+
+    def _compute_time_derivatives_inhomogeneous(
+        self,
+        prognostic: PSIQSST,
+    ) -> PSIQSST:
+        """Compute time derivatives for inhomogeneous problem.
+
+        Args:
+            prognostic (PSIQSST): Homogeneous contribution
+                of prognostic variables.
+                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  q : (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            PSIQSST: dpsi, dq
+                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
+                └──  dq : (n_ens, nl, nx, ny)-shaped
+        """
+        psi_i, q_i, sst_anom = prognostic
+
+        ## Reconstruct ψ and q
+        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
+        psi = psi_i + psi_bc
+        q = q_i + q_bc
+        u, v = self._grad_perp(psi)
+        u /= self.space.dy
+        v /= self.space.dx
+
+        ## Compute dq
+        div_flux_q = self._compute_advection_inhomogeneous(
+            u, v, q, self._pv_bc
+        )
+        # wind forcing + bottom drag
+        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        dq = (-div_flux_q + fcg_drag) * self.masks.h
+        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
+        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
+
+        ## Compute dψ
+        # Solve Helmholtz equation
+        dpsi = self._solver_homogeneous.compute_stream_function(
+            dq_i,
+            ensure_mass_conservation=False,
+        )
+
+        ## Compute dSST
+        u_ml = u[:, :1]
+        v_ml = v[:, :1]
+
+        div_flux_sst = self._compute_advection_inhomogeneous(
+            u_ml,
+            v_ml,
+            sst_anom,
+            self._sst_bc,
+        )
+
+        diffusion = self.compute_diffusion(
+            sst_anom,
+            self._sst_bc,
+            with_2nd_order=True,
+            with_4th_order=True,
+        )
+        dsst = (-div_flux_sst + diffusion) * self.masks.h
+
+        ## Adjust boundaries
+        if self.time_stepper == "rk3":
+            # Boundary condition interpolation
+            self._rk3_step += 1
+            if self._rk3_step == 1:
+                coef = 1
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 2:
+                coef = 1 / 2
+                self._set_boundaries(self.time.item() + coef * self.dt)
+            elif self._rk3_step == 3:
+                # There won't be any additional step.
+                ...
+            else:
+                msg = "SSPRK3 should only perform 3 steps."
+                raise ValueError(msg)
+        return PSIQSST(dpsi, dq, dsst)
+
+    @torch.enable_grad()
+    def step(self) -> None:
+        """Performs one step time-integration with RK3-SSP scheme."""
+        self._state.update_psiqsst(self.update(self._state.prognostic.psiqsst))
+
+    def compute_entrainments(
+        self,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute entrainments.
+
+        See "Formulation and users’ guide for Q-GCM, Hogg et al, 2014".
+        Zero entrainment is assumed for layers below layer 1.
+
+        Args:
+            sst_anom (torch.Tensor): Sea surface temperature.
+
+        Returns:
+            torch.Tensor: Entrainments vector.
+        """
+        msg = "This method is of no use with this model."
+        raise NotImplementedError(msg)
