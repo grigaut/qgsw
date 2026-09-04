@@ -61,7 +61,7 @@ from qgsw.scripts.eNATL60 import (
     format_ds,
     load_netcdfs,
 )
-from qgsw.scripts.loss import update_loss
+from qgsw.scripts.loss import rmse, update_loss
 from qgsw.scripts.regularization import compute_regularization_func
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -338,6 +338,11 @@ if __name__ == "__main__":
 
     for c in range(n_cycles):
         torch.cuda.reset_peak_memory_stats()
+        losses = {
+            "obs_losses": [],
+            "sst_losses": [],
+            "reg_losses": [],
+        }
 
         start_cycle = c * n_file_per_cycle + c * separation
         end_cycle = (c + 1) * n_file_per_cycle + c * separation
@@ -403,7 +408,7 @@ if __name__ == "__main__":
                 ],
             )
         psi0_mean = psi0.mean()
-        var_ref = crop(psis[:, 0, 0], b).var()
+        var_psi = crop(psis[:, 0, 0], b).var()
         U: float = psi0_mean / L
         T = L / U
 
@@ -528,14 +533,23 @@ if __name__ == "__main__":
                 model.set_psiq(crop(psi0[:, :1], b), q0)
                 model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
-                loss = torch.tensor(0, **specs)
+                obs_loss = torch.tensor(0, **specs)
+                if with_reg:
+                    reg_loss = torch.tensor(0, **specs)
 
-                loss = update_loss(
-                    loss,
+                val_losses = [
+                    rmse(
+                        model.psi[0, 0],
+                        crop(psis[0][0, 0], b),
+                    )
+                ]
+
+                obs_loss = update_loss(
+                    obs_loss,
                     model.psi[0, 0],
                     crop(psis[0][0, 0], b),
                     mask=obs_mask.at_time(model.time),
-                    variance=var_ref,
+                    variance=var_psi,
                 )
 
                 for n in range(1, n_steps_per_cyle):
@@ -554,20 +568,29 @@ if __name__ == "__main__":
 
                     if with_reg:
                         dpsi1_ = (psi1 - psi1_) / dt
-                        reg = gamma * (compute_reg(psi1_, dpsi1_, time))
-                        loss += reg / 2
+                        reg_loss += compute_reg(psi1_, dpsi1_, time)
 
                     if n % 2 == 0:
-                        loss = update_loss(
-                            loss,
-                            psi1[0, 0],
-                            crop(psis[int(n // 2)][0, 0], b),
+                        obs_loss = update_loss(
+                            obs_loss,
+                            model.psi[0, 0],
+                            crop(psis[n // 2][0, 0], b),
                             mask=obs_mask.at_time(model.time),
-                            variance=var_ref,
+                            variance=var_psi,
+                        )
+                        val_losses.append(
+                            rmse(
+                                model.psi[0, 0],
+                                crop(psis[n // 2][0, 0], b),
+                            )
                         )
                 if not with_reg:
                     for coef in coefs_scaled.values():
-                        loss += gamma * coef.square().mean()
+                        reg_loss += coef.square().mean()
+                loss = obs_loss + gamma * reg_loss
+
+            losses["obs_losses"].append(obs_loss.detach().item())
+            losses["reg_losses"].append(reg_loss.detach().item())
 
             if torch.isnan(loss.detach()):
                 msg = "Loss has diverged."
@@ -581,6 +604,7 @@ if __name__ == "__main__":
 
             register_params.step(
                 loss,
+                val_losses=[e.detach().item() for e in val_losses],
                 alpha=alpha,
                 coefs=coefs_scaled.to_dict(),
                 uv10_to_uvsurf=uv10_to_uvsurf,
@@ -600,6 +624,12 @@ if __name__ == "__main__":
                 f"Best loss: {register_params.best_loss:>#10.5g}"
             )
             logger.info(msg)
+
+            msg = (
+                f"\tObs: {obs_loss.detach().item():>#10.5g}"
+                f"| Reg: {gamma * reg_loss.detach().item():>#10.5g}"
+            )
+            logger.detail(msg)
 
             loss.backward()
 
@@ -641,6 +671,8 @@ if __name__ == "__main__":
                 "nb_steps": o + 1,
                 "loss": best_loss,
             },
+            "losses": losses,
+            "val_loss": register_params.params["val_losses"],
             "specs": {"max_memory_allocated": max_mem},
             "alpha": register_params.params["alpha"],
             "coefs": register_params.params["coefs"],
