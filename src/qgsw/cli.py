@@ -159,6 +159,15 @@ class ScriptsArgsParser:
         )
         return self.namespace.reg_exp
 
+    @property
+    def wind_optim(self) -> bool:
+        """wind_optim."""
+        self._check_attr(
+            self.has_wind_optim,
+            "wind_optim not tracked.",
+        )
+        return self.namespace.wind_optim
+
     def __init__(self) -> None:
         """Instantiate parser."""
         self.parser = argparse.ArgumentParser(
@@ -418,6 +427,17 @@ class ScriptsArgsParser:
         )
         self.has_reg_exp = True
 
+    def add_wind_optim(self) -> None:
+        """Add wind optimization."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--wind-optim",
+            type=bool,
+            default=False,
+            help="Whether to perform wind optimization.",
+        )
+        self.has_wind_optim = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_args(namespace=self.namespace)
@@ -453,10 +473,11 @@ class ScriptsArgsParser:
             f"_s{self.separation}"
             if (self.has_separation and self.separation != 0)
             else "",
+            f"_re{self.reg_exp}" if (self.has_reg_exp) else "",
+            "_windoptim" if (self.has_wind_optim and self.wind_optim) else "",
             f"_{self.season}"
             if (self.has_season and self.season is not None)
             else "",
-            f"_re{self.reg_exp}" if (self.has_reg_exp) else "",
         ]
 
     def complete_prefix(self) -> str:

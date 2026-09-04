@@ -94,6 +94,7 @@ if __name__ == "__main__":
     args.add_regularization(gamma_default=0.1)
     args.add_alpha()
     args.add_season(default="summer")
+    args.add_wind_optim()
     args.retrieve()
     with_reg = not args.no_reg
     with_alpha = not args.no_alpha
@@ -271,6 +272,8 @@ if __name__ == "__main__":
     )
     if with_wind:
         msg_wind = "Using wind from ERA interim DFS5."
+        if args.wind_optim:
+            msg_wind += "\nOptimizing wind surface conversion."
     else:
         msg_wind = "No wind considered."
     msg_output = f"Output will be saved to {output_file}."
@@ -451,13 +454,10 @@ if __name__ == "__main__":
 
         if with_alpha:
             kappa = torch.tensor(0, **specs, requires_grad=True)
-            mu = torch.tensor(0, **specs, requires_grad=True)
-            theta0 = torch.tensor(0, **specs, requires_grad=True)
-            numel = kappa.numel() + mu.numel() + theta0.numel() + coefs.numel()
+
+            numel = kappa.numel() + coefs.numel()
             params = [
                 {"params": [kappa], "lr": 1e-2, "name": "κ"},
-                {"params": [mu], "lr": 1e0, "name": "µ"},
-                {"params": [theta0], "lr": 1e-1, "name": "θ₀"},
                 {
                     "params": list(coefs.values()),
                     "lr": 1e0,
@@ -466,8 +466,6 @@ if __name__ == "__main__":
             ]
         else:
             kappa = torch.tensor(0, **specs)
-            mu = torch.tensor(0, **specs)
-            theta0 = torch.tensor(0, **specs)
             numel = coefs.numel()
             params = [
                 {
@@ -476,7 +474,24 @@ if __name__ == "__main__":
                     "name": "Decomposition coefs",
                 },
             ]
+        mu = torch.tensor(0, **specs, requires_grad=True)
+        theta0 = torch.tensor(0, **specs, requires_grad=True)
+        numel += mu.numel() + theta0.numel()
+        params += [
+            {"params": [mu], "lr": 1e0, "name": "µ"},
+            {"params": [theta0], "lr": 1e-1, "name": "θ₀"},
+        ]
         uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
+        if with_wind and args.wind_optim:
+            uv10_to_uvsurf = uv10_to_uvsurf.requires_grad_()
+            params += [
+                {
+                    "params": [uv10_to_uvsurf],
+                    "lr": 1e-2,
+                    "name": "Wind conversion",
+                }
+            ]
+            numel += uv10_to_uvsurf.numel()
 
         msg = f"Control vector contains {numel} elements."
         logger.info(box(msg, style="round"))
@@ -672,8 +687,10 @@ if __name__ == "__main__":
 
             if with_alpha:
                 torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
-                torch.nn.utils.clip_grad_value_([mu], clip_value=1.0)
-                torch.nn.utils.clip_grad_value_([theta0], clip_value=1.0)
+            if with_wind and args.wind_optim:
+                torch.nn.utils.clip_grad_norm_([uv10_to_uvsurf], max_norm=1.0)
+            torch.nn.utils.clip_grad_value_([mu], clip_value=1.0)
+            torch.nn.utils.clip_grad_value_([theta0], clip_value=1.0)
 
             torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
