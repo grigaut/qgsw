@@ -1,7 +1,7 @@
 #!/bin/bash
 SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-SCRIPT="scripts/bash/run_va_enatl60_sst_adv_hr.sh"
-NAME="eNATL60-SST-Adv-HR"
+SCRIPT="scripts/bash/run_va_enatl60_forced_sst_hr.sh"
+NAME="eNATL60-Forced-SST-HR"
 source "$SRCDIR/scripts/oar/lib.sh"
 
 cd $SRCDIR
@@ -18,7 +18,7 @@ n_seasons=0
 [ "$spring" = true ] && (( n_seasons++ ))
 
 # Compute walltime
-walltime=18
+walltime=12
 [ "$long_optim" = true ] && (( walltime *= 4 ))
 [ "$contiguous" = true ] && (( walltime *= n_seasons ))
 
