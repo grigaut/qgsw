@@ -32,6 +32,8 @@ class ScriptsArgsParser:
     has_no_reg = False
     has_no_alpha = False
     has_reg_exp = False
+    has_wind_optim = False
+    has_gamma_sst = False
 
     @property
     def config(self) -> Path:
@@ -483,10 +485,7 @@ class ScriptsArgsParser:
             gamma_sst_str = "0"
         gamma_sst_suffix = (
             f"_gammasst{gamma_sst_str}"
-            if (
-                (self.has_no_reg and not self.no_reg)
-                and (self.has_gamma_sst and self.gamma_sst != 1)
-            )
+            if (self.has_gamma_sst and self.gamma_sst != 1)
             else ""
         )
         return [
