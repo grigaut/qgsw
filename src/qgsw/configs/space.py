@@ -12,7 +12,7 @@ from pydantic import (
 )
 
 from qgsw.specs import DEVICE
-from qgsw.utils.units._units import Unit  # noqa: TC001
+from qgsw.utils.units._units import Unit  # noqa: TCH001
 
 
 class SpaceConfig(BaseModel):
