@@ -612,7 +612,7 @@ if __name__ == "__main__":
                         val_losses.append(
                             rmse(
                                 model.psi[0, 0],
-                                crop(psis[0][0, 0], b),
+                                crop(psis[n // 2][0, 0], b),
                             )
                         )
                     if n % 20 == 0:
