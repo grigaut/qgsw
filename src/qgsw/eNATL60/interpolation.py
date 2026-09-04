@@ -121,11 +121,11 @@ def build_regridder(
     )
     if (len(ds[LONGITUDE].shape) == 1) and (len(ds[LATITUDE].shape) == 1):
         lons_, lats_ = xr.broadcast(ds[LONGITUDE], ds[LATITUDE])
-        lons_ref = np.ascontiguousarray(lons_.T).T
-        lats_ref = np.ascontiguousarray(lats_.T).T
+        lons_ref = np.ascontiguousarray(lons_)
+        lats_ref = np.ascontiguousarray(lats_)
     elif (len(ds[LONGITUDE].shape) == 2) and (len(ds[LATITUDE].shape) == 2):
-        lons_ref = np.ascontiguousarray(ds[LONGITUDE].T).T
-        lats_ref = np.ascontiguousarray(ds[LATITUDE].T).T
+        lons_ref = np.ascontiguousarray(ds[LONGITUDE])
+        lats_ref = np.ascontiguousarray(ds[LATITUDE])
 
     else:
         msg = "Incompatible lon/lat shapes."

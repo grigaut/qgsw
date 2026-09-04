@@ -44,7 +44,7 @@ from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQCore
-from qgsw.models.qg.psiq.mixed_layer.forced import QGPSIQSSTRGSI
+from qgsw.models.qg.psiq.mixed_layer.forced import QGPSIQSSTAdvRGSI
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     ## Config
 
     args = ScriptsArgsParser.va_setup(
-        prefix_default="results_enatl60_sst",
+        prefix_default="results_enatl60_sst_adv",
         cycles_default=4,
     )
     args.add_regularization(gamma_default=0.1)
@@ -314,15 +314,13 @@ if __name__ == "__main__":
         model.dt = dt
         return model
 
-    model = QGPSIQSSTRGSI(
+    model = QGPSIQSSTAdvRGSI(
         space_2d=space_interior,
         H=H[:2],
         beta_plane=beta_plane,
         g_prime=g_prime[:2],
     )
-    model: QGPSIQSSTRGSI = set_inhomogeneous_model(model)
-    model.H_ml = 10
-    model.temp_1_offset = 4
+    model: QGPSIQSSTAdvRGSI = set_inhomogeneous_model(model)
 
     y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
     beta_effect = beta_plane.beta * (y_w - model.y0)
@@ -477,13 +475,6 @@ if __name__ == "__main__":
                     "name": "Decomposition coefs",
                 },
             ]
-        mu = torch.tensor(0, **specs, requires_grad=True)
-        theta0 = torch.tensor(0, **specs, requires_grad=True)
-        numel += mu.numel() + theta0.numel()
-        params += [
-            {"params": [mu], "lr": 1e0, "name": "µ"},
-            {"params": [theta0], "lr": 1e-1, "name": "θ₀"},
-        ]
         uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
         if with_wind and args.wind_optim:
             uv10_to_uvsurf = uv10_to_uvsurf.requires_grad_()
@@ -524,11 +515,6 @@ if __name__ == "__main__":
             model.reset_time()
 
             with torch.enable_grad():
-                H_ml = 55 + 45 * 2 / torch.pi * torch.atan(mu)
-                model.H_ml = H_ml
-                temp_1_offset = 5 + 3 * 2 / torch.pi * torch.atan(theta0)
-                model.temp_1_offset = temp_1_offset
-
                 if with_wind:
                     tauxs_i, tauys_i = compute_windstress(
                         uv10,
@@ -657,8 +643,6 @@ if __name__ == "__main__":
                 loss,
                 val_losses=[e.detach().item() for e in val_losses],
                 alpha=alpha,
-                H_ml=H_ml,
-                temp_1_offset=temp_1_offset,
                 coefs=coefs_scaled.to_dict(),
                 uv10_to_uvsurf=uv10_to_uvsurf,
             )
@@ -691,8 +675,6 @@ if __name__ == "__main__":
                 torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
             if with_wind and args.wind_optim:
                 torch.nn.utils.clip_grad_norm_([uv10_to_uvsurf], max_norm=1.0)
-            torch.nn.utils.clip_grad_value_([mu], clip_value=1.0)
-            torch.nn.utils.clip_grad_value_([theta0], clip_value=1.0)
 
             torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
@@ -729,8 +711,6 @@ if __name__ == "__main__":
             "val_loss": register_params.params["val_losses"],
             "specs": {"max_memory_allocated": max_mem},
             "alpha": register_params.params["alpha"],
-            "H_ml": register_params.params["H_ml"],
-            "temp_1_offset": register_params.params["temp_1_offset"],
             "coefs": register_params.params["coefs"],
             "uv10_to_uvsurf": register_params.params["uv10_to_uvsurf"],
         }

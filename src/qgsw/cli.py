@@ -443,8 +443,7 @@ class ScriptsArgsParser:
         self._check_unretrieved()
         self.parser.add_argument(
             "--wind-optim",
-            type=bool,
-            default=False,
+            action="store_true",
             help="Whether to perform wind optimization.",
         )
         self.has_wind_optim = True
