@@ -96,6 +96,7 @@ if __name__ == "__main__":
     args.add_alpha()
     args.add_season(default="summer")
     args.add_reg_exp(default=2)
+    args.add_wind_optim()
     args.retrieve()
     with_reg = not args.no_reg
     with_alpha = not args.no_alpha
@@ -272,6 +273,8 @@ if __name__ == "__main__":
     )
     if with_wind:
         msg_wind = "Using wind from ERA interim DFS5."
+        if args.wind_optim:
+            msg_wind += "\nOptimizing wind surface conversion."
     else:
         msg_wind = "No wind considered."
     msg_output = f"Output will be saved to {output_file}."
@@ -479,7 +482,7 @@ if __name__ == "__main__":
                 },
             ]
         uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
-        if with_wind:
+        if with_wind and args.wind_optim:
             uv10_to_uvsurf = uv10_to_uvsurf.requires_grad_()
             params += [
                 {
@@ -654,7 +657,7 @@ if __name__ == "__main__":
 
             if with_alpha:
                 torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
-            if with_wind:
+            if with_wind and args.wind_optim:
                 torch.nn.utils.clip_grad_norm_([uv10_to_uvsurf], max_norm=1.0)
 
             torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
