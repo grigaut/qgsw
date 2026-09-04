@@ -168,6 +168,15 @@ class ScriptsArgsParser:
         )
         return self.namespace.wind_optim
 
+    @property
+    def gamma_sst(self) -> float:
+        """gamma_sst."""
+        self._check_attr(
+            self.has_gamma_sst,
+            "gamma_sst not tracked.",
+        )
+        return self.namespace.gamma_sst
+
     def __init__(self) -> None:
         """Instantiate parser."""
         self.parser = argparse.ArgumentParser(
@@ -438,6 +447,17 @@ class ScriptsArgsParser:
         )
         self.has_wind_optim = True
 
+    def add_gamma_sst(self, default: float = 1) -> None:
+        """Add gamma sst."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--gamma-sst",
+            type=float,
+            default=default,
+            help="Gamma for SST loss.",
+        )
+        self.has_gamma_sst = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_args(namespace=self.namespace)
@@ -457,10 +477,23 @@ class ScriptsArgsParser:
             )
             else ""
         )
+        if self.has_gamma_sst and (g := self.gamma_sst) != 0:
+            gamma_sst_str = str(g).rstrip("0").rstrip(".").replace(".", "_")
+        else:
+            gamma_sst_str = "0"
+        gamma_sst_suffix = (
+            f"_gammasst{gamma_sst_str}"
+            if (
+                (self.has_no_reg and not self.no_reg)
+                and (self.has_gamma_sst and self.gamma_sst != 1)
+            )
+            else ""
+        )
         return [
             "_noalpha" if (self.has_no_alpha and self.no_alpha) else "",
             "_noreg" if (self.has_no_reg and self.no_reg) else "",
             gamma_suffix,
+            gamma_sst_suffix,
             "_nowind" if (self.has_no_wind and self.no_wind) else "",
             "_obstrack" if (self.has_obs_track and self.obs_track) else "",
             f"_c{self.comparison}"

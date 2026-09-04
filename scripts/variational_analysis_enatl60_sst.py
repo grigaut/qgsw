@@ -95,6 +95,7 @@ if __name__ == "__main__":
     args.add_alpha()
     args.add_season(default="summer")
     args.add_wind_optim()
+    args.add_gamma_sst(default=1)
     args.retrieve()
     with_reg = not args.no_reg
     with_alpha = not args.no_alpha
@@ -232,6 +233,7 @@ if __name__ == "__main__":
     ## Regularization
 
     gamma = args.gamma / comparison_interval
+    gamma_sst = args.gamma_sst
 
     if with_reg:
         msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
@@ -431,7 +433,8 @@ if __name__ == "__main__":
                 ],
             )
         psi0_mean = psi0.mean()
-        var_ref = crop(psis[:, 0, 0], b).var()
+        var_psi = crop(psis[:, 0, 0], b).var()
+        var_sst = crop(ssts[:, 0, 0], b).var()
         U: float = psi0_mean / L
         T = L / U
 
@@ -589,7 +592,7 @@ if __name__ == "__main__":
                     model.psi[0, 0],
                     crop(psis[0][0, 0], b),
                     mask=obs_mask.at_time(model.time),
-                    variance=var_ref,
+                    variance=var_psi,
                 )
 
                 for n in range(1, n_steps_per_cyle):
@@ -610,7 +613,7 @@ if __name__ == "__main__":
 
                     if with_reg:
                         dpsi1_ = (psi1 - psi1_) / dt
-                        reg = gamma * (compute_reg(psi1_, dpsi1_, time))
+                        reg = compute_reg(psi1_, dpsi1_, time)
                         reg_loss += reg
                     if n % 2 == 0:
                         obs_loss = update_loss(
@@ -618,7 +621,7 @@ if __name__ == "__main__":
                             psi1[0, 0],
                             crop(psis[n // 2][0, 0], b),
                             mask=obs_mask.at_time(model.time),
-                            variance=var_ref,
+                            variance=var_psi,
                         )
                         val_losses.append(
                             rmse(
@@ -631,11 +634,10 @@ if __name__ == "__main__":
                             sst_loss,
                             model.sst[0, 0],
                             crop(ssts[n // 2], b),
-                            variance=crop(ssts[n // 2], b).square().sum()
-                            / 500000,
+                            variance=var_sst,
                         )
 
-                loss = obs_loss + sst_loss + reg_loss
+                loss = obs_loss + gamma_sst * sst_loss + gamma * reg_loss
 
             losses["obs_losses"].append(obs_loss.detach().item())
             losses["sst_losses"].append(sst_loss.detach().item())
@@ -678,8 +680,8 @@ if __name__ == "__main__":
 
             msg = (
                 f"\tObs: {obs_loss.detach().item():>#10.5g}"
-                f"| SST: {sst_loss.detach().item():>#10.5g}"
-                f"| Reg: {reg_loss.detach().item():>#10.5g}"
+                f"| SST: {gamma_sst * sst_loss.detach().item():>#10.5g}"
+                f"| Reg: {gamma * reg_loss.detach().item():>#10.5g}"
             )
             logger.detail(msg)
 
