@@ -360,15 +360,17 @@ def compute_regularization_func(
 
 # PV computation
 
-build_compute_q_rg = lambda A11, A12: lambda psi1: compute_q1_interior(
-    psi1,
-    torch.zeros_like(psi1),
-    A11,
-    A12,
-    dx,
-    dy,
-    beta_plane.f0,
-    beta_effect_w,
+build_compute_q_rg = lambda A11, A12: (
+    lambda psi1: compute_q1_interior(
+        psi1,
+        torch.zeros_like(psi1),
+        A11,
+        A12,
+        dx,
+        dy,
+        beta_plane.f0,
+        beta_effect_w,
+    )
 )
 
 
@@ -610,7 +612,10 @@ for c in range(n_cycles):
     }
     outputs.append(output)
 
-    torch.save(outputs, output_file)
+    torch.save(
+        {"params": args.namespace.__dict__, "results": outputs},
+        output_file,
+    )
     msg = f"Outputs saved to {output_file}"
     logger.info(box(msg, style="="))
 
