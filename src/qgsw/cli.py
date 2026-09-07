@@ -34,6 +34,7 @@ class ScriptsArgsParser:
     has_reg_exp = False
     has_wind_optim = False
     has_gamma_sst = False
+    has_no_ml_optim = False
 
     @property
     def config(self) -> Path:
@@ -178,6 +179,15 @@ class ScriptsArgsParser:
             "gamma_sst not tracked.",
         )
         return self.namespace.gamma_sst
+
+    @property
+    def no_ml_optim(self) -> bool:
+        """no_ml_optim."""
+        self._check_attr(
+            self.has_no_ml_optim,
+            "no_ml_optim not tracked.",
+        )
+        return self.namespace.no_ml_optim
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -459,6 +469,16 @@ class ScriptsArgsParser:
         )
         self.has_gamma_sst = True
 
+    def add_no_ml_optim(self) -> None:
+        """Add ML optimization."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--no-ml-optim",
+            action="store_true",
+            help="Whether to perform ML optimization.",
+        )
+        self.has_no_ml_optim = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_args(namespace=self.namespace)
@@ -506,6 +526,9 @@ class ScriptsArgsParser:
             else "",
             f"_re{self.reg_exp}" if (self.has_reg_exp) else "",
             "_windoptim" if (self.has_wind_optim and self.wind_optim) else "",
+            "_noMLoptim"
+            if (self.has_no_ml_optim and self.no_ml_optim)
+            else "",
             f"_{self.season}"
             if (self.has_season and self.season is not None)
             else "",
