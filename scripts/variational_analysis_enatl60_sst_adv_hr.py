@@ -615,7 +615,7 @@ if __name__ == "__main__":
                                 crop(psis[n // 2][0, 0], b),
                             )
                         )
-                    if n % 20 == 0:
+                    if n % 24 == 0:
                         sst_loss = update_loss(
                             sst_loss,
                             model.sst[0, 0],

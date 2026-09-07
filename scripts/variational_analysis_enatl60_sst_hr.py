@@ -96,11 +96,13 @@ if __name__ == "__main__":
     args.add_season(default="summer")
     args.add_wind_optim()
     args.add_gamma_sst(default=1)
+    args.add_no_ml_optim()
     args.retrieve()
     with_reg = not args.no_reg
     with_alpha = not args.no_alpha
     with_obs_track = args.obs_track
     with_wind = not args.no_wind
+    ml_optim = not args.no_ml_optim
 
     specs = defaults.get()
 
@@ -477,13 +479,16 @@ if __name__ == "__main__":
                     "name": "Decomposition coefs",
                 },
             ]
-        mu = torch.tensor(0, **specs, requires_grad=True)
-        theta0 = torch.tensor(0, **specs, requires_grad=True)
-        numel += mu.numel() + theta0.numel()
-        params += [
-            {"params": [mu], "lr": 1e0, "name": "µ"},
-            {"params": [theta0], "lr": 1e-1, "name": "θ₀"},
-        ]
+        mu = torch.tensor(0, **specs, requires_grad=False)
+        theta0 = torch.tensor(0, **specs, requires_grad=False)
+        if ml_optim:
+            mu = mu.requires_grad_()
+            theta0 = theta0.requires_grad_()
+            numel += mu.numel() + theta0.numel()
+            params += [
+                {"params": [mu], "lr": 1e0, "name": "µ"},
+                {"params": [theta0], "lr": 1e-1, "name": "θ₀"},
+            ]
         uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
         if with_wind and args.wind_optim:
             uv10_to_uvsurf = uv10_to_uvsurf.requires_grad_()
@@ -629,7 +634,7 @@ if __name__ == "__main__":
                                 crop(psis[n // 2][0, 0], b),
                             )
                         )
-                    if n % 20 == 0:
+                    if n % 24 == 0:
                         sst_loss = update_loss(
                             sst_loss,
                             model.sst[0, 0],
@@ -691,8 +696,9 @@ if __name__ == "__main__":
                 torch.nn.utils.clip_grad_value_([kappa], clip_value=1.0)
             if with_wind and args.wind_optim:
                 torch.nn.utils.clip_grad_norm_([uv10_to_uvsurf], max_norm=1.0)
-            torch.nn.utils.clip_grad_value_([mu], clip_value=1.0)
-            torch.nn.utils.clip_grad_value_([theta0], clip_value=1.0)
+            if not args.no_ml_optim:
+                torch.nn.utils.clip_grad_value_([mu], clip_value=1.0)
+                torch.nn.utils.clip_grad_value_([theta0], clip_value=1.0)
 
             torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
