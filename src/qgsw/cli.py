@@ -35,6 +35,7 @@ class ScriptsArgsParser:
     has_wind_optim = False
     has_gamma_sst = False
     has_no_ml_optim = False
+    has_sst_forcing = False
 
     @property
     def config(self) -> Path:
@@ -188,6 +189,15 @@ class ScriptsArgsParser:
             "no_ml_optim not tracked.",
         )
         return self.namespace.no_ml_optim
+
+    @property
+    def with_sst_forcing(self) -> bool:
+        """with_sst_forcing."""
+        self._check_attr(
+            self.has_sst_forcing,
+            "with_sst_forcing not tracked.",
+        )
+        return self.namespace.with_sst_forcing
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -478,6 +488,16 @@ class ScriptsArgsParser:
             help="Whether to perform ML optimization.",
         )
         self.has_no_ml_optim = True
+
+    def add_with_sst_forcing(self) -> None:
+        """Add SST forcing option."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--with-sst-forcing",
+            action="store_true",
+            help="Whether to use SST forcing.",
+        )
+        self.has_sst_forcing = True
 
     def retrieve(self) -> None:
         """Retrieve arguments."""
