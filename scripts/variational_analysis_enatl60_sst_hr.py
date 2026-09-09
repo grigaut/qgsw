@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import sqrt
 from pathlib import Path
 from typing import TypeVar
 
@@ -14,6 +15,8 @@ from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
+from qgsw.decomposition.wavelets.core import WaveletBasis
+from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
 from qgsw.eNATL60 import seasons
 from qgsw.eNATL60.fields_computations import (
     compute_streamfunction_with_atmospheric_pressure_xy_avg,
@@ -97,6 +100,7 @@ if __name__ == "__main__":
     args.add_wind_optim()
     args.add_gamma_sst(default=1)
     args.add_no_ml_optim()
+    args.add_with_sst_forcing()
     args.retrieve()
     with_reg = not args.no_reg
     with_alpha = not args.no_alpha
@@ -439,6 +443,7 @@ if __name__ == "__main__":
         var_sst = crop(ssts[:, 0, 0], b).var()
         U: float = psi0_mean / L
         T = L / U
+        THETA = ssts[0].mean()
 
         s = step(c + 1, n_cycles)
         msg = f"Cycle {s}: eNATL60 data loaded and processed."
@@ -477,6 +482,32 @@ if __name__ == "__main__":
                     "params": list(coefs.values()),
                     "lr": 1e0,
                     "name": "Decomposition coefs",
+                },
+            ]
+
+        space_params_sst, time_params_sst = dyadic_decomposition(
+            order=5,
+            xx_ref=xx,
+            yy_ref=yy,
+            Lxy_max=900_000,
+            Lt_max=n_steps_per_cyle * dt,
+        )
+        basis_sst = WaveletBasis(space_params_sst, time_params_sst)
+        basis_sst.n_theta = 7
+
+        msg = f"Using basis_sst of order {basis_sst.order}"
+        logger.info(msg)
+
+        coefs_sst = basis_sst.generate_random_coefs()
+        coefs_sst = DecompositionCoefs.zeros_like(coefs_sst)
+        if args.with_sst_forcing:
+            coefs_sst = coefs_sst.requires_grad_()
+            numel += coefs_sst.numel()
+            params += [
+                {
+                    "params": list(coefs_sst.values()),
+                    "lr": 1e-2,
+                    "name": "Wavelet coefs (SST)",
                 },
             ]
         mu = torch.tensor(0, **specs, requires_grad=False)
@@ -533,6 +564,13 @@ if __name__ == "__main__":
                 model.H_ml = H_ml
                 temp_1_offset = 5 + 3 * 2 / torch.pi * torch.atan(theta0)
                 model.temp_1_offset = temp_1_offset
+                coefs_sst_scaled = coefs_sst.scale(
+                    *(U / L * THETA for _ in range(basis_sst.order))
+                )
+                basis_sst.set_coefs(coefs_sst_scaled)
+                wv_sst = basis_sst.localize(
+                    space_interior.q.xy.x, space_interior.q.xy.y
+                )
 
                 if with_wind:
                     tauxs_i, tauys_i = compute_windstress(
@@ -608,6 +646,7 @@ if __name__ == "__main__":
                         model.set_wind_forcing(
                             tauxs_i[(n - 1) // 2], tauys_i[(n - 1) // 2]
                         )
+                    model.sst_forcing = wv_sst(model.time)[None, None, ...]
 
                     model.step()
 
@@ -641,6 +680,14 @@ if __name__ == "__main__":
                             crop(ssts[n // 2], b),
                             variance=var_sst,
                         )
+                if with_reg and args.with_sst_forcing:
+                    for lvl, coef in coefs_sst.items():
+                        sigma_x = space_params_sst[lvl]["sigma_x"] / dx
+                        sigma_y = space_params_sst[lvl]["sigma_y"] / dy
+                        reg_loss += (
+                            sqrt(sigma_x * sigma_y) ** (-2)
+                            * coef.square().mean()
+                        )
 
                 loss = obs_loss + gamma_sst * sst_loss + gamma * reg_loss
 
@@ -665,6 +712,7 @@ if __name__ == "__main__":
                 H_ml=H_ml,
                 temp_1_offset=temp_1_offset,
                 coefs=coefs_scaled.to_dict(),
+                coefs_sst=coefs_sst_scaled.to_dict(),
                 uv10_to_uvsurf=uv10_to_uvsurf,
             )
 
@@ -699,7 +747,10 @@ if __name__ == "__main__":
             if not args.no_ml_optim:
                 torch.nn.utils.clip_grad_value_([mu], clip_value=1.0)
                 torch.nn.utils.clip_grad_value_([theta0], clip_value=1.0)
-
+            if args.with_sst_forcing:
+                torch.nn.utils.clip_grad_norm_(
+                    list(coefs_sst.values()), max_norm=1e0
+                )
             torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
             optimizer.step()
@@ -738,6 +789,7 @@ if __name__ == "__main__":
             "H_ml": register_params.params["H_ml"],
             "temp_1_offset": register_params.params["temp_1_offset"],
             "coefs": register_params.params["coefs"],
+            "coefs_sst": register_params.params["coefs_sst"],
             "uv10_to_uvsurf": register_params.params["uv10_to_uvsurf"],
         }
         outputs.append(output)

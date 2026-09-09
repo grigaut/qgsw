@@ -42,6 +42,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
 
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
     _type = ModelName.QUASI_GEOSTROPHIC_ML
+    _sst_forcing: torch.Tensor
 
     def __init__(
         self,
@@ -113,6 +114,21 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         self._basis = basis
         space = self.space.remove_h()
         self._fpsi2 = basis.localize(space.psi.xy.x, space.psi.xy.y)
+
+    @property
+    def sst_forcing(self) -> torch.Tensor:
+        """SST forcing term.
+
+        └── (n_ens, nl, nx, ny)-shaped
+        """
+        try:
+            return self._sst_forcing
+        except AttributeError:
+            return torch.zeros_like(self.q)
+
+    @sst_forcing.setter
+    def sst_forcing(self, sst_forcing: torch.Tensor) -> None:
+        self._sst_forcing = sst_forcing
 
     def _set_io(self, state: StatePSIQSSTAlpha) -> None:
         self._io = IO(state.t, state.psi, state.q, state.sst, state.alpha)
@@ -328,6 +344,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             + heat_flux
             + fluxes
             + diffusion
+            + self.sst_forcing
         ) * self.masks.h
         return PSIQSST(dpsi, dq, dsst)
 
@@ -415,6 +432,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             + heat_flux
             + fluxes
             + diffusion
+            + self.sst_forcing
         ) * self.masks.h
 
         ## Adjust boundaries
@@ -543,7 +561,7 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
             with_4th_order=True,
         )
 
-        dsst = (-div_flux_sst + diffusion) * self.masks.h
+        dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
         return PSIQSST(dpsi, dq, dsst)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -607,7 +625,7 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
             with_2nd_order=True,
             with_4th_order=True,
         )
-        dsst = (-div_flux_sst + diffusion) * self.masks.h
+        dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
 
         ## Adjust boundaries
         if self.time_stepper == "rk3":
@@ -654,7 +672,7 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
 class QGPSIQSSTForced(QGPSIQSST):
     """Forced RG model with SST Advection."""
 
-    _forcing: torch.Tensor = None
+    _forcing: torch.Tensor
 
     _H_ml = None
     _temp_1_offset = None
@@ -665,13 +683,29 @@ class QGPSIQSSTForced(QGPSIQSST):
 
         └── (n_ens, nl, nx, ny)-shaped
         """
-        if self._forcing is None:
+        try:
+            return self._forcing
+        except AttributeError:
             return torch.zeros_like(self.q)
-        return self._forcing
 
     @forcing.setter
     def forcing(self, forcing: torch.Tensor) -> None:
         self._forcing = forcing
+
+    @property
+    def sst_forcing(self) -> torch.Tensor:
+        """SST forcing term.
+
+        └── (n_ens, nl, nx, ny)-shaped
+        """
+        try:
+            return self._sst_forcing
+        except AttributeError:
+            return torch.zeros_like(self.q)
+
+    @sst_forcing.setter
+    def sst_forcing(self, sst_forcing: torch.Tensor) -> None:
+        self._sst_forcing = sst_forcing
 
     @property
     def wind_scaling(self) -> torch.Tensor:
@@ -767,7 +801,7 @@ class QGPSIQSSTForced(QGPSIQSST):
             with_4th_order=True,
         )
 
-        dsst = (-div_flux_sst + diffusion) * self.masks.h
+        dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
         return PSIQSST(dpsi, dq, dsst)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -830,7 +864,7 @@ class QGPSIQSSTForced(QGPSIQSST):
             with_2nd_order=True,
             with_4th_order=True,
         )
-        dsst = (-div_flux_sst + diffusion) * self.masks.h
+        dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
 
         ## Adjust boundaries
         if self.time_stepper == "rk3":
