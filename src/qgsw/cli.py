@@ -549,6 +549,9 @@ class ScriptsArgsParser:
             "_noMLoptim"
             if (self.has_no_ml_optim and self.no_ml_optim)
             else "",
+            "_sstforcing"
+            if (self.has_sst_forcing and self.with_sst_forcing)
+            else "",
             f"_{self.season}"
             if (self.has_season and self.season is not None)
             else "",
