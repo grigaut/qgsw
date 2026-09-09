@@ -90,6 +90,7 @@ if __name__ == "__main__":
     args.add_reg_exp(default=2)
     args.add_wind_optim()
     args.add_gamma_sst()
+    args.add_with_sst_forcing()
     args.retrieve()
     with_reg = not args.no_reg
     with_obs_track = args.obs_track
@@ -208,7 +209,7 @@ if __name__ == "__main__":
                 "inferred from tracks trajectory."
             )
             logger.warning(box(msg, style="="))
-        n_obs = obs_mask.compute_obs_nb(n_steps_per_cyle, dt)
+        n_obs = obs_mask.compute_obs_nb(240, 7200)
         msg_obs = (
             "Surface observed along satellite tracks,"
             f" {n_obs} pixels observed."
@@ -433,6 +434,7 @@ if __name__ == "__main__":
         var_sst = crop(ssts[:, 0, 0], b).var()
         U: float = psi0_mean / L
         T = L / U
+        THETA = ssts[0].mean()
 
         s = step(c + 1, n_cycles)
         msg = f"Cycle {s}: eNATL60 data loaded and processed."
@@ -469,6 +471,24 @@ if __name__ == "__main__":
                 "name": "Wavelet coefs",
             },
         ]
+        basis_sst = WaveletBasis(space_params, time_params)
+        basis_sst.n_theta = 7
+
+        msg = f"Using basis_sst of order {basis_sst.order}"
+        logger.info(msg)
+
+        coefs_sst = basis_sst.generate_random_coefs()
+        coefs_sst = DecompositionCoefs.zeros_like(coefs_sst)
+        if args.with_sst_forcing:
+            coefs_sst = coefs_sst.requires_grad_()
+            numel += coefs_sst.numel()
+            params += [
+                {
+                    "params": list(coefs_sst.values()),
+                    "lr": 1e-2,
+                    "name": "Wavelet coefs (SST)",
+                },
+            ]
 
         uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
         if with_wind and args.wind_optim:
@@ -515,10 +535,17 @@ if __name__ == "__main__":
                 coefs_scaled = coefs.scale(
                     *(U**2 / L**2 for _ in range(basis.order))
                 )
+                coefs_sst_scaled = coefs_sst.scale(
+                    *(U / L * THETA for _ in range(basis_sst.order))
+                )
 
                 basis.set_coefs(coefs_scaled)
+                basis_sst.set_coefs(coefs_sst_scaled)
 
                 wv = basis.localize(
+                    space_interior.q.xy.x, space_interior.q.xy.y
+                )
+                wv_sst = basis_sst.localize(
                     space_interior.q.xy.x, space_interior.q.xy.y
                 )
 
@@ -561,6 +588,7 @@ if __name__ == "__main__":
                         )
 
                     model.forcing = wv(model.time)[None, None, ...]
+                    model.sst_forcing = wv_sst(model.time)[None, None, ...]
 
                     model.step()
 
@@ -593,6 +621,14 @@ if __name__ == "__main__":
                             sqrt(sigma_x * sigma_y) ** (-args.reg_exp)
                             * coef.square().mean()
                         )
+                    if args.with_sst_forcing:
+                        for lvl, coef in coefs_sst.items():
+                            sigma_x = space_params[lvl]["sigma_x"] / dx
+                            sigma_y = space_params[lvl]["sigma_y"] / dy
+                            reg_loss += (
+                                sqrt(sigma_x * sigma_y) ** (-args.reg_exp)
+                                * coef.square().mean()
+                            )
                 loss = obs_loss + gamma_sst * sst_loss + gamma * reg_loss
 
             losses["obs_losses"].append(obs_loss.detach().item())
@@ -613,6 +649,7 @@ if __name__ == "__main__":
                 loss,
                 val_losses=[e.detach().item() for e in val_losses],
                 coefs=coefs_scaled.to_dict(),
+                coefs_sst=coefs_sst_scaled.to_dict(),
                 uv10_to_uvsurf=uv10_to_uvsurf,
             )
 
@@ -642,6 +679,10 @@ if __name__ == "__main__":
 
             if with_wind and args.wind_optim:
                 torch.nn.utils.clip_grad_norm_([uv10_to_uvsurf], max_norm=1.0)
+            if args.with_sst_forcing:
+                torch.nn.utils.clip_grad_norm_(
+                    list(coefs_sst.values()), max_norm=1e0
+                )
 
             torch.nn.utils.clip_grad_norm_(list(coefs.values()), max_norm=1e0)
 
@@ -678,6 +719,7 @@ if __name__ == "__main__":
             "val_loss": register_params.params["val_losses"],
             "specs": {"max_memory_allocated": max_mem},
             "coefs": register_params.params["coefs"],
+            "coefs_sst": register_params.params["coefs_sst"],
             "uv10_to_uvsurf": register_params.params["uv10_to_uvsurf"],
         }
         outputs.append(output)
