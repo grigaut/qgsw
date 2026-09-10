@@ -770,6 +770,7 @@ if __name__ == "__main__":
                 "obstrack": args.obs_track,
                 "gamma": args.gamma if with_reg else 0,
                 "basis": basis.get_params(),
+                "basis_sst": basis_sst.get_params(),
                 "numel": numel,
                 "sigma_bc": sigma_bc,
                 "sigma_ic": sigma_ic,
