@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 from math import sqrt
 from pathlib import Path
 from typing import TypeVar
@@ -67,7 +68,7 @@ from qgsw.scripts.eNATL60 import (
     format_ds,
     load_netcdfs,
 )
-from qgsw.scripts.loss import rmse, update_loss
+from qgsw.scripts.loss import update_loss
 from qgsw.scripts.regularization import compute_regularization_func
 from qgsw.spatial.core.discretization import (
     SpaceDiscretization2D,
@@ -236,6 +237,11 @@ if __name__ == "__main__":
         msg_obs = (
             f"Full surface observed every {sec2text(comparison_interval * dt)}"
         )
+    obs_mask_sst = FullDomainMask(
+        space_interior.q.xy.x,
+        space_interior.q.xy.y,
+        dt=24 * 3600,
+    )
 
     ## Regularization
 
@@ -405,6 +411,21 @@ if __name__ == "__main__":
                 )
                 ds_interp[LONGITUDE] = (["i", "j"], lons)
                 ds_interp[LATITUDE] = (["i", "j"], lats)
+                ds_interp["mask"] = (
+                    ("time", "i", "j"),
+                    np.stack(
+                        [
+                            torch.nn.functional.pad(
+                                obs_mask.at_time(torch.tensor(i * 7200)),
+                                (4, 4, 4, 4),
+                                value=False,
+                            )
+                            .cpu()
+                            .numpy()
+                            for i in range(240)
+                        ]
+                    ),
+                )
 
             with logger.timeit("Interpolating SST"):
                 regridded_sst: xr.DataArray = sst_regridder(
@@ -419,18 +440,80 @@ if __name__ == "__main__":
                     regridded_sst.coords,
                 )
                 ds_sst_interp = ds_sst_interp.set_coords([LONGITUDE, LATITUDE])
+                ds_sst_interp["mask"] = (
+                    ("time", "i", "j"),
+                    np.stack(
+                        [
+                            torch.nn.functional.pad(
+                                obs_mask_sst.at_time(torch.tensor(i * 7200)),
+                                (4, 4, 4, 4),
+                                value=False,
+                            )
+                            .cpu()
+                            .numpy()
+                            for i in range(240)
+                        ]
+                    ),
+                )
 
         with logger.timeit("Building tensors"):
             psi0 = da_to_tensor(psi0_filt_da, **specs) / f0
-            psis = da_to_tensor(ds_interp[STREAMFUNCTION], **specs) / f0
+            psis = [
+                torch.tensor(
+                    arr[
+                        obs_mask.at_time(
+                            torch.tensor(i * 7200, dtype=torch.float64)
+                        )
+                        .flatten()
+                        .cpu()
+                        .numpy()
+                    ],
+                    **specs,
+                )
+                / f0
+                if obs_mask.at_time(torch.tensor(i * 7200)).sum() != 0
+                else None
+                for i, arr in enumerate(
+                    ds_interp[STREAMFUNCTION]
+                    .where(
+                        ds_interp["mask"],
+                        drop=False,
+                    )
+                    .isel(i=slice(b, -b), j=slice(b, -b))
+                    .stack(points=("i", "j"))
+                    .to_numpy()
+                )
+            ]
             psis_f = da_to_tensor(ds_interp["psi_filt"], **specs) / f0
-            ssts = da_to_tensor(ds_sst_interp[SST], **specs) + 273.15
+            ssts_tensors = da_to_tensor(ds_sst_interp[SST]) + 273.15
+
+            sst0 = crop(ssts_tensors[0], b).clone()
+
+            ssts = [
+                arr.clone()
+                if obs_mask_sst.at_time(torch.tensor(i * 7200)).sum() != 0
+                else None
+                for i, arr in enumerate(crop(ssts_tensors, b))
+            ]
+
             t0 = ds_interp[TIME][0]
             times = (ds_interp[TIME] - t0).dt.total_seconds().to_numpy()
             times = torch.tensor(times, **specs)
         with logger.timeit("Retrieving boundaries"):
-            psi_bcs = [extract_psi_bc(p, b) for p in psis_f]
-            sst_bcs = [extract_sst_bc(s, b) for s in ssts]
+            psi_bcs = [extract_psi_bc(arr, b, clone=False) for arr in psis_f]
+            sst_bcs = [
+                extract_sst_bc(arr, b, clone=True) for arr in ssts_tensors
+            ]
+
+        del ssts_tensors
+        gc.collect()
+        var_psi = (
+            ds_interp[STREAMFUNCTION]
+            .isel(i=slice(b, -b), j=slice(b, -b))
+            .var()
+            .compute()
+            .values.item()
+        ) / f0**2
 
         if with_wind:
             u10 = ds_interp[ZONAL_WIND_10M].to_numpy()
@@ -442,11 +525,10 @@ if __name__ == "__main__":
                 ],
             )
         psi0_mean = psi0.mean()
-        var_psi = crop(psis[:, 0, 0], b).var()
-        var_sst = crop(ssts[:, 0, 0], b).var()
+        var_sst = sst0.var()
         U: float = psi0_mean / L
         T = L / U
-        THETA = ssts[0].mean()
+        THETA = sst0.mean()
 
         s = step(c + 1, n_cycles)
         msg = f"Cycle {s}: eNATL60 data loaded and processed."
@@ -614,10 +696,10 @@ if __name__ == "__main__":
 
                 qs = (compute_q_rg(p1) for p1 in psis_f)
 
-                q_bcs = [extract_q_bc(q, b) for q in qs]
+                q_bcs = [extract_q_bc(q, b, clone=True) for q in qs]
                 q_bc_interp = QuadraticInterpolation(times, q_bcs)
 
-                model.set_psiqsst(crop(psi0[:, :1], b), q0, crop(ssts[0], b))
+                model.set_psiqsst(crop(psi0[:, :1], b), q0, sst0)
                 model.set_boundary_maps(
                     psi_bc_interp, q_bc_interp, sst_bc_interp
                 )
@@ -627,20 +709,15 @@ if __name__ == "__main__":
                 reg_loss = torch.tensor(0, **specs)
                 sst_reg_loss = torch.tensor(0, **specs)
 
-                val_losses = [
-                    rmse(
-                        model.psi[0, 0],
-                        crop(psis[0][0, 0], b),
+                if (p := psis[0]) is not None:
+                    obs_loss = update_loss(
+                        obs_loss,
+                        model.psi[0, 0].flatten()[
+                            obs_mask.at_time(model.time).flatten()
+                        ],
+                        p,
+                        variance=var_psi,
                     )
-                ]
-
-                obs_loss = update_loss(
-                    obs_loss,
-                    model.psi[0, 0],
-                    crop(psis[0][0, 0], b),
-                    mask=obs_mask.at_time(model.time),
-                    variance=var_psi,
-                )
 
                 for n in range(1, n_steps_per_cyle):
                     psi1_ = model.psi
@@ -664,26 +741,24 @@ if __name__ == "__main__":
                         reg = compute_reg(psi1_, dpsi1_, time)
                         reg_loss += reg
                     if n % 2 == 0:
-                        obs_loss = update_loss(
-                            obs_loss,
-                            psi1[0, 0],
-                            crop(psis[n // 2][0, 0], b),
-                            mask=obs_mask.at_time(model.time),
-                            variance=var_psi,
-                        )
-                        val_losses.append(
-                            rmse(
-                                model.psi[0, 0],
-                                crop(psis[n // 2][0, 0], b),
+                        if (p := psis[n // 2]) is not None:
+                            obs_loss = update_loss(
+                                obs_loss,
+                                model.psi[0, 0].flatten()[
+                                    obs_mask.at_time(model.time).flatten()
+                                ],
+                                p,
+                                variance=var_psi,
                             )
-                        )
-                    if n % 24 == 0:
-                        sst_loss = update_loss(
-                            sst_loss,
-                            model.sst[0, 0],
-                            crop(ssts[n // 2], b),
-                            variance=var_sst,
-                        )
+                        if (s := ssts[n // 2]) is not None:
+                            sst_loss = update_loss(
+                                sst_loss,
+                                model.sst[0, 0].flatten()[
+                                    obs_mask_sst.at_time(model.time).flatten()
+                                ],
+                                s[0, 0].flatten(),
+                                variance=var_sst,
+                            )
                 if with_reg and args.with_sst_forcing:
                     for lvl, coef in coefs_sst.items():
                         sigma_x = space_params_sst[lvl]["sigma_x"] / dx
@@ -717,7 +792,6 @@ if __name__ == "__main__":
 
             register_params.step(
                 loss,
-                val_losses=[e.detach().item() for e in val_losses],
                 alpha=alpha,
                 H_ml=H_ml,
                 temp_1_offset=temp_1_offset,
@@ -796,7 +870,6 @@ if __name__ == "__main__":
                 "loss": best_loss,
             },
             "losses": losses,
-            "val_loss": register_params.params["val_losses"],
             "specs": {"max_memory_allocated": max_mem},
             "alpha": register_params.params["alpha"],
             "H_ml": register_params.params["H_ml"],
