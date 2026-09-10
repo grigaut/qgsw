@@ -565,14 +565,8 @@ if __name__ == "__main__":
 
                 obs_loss = torch.tensor(0, **specs)
                 sst_loss = torch.tensor(0, **specs)
-                if with_reg:
-                    reg_loss = torch.tensor(0, **specs)
-                else:
-                    reg_loss = torch.tensor(torch.nan)
-                if with_reg and args.with_sst_forcing:
-                    sst_reg_loss = torch.tensor(0, **specs)
-                else:
-                    sst_reg_loss = torch.tensor(torch.nan)
+                reg_loss = torch.tensor(0, **specs)
+                sst_reg_loss = torch.tensor(0, **specs)
 
                 val_losses = [
                     rmse(
