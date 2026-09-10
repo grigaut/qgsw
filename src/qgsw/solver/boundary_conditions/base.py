@@ -37,6 +37,15 @@ class Boundaries:
     left: torch.Tensor
     right: torch.Tensor
 
+    def numel(self) -> int:
+        """Number of elements."""
+        return (
+            self.top.numel()
+            + self.bottom.numel()
+            + self.left.numel()
+            + self.right.numel()
+        )
+
     def __add__(self, other: Boundaries) -> Boundaries:
         """Add two boundary conditions."""
         if not isinstance(other, Boundaries | float | int | torch.Tensor):
@@ -353,6 +362,23 @@ class Boundaries:
                 imax - 1 : imax + w - 1,
                 jmin - (w - 1) : jmax + (w - 1),
             ],
+        )
+
+    @classmethod
+    def zeros_like(cls, bc: Boundaries) -> Boundaries:
+        """Compute zeros-filled boundaries like other.
+
+        Args:
+            bc (Boundaries): Boundaries to retrieve from.
+
+        Returns:
+            Boundaries: Zeros-filled boundaries.
+        """
+        return Boundaries(
+            top=torch.zeros_like(bc.top),
+            bottom=torch.zeros_like(bc.bottom),
+            left=torch.zeros_like(bc.left),
+            right=torch.zeros_like(bc.right),
         )
 
     @overload
