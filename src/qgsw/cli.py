@@ -36,6 +36,7 @@ class ScriptsArgsParser:
     has_gamma_sst = False
     has_no_ml_optim = False
     has_sst_forcing = False
+    has_gamma_sst_reg = False
 
     @property
     def config(self) -> Path:
@@ -198,6 +199,15 @@ class ScriptsArgsParser:
             "with_sst_forcing not tracked.",
         )
         return self.namespace.with_sst_forcing
+
+    @property
+    def gamma_sst_reg(self) -> float:
+        """gamma_sst_reg."""
+        self._check_attr(
+            self.has_gamma_sst_reg,
+            "gamma_sst_reg not tracked.",
+        )
+        return self.namespace.gamma_sst_reg
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -499,6 +509,17 @@ class ScriptsArgsParser:
         )
         self.has_sst_forcing = True
 
+    def add_gamma_sst_reg(self, default: float = 1) -> None:
+        """Add gamma sst reg."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--gamma-sst-reg",
+            type=float,
+            default=default,
+            help="Gamma for SST regularization loss.",
+        )
+        self.has_gamma_sst_reg = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_args(namespace=self.namespace)
@@ -527,11 +548,23 @@ class ScriptsArgsParser:
             if (self.has_gamma_sst and self.gamma_sst != 1)
             else ""
         )
+        if self.has_gamma_sst_reg and (g := self.gamma_sst_reg) != 0:
+            gamma_sst_reg_str = (
+                str(g).rstrip("0").rstrip(".").replace(".", "_")
+            )
+        else:
+            gamma_sst_reg_str = "0"
+        gamma_sst_reg_suffix = (
+            f"_gammasstreg{gamma_sst_reg_str}"
+            if (self.has_gamma_sst_reg and self.gamma_sst_reg != 1)
+            else ""
+        )
         return [
             "_noalpha" if (self.has_no_alpha and self.no_alpha) else "",
             "_noreg" if (self.has_no_reg and self.no_reg) else "",
             gamma_suffix,
             gamma_sst_suffix,
+            gamma_sst_reg_suffix,
             "_nowind" if (self.has_no_wind and self.no_wind) else "",
             "_obstrack" if (self.has_obs_track and self.obs_track) else "",
             f"_c{self.comparison}"

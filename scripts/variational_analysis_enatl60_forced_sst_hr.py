@@ -91,6 +91,7 @@ if __name__ == "__main__":
     args.add_wind_optim()
     args.add_gamma_sst()
     args.add_with_sst_forcing()
+    args.add_gamma_sst_reg(1e5)
     args.retrieve()
     with_reg = not args.no_reg
     with_obs_track = args.obs_track
@@ -228,6 +229,7 @@ if __name__ == "__main__":
 
     gamma = args.gamma / comparison_interval
     gamma_sst = args.gamma_sst
+    gamma_sst_reg = args.gamma_sst_reg
 
     if with_reg:
         msg_reg = f"Using ɣ = {gamma:#8.3g} to weight regularization"  # noqa: RUF001
@@ -347,6 +349,7 @@ if __name__ == "__main__":
             "obs_losses": [],
             "sst_losses": [],
             "reg_losses": [],
+            "sst_reg_losses": [],
         }
         torch.cuda.reset_peak_memory_stats()
 
@@ -564,6 +567,12 @@ if __name__ == "__main__":
                 sst_loss = torch.tensor(0, **specs)
                 if with_reg:
                     reg_loss = torch.tensor(0, **specs)
+                else:
+                    reg_loss = torch.tensor(torch.nan)
+                if with_reg and args.with_sst_forcing:
+                    sst_reg_loss = torch.tensor(0, **specs)
+                else:
+                    sst_reg_loss = torch.tensor(torch.nan)
 
                 val_losses = [
                     rmse(
@@ -625,15 +634,21 @@ if __name__ == "__main__":
                         for lvl, coef in coefs_sst.items():
                             sigma_x = space_params[lvl]["sigma_x"] / dx
                             sigma_y = space_params[lvl]["sigma_y"] / dy
-                            reg_loss += (
+                            sst_reg_loss += (
                                 sqrt(sigma_x * sigma_y) ** (-args.reg_exp)
                                 * coef.square().mean()
                             )
-                loss = obs_loss + gamma_sst * sst_loss + gamma * reg_loss
+                loss = (
+                    obs_loss
+                    + gamma_sst * sst_loss
+                    + gamma * reg_loss
+                    + gamma_sst_reg * sst_reg_loss
+                )
 
             losses["obs_losses"].append(obs_loss.detach().item())
             losses["sst_losses"].append(sst_loss.detach().item())
             losses["reg_losses"].append(reg_loss.detach().item())
+            losses["sst_reg_losses"].append(sst_reg_loss.detach().item())
 
             if torch.isnan(loss.detach()):
                 msg = "Loss has diverged."
@@ -672,6 +687,8 @@ if __name__ == "__main__":
                 f"\tObs: {obs_loss.detach().item():>#10.5g}"
                 f"| SST: {gamma_sst * sst_loss.detach().item():>#10.5g}"
                 f"| Reg: {gamma * reg_loss.detach().item():>#10.5g}"
+                "| SST Reg: "
+                f"{gamma_sst_reg * sst_reg_loss.detach().item():>#10.5g}"
             )
             logger.detail(msg)
 
