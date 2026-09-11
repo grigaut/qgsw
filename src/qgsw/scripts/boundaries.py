@@ -15,6 +15,24 @@ def extract_psi_bc(
     return Boundaries.extract(psi, bc, -bc - 1, bc, -bc - 1, 2, clone=clone)
 
 
+def extract_wide_psi_bc(
+    psi_f: torch.Tensor,
+    bc: int,
+    *,
+    clone: bool = False,
+) -> Boundaries:
+    """Extract wide psi boundaries."""
+    return Boundaries.extract(
+        psi_f,
+        bc + 1,
+        -bc - 2,
+        bc + 1,
+        -bc - 2,
+        6,
+        clone=clone,
+    )
+
+
 def extract_q_bc(
     q: torch.Tensor,
     bc: int,

@@ -10,6 +10,13 @@ def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
     return ((f - f_ref).square().mean() / f_ref.square().mean()).sqrt()
 
 
+def mse(
+    f: torch.Tensor, f_ref: torch.Tensor, *, variance: float | torch.Tensor = 1
+) -> torch.Tensor:
+    """MSE."""
+    return (f - f_ref).square().sum() / variance
+
+
 def update_loss(
     loss: torch.Tensor,
     f: torch.Tensor,
@@ -25,4 +32,4 @@ def update_loss(
         return loss
     f_sliced = f.flatten()[mask.flatten()]
     f_ref_sliced = f_ref.flatten()[mask.flatten()]
-    return loss + (f_sliced - f_ref_sliced).square().sum() / variance
+    return loss + mse(f_sliced, f_ref_sliced, variance=variance)
