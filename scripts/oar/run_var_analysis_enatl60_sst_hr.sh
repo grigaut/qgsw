@@ -18,7 +18,7 @@ n_seasons=0
 [ "$spring" = true ] && (( n_seasons++ ))
 
 # Compute walltime
-walltime=18
+walltime=24
 [ "$long_optim" = true ] && (( walltime *= 4 ))
 [ "$contiguous" = true ] && (( walltime *= n_seasons ))
 
