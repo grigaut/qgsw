@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import torch
+import torch.nn.functional as F  # noqa: N812
 import xarray as xr
 from scipy.ndimage import gaussian_filter
 
@@ -27,9 +28,14 @@ from qgsw.eNATL60.var_keys import (
 )
 from qgsw.logging.core import getLogger
 from qgsw.specs import defaults
+from qgsw.utils.reshaping import crop_xr
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import numpy as np
+
+    from qgsw.observations.base import BaseObservationMask
 
 logger = getLogger(__name__)
 
@@ -147,6 +153,72 @@ def filter_streamfunction(
     return psi0_filt_da, psis_filt_da
 
 
+def create_masks(
+    obs_mask: BaseObservationMask,
+    n_steps: int,
+    dt: float,
+    *,
+    pad_value: bool = False,
+    pad_width: int = 0,
+) -> np.ndarray:
+    """Create mask.
+
+    Args:
+        obs_mask (BaseObservationMask): Observation mask.
+        n_steps (int): Number of steps.
+        dt (float): Timestep.
+        pad_value (bool, optional): Boolean to use for padding.
+            Defaults to False.
+        pad_width (int, optional): Width of padding. Defaults to 0.
+
+    Returns:
+        np.ndarray: Masks
+    """
+    pad = (pad_width, pad_width, pad_width, pad_width)
+    return (
+        torch.stack(
+            [
+                F.pad(
+                    obs_mask.at_time(torch.tensor(i * dt)),
+                    pad,
+                    value=pad_value,
+                )
+                for i in range(n_steps)
+            ]
+        )
+        .cpu()
+        .numpy()
+    )
+
+
+def retrieve_masked(
+    da: xr.DataArray,
+    da_mask: xr.DataArray,
+    b: int = 0,
+    *,
+    dtype: torch.dtype | None = None,
+    device: torch.device | None = None,
+) -> torch.Tensor:
+    """Apply mask to DataArray.
+
+    Args:
+        da (xr.DataArray): DataArray to mask.
+        da_mask (xr.DataArray): Mask DataArray.
+        b (int, optional): Boundary width. Defaults to 0.
+        dtype (torch.dtype | None, optional): Data type. Defaults to None.
+        device (torch.device | None, optional): Device. Defaults to None.
+
+    Returns:
+        torch.Tensor: Masked DataArray.
+    """
+    masked = da.where(da_mask, drop=False)
+    masked_sliced = crop_xr(masked, b)
+    return torch.tensor(
+        masked_sliced.to_numpy(),
+        **defaults.get(dtype=dtype, device=device),
+    )
+
+
 def da_to_tensor(
     da: xr.DataArray,
     *,
@@ -163,6 +235,6 @@ def da_to_tensor(
     Returns:
         torch.Tensor: _description_
     """
-    return torch.tensor(
-        da.to_numpy(), **defaults.get(dtype=dtype, device=device)
+    return torch.from_numpy(da.to_numpy()).to(
+        **defaults.get(dtype=dtype, device=device)
     )[..., None, None, :, :]
