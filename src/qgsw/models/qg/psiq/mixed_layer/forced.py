@@ -319,7 +319,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             sst_anom,
         )
 
-        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        temp_1_anom = self._compute_temp1_anom(self.sst_anom)
 
         heat_flux = torch.where(
             self._wek > 0,
@@ -408,7 +408,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             self._sst_bc,
         )
 
-        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        temp_1_anom = self._compute_temp1_anom(self.sst_anom)
 
         heat_flux = torch.where(
             self._wek > 0,
@@ -468,7 +468,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         Returns:
             torch.Tensor: Entrainments vector.
         """
-        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        temp_1_anom = self._compute_temp1_anom(self.sst_anom)
         delta_temp_ml = sst_anom - temp_1_anom
         e_ml = self._wek
         e1 = torch.where(

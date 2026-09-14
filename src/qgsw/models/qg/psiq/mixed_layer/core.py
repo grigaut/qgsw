@@ -590,7 +590,7 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
             sst_anom,
         )
 
-        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        temp_1_anom = self._compute_temp1_anom(self.sst_anom)
 
         heat_flux = torch.where(
             self._wek > 0,
@@ -676,7 +676,7 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
             self._sst_bc,
         )
 
-        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        temp_1_anom = self._compute_temp1_anom(self.sst_anom)
 
         heat_flux = torch.where(
             self._wek > 0,
@@ -851,7 +851,7 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         Returns:
             torch.Tensor: Entrainments vector.
         """
-        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
+        temp_1_anom = self._compute_temp1_anom(self.sst_anom)
         delta_temp_ml = sst_anom - temp_1_anom
         e_ml = self._wek
         e1 = torch.where(
@@ -944,13 +944,20 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         psi_bc = self._solver_inhomogeneous.psiq_bc.psi
         return PSIQSST(psiqsst_i.psi + psi_bc, psiqsst_i.q, psiqsst_i.sst)
 
+    def _compute_temp1_anom(self, sst_anom: torch.Tensor) -> torch.Tensor:
+        return sst_anom - self.temp_1_offset
+
     @torch.enable_grad()
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.update_psiqsst(self.update(self._state.prognostic.psiqsst))
-        sst_anom = self.sst_anom
-        temp_1_anom = torch.mean(sst_anom * self.masks.h) - self.temp_1_offset
-        sst_anom = torch.where(sst_anom >= temp_1_anom, sst_anom, temp_1_anom)
+
+        temp_1_anom = self._compute_temp1_anom(self.sst_anom)
+        sst_anom = torch.where(
+            self.sst_anom >= temp_1_anom,
+            self.sst_anom,
+            temp_1_anom,
+        )
         self._state.update_sst(sst_anom)
 
 
