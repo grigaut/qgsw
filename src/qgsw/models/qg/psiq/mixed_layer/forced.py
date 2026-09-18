@@ -346,8 +346,8 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         )
         diffusion = self.compute_diffusion(
             sst_anom,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
 
         dsst = (
@@ -435,8 +435,8 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         diffusion = self.compute_diffusion(
             sst_anom,
             self._sst_bc,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
         dsst = (
             -div_flux_sst
@@ -569,8 +569,8 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
 
         diffusion = self.compute_diffusion(
             sst_anom,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
 
         dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
@@ -634,8 +634,8 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
         diffusion = self.compute_diffusion(
             sst_anom,
             self._sst_bc,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
         dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
 
@@ -809,8 +809,8 @@ class QGPSIQSSTForced(QGPSIQSST):
 
         diffusion = self.compute_diffusion(
             sst_anom,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
 
         dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
@@ -873,8 +873,8 @@ class QGPSIQSSTForced(QGPSIQSST):
         diffusion = self.compute_diffusion(
             sst_anom,
             self._sst_bc,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
         dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
 

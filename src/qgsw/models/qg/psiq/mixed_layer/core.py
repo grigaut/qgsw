@@ -605,8 +605,8 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         )
         diffusion = self.compute_diffusion(
             sst_anom,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
 
         dsst = (
@@ -691,8 +691,8 @@ class QGPSIQSSTCore(QGPSIQCore[T, State]):
         diffusion = self.compute_diffusion(
             sst_anom,
             sst_anom_bcs=None,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
         self.diff = diffusion
         dsst = (
@@ -1038,8 +1038,8 @@ class QGPSIQSSTAdv(QGPSIQSST):
 
         diffusion = self.compute_diffusion(
             sst_anom,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
 
         dsst = (-div_flux_sst + diffusion) * self.masks.h
@@ -1101,8 +1101,8 @@ class QGPSIQSSTAdv(QGPSIQSST):
         diffusion = self.compute_diffusion(
             sst_anom,
             sst_anom_bcs=None,
-            with_2nd_order=True,
-            with_4th_order=True,
+            with_2nd_order=False,
+            with_4th_order=False,
         )
         self.diff = diffusion
         dsst = (-div_flux_sst + diffusion) * self.masks.h

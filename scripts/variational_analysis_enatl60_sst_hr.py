@@ -470,9 +470,9 @@ if __name__ == "__main__":
                 obs_mask_sst.at_time(torch.tensor(i * data_dt)).ravel()
                 for i in range(data_n_steps)
             )
-            ts = (t for t in crop(ssts_tensors, b))
+            ts = (t.ravel() for t in crop(ssts_tensors, b))
             tm = [
-                (t, m) if m.sum() != 0 else (None, None)
+                (t[m], m) if m.sum() != 0 else (None, None)
                 for m, t in zip(ms, ts)
             ]
             ssts, masks_sst = zip(*tm)
@@ -725,13 +725,8 @@ if __name__ == "__main__":
                         )
                     if (s := ssts[n]) is not None:
                         sst_loss += mse(
-                            model.sst[0, 0].diff(n=1, dim=0).ravel(),
-                            s[0, 0].diff(n=1, dim=0).ravel(),
-                            variance=var_sst,
-                        )
-                        sst_loss += mse(
-                            model.sst[0, 0].diff(n=1, dim=1).ravel(),
-                            s[0, 0].diff(n=1, dim=1).ravel(),
+                            model.sst[0, 0].ravel()[masks_sst[n]],
+                            s,
                             variance=var_sst,
                         )
                 if with_reg and args.with_sst_forcing:
