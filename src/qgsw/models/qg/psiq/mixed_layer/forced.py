@@ -20,12 +20,12 @@ from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.psiq.mixed_layer.core import QGPSIQSST, QGPSIQSSTCore
 from qgsw.models.qg.stretching_matrix import compute_A_tilde
-from qgsw.solver.finite_diff import laplacian
+from qgsw.solver.finite_diff import grad, laplacian
 from qgsw.solver.pv_inversion import (
     HomogeneousPVInversion,
     InhomogeneousPVInversion,
 )
-from qgsw.spatial.core.grid_conversion import interpolate
+from qgsw.spatial.core.grid_conversion import interpolate, interpolate1D
 from qgsw.specs import DEVICE, defaults
 from qgsw.utils.reshaping import crop
 
@@ -350,13 +350,15 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             with_4th_order=False,
         )
 
+        forcing = self.compute_sst_forcing_inhomogeneous(sst_anom)
+
         dsst = (
             -div_flux_sst
             + self._wek * sst_anom / self.H_ml
             + heat_flux
             + fluxes
             + diffusion
-            + self.sst_forcing
+            + forcing
         ) * self.masks.h
         return PSIQSST(dpsi, dq, dsst)
 
@@ -438,13 +440,16 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             with_2nd_order=False,
             with_4th_order=False,
         )
+
+        forcing = self.compute_sst_forcing_inhomogeneous(sst_anom)
+
         dsst = (
             -div_flux_sst
             + self._wek * sst_anom / self.H_ml
             + heat_flux
             + fluxes
             + diffusion
-            + self.sst_forcing
+            + forcing
         ) * self.masks.h
 
         ## Adjust boundaries
@@ -495,6 +500,38 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
             [e_ml, e1 - torch.mean(e1)],
             dim=1,
         )
+
+    def compute_sst_forcing_inhomogeneous(
+        self, sst: torch.Tensor
+    ) -> torch.Tensor:
+        """SST forcing."""
+        sst_ = self._sst_bc.get_band(0).expand(sst)
+        dx_sst, dy_sst = grad(sst_)
+        dx_sst /= self.space.dx
+        dy_sst /= self.space.dy
+
+        dx_sst = interpolate1D(dx_sst, dim=-1)
+        dy_sst = interpolate1D(dy_sst, dim=-2)
+
+        grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
+
+        return self.sst_forcing * interpolate(grad_sst_norm)
+
+    def compute_sst_forcing_homogeneous(
+        self, sst: torch.Tensor
+    ) -> torch.Tensor:
+        """SST forcing."""
+        sst_ = torch.nn.functional.pad(sst, (1, 1, 1, 1), value=0)
+        dx_sst, dy_sst = grad(sst_)
+        dx_sst /= self.space.dx
+        dy_sst /= self.space.dy
+
+        dx_sst = interpolate1D(dx_sst, dim=-1)
+        dy_sst = interpolate1D(dy_sst, dim=-2)
+
+        grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
+
+        return self.sst_forcing * interpolate(grad_sst_norm)
 
 
 class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
@@ -573,7 +610,9 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
             with_4th_order=False,
         )
 
-        dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
+        forcing = self.compute_sst_forcing_inhomogeneous(sst_anom)
+
+        dsst = (-div_flux_sst + diffusion + forcing) * self.masks.h
         return PSIQSST(dpsi, dq, dsst)
 
     def _compute_time_derivatives_inhomogeneous(
@@ -637,7 +676,8 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
             with_2nd_order=False,
             with_4th_order=False,
         )
-        dsst = (-div_flux_sst + diffusion + self.sst_forcing) * self.masks.h
+        forcing = self.compute_sst_forcing_inhomogeneous(sst_anom)
+        dsst = (-div_flux_sst + diffusion + forcing) * self.masks.h
 
         ## Adjust boundaries
         if self.time_stepper == "rk3":
@@ -679,6 +719,38 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
         """
         msg = "This method is of no use with this model."
         raise NotImplementedError(msg)
+
+    def compute_sst_forcing_inhomogeneous(
+        self, sst: torch.Tensor
+    ) -> torch.Tensor:
+        """SST forcing."""
+        sst_ = self._sst_bc.get_band(0).expand(sst)
+        dx_sst, dy_sst = grad(sst_)
+        dx_sst /= self.space.dx
+        dy_sst /= self.space.dy
+
+        dx_sst = interpolate1D(dx_sst, dim=-1)
+        dy_sst = interpolate1D(dy_sst, dim=-2)
+
+        grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
+
+        return self.sst_forcing * interpolate(grad_sst_norm)
+
+    def compute_sst_forcing_homogeneous(
+        self, sst: torch.Tensor
+    ) -> torch.Tensor:
+        """SST forcing."""
+        sst_ = torch.nn.functional.pad(sst, (1, 1, 1, 1), value=0)
+        dx_sst, dy_sst = grad(sst_)
+        dx_sst /= self.space.dx
+        dy_sst /= self.space.dy
+
+        dx_sst = interpolate1D(dx_sst, dim=-1)
+        dy_sst = interpolate1D(dy_sst, dim=-2)
+
+        grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
+
+        return self.sst_forcing * interpolate(grad_sst_norm)
 
 
 class QGPSIQSSTForced(QGPSIQSST):
