@@ -515,7 +515,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
 
         grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
 
-        return self.sst_forcing * interpolate(grad_sst_norm)
+        return -self.sst_forcing * interpolate(grad_sst_norm)
 
     def compute_sst_forcing_homogeneous(
         self, sst: torch.Tensor
@@ -531,7 +531,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
 
         grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
 
-        return self.sst_forcing * interpolate(grad_sst_norm)
+        return -self.sst_forcing * interpolate(grad_sst_norm)
 
 
 class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
@@ -734,7 +734,7 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
 
         grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
 
-        return self.sst_forcing * interpolate(grad_sst_norm)
+        return -self.sst_forcing * interpolate(grad_sst_norm)
 
     def compute_sst_forcing_homogeneous(
         self, sst: torch.Tensor
@@ -750,7 +750,7 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
 
         grad_sst_norm = (dx_sst.square() + dy_sst.square()).sqrt()
 
-        return self.sst_forcing * interpolate(grad_sst_norm)
+        return -self.sst_forcing * interpolate(grad_sst_norm)
 
 
 class QGPSIQSSTForced(QGPSIQSST):
