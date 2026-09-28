@@ -433,10 +433,10 @@ if __name__ == "__main__":
         yy = space_interior.psi.xy.y
 
         space_params, time_params = dyadic_decomposition(
-            order=5 - 3,
+            order=5,
             xx_ref=xx,
             yy_ref=yy,
-            Lxy_max=900_000 / 2**3,
+            Lxy_max=900_000,
             Lt_max=n_steps_per_cyle * dt,
         )
 
@@ -600,7 +600,7 @@ if __name__ == "__main__":
 
                     if with_reg:
                         dpsi1_ = (psi1 - psi1_) / dt
-                        reg = 0.001 * (compute_reg(psi1_, dpsi1_, time))
+                        reg = 0.01 * (compute_reg(psi1_, dpsi1_, time))
                         loss += reg
 
                     loss = update_loss(
