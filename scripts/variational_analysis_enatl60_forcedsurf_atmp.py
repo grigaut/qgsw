@@ -611,7 +611,7 @@ if __name__ == "__main__":
                         variance=var_ref,
                     )
                 if with_reg:
-                    for lvl, coef in coefs.items():
+                    for lvl, coef in coefs_wv.items():
                         sigma_x = space_params[lvl]["sigma_x"] / dx
                         sigma_y = space_params[lvl]["sigma_y"] / dy
                         loss += (
