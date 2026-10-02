@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from time import perf_counter
 from typing import TYPE_CHECKING
 
@@ -30,6 +30,14 @@ class Logger(logging.Logger):
     @property
     def _indent(self) -> str:
         return "    " * _indent_level.get()
+
+    def increase_indent(self) -> Token[int]:
+        """Increase the indent level."""
+        return _indent_level.set(_indent_level.get() + 1)
+
+    def reset_indent(self, token: Token[int]) -> None:
+        """Reset the indent level."""
+        _indent_level.reset(token)
 
     def detail(self, msg: object, *args: P.args, **kwargs: P.kwargs) -> None:
         """Implement the .detail method.
@@ -92,10 +100,8 @@ class Logger(logging.Logger):
         Yields:
             Generator[None, None, None]: Context manager.
         """
-        if message is not None:
-            self.log(level, message)
+        token = self.start_section(message, level=level)
         start = perf_counter() if elapsed else None
-        token = _indent_level.set(_indent_level.get() + 1)
         try:
             yield
         finally:
@@ -104,5 +110,43 @@ class Logger(logging.Logger):
                 if elapsed:
                     duration = perf_counter() - start
                     suffix = f" ({sec2text(duration)})"
-                self.log(level, f"{end_message}{suffix}")
-            _indent_level.reset(token)
+                end_message = f"{end_message}{suffix}"
+            self.end_section(token, end_message=end_message, level=level)
+
+    def start_section(
+        self,
+        message: str | None = None,
+        level: int = INFO,
+    ) -> Token[int]:
+        """Start a section.
+
+        Args:
+            message (str | None, optional): Message to display,
+            ignored if None. Defaults to None.
+            level (int, optional): Level of message. Defaults to INFO.
+
+        Returns:
+            Token[int]: Token to be able to restore indentation.
+        """
+        if message is not None:
+            self.log(level, message)
+        return self.increase_indent()
+
+    def end_section(
+        self,
+        token: Token[int],
+        end_message: str | None = None,
+        level: int = INFO,
+    ) -> None:
+        """End a section.
+
+        Args:
+            token (Token[int]): Token to restore indentation.
+            end_message (str | None, optional): End message, ignored if None.
+            Defaults to None.
+            level (int, optional): Level of message. Defaults to INFO.
+        """
+        if end_message is not None:
+            suffix = ""
+            self.log(level, f"{end_message}{suffix}")
+        self.reset_indent(token)
