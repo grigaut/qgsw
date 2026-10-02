@@ -28,6 +28,6 @@ for arg in "${args[@]}"; do
 done
 
 
-echo oarsub "${OAR_OPTS[@]}" -n "${NAME}" "$cmd"
+oarsub "${OAR_OPTS[@]}" -n "${NAME}" "$cmd"
 # Append extra python args based on flags
 exit 0
