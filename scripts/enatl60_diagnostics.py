@@ -347,7 +347,7 @@ if __name__ == "__main__":
                 allow_pickle=True,
             )
             data = data_.item()
-            data[season][month] = [
+            data[season][calendar.month_name[month]] = [
                 (ds["t"][:-1].to_numpy(), r"$t$"),
                 (dt_vort_g_rms, r"$\partial_t \zeta_g$"),
                 (u_g_grad_vort_g_rms, r"${\bf{u}}_g\cdot\nabla \zeta_g$"),
@@ -408,7 +408,7 @@ if __name__ == "__main__":
                 allow_pickle=True,
             )
             data = data_.item()
-            data[season][month] = [
+            data[season][calendar.month_name[month]] = [
                 (ds["t"][:-1].to_numpy(), r"$t$"),
                 (Dt_div_rms, r"$\mathrm{D}_t \delta$"),
                 (dt_div_rms, r"$\partial_t \delta$"),
