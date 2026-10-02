@@ -421,7 +421,7 @@ if __name__ == "__main__":
             )
             data = data_.item()
             data[season][calendar.month_name[month]] = {
-                "timt": (ds["t"][:-1].to_numpy(), r"$t$"),
+                "time": (ds["t"][:-1].to_numpy(), r"$t$"),
                 "Dt_div": (Dt_div_rms, r"$\mathrm{D}_t \delta$"),
                 "dt_div": (dt_div_rms, r"$\partial_t \delta$"),
                 "u_grad_div": (
