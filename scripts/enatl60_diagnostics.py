@@ -230,11 +230,11 @@ if __name__ == "__main__":
             return da.diff(dim="t") / data_dt
 
         output["vorticity"] = {
-            season: {calendar.month_name[m]: [] for m in months}
+            season: {calendar.month_name[m].lower(): [] for m in months}
             for season, months in season_map.items()
         }
         output["divergence"] = {
-            season: {calendar.month_name[m]: [] for m in months}
+            season: {calendar.month_name[m].lower(): [] for m in months}
             for season, months in season_map.items()
         }
         np.save(
@@ -250,8 +250,6 @@ if __name__ == "__main__":
         msg = f"Loading {season} files"
         s_token = logger.start_section(msg)
         for month in months:
-            output["vorticity"][season][month] = {}
-            output["divergence"][season][month] = {}
             msg = f"Loading {calendar.month_name[month]} files"
             m_token = logger.start_section(msg)
             files, ufiles, vfiles = load_season_files(
@@ -347,7 +345,7 @@ if __name__ == "__main__":
                 allow_pickle=True,
             )
             data = data_.item()
-            data[season][calendar.month_name[month]] = {
+            data[season][calendar.month_name[month].lower()] = {
                 "time": (ds["t"][:-1].to_numpy(), r"$t$"),
                 "dt_vort_g": (dt_vort_g_rms, r"$\partial_t \zeta_g$"),
                 "u_g_grad_vort_g": (
@@ -420,7 +418,7 @@ if __name__ == "__main__":
                 allow_pickle=True,
             )
             data = data_.item()
-            data[season][calendar.month_name[month]] = {
+            data[season][calendar.month_name[month].lower()] = {
                 "time": (ds["t"][:-1].to_numpy(), r"$t$"),
                 "Dt_div": (Dt_div_rms, r"$\mathrm{D}_t \delta$"),
                 "dt_div": (dt_div_rms, r"$\partial_t \delta$"),
