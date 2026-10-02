@@ -227,7 +227,7 @@ if __name__ == "__main__":
 
         def dt(da: xr.DataArray) -> xr.DataArray:
             """Dt function."""
-            return da.diff(dim="t") / data_dt
+            return da.diff(dim="t", label="lower") / data_dt
 
         output["vorticity"] = {
             season: {calendar.month_name[m].lower(): [] for m in months}
@@ -299,10 +299,10 @@ if __name__ == "__main__":
                 div = interpf(dx(u) + dy(v))
 
             with logger.timeit("Inferring vorticity equation terms"):
-                dt_vort = filt(vort.diff(dim="t") / data_dt)
+                dt_vort = filt(dt(vort))
 
-                dt_vort_g = filt(vort_g.diff(dim="t") / data_dt)
-                dt_vort_a = filt(vort_a.diff(dim="t") / data_dt)
+                dt_vort_g = filt(dt(vort_g))
+                dt_vort_a = filt(dt(vort_a))
 
                 dx_vort_g = interpf(dx(vort_g))
                 dy_vort_g = interpf(dy(vort_g))
@@ -374,7 +374,7 @@ if __name__ == "__main__":
             )
             gc.collect()
             with logger.timeit("Inferring divergence equation terms"):
-                dt_div = filt(div.diff(dim="t") / data_dt)
+                dt_div = filt(dt(div))
 
                 dx_div = interpf(dx(div))
 
