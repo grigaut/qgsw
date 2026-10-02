@@ -356,7 +356,7 @@ if __name__ == "__main__":
                     Dtg_vort_g_rms,
                     r"$\mathrm{D}_g \zeta_g / \mathrm{D}_t$",
                 ),
-                "vort_div_u": (vort_div_u_rms, r"$\zeta_g \delta$"),
+                "vort_div_u": (vort_div_u_rms, r"$\zeta \delta$"),
                 "f_div_u": (f_div_u_rms, r"$f \delta$"),
                 "u_grad_f": (u_grad_f_rms, r"${\bf{u}}\cdot\nabla f$"),
                 "Dt_vort_a": (
@@ -424,14 +424,17 @@ if __name__ == "__main__":
                 "dt_div": (dt_div_rms, r"$\partial_t \delta$"),
                 "u_grad_div": (
                     u_grad_div_rms,
-                    r"$\bf{u} \cdot \nabla \delta$",
+                    r"${\bf{u}} \cdot \nabla \delta$",
                 ),
                 "Q_squared": (Q_squared_rms, r"$(\sigma^2 - \zeta^2)/2$"),
                 "d_squared": (d_squared_rms, r"$\delta^2/2$"),
                 "sigma_squared": (sigma_squared_rms, r"$\sigma^2/2$"),
                 "zeta_squared": (zeta_squared_rms, r"$\zeta^2/2$"),
                 "f_zeta": (f_zeta_rms, r"$-f\zeta$"),
-                "grad_f_u": (grad_f_u_rms, r"$-\nabla^{\perp}f \cdot \bf{u}$"),
+                "grad_f_u": (
+                    grad_f_u_rms,
+                    r"$-\nabla^{\perp}f \cdot {\bf{u}}$",
+                ),
                 "lap_geop": (lap_geop_rms, r"$\Delta \Phi$"),
                 "diff_lap_geo": (diff_lap_geop_fz, r"$\Delta \Phi - f\zeta$"),
             }
