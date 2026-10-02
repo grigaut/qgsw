@@ -347,17 +347,29 @@ if __name__ == "__main__":
                 allow_pickle=True,
             )
             data = data_.item()
-            data[season][calendar.month_name[month]] = [
-                (ds["t"][:-1].to_numpy(), r"$t$"),
-                (dt_vort_g_rms, r"$\partial_t \zeta_g$"),
-                (u_g_grad_vort_g_rms, r"${\bf{u}}_g\cdot\nabla \zeta_g$"),
-                (Dtg_vort_g_rms, r"$\mathrm{D}_g \zeta_g / \mathrm{D}_t$"),
-                (vort_div_u_rms, r"$\zeta_g \delta$"),
-                (f_div_u_rms, r"$f \delta$"),
-                (u_grad_f_rms, r"${\bf{u}}\cdot\nabla f$"),
-                (Dt_vort_a_rms, r"$\mathrm{D} \zeta_a / \mathrm{D}_t$"),
-                (u_a_grad_vort_g_rms, r"${\bf{u}}_a\cdot\nabla \zeta_g$"),
-            ]
+            data[season][calendar.month_name[month]] = {
+                "time": (ds["t"][:-1].to_numpy(), r"$t$"),
+                "dt_vort_g": (dt_vort_g_rms, r"$\partial_t \zeta_g$"),
+                "u_g_grad_vort_g": (
+                    u_g_grad_vort_g_rms,
+                    r"${\bf{u}}_g\cdot\nabla \zeta_g$",
+                ),
+                "Dtg_vort_g": (
+                    Dtg_vort_g_rms,
+                    r"$\mathrm{D}_g \zeta_g / \mathrm{D}_t$",
+                ),
+                "vort_div_u": (vort_div_u_rms, r"$\zeta_g \delta$"),
+                "f_div_u": (f_div_u_rms, r"$f \delta$"),
+                "u_grad_f": (u_grad_f_rms, r"${\bf{u}}\cdot\nabla f$"),
+                "Dt_vort_a": (
+                    Dt_vort_a_rms,
+                    r"$\mathrm{D} \zeta_a / \mathrm{D}_t$",
+                ),
+                "u_a_grad_vort_g": (
+                    u_a_grad_vort_g_rms,
+                    r"${\bf{u}}_a\cdot\nabla \zeta_g$",
+                ),
+            }
             np.save(
                 output_dir / "vorticity.npy",
                 data,
@@ -408,20 +420,23 @@ if __name__ == "__main__":
                 allow_pickle=True,
             )
             data = data_.item()
-            data[season][calendar.month_name[month]] = [
-                (ds["t"][:-1].to_numpy(), r"$t$"),
-                (Dt_div_rms, r"$\mathrm{D}_t \delta$"),
-                (dt_div_rms, r"$\partial_t \delta$"),
-                (u_grad_div_rms, r"$\bf{u} \cdot \nabla \delta$"),
-                (Q_squared_rms, r"$(\sigma^2 - \zeta^2)/2$"),
-                (d_squared_rms, r"$\delta^2/2$"),
-                (sigma_squared_rms, r"$\sigma^2/2$"),
-                (zeta_squared_rms, r"$\zeta^2/2$"),
-                (f_zeta_rms, r"$-f\zeta$"),
-                (grad_f_u_rms, r"$-\nabla^{\perp}f \cdot \bf{u}$"),
-                (lap_geop_rms, r"$\Delta \Phi$"),
-                (diff_lap_geop_fz, r"$\Delta \Phi - f\zeta$"),
-            ]
+            data[season][calendar.month_name[month]] = {
+                "timt": (ds["t"][:-1].to_numpy(), r"$t$"),
+                "Dt_div": (Dt_div_rms, r"$\mathrm{D}_t \delta$"),
+                "dt_div": (dt_div_rms, r"$\partial_t \delta$"),
+                "u_grad_div": (
+                    u_grad_div_rms,
+                    r"$\bf{u} \cdot \nabla \delta$",
+                ),
+                "Q_squared": (Q_squared_rms, r"$(\sigma^2 - \zeta^2)/2$"),
+                "d_squared": (d_squared_rms, r"$\delta^2/2$"),
+                "sigma_squared": (sigma_squared_rms, r"$\sigma^2/2$"),
+                "zeta_squared": (zeta_squared_rms, r"$\zeta^2/2$"),
+                "f_zeta": (f_zeta_rms, r"$-f\zeta$"),
+                "grad_f_u": (grad_f_u_rms, r"$-\nabla^{\perp}f \cdot \bf{u}$"),
+                "lap_geop": (lap_geop_rms, r"$\Delta \Phi$"),
+                "diff_lap_geo": (diff_lap_geop_fz, r"$\Delta \Phi - f\zeta$"),
+            }
             np.save(
                 output_dir / "divergence.npy",
                 data,
