@@ -353,7 +353,7 @@ if __name__ == "__main__":
                     r"${\bf{u}}_g\cdot\nabla \zeta_g$",
                 ),
                 "u_g_grad_vort_a": (
-                    u_g_grad_vort_g_rms,
+                    u_g_grad_vort_a_rms,
                     r"${\bf{u}}_g\cdot\nabla \zeta_a$",
                 ),
                 "Dtg_vort_g": (
