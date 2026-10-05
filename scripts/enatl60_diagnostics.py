@@ -338,6 +338,8 @@ if __name__ == "__main__":
                 u_a_grad_vort_g_rms = rms(u_a_grad_vort_g[:-1])
                 u_grad_f_rms = rms(u_grad_f[:-1])
                 vort_div_u_rms = rms(vort_div_u[:-1])
+                vort_g_div_u_rms = rms(vort_g_div_u[:-1])
+                vort_a_div_u_rms = rms(vort_a_div_u[:-1])
                 f_div_u_rms = rms(f_div_u[:-1])
             gc.collect()
             data_ = np.load(
@@ -357,6 +359,8 @@ if __name__ == "__main__":
                     r"$\mathrm{D}_g \zeta_g / \mathrm{D}_t$",
                 ),
                 "vort_div_u": (vort_div_u_rms, r"$\zeta \delta$"),
+                "vort_g_div_u": (vort_g_div_u_rms, r"$\zeta_g \delta$"),
+                "vort_a_div_u": (vort_a_div_u_rms, r"$\zeta_a \delta$"),
                 "f_div_u": (f_div_u_rms, r"$f \delta$"),
                 "u_grad_f": (u_grad_f_rms, r"${\bf{u}}\cdot\nabla f$"),
                 "Dt_vort_a": (
