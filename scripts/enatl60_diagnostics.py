@@ -369,7 +369,7 @@ if __name__ == "__main__":
                 ),
                 "Dtg_vort_a": (
                     Dtg_vort_a_rms,
-                    r"$\mathrm{D} \zeta_a / \mathrm{D}_t$",
+                    r"$\mathrm{D}_g \zeta_a / \mathrm{D}_t$",
                 ),
                 "vort_div_u": (vort_div_u_rms, r"$\zeta \delta$"),
                 "vort_g_div_u": (vort_g_div_u_rms, r"$\zeta_g \delta$"),
