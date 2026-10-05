@@ -310,11 +310,12 @@ if __name__ == "__main__":
                 dy_vort_a = interpf(dy(vort_a))
 
                 u_g_grad_vort_g = u_g * dx_vort_g + v_g * dy_vort_g
-                u_grad_vort_a = u_ * dx_vort_a + v_ * dy_vort_a
-
-                Dt_vort_a = dt_vort_a + u_grad_vort_a[:-1]
-                Dtg_vort_g = dt_vort_g + u_g_grad_vort_g[:-1]
                 u_a_grad_vort_g = u_a * dx_vort_g + v_a * dy_vort_g
+                u_g_grad_vort_a = u_g * dx_vort_a + v_g * dy_vort_a
+                u_a_grad_vort_a = u_a * dx_vort_a + v_a * dy_vort_a
+
+                Dtg_vort_g = dt_vort_g + u_g_grad_vort_g[:-1]
+                Dtg_vort_a = dt_vort_a + u_g_grad_vort_a[:-1]
 
                 dx_f = interpf(dx(ds["corio_t"]))
                 dy_f = interpf(dy(ds["corio_t"]))
@@ -332,10 +333,13 @@ if __name__ == "__main__":
                 f_div_u = div * interpf(ds["corio_t"])
 
                 dt_vort_g_rms = rms(dt_vort_g)
+                dt_vort_a_rms = rms(dt_vort_a)
                 u_g_grad_vort_g_rms = rms(u_g_grad_vort_g[:-1])
+                u_g_grad_vort_a_rms = rms(u_g_grad_vort_a[:-1])
                 Dtg_vort_g_rms = rms(Dtg_vort_g)
-                Dt_vort_a_rms = rms(Dt_vort_a)
+                Dtg_vort_a_rms = rms(Dtg_vort_a)
                 u_a_grad_vort_g_rms = rms(u_a_grad_vort_g[:-1])
+                u_a_grad_vort_a_rms = rms(u_a_grad_vort_a[:-1])
                 u_grad_f_rms = rms(u_grad_f[:-1])
                 vort_div_u_rms = rms(vort_div_u[:-1])
                 vort_g_div_u_rms = rms(vort_g_div_u[:-1])
@@ -350,26 +354,35 @@ if __name__ == "__main__":
             data[season][calendar.month_name[month].lower()] = {
                 "time": (ds["t"][:-1].to_numpy(), r"$t$"),
                 "dt_vort_g": (dt_vort_g_rms, r"$\partial_t \zeta_g$"),
+                "dt_vort_a": (dt_vort_a_rms, r"$\partial_t \zeta_a$"),
                 "u_g_grad_vort_g": (
                     u_g_grad_vort_g_rms,
                     r"${\bf{u}}_g\cdot\nabla \zeta_g$",
                 ),
+                "u_g_grad_vort_a": (
+                    u_g_grad_vort_g_rms,
+                    r"${\bf{u}}_g\cdot\nabla \zeta_a$",
+                ),
                 "Dtg_vort_g": (
                     Dtg_vort_g_rms,
                     r"$\mathrm{D}_g \zeta_g / \mathrm{D}_t$",
+                ),
+                "Dtg_vort_a": (
+                    Dtg_vort_a_rms,
+                    r"$\mathrm{D} \zeta_a / \mathrm{D}_t$",
                 ),
                 "vort_div_u": (vort_div_u_rms, r"$\zeta \delta$"),
                 "vort_g_div_u": (vort_g_div_u_rms, r"$\zeta_g \delta$"),
                 "vort_a_div_u": (vort_a_div_u_rms, r"$\zeta_a \delta$"),
                 "f_div_u": (f_div_u_rms, r"$f \delta$"),
                 "u_grad_f": (u_grad_f_rms, r"${\bf{u}}\cdot\nabla f$"),
-                "Dt_vort_a": (
-                    Dt_vort_a_rms,
-                    r"$\mathrm{D} \zeta_a / \mathrm{D}_t$",
-                ),
                 "u_a_grad_vort_g": (
                     u_a_grad_vort_g_rms,
                     r"${\bf{u}}_a\cdot\nabla \zeta_g$",
+                ),
+                "u_a_grad_vort_a": (
+                    u_a_grad_vort_a_rms,
+                    r"${\bf{u}}_a\cdot\nabla \zeta_a$",
                 ),
             }
             np.save(
