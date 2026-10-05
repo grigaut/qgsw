@@ -33,6 +33,10 @@ setup_root_logger(1)
 
 domain_bounds = {"x": slice(2280, 2884.5), "y": slice(1865, 2688.5)}
 
+vort_filename = "vorticity.npy"
+div_filename = "divergence.npy"
+sst_filename = "sst.npy"
+
 data_dt = 7200
 sigma = 3
 bc = 10
@@ -70,7 +74,12 @@ dico_name_grd = {
         "nav_lat": "llat_rr",
     },
 }
-dico_name_all = {"sossheig": "ssh", "sozocrtx": "u", "somecrty": "v"}
+dico_name_all = {
+    "sossheig": "ssh",
+    "sozocrtx": "u",
+    "somecrty": "v",
+    "sosstsst": "sst",
+}
 
 
 def open_file(path_or_list: list[Path] | Path) -> xr.Dataset:
@@ -148,8 +157,6 @@ def build_interpf(
     xs: xr.DataArray, ys: xr.DataArray
 ) -> Callable[[xr.DataArray], xr.DataArray]:
     """Build interpolation function."""
-    xs = ds["x_c"]
-    ys = ds["y_c"]
 
     def interp(da: xr.DataArray) -> xr.DataArray:
 
@@ -184,8 +191,6 @@ if __name__ == "__main__":
         gitignore = output_dir.joinpath(".gitignore")
         with gitignore.open("w") as file:
             file.write("*")
-
-    output = {"vorticity": {}, "divergence": {}}
 
     with logger.timeit("Retrieving files"):
         data_folder = get_path_from_env(key="eNATL60_FOLDER")
@@ -229,22 +234,12 @@ if __name__ == "__main__":
             """Dt function."""
             return da.diff(dim="t", label="lower") / data_dt
 
-        output["vorticity"] = {
+        output = {
             season: {calendar.month_name[m].lower(): [] for m in months}
             for season, months in season_map.items()
         }
-        output["divergence"] = {
-            season: {calendar.month_name[m].lower(): [] for m in months}
-            for season, months in season_map.items()
-        }
-        np.save(
-            output_dir / "vorticity.npy",
-            output["vorticity"],
-        )
-        np.save(
-            output_dir / "divergence.npy",
-            output["divergence"],
-        )
+        for f in [vort_filename, div_filename, sst_filename]:
+            np.save(output_dir / f, output)
 
     for season, months in season_map.items():
         msg = f"Loading {season} files"
@@ -346,10 +341,7 @@ if __name__ == "__main__":
                 vort_a_div_u_rms = rms(vort_a_div_u[:-1])
                 f_div_u_rms = rms(f_div_u[:-1])
             gc.collect()
-            data_ = np.load(
-                output_dir / "vorticity.npy",
-                allow_pickle=True,
-            )
+            data_ = np.load(output_dir / vort_filename, allow_pickle=True)
             data = data_.item()
             data[season][calendar.month_name[month].lower()] = {
                 "time": (ds["t"][:-1].to_numpy(), r"$t$"),
@@ -385,10 +377,7 @@ if __name__ == "__main__":
                     r"${\bf{u}}_a\cdot\nabla \zeta_a$",
                 ),
             }
-            np.save(
-                output_dir / "vorticity.npy",
-                data,
-            )
+            np.save(output_dir / vort_filename, data)
             gc.collect()
             with logger.timeit("Inferring divergence equation terms"):
                 dt_div = filt(dt(div))
@@ -430,10 +419,7 @@ if __name__ == "__main__":
                 lap_geop_rms = rms(lap_geop[:-1])
                 diff_lap_geop_fz = rms(lap_geop[:-1] + f_zeta[:-1])
             gc.collect()
-            data_ = np.load(
-                output_dir / "divergence.npy",
-                allow_pickle=True,
-            )
+            data_ = np.load(output_dir / div_filename, allow_pickle=True)
             data = data_.item()
             data[season][calendar.month_name[month].lower()] = {
                 "time": (ds["t"][:-1].to_numpy(), r"$t$"),
@@ -455,10 +441,48 @@ if __name__ == "__main__":
                 "lap_geop": (lap_geop_rms, r"$\Delta \Phi$"),
                 "diff_lap_geo": (diff_lap_geop_fz, r"$\Delta \Phi - f\zeta$"),
             }
-            np.save(
-                output_dir / "divergence.npy",
-                data,
-            )
+            np.save(output_dir / div_filename, data)
+            gc.collect()
+            with logger.timeit("Inferring SST advection equation terms"):
+                sst = filt(ds["sst"])
+                dt_sst = filt(dt(sst))
+
+                dx_sst = interpf(dx(sst))
+
+                dy_sst = interpf(dy(sst))
+
+                u_grad_sst = u_ * dx_sst + v_ * dy_sst
+                u_g_grad_sst = u_g * dx_sst + v_g * dy_sst
+                u_a_grad_sst = u_grad_sst - u_g_grad_sst
+
+                Dt_sst = dt_sst + u_grad_sst[:-1]
+
+                Dtg_sst = dt_sst + u_g_grad_sst[:-1]
+
+                dt_sst_rms = rms(dt_sst)
+                Dt_sst_rms = rms(Dt_sst)
+                Dtg_sst_rms = rms(Dtg_sst)
+                u_g_grad_sst_rms = rms(u_g_grad_sst[:-1])
+                u_a_grad_sst_rms = rms(u_a_grad_sst[:-1])
+            gc.collect()
+            data_ = np.load(output_dir / sst_filename, allow_pickle=True)
+            data = data_.item()
+            data[season][calendar.month_name[month].lower()] = {
+                "time": (ds["t"][:-1].to_numpy(), r"$t$"),
+                "dt_sst": (dt_sst_rms, r"$\partial_t T$"),
+                "Dt_sst": (
+                    Dt_sst_rms,
+                    r"${\mathrm{D}} T / {\mathrm{D}} t $",
+                ),
+                "Dtg_sst": (
+                    Dtg_sst_rms,
+                    r"${\mathrm{D}}_g T / {\mathrm{D}} t $",
+                ),
+                "u_grad_sst": (u_grad_sst, r"${\bf{u}} \cdot \nabla T$"),
+                "u_g_grad_sst": (u_g_grad_sst, r"${\bf{u}}_g \cdot \nabla T$"),
+                "u_a_grad_sst": (u_a_grad_sst, r"${\bf{u}}_a \cdot \nabla T$"),
+            }
+            np.save(output_dir / sst_filename, data)
             gc.collect()
             ds.close()
             gc.collect()
