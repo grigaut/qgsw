@@ -462,6 +462,7 @@ if __name__ == "__main__":
                 dt_sst_rms = rms(dt_sst)
                 Dt_sst_rms = rms(Dt_sst)
                 Dtg_sst_rms = rms(Dtg_sst)
+                u_grad_sst_rms = rms(u_grad_sst[:-1])
                 u_g_grad_sst_rms = rms(u_g_grad_sst[:-1])
                 u_a_grad_sst_rms = rms(u_a_grad_sst[:-1])
             gc.collect()
@@ -478,9 +479,15 @@ if __name__ == "__main__":
                     Dtg_sst_rms,
                     r"${\mathrm{D}}_g T / {\mathrm{D}} t $",
                 ),
-                "u_grad_sst": (u_grad_sst, r"${\bf{u}} \cdot \nabla T$"),
-                "u_g_grad_sst": (u_g_grad_sst, r"${\bf{u}}_g \cdot \nabla T$"),
-                "u_a_grad_sst": (u_a_grad_sst, r"${\bf{u}}_a \cdot \nabla T$"),
+                "u_grad_sst": (u_grad_sst_rms, r"${\bf{u}} \cdot \nabla T$"),
+                "u_g_grad_sst": (
+                    u_g_grad_sst_rms,
+                    r"${\bf{u}}_g \cdot \nabla T$",
+                ),
+                "u_a_grad_sst": (
+                    u_a_grad_sst_rms,
+                    r"${\bf{u}}_a \cdot \nabla T$",
+                ),
             }
             np.save(output_dir / sst_filename, data)
             gc.collect()
