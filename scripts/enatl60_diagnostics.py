@@ -388,6 +388,8 @@ if __name__ == "__main__":
                 dy_div = interpf(dy(div))
 
                 u_grad_div = u_ * dx_div + v_ * dy_div
+                u_g_grad_div = u_g * dx_div + v_g * dy_div
+                u_a_grad_div = u_a * dx_div + v_a * dy_div
 
                 Dt_div = dt_div + u_grad_div[:-1]
 
@@ -411,6 +413,8 @@ if __name__ == "__main__":
                 dt_div_rms = rms(dt_div)
                 Dt_div_rms = rms(Dt_div)
                 u_grad_div_rms = rms(u_grad_div[:-1])
+                u_g_grad_div_rms = rms(u_g_grad_div[:-1])
+                u_a_grad_div_rms = rms(u_a_grad_div[:-1])
                 sigma_squared_rms = rms(sigma_squared[:-1])
                 zeta_squared_rms = rms(zeta_squared[:-1])
                 Q_squared_rms = rms(Q_squared[:-1])
@@ -429,6 +433,14 @@ if __name__ == "__main__":
                 "u_grad_div": (
                     u_grad_div_rms,
                     r"${\bf{u}} \cdot \nabla \delta$",
+                ),
+                "u_g_grad_div": (
+                    u_g_grad_div_rms,
+                    r"${\bf{u}}_g \cdot \nabla \delta$",
+                ),
+                "u_a_grad_div": (
+                    u_a_grad_div_rms,
+                    r"${\bf{u}}_a \cdot \nabla \delta$",
                 ),
                 "Q_squared": (Q_squared_rms, r"$(\sigma^2 - \zeta^2)/2$"),
                 "d_squared": (d_squared_rms, r"$\delta^2/2$"),
