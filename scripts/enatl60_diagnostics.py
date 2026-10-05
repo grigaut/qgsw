@@ -253,7 +253,7 @@ if __name__ == "__main__":
             if not files or not ufiles or not vfiles:
                 msg = f"No files found for {calendar.month_name[month]}"
                 logger.warning(msg)
-                logger.end_section()
+                logger.end_section(m_token)
                 continue
             dsh = load(files, "gridT")
             dsu = load(ufiles, "gridU")
