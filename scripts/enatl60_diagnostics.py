@@ -443,7 +443,7 @@ if __name__ == "__main__":
                     r"${\bf{u}}_a \cdot \nabla \delta$",
                 ),
                 "Q_squared": (Q_squared_rms, r"$(\sigma^2 - \zeta^2)/2$"),
-                "d_squared": (d_squared_rms, r"$\delta^2/2$"),
+                "div_squared": (d_squared_rms, r"$\delta^2/2$"),
                 "sigma_squared": (sigma_squared_rms, r"$\sigma^2/2$"),
                 "zeta_squared": (zeta_squared_rms, r"$\zeta^2/2$"),
                 "f_zeta": (f_zeta_rms, r"$-f\zeta$"),
