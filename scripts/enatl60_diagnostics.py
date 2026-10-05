@@ -328,7 +328,7 @@ if __name__ == "__main__":
 
                 vort_div_u = vort * div
                 vort_g_div_u = vort_g * div
-                vort_a_div_u = vort_g_div_u - vort_g_div_u
+                vort_a_div_u = vort_a * div
 
                 f_div_u = div * interpf(ds["corio_t"])
 
