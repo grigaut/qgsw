@@ -44,7 +44,7 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
-    QGPSIQRGPsi2TransportDR,
+    QGPSIQRGPsi2Transport,
 )
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
@@ -308,13 +308,13 @@ if __name__ == "__main__":
         model.dt = dt
         return model
 
-    model = QGPSIQRGPsi2TransportDR(
+    model = QGPSIQRGPsi2Transport(
         space_2d=space_interior,
         H=H[:2],
         beta_plane=beta_plane,
         g_prime=g_prime[:2],
     )
-    model: QGPSIQRGPsi2TransportDR = set_inhomogeneous_model(model)
+    model: QGPSIQRGPsi2Transport = set_inhomogeneous_model(model)
 
     y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
     beta_effect = beta_plane.beta * (y_w - model.y0)

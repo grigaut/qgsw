@@ -19,7 +19,7 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
-    QGPSIQRGPsi2TransportDR,
+    QGPSIQRGPsi2Transport,
 )
 from qgsw.models.qg.stretching_matrix import compute_A, compute_A_tilde
 from qgsw.models.qg.uvh.projectors.core import QGProjector
@@ -54,7 +54,7 @@ torch.set_grad_enabled(False)
 ## Config
 
 args = ScriptsArgsParser.va_setup(
-    prefix_default="results_surfml_perturbed",
+    prefix_default="results_surfml",
 )
 args.add_regularization(gamma_default=1e2)
 args.add_alpha()
@@ -374,13 +374,13 @@ build_compute_q_rg = lambda A11, A12: (
 )
 
 
-model = QGPSIQRGPsi2TransportDR(
+model = QGPSIQRGPsi2Transport(
     space_2d=space_slice,
     H=torch.tensor([H1_, H2_], **specs),
     beta_plane=beta_plane,
     g_prime=torch.tensor([g1_, g2_], **specs),
 )
-model: QGPSIQRGPsi2TransportDR = set_inhomogeneous_model(model)
+model: QGPSIQRGPsi2Transport = set_inhomogeneous_model(model)
 
 if not args.no_wind:
     model.set_wind_forcing(
