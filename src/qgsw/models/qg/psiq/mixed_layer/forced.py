@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 import torch
@@ -15,6 +16,7 @@ from qgsw.fields.variables.tuples import (
     PSIQSSTT,
     PSIQSSTTAlpha,
 )
+from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQCore
@@ -27,7 +29,6 @@ from qgsw.solver.pv_inversion import (
 )
 from qgsw.spatial.core.grid_conversion import interpolate, interpolate1D
 from qgsw.specs import DEVICE, defaults
-from qgsw.utils.reshaping import crop
 
 if TYPE_CHECKING:
     from qgsw.decomposition.base import SpaceTimeDecomposition
@@ -36,6 +37,8 @@ if TYPE_CHECKING:
     from qgsw.physics.coriolis.beta_plane import BetaPlane
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
+logger = getLogger(__name__)
+
 
 class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
     """QG model with mixed layer and Psi2 transport with deformation radius."""
@@ -43,6 +46,7 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
     _basis: SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
     _type = ModelName.QUASI_GEOSTROPHIC_ML
     _sst_forcing: torch.Tensor
+    _use_div = False
 
     def __init__(
         self,
@@ -98,6 +102,15 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         self._set_solver()
 
     @property
+    def wide_space(self) -> SpaceDiscretization2D:
+        """Wide space."""
+        return self._wide_space
+
+    @wide_space.setter
+    def wide_space(self, space: SpaceDiscretization2D) -> None:
+        self._wide_space = space
+
+    @property
     def basis(
         self,
     ) -> SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]:
@@ -113,7 +126,14 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
     ) -> None:
         self._basis = basis
         space = self.space.remove_h()
-        self._fpsi2 = basis.localize(space.psi.xy.x, space.psi.xy.y)
+        self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
+        with contextlib.suppress(AttributeError):
+            self._fpsi2_wide = basis.localize(
+                self.wide_space.q.xy.x,
+                self.wide_space.q.xy.y,
+            )
+        self._fpsi2_dx = basis.localize_dx(space.u.xy.x, space.u.xy.y)
+        self._fpsi2_dy = basis.localize_dy(space.v.xy.x, space.v.xy.y)
 
     @property
     def sst_forcing(self) -> torch.Tensor:
@@ -191,17 +211,83 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         self._A11 = self.A[:1, :1]
         self._A12 = self.A[:1, 1:2]
 
-    def compute_psi_2_dt(self, time: torch.Tensor) -> torch.Tensor:
-        """Compute contribution of ѱ₂'s time derivative.
+    def compute_forcing_analytical(
+        self,
+        time: torch.Tensor,
+        psi1: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute forcing using analytical spatial derivatives of psi2.
 
         Args:
             time (torch.Tensor): Time to evaluate at.
+            psi1 (torch.Tensor): Top layer stream function.
 
         Returns:
-            torch.Tensor: -f₀²ѱ₂/H₂g₂
+            torch.Tensor: -f₀²/H₂g₂[∂ₜѱ₂ + J(ѱ₁, ѱ₂)]
+        """
+        u, v = self._grad_perp(psi1)
+        u /= self.space.dy
+        v /= self.space.dx
+
+        dt_psi2 = self._fpsi2.dt(time)
+        dx_psi2 = self._fpsi2_dx(time)
+        dy_psi2 = self._fpsi2_dy(time)
+
+        u_dxpsi2 = u * dx_psi2
+        v_dypsi2 = v * dy_psi2
+
+        adv = (u_dxpsi2[..., 1:, :] + u_dxpsi2[..., :-1, :]) / 2 + (
+            v_dypsi2[..., 1:] + v_dypsi2[..., :-1]
+        ) / 2
+        return (self.beta_plane.f0**2) * self._A12 * (dt_psi2 + adv)
+
+    def compute_forcing(
+        self,
+        time: torch.Tensor,
+        psi1: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute forcing.
+
+        Args:
+            time (torch.Tensor): Time to evaluate at.
+            psi1 (torch.Tensor): Top layer stream function.
+
+        Returns:
+            torch.Tensor: -f₀²/H₂g₂[∂ₜѱ₂ + J(ѱ₁, ѱ₂)]
+        """
+        if self._use_div and self.with_bc:
+            return self.compute_forcing_div(time, psi1)
+        return self.compute_forcing_analytical(time, psi1)
+
+    def compute_forcing_div(
+        self,
+        time: torch.Tensor,
+        psi1: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute forcing using divergence of wide psi2.
+
+        Args:
+            time (torch.Tensor): Time to evaluate at.
+            psi1 (torch.Tensor): Top layer stream function.
+
+        Returns:
+            torch.Tensor: -f₀²/H₂g₂[∂ₜѱ₂ + J(ѱ₁, ѱ₂)]
         """
         dt_psi2 = self._fpsi2.dt(time)
-        return (self.beta_plane.f0**2) * self._A12 * dt_psi2
+
+        u, v = self._grad_perp(psi1)
+        u /= self.space.dy
+        v /= self.space.dx
+        psi2 = self._fpsi2_wide(time)
+        adv = self.div_flux(psi2, u, v)
+
+        return (self.beta_plane.f0**2) * self._A12 * (dt_psi2 + adv)
+
+    def _switch_to_inhomogeneous(self) -> None:
+        if (not self.with_bc) and self._use_div:
+            msg = "Will use flux divergence for forcing advection."
+            logger.detail(msg)
+        return super()._switch_to_inhomogeneous()
 
     def _compute_q_anom_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
         vort = self._compute_vort_from_psi(psi)
@@ -305,15 +391,14 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
         e = self.compute_entrainments(sst_anom)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
         dq = (
             -div_flux_q
             + fcg_drag
+            + forcing
             + self.beta_plane.f0 / self.H[:1] * (e[:, :-1] - e[:, 1:])
         ) * self.masks.h
-
-        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
-
+        dq_i = self._interpolate(dq)
         ## Compute dψ
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -396,13 +481,14 @@ class QGPSIQSSTRGSI(QGPSIQSSTCore[PSIQSSTTAlpha, StatePSIQSSTAlpha]):
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
         e = self.compute_entrainments(sst_anom)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
         dq = (
             -div_flux_q
             + fcg_drag
+            + forcing
             + self.beta_plane.f0 / self.H[:1] * (e[:, :-1] - e[:, 1:])
         ) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
+        dq_i = self._interpolate(dq)
 
         ## Compute dψ
         # Solve Helmholtz equation
@@ -582,11 +668,9 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
         div_flux_q = self._compute_advection_homogeneous(u, v, q)
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
-        dq = (-div_flux_q + fcg_drag) * self.masks.h
-
-        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
-
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
+        dq = (-div_flux_q + fcg_drag + forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
         ## Compute dψ
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
@@ -648,9 +732,9 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
         )
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        dq = (-div_flux_q + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
+        dq = (-div_flux_q + fcg_drag + forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
 
         ## Compute dψ
         # Solve Helmholtz equation
