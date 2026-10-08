@@ -333,14 +333,18 @@ def set_rowtitles(
     return row_titles
 
 
-def clamp_ylims(bottom: float, top: float, ax: Axes) -> None:
+def clamp_ylims(bottom: float, top: float, ax: Axes | np.ndarray) -> None:
     """Clamp y lims.
 
     Args:
         bottom (float): Bottom value.
         top (float): Top value.
-        ax (Axes): Axes.
+        ax (Axes | np.ndarray): Axes or array of axes.
     """
+    if isinstance(ax, np.ndarray):
+        for a in ax.flatten():
+            clamp_ylims(bottom, top, a)
+        return
     ax.autoscale_view()
 
     _, my = ax.margins()
@@ -354,14 +358,18 @@ def clamp_ylims(bottom: float, top: float, ax: Axes) -> None:
     ax.set_ylim(y0 - pad, y1 + pad)
 
 
-def set_ylims(bottom: float, top: float, ax: Axes) -> None:
+def set_ylims(bottom: float, top: float, ax: Axes | np.ndarray) -> None:
     """Set y lims.
 
     Args:
         bottom (float): Bottom value.
         top (float): Top value.
-        ax (Axes): Axes.
+        ax (Axes | np.ndarray): Axes or array of axes.
     """
+    if isinstance(ax, np.ndarray):
+        for a in ax.flatten():
+            clamp_ylims(bottom, top, a)
+        return
     ax.relim()
     ax.autoscale_view()
     _, my = ax.margins()
