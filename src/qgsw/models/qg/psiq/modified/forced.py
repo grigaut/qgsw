@@ -642,6 +642,8 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self._basis = basis
         space = self.space.remove_h()
         self._fpsi2 = basis.localize(space.psi.xy.x, space.psi.xy.y)
+        self._fpsi2_dx = basis.localize_dx(space.psi.xy.x, space.psi.xy.y)
+        self._fpsi2_dy = basis.localize_dy(space.psi.xy.x, space.psi.xy.y)
 
     def __init__(
         self,
@@ -695,6 +697,36 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     def alpha(self, alpha: torch.Tensor) -> None:
         self._state.update_alpha(alpha)
         self._set_solver()
+
+    def compute_forcing(
+        self,
+        time: torch.Tensor,
+        psi1: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute forcing.
+
+        Args:
+            time (torch.Tensor): Time to evaluate at.
+            psi1 (torch.Tensor): Top layer stream function.
+
+        Returns:
+            torch.Tensor: -f₀²J(ѱ₁, ѱ₂)/H₂g₂
+        """
+        u, v = self._grad_perp(psi1)
+        u /= self.space.dy
+        v /= self.space.dx
+
+        dt_psi2 = self._fpsi2.dt(time)
+        dx_psi2 = self._fpsi2_dx(time)
+        dy_psi2 = self._fpsi2_dy(time)
+
+        u_dxpsi2 = u * dx_psi2
+        v_dypsi2 = v * dy_psi2
+
+        adv = (u_dxpsi2[..., 1:, :] + u_dxpsi2[..., :-1, :]) / 2 + (
+            v_dypsi2[..., 1:] + v_dypsi2[..., :-1]
+        ) / 2
+        return (self.beta_plane.f0**2) * self._A12 * (dt_psi2 + adv)
 
     def _compute_q_anom_from_psi(self, psi: Tensor) -> Tensor:
         vort = self._compute_vort_from_psi(psi)
@@ -839,9 +871,9 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_homogeneous(psi)
-        dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
+        dq = (-div_flux + fcg_drag + forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
@@ -876,9 +908,9 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = advection_psi_q
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        dq = (-div_flux + fcg_drag) * self.masks.h
-        dt_psi2 = self.compute_psi_2_dt(self._substep_time)
-        dq_i = self._interpolate(dq) + crop(dt_psi2, 1)
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
+        dq = (-div_flux + fcg_drag + forcing) * self.masks.h
+        dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
         dpsi = self._solver_homogeneous.compute_stream_function(
             dq_i,
