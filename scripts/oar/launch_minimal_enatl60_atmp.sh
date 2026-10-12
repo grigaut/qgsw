@@ -12,6 +12,8 @@ cd $SRCDIR
 
 ./scripts/oar/run_var_analysis_enatl60_forced_atmp.sh --config=config/enatl60.toml -v --obs-track --gamma=1e5 "$@"
 
+./scripts/oar/run_var_analysis_enatl60_forced_atmp_vd.sh --config=config/enatl60.toml -v --obs-track --gamma=1e18 "$@"
+
 # Forced + SurfML
 
 ./scripts/oar/run_var_analysis_enatl60_forcedsurf_atmp.sh --config=config/enatl60.toml -v --obs-track --gamma=1 "$@"
