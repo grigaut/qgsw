@@ -307,71 +307,71 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
     @abstractmethod
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport: ...
+    ) -> dict[int, torch.Tensor]: ...
 
     def _build_space_dx(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement x-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_dy(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement y-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_dx2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement xx-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_dy2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement yy-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_dx3(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement xxx-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_dy3(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement yyy-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_dydx2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement xxy-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_dxdy2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement yyx-derivative."
         raise NotImplementedError(msg)
 
     def _build_space_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement laplacian."
         raise NotImplementedError(msg)
 
     def _build_space_dx_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement dx laplacian."
         raise NotImplementedError(msg)
 
     def _build_space_dy_laplacian(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> TimeSupport:
+    ) -> dict[int, torch.Tensor]:
         msg = "This decomposition does not implement dy laplacian."
         raise NotImplementedError(msg)
 
