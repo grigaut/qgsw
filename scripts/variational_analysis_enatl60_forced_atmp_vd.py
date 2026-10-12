@@ -122,6 +122,7 @@ if __name__ == "__main__":
     ### Data folder
 
     data_folder = get_path_from_env(key="eNATL60_FOLDER")
+    basis_nc_folder = get_path_from_env(key="BASIS_NC_FOLDER")
     files = list((data_folder / "MEANDERS" / "gridT").glob("*.nc"))
 
     files = sort_files_by_dates(*files)
@@ -418,8 +419,10 @@ if __name__ == "__main__":
         yy = space_interior.q.xy.y
 
         basis_config = BASIS_MIOST
-        basis_config["file_aux"] = "data/aux_reduced_basis_MIOST.nc"
-        basis_config["filec_aux"] = "data/aux_first_baroclinic_speed.nc"
+        basis_config["file_aux"] = data_folder / "aux_reduced_basis_MIOST.nc"
+        basis_config["filec_aux"] = (
+            data_folder / "aux_first_baroclinic_speed.nc"
+        )
 
         space_params, time_params, kwargs, Q = vardyn_like_params(
             basis_config,
