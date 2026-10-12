@@ -81,7 +81,7 @@ if __name__ == "__main__":
     ## Config
 
     args = ScriptsArgsParser.va_setup(
-        prefix_default="results_enatl60_forced_atmp",
+        prefix_default="results_enatl60_forced_atmp_vd",
         cycles_default=4,
     )
     args.add_regularization(gamma_default=1e4)
