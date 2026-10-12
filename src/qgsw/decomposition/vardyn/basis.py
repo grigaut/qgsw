@@ -453,12 +453,14 @@ class Basis_miost:
             Q = np.concatenate((Q, Qf))
             iwave += _nwavef
 
-            logger.detail(
-                f"lambda={1 / ff[iff]:.1E}",
-                f"nlocs={P:.1E}",
-                f"tdec={np.nanmean(tdec[iff]):.1E}",
-                f"Q={np.nanmean(Q[self.iff_wavebounds[iff] : iwave + 1]):.1E}",
+            msg = (
+                f"lambda={1 / ff[iff]:.1E}"
+                f"nlocs={P:.1E}"
+                f"tdec={np.nanmean(tdec[iff]):.1E}"
+                f"Q={np.nanmean(Q[self.iff_wavebounds[iff] : iwave + 1]):.1E}"
             )
+
+            logger.detail(msg)
 
             self.P_wavebounds[iff][P + 1] = iwave + 1
         self.iff_wavebounds[iff + 1] = iwave + 1
