@@ -321,9 +321,9 @@ class Basis_miost:
                 else:
                     td1 = np.nan
                 PSDS = daPSDS.interp(
-                    f=ff[iff],
-                    lat=ENSLAT[iff][P],
-                    lon=ENSLON[iff][P],
+                    f=float(ff[iff]),
+                    lat=float(ENSLAT[iff][P]),
+                    lon=float(ENSLON[iff][P]),
                 ).values
                 if Ro > 0:
                     PSDSR = daPSDS.interp(
