@@ -327,9 +327,9 @@ class Basis_miost:
                 ).values
                 if Ro > 0:
                     PSDSR = daPSDS.interp(
-                        f=1.0 / (self.facRo * Ro),
-                        lat=ENSLAT[iff][P],
-                        lon=ENSLON[iff][P],
+                        f=float(1.0 / (self.facRo * Ro)),
+                        lat=float(ENSLAT[iff][P]),
+                        lon=float(ENSLON[iff][P]),
                     ).values
                 else:
                     PSDSR = np.nan
