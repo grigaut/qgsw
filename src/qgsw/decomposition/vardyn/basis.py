@@ -321,15 +321,15 @@ class Basis_miost:
                 else:
                     td1 = np.nan
                 PSDS = daPSDS.interp(
-                    f=ff[iff].item(),
-                    lat=ENSLAT[iff][P].item(),
-                    lon=ENSLON[iff][P].item(),
+                    f=np.atleast_1d(ff[iff]),
+                    lat=np.atleast_1d(ENSLAT[iff][P]),
+                    lon=np.atleast_1d(ENSLON[iff][P]),
                 ).values
                 if Ro > 0:
                     PSDSR = daPSDS.interp(
                         f=1.0 / (self.facRo * Ro),
-                        lat=ENSLAT[iff][P].item(),
-                        lon=ENSLON[iff][P].item(),
+                        lat=np.atleast_1d(ENSLAT[iff][P]),
+                        lon=np.atleast_1d(ENSLON[iff][P]),
                     ).values
                 else:
                     PSDSR = np.nan
@@ -393,9 +393,9 @@ class Basis_miost:
             for P in range(NP[iff]):
                 PSDLOC = abs(
                     daPSDS.interp(
-                        f=ff[iff].item(),
-                        lat=ENSLAT[iff][P].item(),
-                        lon=ENSLON[iff][P].item(),
+                        f=np.atleast_1d(ff[iff]),
+                        lat=np.atleast_1d(ENSLAT[iff][P]),
+                        lon=np.atleast_1d(ENSLON[iff][P]),
                     ).values
                 )
                 C = Cb1[iff][P]
