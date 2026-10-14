@@ -8,6 +8,7 @@ from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.decomposition.taylor.core import TaylorFullFieldBasis
 from qgsw.decomposition.taylor_exp.core import TaylorExpBasis
+from qgsw.decomposition.vardyn.core import BasisMiost
 from qgsw.decomposition.wavelets.core import WaveletBasis
 
 Basis = SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
@@ -17,6 +18,7 @@ BASES: dict[str, type[Basis]] = {
     TaylorExpBasis.type: TaylorExpBasis,
     TaylorFullFieldBasis.type: TaylorFullFieldBasis,
     GaussianExpBasis.type: GaussianExpBasis,
+    BasisMiost.type: BasisMiost,
 }
 
 
