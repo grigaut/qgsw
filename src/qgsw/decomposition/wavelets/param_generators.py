@@ -15,26 +15,22 @@ logger = getLogger(__name__)
 
 
 def dyadic_decomposition(
-    order: int,
+    config: dict[str, Any],
     xx_ref: torch.Tensor,
     yy_ref: torch.Tensor,
-    *,
-    Lxy_max: float,
     Lt_max: float,
-    sigma_t_sigma_xy_ratio: float = 1.17,
-    sigma_xy_l_p_ratio: float = 1.75 / torch.pi * 2 * sqrt(2),
-    l_xy_sigma_xy_ratio: float = 2 * sqrt(log(2)),
-    l_t_sigma_t_ratio: float = 2 * sqrt(log(2)),
-    use_time_frontier_as_centers: bool = False,
 ) -> tuple[dict[int, dict[str, Any]], dict[int, dict[str, Any]]]:
     """Compute wavelet parameters using dyadic subdivisions.
 
     Args:
-        order (int): Decomposition order (number of subdivision to perform).
+        config (dict[str, Any]): Configuration.
         xx_ref (torch.Tensor): Reference x locations to use to place centers.
         yy_ref (torch.Tensor): Reference y locations to use to place centers.
-        Lxy_max (float): Distance to start subdividing from.
         Lt_max (float): Total time duration to localize time patches.
+
+    Config args:
+        order (int): Decomposition order (number of subdivision to perform).
+        Lxy_max (float): Distance to start subdividing from.
         sigma_t_sigma_xy_ratio (float, optional): Ratio between time gaussian
             enveloppe and space gaussian enveloppe. Default value is set so
             to roughly match 900 km to 20 days and 80 km to 2 days.
@@ -61,6 +57,15 @@ def dyadic_decomposition(
     x0 = xx_ref[0, 0].item()
     Ly = (yy_ref[0, -1] - yy_ref[0, 0]).item()
     y0 = yy_ref[0, 0].item()
+
+    order = config["order"]
+    Lxy_max = config["Lxy_max"]
+    Lt_max = config["Lt_max"]
+    sigma_t_sigma_xy_ratio = config["sigma_t_sigma_xy_ratio"]
+    sigma_xy_l_p_ratio = config["sigma_xy_l_p_ratio"]
+    l_xy_sigma_xy_ratio = config["l_xy_sigma_xy_ratio"]
+    l_t_sigma_t_ratio = config["l_t_sigma_t_ratio"]
+    use_time_frontier_as_centers = config["use_time_frontier_as_centers"]
 
     space = {}
     time = {}
