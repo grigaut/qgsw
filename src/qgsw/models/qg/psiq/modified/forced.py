@@ -16,6 +16,7 @@ from qgsw.fields.variables.tuples import (
 )
 from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
+from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.qg.stretching_matrix import (
     compute_A_tilde,
@@ -44,6 +45,7 @@ logger = getLogger(__name__)
 class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
     """Specify and additional forcing term."""
 
+    _type = ModelName.RGF
     _forcing: torch.Tensor = None
 
     @property
@@ -1075,6 +1077,8 @@ class QGPSIQPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
 class QGPSIQRGPsi2TransportDR(QGPSIQRGPsi2Transport):
     """Mixed model using both alpha and psi2."""
 
+    _type = ModelName.RGSI
+
     @property
     def alpha(self) -> torch.Tensor:
         """Collinearity coefficient."""
@@ -1158,6 +1162,7 @@ class QGPSIQRGPsi2TransportDR(QGPSIQRGPsi2Transport):
 class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
     """Mixed model using both alpha and psi2 along with an external forcing."""
 
+    _type = ModelName.RGFSI
     _forcing: torch.Tensor = None
 
     @property
