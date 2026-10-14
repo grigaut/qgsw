@@ -663,17 +663,11 @@ class ScriptsArgsParser:
     def va_setup(
         cls,
         prefix_default: str,
-        dt_default: float,
-        dx_default: float,
-        dy_default: float,
         cycles_default: int = 3,
     ) -> Self:
         """Pre-setup parser for variationla assimilaiton scripts."""
         obj = cls()
         obj.add_config()
-        obj.add_dt(dt_default)
-        obj.add_dx(dx_default)
-        obj.add_dy(dy_default)
         obj.add_verbose()
         obj.add_prefix(default=prefix_default)
         obj.add_comparison_interval(default=1)
