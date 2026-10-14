@@ -37,6 +37,12 @@ class ScriptsArgsParser:
     has_no_ml_optim = False
     has_sst_forcing = False
     has_gamma_sst_reg = False
+    has_dt = False
+    has_dx = False
+    has_dy = False
+    has_sigma_ic = False
+    has_sigma_bc = False
+    has_basis = False
 
     @property
     def config(self) -> Path:
@@ -209,6 +215,60 @@ class ScriptsArgsParser:
         )
         return self.namespace.gamma_sst_reg
 
+    @property
+    def dt(self) -> int:
+        """Dt."""
+        self._check_attr(
+            self.has_dt,
+            "dt not tracked.",
+        )
+        return self.namespace.dt
+
+    @property
+    def dx(self) -> int:
+        """Dx."""
+        self._check_attr(
+            self.has_dx,
+            "dx not tracked.",
+        )
+        return self.namespace.dx
+
+    @property
+    def dy(self) -> int:
+        """Dy."""
+        self._check_attr(
+            self.has_dy,
+            "dy not tracked.",
+        )
+        return self.namespace.dy
+
+    @property
+    def sigma_ic(self) -> float:
+        """sigma_ic."""
+        self._check_attr(
+            self.has_sigma_ic,
+            "sigma_ic not tracked.",
+        )
+        return self.namespace.sigma_ic
+
+    @property
+    def sigma_bc(self) -> float:
+        """sigma_bc."""
+        self._check_attr(
+            self.has_sigma_bc,
+            "sigma_bc not tracked.",
+        )
+        return self.namespace.sigma_bc
+
+    @property
+    def basis(self) -> list[str]:
+        """Basis."""
+        self._check_attr(
+            self.has_basis,
+            "basis not tracked.",
+        )
+        return self.namespace.basis
+
     def __init__(self) -> None:
         """Instantiate parser."""
         self.parser = argparse.ArgumentParser(
@@ -268,8 +328,8 @@ class ScriptsArgsParser:
         """
         self._check_unretrieved()
         self.parser.add_argument(
-            "-i",
             "--indices",
+            "-i",
             required=False,
             nargs=4,
             type=int,
@@ -520,89 +580,100 @@ class ScriptsArgsParser:
         )
         self.has_gamma_sst_reg = True
 
+    def add_dt(self, default: int) -> None:
+        """Add dt."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--dt",
+            type=int,
+            default=default,
+            help="Timestep.",
+        )
+        self.has_dt = True
+
+    def add_dx(self, default: int) -> None:
+        """Add dx."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--dx",
+            type=int,
+            default=default,
+            help="X step.",
+        )
+        self.has_dx = True
+
+    def add_dy(self, default: int) -> None:
+        """Add dy."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--dy",
+            type=int,
+            default=default,
+            help="Y step.",
+        )
+        self.has_dy = True
+
+    def add_sigma_ic(self, default: float) -> None:
+        """Add dt."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--sigma-ic",
+            "--ic",
+            type=float,
+            default=default,
+            help="Initial condition filtering std.",
+        )
+        self.has_sigma_ic = True
+
+    def add_sigma_bc(self, default: float) -> None:
+        """Add dt."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--sigma-bc",
+            "--bc",
+            type=float,
+            default=default,
+            help="Boundary condition filtering std.",
+        )
+        self.has_sigma_bc = True
+
+    def add_basis(self) -> None:
+        """Add indices to parser.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+        """
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "-b",
+            "--basis",
+            required=True,
+            nargs="+",
+            type=str,
+            help="Basis identifications.",
+        )
+        self.has_basis = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_args(namespace=self.namespace)
         self.retrieved = True
 
-    def _build_suffix(self) -> None:
-        """Build full prefix."""
-        if self.has_gamma and (g := self.gamma) != 0:
-            gamma_str = str(g).rstrip("0").rstrip(".").replace(".", "_")
-        else:
-            gamma_str = "0"
-        gamma_suffix = (
-            f"_gamma{gamma_str}"
-            if (
-                (self.has_no_reg and not self.no_reg)
-                and (self.has_gamma and self.gamma != 1)
-            )
-            else ""
-        )
-        if self.has_gamma_sst and (g := self.gamma_sst) != 0:
-            gamma_sst_str = str(g).rstrip("0").rstrip(".").replace(".", "_")
-        else:
-            gamma_sst_str = "0"
-        gamma_sst_suffix = (
-            f"_gammasst{gamma_sst_str}"
-            if (self.has_gamma_sst and self.gamma_sst != 1)
-            else ""
-        )
-        if self.has_gamma_sst_reg and (g := self.gamma_sst_reg) != 0:
-            gamma_sst_reg_str = (
-                str(g).rstrip("0").rstrip(".").replace(".", "_")
-            )
-        else:
-            gamma_sst_reg_str = "0"
-        gamma_sst_reg_suffix = (
-            f"_gammasstreg{gamma_sst_reg_str}"
-            if (self.has_gamma_sst_reg and self.gamma_sst_reg != 1)
-            else ""
-        )
-        return [
-            "_noalpha" if (self.has_no_alpha and self.no_alpha) else "",
-            "_noreg" if (self.has_no_reg and self.no_reg) else "",
-            gamma_suffix,
-            gamma_sst_suffix,
-            gamma_sst_reg_suffix,
-            "_nowind" if (self.has_no_wind and self.no_wind) else "",
-            "_obstrack" if (self.has_obs_track and self.obs_track) else "",
-            f"_c{self.comparison}"
-            if (self.has_obs_track and self.obs_track)
-            and (self.has_comparison and self.comparison != 1)
-            else "",
-            f"_o{self.optim}"
-            if (self.has_optim and self.optim != 200)
-            else "",
-            f"_s{self.separation}"
-            if (self.has_separation and self.separation != 0)
-            else "",
-            f"_re{self.reg_exp}" if (self.has_reg_exp) else "",
-            "_windoptim" if (self.has_wind_optim and self.wind_optim) else "",
-            "_noMLoptim"
-            if (self.has_no_ml_optim and self.no_ml_optim)
-            else "",
-            "_sstforcing"
-            if (self.has_sst_forcing and self.with_sst_forcing)
-            else "",
-            f"_{self.season}"
-            if (self.has_season and self.season is not None)
-            else "",
-        ]
-
-    def complete_prefix(self) -> str:
-        """Complete prefix with cli arguments info.
-
-        Returns:
-            str: Completed prefix.
-        """
-        return self.prefix + "".join(self._build_suffix())
-
     @classmethod
-    def va_setup(cls, prefix_default: str, cycles_default: int = 3) -> Self:
+    def va_setup(
+        cls,
+        prefix_default: str,
+        dt_default: float,
+        dx_default: float,
+        dy_default: float,
+        cycles_default: int = 3,
+    ) -> Self:
         """Pre-setup parser for variationla assimilaiton scripts."""
         obj = cls()
         obj.add_config()
+        obj.add_dt(dt_default)
+        obj.add_dx(dx_default)
+        obj.add_dy(dy_default)
         obj.add_verbose()
         obj.add_prefix(default=prefix_default)
         obj.add_comparison_interval(default=1)
