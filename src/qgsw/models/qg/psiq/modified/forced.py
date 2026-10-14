@@ -610,7 +610,7 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         div_flux = advection_psi_q
         # wind forcing + bottom drag
         fcg_drag = self._compute_drag_inhomogeneous(psi)
-        forcing = self.compute_forcing_div(self._substep_time, psi[:, :1])
+        forcing = self.compute_forcing(self._substep_time, psi[:, :1])
         dq = (-div_flux + fcg_drag + forcing) * self.masks.h
         dq_i = self._interpolate(dq)
         # Solve Helmholtz equation
