@@ -27,7 +27,7 @@ class DecompositionCoefs:
     @property
     def specs(self) -> TensorSpecs:
         """Specs."""
-        return specs.from_tensor(self._coefs.values()[0])
+        return specs.from_tensor(next(iter(self._coefs.values())))
 
     @property
     def order(self) -> int:
