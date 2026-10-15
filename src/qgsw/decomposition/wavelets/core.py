@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
-from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.cosine import (
     CosineBasisFunctions,
 )
@@ -80,42 +79,20 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
         self.n_theta = self._n_theta
         self.phase = torch.tensor([0, torch.pi / 2], **self._specs)
 
-    def numel(self) -> int:
-        """Total number of elements."""
-        n = sum(
-            s["numel"] * self._time[k]["numel"] for k, s in self._space.items()
-        )
-
-        return n * self.phase.numel() * self.n_theta
-
-    def generate_random_coefs(self) -> DecompositionCoefs:
-        """Generate random coefficient.
-
-        Useful to properly instantiate coefs.
-
-        Returns:
-            DecompositionCoefs: Level -> coefficients.
-                ├── 0: (1, 1)-shaped
-                ├── 1: (2, 4)-shaped
-                ├── 2: (4, 16)-shaped
-                ├── ...
-                ├── p: (2**p, (2**p)**2)-shaped
-                ├── ...
-                └── order: (2**order, (2**order)**2)-shaped
-        """
-        coefs = {}
-        for k in self._space:
-            coefs[k] = torch.randn(
-                (
-                    self._time[k]["numel"],
-                    self._space[k]["numel"],
-                    self.n_theta,
-                    2,
-                ),
-                **self._specs,
+    def shapes(self) -> dict[int, torch.Size]:  # noqa: D102
+        return {
+            k: (
+                self._time[k]["numel"],
+                self._space[k]["numel"],
+                self.n_theta,
+                2,
             )
+            for k in self._time
+        }
 
-        return DecompositionCoefs.from_dict(coefs)
+    shapes.__doc__ = SpaceTimeDecomposition[
+        ExpCosSupport, GaussianTimeSupport
+    ].shapes.__doc__
 
     def _compute_space_params(
         self, params: dict[str, Any], xx: torch.Tensor, yy: torch.Tensor
@@ -549,11 +526,8 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
         Args:
             t (torch.Tensor): Time to freeze normalization at.
         """
-        self.generate_time_support = (
-            lambda time_params,
-            space_fields: self._generate_frozen_time_support(
-                t, time_params, space_fields
-            )
+        self.generate_time_support = lambda time_params, space_fields: (
+            self._generate_frozen_time_support(t, time_params, space_fields)
         )
 
     def unfreeze_time_normalization(self) -> None:

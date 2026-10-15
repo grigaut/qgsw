@@ -83,14 +83,15 @@ def build_basis_from_config(
             basis = WaveletBasis(space_params, time_params, **basis_kwargs)
             basis.n_theta = config["n_theta"]
             Q = {
-                sqrt(
+                k: torch.ones(s, **basis.specs)
+                * sqrt(
                     space_params[k]["sigma_x"]
                     * space_params[k]["sigma_y"]
                     / space.dx
                     / space.dy
                 )
                 ** (-exp_cov)
-                for k in range(basis.order)
+                for k, s in basis.shapes().items()
             }
 
         case GaussianExpBasis.type:
@@ -99,14 +100,15 @@ def build_basis_from_config(
             )
             basis = GaussianExpBasis(space_params, time_params, **basis_kwargs)
             Q = {
-                sqrt(
+                k: torch.ones(s, **basis.specs)
+                * sqrt(
                     space_params[k]["sigma_x"]
                     * space_params[k]["sigma_y"]
                     / space.dx
                     / space.dy
                 )
                 ** (-exp_cov)
-                for k in range(basis.order)
+                for k, s in basis.shapes().items()
             }
 
         case _:

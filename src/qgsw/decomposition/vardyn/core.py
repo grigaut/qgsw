@@ -142,18 +142,12 @@ class MIOSTBasis(
             self._coefs,
         )
 
-    def numel(self) -> int:
-        """Number of elements."""
-        return sum([t[0].shape[0] for t in self._time.values()])
+    def shapes(self) -> dict[int, torch.Size]:  # noqa: D102
+        return {k: torch.Size((t[0].shape[0],)) for k, t in self._time.items()}
 
-    def generate_random_coefs(self) -> DecompositionCoefs:
-        """Generate random coefs."""
-        return DecompositionCoefs(
-            *[
-                torch.rand((t[0].shape[0],), **self._specs)
-                for t in self._time.values()
-            ]
-        )
+    shapes.__doc__ = SpaceTimeDecomposition[
+        "MIOSTSpaceSupport", "MIOSTTimeSupport"
+    ].shapes.__doc__
 
     def get_params(self) -> dict[str, Any]:
         """Return decomposition params as dict.

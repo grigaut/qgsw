@@ -6,7 +6,6 @@ import torch
 from torch import Tensor
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
-from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
@@ -33,29 +32,18 @@ class TaylorExpBasis(
         y = yy[None, :, :] - yc[:, None, None]
         return (x, y)
 
-    def numel(self) -> int:  # noqa: D102
-        return sum(s["numel"] for s in self._space.values())
-
-    numel.__doc__ = SpaceTimeDecomposition[
-        NormalizedGaussianSupport, TaylorSeriesTimeSupport
-    ].numel.__doc__
-
-    def generate_random_coefs(self) -> DecompositionCoefs:  # noqa: D102
-        coefs = {}
-        for k in self._space:
-            coefs[k] = torch.randn(
-                (
-                    self._time[k]["numel"],
-                    self._space[k]["numel"],
-                ),
-                **self._specs,
+    def shapes(self) -> dict[int, torch.Size]:  # noqa: D102
+        return {
+            k: (
+                self._time[k]["numel"],
+                self._space[k]["numel"],
             )
+            for k in self._time
+        }
 
-        return DecompositionCoefs.from_dict(coefs)
-
-    generate_random_coefs.__doc__ = SpaceTimeDecomposition[
+    shapes.__doc__ = SpaceTimeDecomposition[
         NormalizedGaussianSupport, TaylorSeriesTimeSupport
-    ].generate_random_coefs.__doc__
+    ].shapes.__doc__
 
     def generate_time_support(  # noqa: D102
         self,
