@@ -63,6 +63,8 @@ logger = getLogger(__name__)
 class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
     """Finite volume multi-layer QG solver."""
 
+    _has_alpha: bool = False
+
     _flux_stencil = 5
 
     _time_stepper: str = "rk3"
@@ -122,6 +124,11 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
         # wind forcing
         self.set_wind_forcing(0.0, 0.0)
+
+    @property
+    def implements_alpha(self) -> bool:
+        """Whether the model implements alpha or not."""
+        return self._has_alpha
 
     @property
     def _substep_time(self) -> torch.Tensor:

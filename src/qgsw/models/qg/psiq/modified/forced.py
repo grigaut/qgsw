@@ -266,6 +266,7 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         SpaceSupportFunction, TimeSupportFunction
     ]
     _use_div = False
+    _has_alpha = True
 
     @property
     def wide_space(self) -> SpaceDiscretization2D:
