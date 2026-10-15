@@ -62,7 +62,7 @@ def setup_model(
     if model_type == QGPSIQForced.get_type():
         model = _setup_forced(model_type, space, H, g_prime, beta_plane)
     else:
-        model = _setup()
+        model = _setup(model_type, space, H, g_prime, beta_plane)
     return set_inhomogeneous_model(model, dt, slip_coef)
 
 
