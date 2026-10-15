@@ -69,9 +69,10 @@ def optim_setup(
     uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
     kappa = torch.tensor(0, **specs, requires_grad=False)
     coefs_grad: Coefs = {}
+    params = []
     for k, coef in coefs.items():
         coefs_grad[k] = coef.requires_grad_()
-        params = [
+        params += [
             {
                 "params": list(coefs_grad[k].values()),
                 "lr": coefs_lr[k],
