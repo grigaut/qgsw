@@ -5,7 +5,7 @@
 from collections.abc import Callable
 
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
-from qgsw.decomposition.vardyn.core import BasisMiost
+from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
@@ -16,14 +16,14 @@ from qgsw.scripts.setups.types import Coefs
 
 SCALINGS = {
     QGPSIQForced.get_type(): {
-        BasisMiost.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
+        MIOSTBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
         WaveletBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs.scale(
             *(U**2 / L**2 for _ in range(coefs.order))
         ),
         GaussianExpBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
     },
     QGPSIQRGPsi2TransportDR.get_type(): {
-        BasisMiost.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
+        MIOSTBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
         WaveletBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
         GaussianExpBasis.type: lambda coefs, L, U, psi0_mean, T_tot: (
             coefs.scale(
@@ -32,7 +32,7 @@ SCALINGS = {
         ),
     },
     QGPSIQForcedSurfML.get_type(): {
-        BasisMiost.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
+        MIOSTBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
         WaveletBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs.scale(
             *(U**2 / L**2 for _ in range(coefs.order))
         ),

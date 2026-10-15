@@ -16,7 +16,7 @@ from qgsw.specs import defaults
 logger = getLogger(__name__)
 
 
-class BasisMiost(
+class MIOSTBasis(
     SpaceTimeDecomposition["MIOSTSpaceSupport", "MIOSTTimeSupport"]
 ):
     """Basis using VarDyn's basis specs."""

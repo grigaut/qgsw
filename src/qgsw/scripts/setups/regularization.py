@@ -10,7 +10,7 @@ from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
-from qgsw.decomposition.vardyn.core import BasisMiost
+from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.scripts.regularization import compute_regularization_func
@@ -187,12 +187,12 @@ INLINE_REG_PRESETS: dict[
     ],
 ] = {
     "external": {
-        BasisMiost.type: dynamical_noreg,
+        MIOSTBasis.type: dynamical_noreg,
         WaveletBasis.type: dynamical_noreg,
         GaussianExpBasis.type: dynamical_noreg,
     },
     "dynamical": {
-        BasisMiost.type: dynamical_noreg,
+        MIOSTBasis.type: dynamical_noreg,
         WaveletBasis.type: dynamical_reg,
         GaussianExpBasis.type: dynamical_reg,
     },
@@ -208,12 +208,12 @@ POST_CYCLE_REG_PRESETS: dict[
     ],
 ] = {
     "external": {
-        BasisMiost.type: background_reg,
+        MIOSTBasis.type: background_reg,
         WaveletBasis.type: background_reg,
         GaussianExpBasis.type: background_reg,
     },
     "dynamical": {
-        BasisMiost.type: background_noreg,
+        MIOSTBasis.type: background_noreg,
         WaveletBasis.type: background_noreg,
         GaussianExpBasis.type: background_noreg,
     },

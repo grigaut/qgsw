@@ -7,7 +7,7 @@ import torch
 
 from qgsw.decomposition.config import BASIS_CONFIGS
 from qgsw.decomposition.core import Basis, build_basis_from_config
-from qgsw.decomposition.vardyn.core import BasisMiost
+from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
@@ -41,7 +41,7 @@ def setup_basis(
     Qs = {}
     for k, v in basis_type.items():
         basis_config = BASIS_CONFIGS[v]
-        if v == BasisMiost.type:
+        if v == MIOSTBasis.type:
             basis_config["file_aux"] = file_aux
             basis_config["filec_aux"] = filec_aux
         basis, Q = build_basis_from_config(

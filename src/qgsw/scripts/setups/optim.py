@@ -5,7 +5,7 @@ from typing import Any
 import torch
 
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
-from qgsw.decomposition.vardyn.core import BasisMiost
+from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.logging.core import getLogger
 from qgsw.logging.utils import box
@@ -20,17 +20,17 @@ logger = getLogger(__name__)
 
 COEFS_OPTIM = {
     QGPSIQForced.get_type(): {
-        BasisMiost.type: 1e-13,
+        MIOSTBasis.type: 1e-13,
         WaveletBasis.type: None,
         GaussianExpBasis.type: None,
     },
     QGPSIQRGPsi2TransportDR.get_type(): {
-        BasisMiost.type: None,
+        MIOSTBasis.type: None,
         WaveletBasis.type: None,
         GaussianExpBasis.type: None,
     },
     QGPSIQForcedSurfML.get_type(): {
-        BasisMiost.type: None,
+        MIOSTBasis.type: None,
         WaveletBasis.type: None,
         GaussianExpBasis.type: None,
     },

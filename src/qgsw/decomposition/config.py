@@ -9,11 +9,11 @@ from math import log, sqrt
 import torch
 
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
-from qgsw.decomposition.vardyn.core import BasisMiost
+from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.decomposition.wavelets.core import WaveletBasis
 
 BASIS_MIOST = {
-    "type": BasisMiost.type,
+    "type": MIOSTBasis.type,
     "name_mod_var": None,  # Name of the related model variable
     "flux": False,
     "save_wave_basis": False,  # save the basis matrix in tmp_DA_path.If False, the matrix is stored in line  # noqa: E501
@@ -61,7 +61,7 @@ WAVELETS = {
 }
 
 BASIS_CONFIGS = {
-    BasisMiost.type: BASIS_MIOST,
+    MIOSTBasis.type: BASIS_MIOST,
     WaveletBasis.type: WAVELETS,
     GaussianExpBasis.type: GAUSSIAN_EXP,
 }
