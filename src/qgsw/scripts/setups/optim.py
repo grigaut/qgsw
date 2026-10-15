@@ -21,18 +21,18 @@ logger = getLogger(__name__)
 COEFS_OPTIM = {
     QGPSIQForced.get_type(): {
         MIOSTBasis.type: 1e-13,
-        WaveletBasis.type: None,
-        GaussianExpBasis.type: None,
+        WaveletBasis.type: 1e0,
+        GaussianExpBasis.type: 1e0,
     },
     QGPSIQRGPsi2TransportDR.get_type(): {
-        MIOSTBasis.type: None,
-        WaveletBasis.type: None,
-        GaussianExpBasis.type: None,
+        MIOSTBasis.type: 1e0,
+        WaveletBasis.type: 1e0,
+        GaussianExpBasis.type: 1e0,
     },
     QGPSIQForcedSurfML.get_type(): {
-        MIOSTBasis.type: None,
-        WaveletBasis.type: None,
-        GaussianExpBasis.type: None,
+        MIOSTBasis.type: 1e0,
+        WaveletBasis.type: 1e0,
+        GaussianExpBasis.type: 1e0,
     },
 }
 
