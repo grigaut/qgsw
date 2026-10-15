@@ -86,7 +86,7 @@ def background_reg(
 
     def compute_reg(coefs: DecompositionCoefs) -> torch.Tensor:
         return torch.concatenate(
-            [(coefs[k].square() / Q[k]) for k in coefs.keys()]  # noqa: SIM118
+            [(coefs[k].square() / Q[k]).flatten() for k in coefs.keys()]  # noqa: SIM118
         ).sum()
 
     return compute_reg
