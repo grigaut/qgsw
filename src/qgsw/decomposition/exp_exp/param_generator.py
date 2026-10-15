@@ -48,7 +48,7 @@ def gaussian_exp_field(
 
     l_t = config["l_t"]
 
-    spacing = config["spacing"] // dx
+    spacing = int(config["spacing"] // dx)
 
     Nx, Ny = xx_ref.shape
     nx = int((Nx) / spacing)

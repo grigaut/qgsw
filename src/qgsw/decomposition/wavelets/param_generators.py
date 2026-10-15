@@ -60,7 +60,6 @@ def dyadic_decomposition(
 
     order = config["order"]
     Lxy_max = config["Lxy_max"]
-    Lt_max = config["Lt_max"]
     sigma_t_sigma_xy_ratio = config["sigma_t_sigma_xy_ratio"]
     sigma_xy_l_p_ratio = config["sigma_xy_l_p_ratio"]
     l_xy_sigma_xy_ratio = config["l_xy_sigma_xy_ratio"]
