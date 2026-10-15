@@ -21,7 +21,7 @@ logger = getLogger(__name__)
 COEFS_OPTIM = {
     QGPSIQForced.get_type(): {
         MIOSTBasis.type: 1e-13,
-        WaveletBasis.type: 1e0,
+        WaveletBasis.type: 1e-2,
         GaussianExpBasis.type: 1e0,
     },
     QGPSIQRGPsi2TransportDR.get_type(): {
