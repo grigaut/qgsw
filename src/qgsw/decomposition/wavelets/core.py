@@ -81,11 +81,13 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
 
     def shapes(self) -> dict[int, torch.Size]:  # noqa: D102
         return {
-            k: (
-                self._time[k]["numel"],
-                self._space[k]["numel"],
-                self.n_theta,
-                2,
+            k: torch.Size(
+                (
+                    self._time[k]["numel"],
+                    self._space[k]["numel"],
+                    self.n_theta,
+                    2,
+                )
             )
             for k in self._time
         }

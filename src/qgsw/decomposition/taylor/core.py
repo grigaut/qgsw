@@ -19,10 +19,7 @@ class TaylorFullFieldBasis(
 
     def shapes(self) -> dict[int, torch.Size]:  # noqa: D102
         return {
-            k: (
-                self._time[k]["numel"],
-                self._space[k]["numel"],
-            )
+            k: torch.Size((self._time[k]["numel"], self._space[k]["numel"]))
             for k in self._time
         }
 
