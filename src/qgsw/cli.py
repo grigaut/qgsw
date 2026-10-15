@@ -37,7 +37,8 @@ class ScriptsArgsParser:
     has_optim = False
     has_separation = False
     has_season = False
-    has_gamma = False
+    has_gamma_reg_dyn = False
+    has_gamma_reg_bkg = False
     has_no_reg = False
     has_no_alpha = False
     has_reg_exp = False
@@ -146,13 +147,22 @@ class ScriptsArgsParser:
         return self.namespace.season
 
     @property
-    def gamma(self) -> float:
-        """Gamma."""
+    def gamma_reg_dyn(self) -> float:
+        """Gamma_reg_dyn."""
         self._check_attr(
-            self.has_gamma,
-            "Gamma not tracked.",
+            self.has_gamma_reg_dyn,
+            "Gamma_reg_dyn not tracked.",
         )
-        return self.namespace.gamma
+        return self.namespace.gamma_reg_dyn
+
+    @property
+    def gamma_reg_bkg(self) -> float:
+        """Gamma_reg_bkg."""
+        self._check_attr(
+            self.has_gamma_reg_bkg,
+            "Gamma_reg_bkg not tracked.",
+        )
+        return self.namespace.gamma_reg_bkg
 
     @property
     def no_reg(self) -> bool:
@@ -497,8 +507,8 @@ class ScriptsArgsParser:
         )
         self.has_season = True
 
-    def add_gamma(self, default: float = 1) -> None:
-        """Specify whether to use regularization or not.
+    def add_gamma_reg_dyn(self, default: float = 1) -> None:
+        """Dynamical regularization coef.
 
         Args:
             parser (argparse.ArgumentParser): Arguments parser.
@@ -506,12 +516,32 @@ class ScriptsArgsParser:
         """
         self._check_unretrieved()
         self.parser.add_argument(
-            "--gamma",
+            "--gamma-reg-dyn",
+            "--gamma-dyn",
+            "--grdyn",
             type=float,
             default=default,
-            help="Gamma value.",
+            help="Gamma reg dyn value.",
         )
-        self.has_gamma = True
+        self.has_gamma_reg_dyn = True
+
+    def add_gamma_reg_bkg(self, default: float = 1) -> None:
+        """Background regularization coef.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (float, optional): Default value. Defaults to 1.
+        """
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--gamma-reg-bkg",
+            "--gamma-bkg",
+            "--grbkg",
+            type=float,
+            default=default,
+            help="Gamma reg bkg value.",
+        )
+        self.has_gamma_reg_bkg = True
 
     def add_no_reg(self) -> None:
         """Specify whether to use regularization or not.
@@ -527,9 +557,14 @@ class ScriptsArgsParser:
         )
         self.has_no_reg = True
 
-    def add_regularization(self, gamma_default: float = 1) -> None:
+    def add_regularization(
+        self,
+        gamma_dyn_default: float = 1,
+        gamma_bkg_default: float = 1,
+    ) -> None:
         """Add regularization."""
-        self.add_gamma(gamma_default)
+        self.add_gamma_reg_dyn(gamma_dyn_default)
+        self.add_gamma_reg_bkg(gamma_bkg_default)
         self.add_no_reg()
 
     def add_alpha(self) -> None:
