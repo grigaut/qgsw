@@ -4,7 +4,6 @@ from typing import Any
 
 import torch
 
-from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.vardyn.core import BasisMiost
 from qgsw.decomposition.wavelets.core import WaveletBasis
@@ -15,6 +14,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
 )
+from qgsw.scripts.setups.types import Coefs
 
 logger = getLogger(__name__)
 
@@ -39,13 +39,13 @@ COEFS_OPTIM = {
 
 def optim_setup(
     coefs_lr: dict[str, float],
-    coefs: dict[str, DecompositionCoefs],
+    coefs: Coefs,
     *,
     alpha_optim: bool,
     wind_optim: bool,
 ) -> tuple[
     list[{dict[str, Any]}],
-    dict[str, DecompositionCoefs],
+    Coefs,
     torch.Tensor,
     torch.Tensor,
     int,
@@ -54,13 +54,13 @@ def optim_setup(
 
     Args:
         coefs_lr (dict[str, float]): Learning rates for coefficients.
-        coefs (dict[str, DecompositionCoefs]): Coefficients.
+        coefs (Coefs): Coefficients.
         alpha_optim (bool): Whether to perform optimization on alpha.
         wind_optim (bool): Whether to perform optimization on wind.
 
 
     Returns:
-        tuple[list[{dict[str, Any]}],dict[str, DecompositionCoefs],torch.Tensor,torch.Tensor,int]: Optim params, coefs, kappa, ub10_to_uvsurf, numel
+        tuple[list[{dict[str, Any]}],Coefs,torch.Tensor,torch.Tensor,int]: Optim params, coefs, kappa, ub10_to_uvsurf, numel
     """  # noqa: E501
     specs = coefs[coefs.keys()[0]].specs
 
@@ -68,7 +68,7 @@ def optim_setup(
 
     uv10_to_uvsurf = torch.eye(2, **specs, requires_grad=False)
     kappa = torch.tensor(0, **specs, requires_grad=False)
-    coefs_grad: dict[str, DecompositionCoefs] = {}
+    coefs_grad: Coefs = {}
     for k, coef in coefs.items():
         coefs_grad[k] = coef.requires_grad_()
         params = [
