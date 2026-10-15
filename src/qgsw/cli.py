@@ -6,6 +6,15 @@ import argparse
 import pathlib
 from pathlib import Path
 
+from qgsw.decomposition.exp_exp.core import GaussianExpBasis
+from qgsw.decomposition.vardyn.core import MIOSTBasis
+from qgsw.decomposition.wavelets.core import WaveletBasis
+from qgsw.models.qg.psiq.modified.forced import (
+    QGPSIQForced,
+    QGPSIQForcedSurfML,
+    QGPSIQRGPsi2TransportDR,
+)
+
 try:
     from typing import Self
 except ImportError:
@@ -42,7 +51,9 @@ class ScriptsArgsParser:
     has_dy = False
     has_sigma_ic = False
     has_sigma_bc = False
-    has_basis = False
+    has_basis_dyn = False
+    has_basis_ext = False
+    has_model_type = False
 
     @property
     def config(self) -> Path:
@@ -261,13 +272,31 @@ class ScriptsArgsParser:
         return self.namespace.sigma_bc
 
     @property
-    def basis(self) -> list[str]:
-        """Basis."""
+    def basis_dyn(self) -> str:
+        """Basis dynamical."""
         self._check_attr(
-            self.has_basis,
-            "basis not tracked.",
+            self.has_basis_dyn,
+            "basis_dyn not tracked.",
         )
-        return self.namespace.basis
+        return self.namespace.basis_dyn
+
+    @property
+    def basis_ext(self) -> str:
+        """Basis external."""
+        self._check_attr(
+            self.has_basis_ext,
+            "basis_ext not tracked.",
+        )
+        return self.namespace.basis_ext
+
+    @property
+    def model_type(self) -> str:
+        """Model type."""
+        self._check_attr(
+            self.has_model_type,
+            "model_type not tracked.",
+        )
+        return self.namespace.model_type
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -614,7 +643,7 @@ class ScriptsArgsParser:
         self.has_dy = True
 
     def add_sigma_ic(self, default: float) -> None:
-        """Add dt."""
+        """Add sigma_ic."""
         self._check_unretrieved()
         self.parser.add_argument(
             "--sigma-ic",
@@ -626,7 +655,7 @@ class ScriptsArgsParser:
         self.has_sigma_ic = True
 
     def add_sigma_bc(self, default: float) -> None:
-        """Add dt."""
+        """Add sigma_bc."""
         self._check_unretrieved()
         self.parser.add_argument(
             "--sigma-bc",
@@ -637,22 +666,68 @@ class ScriptsArgsParser:
         )
         self.has_sigma_bc = True
 
-    def add_basis(self) -> None:
-        """Add indices to parser.
+    def add_basis_dynamical(self) -> None:
+        """Add basis_dyn to parser.
 
         Args:
             parser (argparse.ArgumentParser): Arguments parser.
         """
         self._check_unretrieved()
         self.parser.add_argument(
-            "-b",
-            "--basis",
-            required=True,
-            nargs="+",
+            "--basis-dyn",
+            "--bdyn",
+            required=False,
             type=str,
-            help="Basis identifications.",
+            choices=[
+                MIOSTBasis.type,
+                WaveletBasis.type,
+                GaussianExpBasis.type,
+            ],
+            help="Basis dynamical identification.",
         )
-        self.has_basis = True
+        self.has_basis_dyn = True
+
+    def add_basis_external(self) -> None:
+        """Add basis_ext to parser.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+        """
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--basis-ext",
+            "--bext",
+            required=False,
+            type=str,
+            choices=[
+                MIOSTBasis.type,
+                WaveletBasis.type,
+                GaussianExpBasis.type,
+            ],
+            help="Basis external identification.",
+        )
+        self.has_basis_ext = True
+
+    def add_model_type(self) -> None:
+        """Add model-type to parser.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+        """
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "-m",
+            "--model-type",
+            required=True,
+            type=str,
+            choices=[
+                QGPSIQForced.get_type(),
+                QGPSIQRGPsi2TransportDR.get_type(),
+                QGPSIQForcedSurfML.get_type(),
+            ],
+            help="Model type.",
+        )
+        self.has_model_type = True
 
     def retrieve(self) -> None:
         """Retrieve arguments."""
@@ -676,4 +751,7 @@ class ScriptsArgsParser:
         obj.add_cycles(default=cycles_default)
         obj.add_optim_max_step(default=200)
         obj.add_separation(default=0)
+        obj.add_model_type()
+        obj.add_basis_dynamical()
+        obj.add_basis_external()
         return obj
