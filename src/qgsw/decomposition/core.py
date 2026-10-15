@@ -78,7 +78,7 @@ def build_basis_from_config(
             space_params, time_params = dyadic_decomposition(
                 config,
                 *space.psi.xy,
-                Lt_max=n_steps * dt,
+                Lt_max=(n_steps + 1) * dt,
             )
             basis = WaveletBasis(space_params, time_params, **basis_kwargs)
             basis.n_theta = config["n_theta"]
@@ -96,7 +96,7 @@ def build_basis_from_config(
 
         case GaussianExpBasis.type:
             space_params, time_params = gaussian_exp_field(
-                config, *space.psi.xy, n_steps * dt
+                config, *space.psi.xy, (n_steps + 1) * dt
             )
             basis = GaussianExpBasis(space_params, time_params, **basis_kwargs)
             Q = {
