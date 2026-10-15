@@ -4,6 +4,7 @@ from math import sqrt
 from typing import Any
 
 import numpy as np
+import torch
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
@@ -48,7 +49,7 @@ def build_basis_from_config(
     dt: float,
     n_steps: int,
     exp_cov: float = 1,
-) -> tuple[Basis, dict[str, Any]]:
+) -> tuple[Basis, dict[str, torch.Tensor]]:
     """Build basis given configuration and parameters.
 
     Args:
@@ -64,16 +65,14 @@ def build_basis_from_config(
         ValueError: If the basis type is not recognised.
 
     Returns:
-        tuple[Basis, dict[str, Any]]: Basis, kwargs
+        tuple[Basis, dict[str, torch.Tensor]]: Basis, Q
     """
-    kwargs = {}
     basis_kwargs = {}
     match bt := config["type"]:
         case BasisMiost.type:
             space_params, time_params, basis_kwargs, Q = vardyn_like_params(
                 config, *lon_lat, *space.q.xy, dt, n_steps
             )
-            kwargs["Q"] = Q
             basis = BasisMiost(space_params, time_params, **basis_kwargs)
         case WaveletBasis.type:
             space_params, time_params = dyadic_decomposition(
@@ -93,7 +92,6 @@ def build_basis_from_config(
                 ** (-exp_cov)
                 for k in range(basis.order)
             }
-            kwargs["Q"] = Q
 
         case GaussianExpBasis.type:
             space_params, time_params = gaussian_exp_field(
@@ -110,9 +108,8 @@ def build_basis_from_config(
                 ** (-exp_cov)
                 for k in range(basis.order)
             }
-            kwargs["Q"] = Q
 
         case _:
             msg = f"Unrecognised basis type: {bt}."
             raise ValueError(msg)
-    return basis, kwargs
+    return basis, Q

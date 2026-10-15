@@ -1,9 +1,9 @@
 """Basis setup."""
 
 from pathlib import Path
-from typing import Any
 
 import numpy as np
+import torch
 
 from qgsw.decomposition.config import BASIS_CONFIGS
 from qgsw.decomposition.core import Basis, build_basis_from_config
@@ -20,7 +20,7 @@ def setup_basis(
     exp_cov: float,
     file_aux: Path,
     filec_aux: Path,
-) -> tuple[dict[str, Basis], dict[str, dict[str, Any]]]:
+) -> tuple[dict[str, Basis], dict[str, dict[str, torch.Tensor]]]:
     """Setup basis.
 
     Args:
@@ -34,18 +34,19 @@ def setup_basis(
         filec_aux (Path): Path to file
 
     Returns:
-        tuple[Basis, dict[str, Any]]: Basis and additional kwargs
+        tuple[Basis, dict[str, torch.Tensor]]: Basis and corresponding
+        covariances.
     """
     bases = {}
-    kwargs = {}
+    Qs = {}
     for k, v in basis_type.items():
         basis_config = BASIS_CONFIGS[v]
         if v == BasisMiost.type:
             basis_config["file_aux"] = file_aux
             basis_config["filec_aux"] = filec_aux
-        b, kw = build_basis_from_config(
+        basis, Q = build_basis_from_config(
             basis_config, lon_lat, space, dt, n_steps, exp_cov
         )
-        bases[k] = b
-        kwargs[k] = kw
-    return bases, kwargs
+        bases[k] = basis
+        Qs[k] = Q
+    return bases, Qs

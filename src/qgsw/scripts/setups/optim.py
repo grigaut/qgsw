@@ -62,7 +62,7 @@ def optim_setup(
     Returns:
         tuple[list[{dict[str, Any]}],Coefs,torch.Tensor,torch.Tensor,int]: Optim params, coefs, kappa, ub10_to_uvsurf, numel
     """  # noqa: E501
-    specs = coefs[coefs.keys()[0]].specs
+    specs = next(iter(coefs.values())).specs
 
     numel = 0
 
