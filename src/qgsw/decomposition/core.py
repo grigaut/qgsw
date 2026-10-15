@@ -1,5 +1,6 @@
 """Core function to build a decomposition."""
 
+from math import sqrt
 from typing import Any
 
 import numpy as np
@@ -46,6 +47,7 @@ def build_basis_from_config(
     space: SpaceDiscretization2D,
     dt: float,
     n_steps: int,
+    exp_cov: float = 1,
 ) -> tuple[Basis, dict[str, Any]]:
     """Build basis given configuration and parameters.
 
@@ -55,6 +57,8 @@ def build_basis_from_config(
         space (SpaceDiscretization2D): Cartesian Xs and Ys grids.
         dt (float): Timestep
         n_steps (int): Number of steps.
+        exp_cov (float): Exponent for WaveletBasis and GaussianExpBasis
+            covariance.
 
     Raises:
         ValueError: If the basis type is not recognised.
@@ -79,14 +83,36 @@ def build_basis_from_config(
             )
             basis = WaveletBasis(space_params, time_params, **basis_kwargs)
             basis.n_theta = config["n_theta"]
+            Q = {
+                sqrt(
+                    space_params[k]["sigma_x"]
+                    * space_params[k]["sigma_y"]
+                    / space.dx
+                    / space.dy
+                )
+                ** (-exp_cov)
+                for k in range(basis.order)
+            }
+            kwargs["Q"] = Q
 
         case GaussianExpBasis.type:
             space_params, time_params = gaussian_exp_field(
                 config, *space.psi.xy, n_steps * dt
             )
             basis = GaussianExpBasis(space_params, time_params, **basis_kwargs)
+            Q = {
+                sqrt(
+                    space_params[k]["sigma_x"]
+                    * space_params[k]["sigma_y"]
+                    / space.dx
+                    / space.dy
+                )
+                ** (-exp_cov)
+                for k in range(basis.order)
+            }
+            kwargs["Q"] = Q
 
         case _:
-            msg = f"Unrecognised basus type: {bt}."
+            msg = f"Unrecognised basis type: {bt}."
             raise ValueError(msg)
     return basis, kwargs
