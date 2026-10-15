@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 from pathlib import Path
+from typing import Any
 
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.vardyn.core import MIOSTBasis
@@ -19,6 +21,19 @@ try:
     from typing import Self
 except ImportError:
     from typing_extensions import Self
+
+
+def parse_presets() -> dict[str, Any]:
+    """Parse presets."""
+    parser = argparse.ArgumentParser(
+        description="Retrieve preset.",
+    )
+    parser.add_argument("--presets", type=pathlib.Path, help="Presets file")
+    args, _ = parser.parse_known_args()
+    if (presets := args.presets) is None:
+        return {}
+    with presets.open("r") as f:
+        return json.load(f)
 
 
 class ScriptsArgsParser:
@@ -337,7 +352,6 @@ class ScriptsArgsParser:
         self._check_unretrieved()
         self.parser.add_argument(
             "--config",
-            required=True,
             type=pathlib.Path,
             help="Configuration File Path (from qgsw root level)",
         )
@@ -753,7 +767,6 @@ class ScriptsArgsParser:
         self.parser.add_argument(
             "-m",
             "--model-type",
-            required=True,
             type=str,
             choices=[
                 QGPSIQForced.get_type(),
@@ -766,8 +779,14 @@ class ScriptsArgsParser:
 
     def retrieve(self) -> None:
         """Retrieve arguments."""
-        self.parser.parse_args(namespace=self.namespace)
+        self.parser.parse_known_args(namespace=self.namespace)
         self.retrieved = True
+
+    def set_presets(self, presets: dict | None = None) -> None:
+        """Set presets."""
+        if not presets:
+            return
+        self.parser.set_defaults(**presets)
 
     @classmethod
     def va_setup(
