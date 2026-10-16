@@ -55,13 +55,13 @@ def retrieve_bases_types(
 
 def setup_basis(
     basis_type: dict[str, str],
-    lon_lat: tuple[np.ndarray, np.ndarray],
+    lon_lat: tuple[np.ndarray, np.ndarray] | None,
     space: SpaceDiscretization2D,
     dt: float,
     n_steps: int,
     exp_cov: float,
-    file_aux: Path,
-    filec_aux: Path,
+    file_aux: Path | None,
+    filec_aux: Path | None,
 ) -> tuple[dict[str, Basis], dict[str, dict[str, torch.Tensor]]]:
     """Setup basis.
 
