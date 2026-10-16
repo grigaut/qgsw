@@ -1,6 +1,7 @@
 """Basis setup."""
 
 from pathlib import Path
+from typing import TypeVar
 
 import numpy as np
 import torch
@@ -15,22 +16,24 @@ from qgsw.models.qg.psiq.modified.forced import (
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
+T = TypeVar("T")
 
-def retrieve_bases_types(
-    model_type: str, basis_dynamical: str | None, basis_external: str | None
-) -> dict[str, str]:
+
+def retrieve_bases_elements(
+    model_type: str, basis_dynamical: T | None, basis_external: T | None
+) -> dict[str, T]:
     """Build bases types dict.
 
     Args:
         model_type (str): Model type.
-        basis_dynamical (str): Dynamical basis
-        basis_external (str): External basis
+        basis_dynamical (T): Dynamical basis
+        basis_external (T): External basis
 
     Raises:
         ValueError: If the model type is not recognised.
 
     Returns:
-        dict[str, str]: Bases types mapping.
+        dict[str, T]: Bases types mapping.
     """
     without_bdyn = basis_dynamical is None
     without_bext = basis_external is None
