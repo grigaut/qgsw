@@ -492,8 +492,8 @@ if __name__ == "__main__":
 
             msg = (
                 f"\tObs: {obs_loss.detach().item():>#10.5g}"
-                f"| Dyn Reg: {dynamical_reg.detach().item():>#10.5g}"
-                f"| Bkg Reg: {background_reg.detach().item():>#10.5g}"
+                f" | Dyn Reg: {dynamical_reg.detach().item():>#10.5g}"
+                f" | Bkg Reg: {background_reg.detach().item():>#10.5g}"
             )
             logger.detail(msg)
 

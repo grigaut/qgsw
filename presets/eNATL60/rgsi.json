@@ -1,0 +1,28 @@
+{
+    "model_type":"RGSI",
+    "prefix": "eNATL60",
+    "cycles": 4,
+    "separation":0,
+
+    "obs_track":true,
+
+    "dt": 7200,
+    "dx":10000,
+    "dy":10000,
+
+    "optim":200,
+
+    "sigma_bc":14,
+    "sigma_ic":14,
+
+    "basis_dyn": "gaussian-exps",
+    "basis_dyn_lr":1e0,
+
+    "no_alpha":false,
+    "alpha_lr":1e-2,
+
+    "gamma_reg_dyn": 1e-3,
+
+    "no_reg":false,
+    "no_wind":true
+}

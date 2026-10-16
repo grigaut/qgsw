@@ -1,0 +1,25 @@
+{
+    "model_type":"RGFSI",
+    "prefix": "QG3L",
+    "cycles": 12,
+    "separation":250,
+    "optim":200,
+
+    "obs_track":true,
+
+    "basis_dyn": "gaussian-exps",
+    "basis_dyn_lr":1e0,
+
+    "basis_ext": "wavelets",
+    "basis_ext_lr":1e-2,
+
+    "no_alpha":false,
+    "alpha_lr":1e-2,
+
+    "gamma_reg_dyn": 1e2,
+    "gamma_reg_bkg": 1e-2,
+    "reg_exp":2,
+
+    "no_reg":false,
+    "no_wind":false
+}
