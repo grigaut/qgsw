@@ -44,7 +44,7 @@ def build_basis_from_params_dict(params: dict[str, Any]) -> Basis:
 
 def build_basis_from_config(
     config: dict[str, Any],
-    lon_lat: tuple[np.ndarray, np.ndarray],
+    lon_lat: tuple[np.ndarray, np.ndarray] | None,
     space: SpaceDiscretization2D,
     dt: float,
     n_steps: int,
@@ -70,6 +70,9 @@ def build_basis_from_config(
     basis_kwargs = {}
     match bt := config["type"]:
         case MIOSTBasis.type:
+            if lon_lat is None:
+                msg = "MIOSTBasis can not be built without lon/lat values."
+                raise ValueError(msg)
             space_params, time_params, basis_kwargs, Q = vardyn_like_params(
                 config, *lon_lat, *space.q.xy, dt, n_steps
             )
