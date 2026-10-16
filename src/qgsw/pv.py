@@ -35,7 +35,7 @@ def compute_q1_interior(
         dy (float): Horizontal distance step in the Y direction.
         f0 (float): Coriolis parameter.
         beta_effect (torch.Tensor): Beta effect.
-            └── (1, ny+1)-shaped
+            └── (1, ny-2)-shaped
 
     Returns:
         torch.Tensor: Δѱ₁ - f₀² / H₁ (1/g₁ + 1/g₂) ѱ₁ + (f₀² / H₁ /  g₂) ѱ₂
