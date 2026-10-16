@@ -74,6 +74,7 @@ class ScriptsArgsParser:
     has_basis_ext = False
     has_basis_ext_lr = False
     has_model_type = False
+    has_perturbed_params = False
 
     @property
     def config(self) -> Path:
@@ -362,6 +363,15 @@ class ScriptsArgsParser:
             "model_type not tracked.",
         )
         return self.namespace.model_type
+
+    @property
+    def perturbed_params(self) -> bool:
+        """Perturbed params."""
+        self._check_attr(
+            self.has_perturbed_params,
+            "perturbed_params not tracked.",
+        )
+        return self.namespace.perturbed_params
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -884,6 +894,16 @@ class ScriptsArgsParser:
             help="Model type.",
         )
         self.has_model_type = True
+
+    def add_perturbed_params(self) -> None:
+        """Add perturbed_params."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--perturbed-params",
+            action="store_true",
+            help="Whether to perturb params.",
+        )
+        self.has_perturbed_params = True
 
     def retrieve(self) -> None:
         """Retrieve arguments."""

@@ -64,6 +64,7 @@ if __name__ == "__main__":
     args.add_indices()
     args.add_reg_exp(default=2)
     args.add_alpha(1e-2)
+    args.add_perturbed_params()
     args.set_presets(presets)
     args.retrieve()
 
@@ -255,8 +256,14 @@ if __name__ == "__main__":
     y_wide = space_slice_wide.q.xy.y[0, :].unsqueeze(0)
     beta_effect_wide = beta_plane.beta * (y_wide - y0)
 
-    H1_, H2_ = H[0], H[1]
-    g1_, g2_ = g_prime[0], g_prime[1]
+    if args.perturbed_params:
+        msg = "Using perturbed params."
+        logger.info(box(msg))
+        H1_, H2_ = 150, 1350
+        g1_, g2_ = g_prime[0], g_prime[1] * 1
+    else:
+        H1_, H2_ = H[0], H[1]
+        g1_, g2_ = g_prime[0], g_prime[1]
 
     # Model
     model = setup_model(
