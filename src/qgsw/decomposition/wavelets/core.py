@@ -17,7 +17,6 @@ from qgsw.decomposition.supports.time.gaussian import (
     GaussianTimeSupport,
 )
 from qgsw.decomposition.wavelets.param_generators import (
-    dyadic_decomposition,
     linear_decomposition,
 )
 
@@ -573,36 +572,6 @@ class WaveletBasis(SpaceTimeDecomposition[ExpCosSupport, GaussianTimeSupport]):
         return GaussianTimeSupport(time_params, space_fields)
 
     generate_time_support = _generate_time_support
-
-    @classmethod
-    def from_dyadic_decomposition(
-        cls,
-        order: int,
-        xx_ref: torch.Tensor,
-        yy_ref: torch.Tensor,
-        Lxy_max: float,
-        Lt_max: float,
-    ) -> Self:
-        """Generate space and time basis parameters to instantiate the object.
-
-        Args:
-            order (int): "Depth" of decomposition.
-            xx_ref (torch.Tensor): X locations to use as reference.
-            yy_ref (torch.Tensor): Y locations to use as reference.
-            Lxy_max (float): Max horizontal scale.
-            Lt_max (float): Max time scale.
-
-        Returns:
-            tuple[dict[str, Any], dict[str, Any]]: WaveletBasis.
-        """
-        space_params, time_params = dyadic_decomposition(
-            order=order,
-            xx_ref=xx_ref,
-            yy_ref=yy_ref,
-            Lxy_max=Lxy_max,
-            Lt_max=Lt_max,
-        )
-        return cls(space_params, time_params)
 
     @classmethod
     def from_linear_decomposition(

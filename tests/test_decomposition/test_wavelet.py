@@ -3,7 +3,9 @@
 import pytest
 import torch
 
+from qgsw.decomposition.config import WAVELETS
 from qgsw.decomposition.wavelets import WaveletBasis
+from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
 from qgsw.specs import defaults
 
 specs = defaults.get()
@@ -26,9 +28,14 @@ def test_dt(order: int) -> None:
     yy = y - y[:, :1]
     tt = torch.arange(0, 250, dtype=torch.float64)
 
-    basis = WaveletBasis.from_dyadic_decomposition(
-        order, xx, yy, (x[-1, 0] - x[0, 0]).item(), tt[-1].item()
+    config = WAVELETS
+    config["order"] = order
+
+    space_params, time_params = dyadic_decomposition(
+        config=WAVELETS, xx_ref=xx, yy_ref=yy, Lt_max=tt[-1].item()
     )
+
+    basis = WaveletBasis(space_params, time_params)
     coefs = basis.generate_random_coefs()
     basis.set_coefs(coefs)
 
