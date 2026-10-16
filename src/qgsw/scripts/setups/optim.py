@@ -17,6 +17,8 @@ def optim_setup(
     *,
     alpha_optim: bool,
     wind_optim: bool,
+    alpha_lr: float | None = None,
+    wind_lr: float | None = None,
 ) -> tuple[
     list[{dict[str, Any]}],
     Coefs,
@@ -31,6 +33,8 @@ def optim_setup(
         coefs (Coefs): Coefficients.
         alpha_optim (bool): Whether to perform optimization on alpha.
         wind_optim (bool): Whether to perform optimization on wind.
+        alpha_lr (float): Alpha learning rate.
+        wind_lr (float): Wind learning rate.
 
 
     Returns:
@@ -55,16 +59,22 @@ def optim_setup(
         ]
         numel += coef.numel()
     if alpha_optim:
+        if alpha_lr is None:
+            msg = "No learning rate specified for alpha."
+            raise ValueError(msg)
         kappa = kappa.requires_grad_()
-        params += [{"params": [kappa], "lr": 1e-2, "name": "κ"}]
+        params += [{"params": [kappa], "lr": alpha_lr, "name": "κ"}]
         numel += kappa.numel()
         logger.info("ɑ added to optimisable params.")  # noqa: RUF001
     if wind_optim:
+        if wind_lr is None:
+            msg = "No learning rate specified for the wind."
+            raise ValueError(msg)
         uv10_to_uvsurf = uv10_to_uvsurf.requires_grad_()
         params += [
             {
                 "params": [uv10_to_uvsurf],
-                "lr": 1e-2,
+                "lr": wind_lr,
                 "name": "Wind conversion",
             }
         ]
