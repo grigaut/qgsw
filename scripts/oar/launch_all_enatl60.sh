@@ -12,7 +12,7 @@ cd $SRCDIR
 
 # RGF-VD
 
-./scripts/oar/run_va_enatl60.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgf.json --basis-ext=basis-miost --basis-ext-lr=1e-13 --gamma-reg-bkg=1e18 "$@"
+./scripts/oar/run_va_enatl60.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgf_vd.json "$@"
 
 # RGFSI
 
