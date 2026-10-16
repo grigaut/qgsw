@@ -2,18 +2,14 @@
 SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd $SRCDIR
 
-# SurfML
+# RGSI
 
-./scripts/oar/run_var_analysis_surfml.sh --config=config/variational_analysis.toml -v --obs-track --gamma=1e2 "$@"
+./scripts/oar/run_va_qg3l.sh --config=config/variational_analysis.toml -v --presets=presets/rgsi.json "$@"
 
-./scripts/oar/run_var_analysis_surfml.sh --config=config/variational_analysis.toml -v --obs-track --gamma=1e2 --no-alpha "$@"
+# RGF
 
-./scripts/oar/run_var_analysis_surfml.sh --config=config/variational_analysis.toml -v --obs-track --no-reg "$@"
+./scripts/oar/run_va_qg3l.sh --config=config/variational_analysis.toml -v --presets=presets/rgf.json "$@"
 
-./scripts/oar/run_var_analysis_surfml.sh --config=config/variational_analysis.toml -v --obs-track --no-reg --no-alpha "$@"
+# RGFSI
 
-# Forced
-
-./scripts/oar/run_var_analysis_forced_rg_dr.sh --config=config/variational_analysis.toml -v --obs-track --gamma=1e7 "$@"
-
-./scripts/oar/run_var_analysis_forced_rg_dr.sh --config=config/variational_analysis.toml -v --obs-track --no-reg "$@"
+./scripts/oar/run_va_qg3l.sh --config=config/variational_analysis.toml -v --presets=presets/rgfsi.json "$@"

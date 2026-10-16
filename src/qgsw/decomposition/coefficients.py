@@ -4,6 +4,9 @@ from collections.abc import ItemsView, Iterator, KeysView, ValuesView
 
 import torch
 
+from qgsw import specs
+from qgsw.specs._utils import TensorSpecs
+
 try:
     from typing import Self
 except ImportError:
@@ -20,6 +23,16 @@ class DecompositionCoefs:
             *coefs (torch.Tensor): Tensors to use as coefs.
         """
         self._coefs = dict(enumerate(coefs))
+
+    @property
+    def specs(self) -> TensorSpecs:
+        """Specs."""
+        return specs.from_tensor(next(iter(self._coefs.values())))
+
+    @property
+    def order(self) -> int:
+        """Basis order."""
+        return len(self._coefs)
 
     def numel(self) -> int:
         """Number of coefficients."""

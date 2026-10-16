@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from git import TYPE_CHECKING
+
 from qgsw.logging.core import getLogger
 
 try:
@@ -11,16 +13,17 @@ except ImportError:
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
+import torch
+
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.specs import defaults
 
 if TYPE_CHECKING:
-    import torch
-
-    from qgsw.decomposition.coefficients import DecompositionCoefs
+    from qgsw.specs._utils import TensorSpecs
 TimeSupport = TypeVar("TimeSupport", bound=TimeSupportFunction)
 SpaceSupport = TypeVar("SpaceSupport", bound=SpaceSupportFunction)
 
@@ -36,6 +39,11 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
     def order(self) -> int:
         """Decomposition order."""
         return len(self._space.keys())
+
+    @cached_property
+    def specs(self) -> TensorSpecs:
+        """Specs."""
+        return self._specs
 
     def __init__(
         self,
@@ -74,10 +82,13 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
             raise ValueError(msg)
 
     @abstractmethod
+    def shapes(self) -> dict[int, torch.Size]:
+        """Coefficients shapes."""
+
     def numel(self) -> int:
         """Total number of elements."""
+        return sum(s.numel() for s in self.shapes().values())
 
-    @abstractmethod
     def generate_random_coefs(self) -> DecompositionCoefs:
         """Generate random coefficient.
 
@@ -89,6 +100,12 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
                 ├── ...
                 └── order-1: coefficient for level order-1
         """
+        return DecompositionCoefs.from_dict(
+            {
+                k: torch.randn(s, **self._specs)
+                for k, s in self.shapes().items()
+            }
+        )
 
     def set_coefs(self, coefs: DecompositionCoefs) -> None:
         """Set coefficients values.

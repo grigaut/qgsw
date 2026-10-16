@@ -5,7 +5,6 @@ from typing import Any
 import torch
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
-from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
@@ -31,31 +30,15 @@ class GaussianExpBasis(
         y = yy[None, :, :] - yc[:, None, None]
         return (x, y)
 
-    def numel(self) -> int:  # noqa: D102
-        return sum(
-            s["numel"] * self._time[k]["numel"] for k, s in self._space.items()
-        )
+    def shapes(self) -> dict[int, torch.Size]:  # noqa: D102
+        return {
+            k: torch.Size((self._time[k]["numel"], self._space[k]["numel"]))
+            for k in self._time
+        }
 
-    numel.__doc__ = SpaceTimeDecomposition[
+    shapes.__doc__ = SpaceTimeDecomposition[
         NormalizedGaussianSupport, GaussianTimeSupport
-    ].numel.__doc__
-
-    def generate_random_coefs(self) -> DecompositionCoefs:  # noqa: D102
-        coefs = {}
-        for k in self._space:
-            coefs[k] = torch.randn(
-                (
-                    self._time[k]["numel"],
-                    self._space[k]["numel"],
-                ),
-                **self._specs,
-            )
-
-        return DecompositionCoefs.from_dict(coefs)
-
-    generate_random_coefs.__doc__ = SpaceTimeDecomposition[
-        NormalizedGaussianSupport, GaussianTimeSupport
-    ].generate_random_coefs.__doc__
+    ].shapes.__doc__
 
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -216,11 +199,8 @@ class GaussianExpBasis(
         Args:
             t (torch.Tensor): Time to freeze normalization at.
         """
-        self.generate_time_support = (
-            lambda time_params,
-            space_fields: self._generate_frozen_time_support(
-                t, time_params, space_fields
-            )
+        self.generate_time_support = lambda time_params, space_fields: (
+            self._generate_frozen_time_support(t, time_params, space_fields)
         )
 
     def unfreeze_time_normalization(self) -> None:

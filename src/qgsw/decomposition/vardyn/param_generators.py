@@ -24,7 +24,7 @@ def vardyn_like_params(
     dict[int, torch.Tensor],
     dict[int, list[torch.Tensor]],
     dict[str, Any],
-    np.ndarray,
+    dict[int, torch.Tensor],
 ]:
     """Generate parameters for the Basis MIOSt.
 
@@ -40,7 +40,7 @@ def vardyn_like_params(
         device (torch.device | None, optional): Device. Defaults to None.
 
     Returns:
-        tuple[ dict[int, torch.Tensor], dict[int, list[torch.Tensor]], dict[str, Any], np.ndarray, ]: Space_params, time_params, keywords args and correlation matrix.
+        tuple[ dict[int, torch.Tensor], dict[int, list[torch.Tensor]], dict[str, Any], dict[int, torch.Tensor], ]: Space_params, time_params, keywords args and correlation matrix.
     """  # noqa: E501
     specs = defaults.get(dtype=dtype, device=device)
     assert xx.shape == yy.shape
@@ -60,7 +60,12 @@ def vardyn_like_params(
         ),
     )
     times_day = np.arange(n_steps + 1) * dt / (24 * 3600)
-    _, Q = basis_ref.set_basis(times_day, return_q=True)
+    _, q = basis_ref.set_basis(times_day, return_q=True)
+    bounds = basis_ref.iff_wavebounds
+    Q = {
+        k: torch.from_numpy(q[bounds[k] : bounds[k + 1]]).to(**specs)
+        for k in range(basis_ref.nf)
+    }
     return (
         dict(enumerate(basis_ref.Gx)),
         {

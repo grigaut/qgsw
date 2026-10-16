@@ -8,12 +8,10 @@ import torch
 
 
 def gaussian_exp_field(
-    order: int,  # noqa: ARG001
-    spacing: int,
+    config: dict[str, Any],
     xx_ref: torch.Tensor,
     yy_ref: torch.Tensor,
     Lt_max: float,
-    l_t: float,
 ) -> tuple[dict[int, dict[str, Any]], dict[int, dict[str, Any]]]:
     """Subdivide space into regular-spaced chunks.
 
@@ -21,16 +19,37 @@ def gaussian_exp_field(
     that cross at 0.5.
 
     Args:
-        order (int): Taylor series order.
-        spacing (int): Width of the chunks.
+        config (dict[str, Any]): Configuration.
         xx_ref (torch.Tensor): Reference x locations.
         yy_ref (torch.Tensor): Reference Y locations.
         Lt_max (float): Max duration.
+
+    Config args:
+        spacing (int): Width of the chunks (in the same unit as xx and yy)
         l_t (float): Time spacing.
 
     Returns:
         dict[int,dict[str, Any]]: 0 -> parameters.
     """
+    try:
+        dx = (xx_ref[1:, :] - xx_ref[:-1, :]).unique().item()
+        dy = (yy_ref[:, 1:] - yy_ref[:, :-1]).unique().item()
+    except RuntimeError as e:
+        msg = "xx_ref and yy_ref must be on regular grids."
+        raise ValueError(msg) from e
+
+    if dx != dy:
+        msg = f"dx and dy must be the same ({dx=} != {dy=})."
+        raise ValueError(msg)
+
+    if (sp := config["spacing"]) % dx != 0:
+        msg = f"spacing={sp} must be divisible by {dx=}."
+        raise ValueError(msg)
+
+    l_t = config["l_t"]
+
+    spacing = int(config["spacing"] // dx)
+
     Nx, Ny = xx_ref.shape
     nx = int((Nx) / spacing)
     ny = int((Ny) / spacing)

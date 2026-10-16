@@ -1,14 +1,23 @@
 """Core function to build a decomposition."""
 
+from math import sqrt
 from typing import Any
+
+import numpy as np
+import torch
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
+from qgsw.decomposition.exp_exp.param_generator import gaussian_exp_field
 from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.decomposition.taylor.core import TaylorFullFieldBasis
 from qgsw.decomposition.taylor_exp.core import TaylorExpBasis
+from qgsw.decomposition.vardyn.core import MIOSTBasis
+from qgsw.decomposition.vardyn.param_generators import vardyn_like_params
 from qgsw.decomposition.wavelets.core import WaveletBasis
+from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
+from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 Basis = SpaceTimeDecomposition[SpaceSupportFunction, TimeSupportFunction]
 
@@ -17,6 +26,7 @@ BASES: dict[str, type[Basis]] = {
     TaylorExpBasis.type: TaylorExpBasis,
     TaylorFullFieldBasis.type: TaylorFullFieldBasis,
     GaussianExpBasis.type: GaussianExpBasis,
+    MIOSTBasis.type: MIOSTBasis,
 }
 
 
@@ -30,3 +40,81 @@ def build_basis_from_params_dict(params: dict[str, Any]) -> Basis:
         Basis: Corresponding basis.
     """
     return BASES[params["type"]].from_params(params)
+
+
+def build_basis_from_config(
+    config: dict[str, Any],
+    lon_lat: tuple[np.ndarray, np.ndarray] | None,
+    space: SpaceDiscretization2D,
+    dt: float,
+    n_steps: int,
+    exp_cov: float = 1,
+) -> tuple[Basis, dict[str, torch.Tensor]]:
+    """Build basis given configuration and parameters.
+
+    Args:
+        config (dict[str, Any]): Basis configuration.
+        lon_lat (tuple[np.ndarray, np.ndarray]): Longitude, latitudes
+        space (SpaceDiscretization2D): Cartesian Xs and Ys grids.
+        dt (float): Timestep
+        n_steps (int): Number of steps.
+        exp_cov (float): Exponent for WaveletBasis and GaussianExpBasis
+            covariance.
+
+    Raises:
+        ValueError: If the basis type is not recognised.
+
+    Returns:
+        tuple[Basis, dict[str, torch.Tensor]]: Basis, Q
+    """
+    basis_kwargs = {}
+    match bt := config["type"]:
+        case MIOSTBasis.type:
+            if lon_lat is None:
+                msg = "MIOSTBasis can not be built without lon/lat values."
+                raise ValueError(msg)
+            space_params, time_params, basis_kwargs, Q = vardyn_like_params(
+                config, *lon_lat, *space.q.xy, dt, n_steps
+            )
+            basis = MIOSTBasis(space_params, time_params, **basis_kwargs)
+        case WaveletBasis.type:
+            space_params, time_params = dyadic_decomposition(
+                config,
+                *space.psi.xy,
+                Lt_max=(n_steps + 1) * dt,
+            )
+            basis = WaveletBasis(space_params, time_params, **basis_kwargs)
+            basis.n_theta = config["n_theta"]
+            Q = {
+                k: torch.ones(s, **basis.specs)
+                * sqrt(
+                    space_params[k]["sigma_x"]
+                    * space_params[k]["sigma_y"]
+                    / space.dx
+                    / space.dy
+                )
+                ** (-exp_cov)
+                for k, s in basis.shapes().items()
+            }
+
+        case GaussianExpBasis.type:
+            space_params, time_params = gaussian_exp_field(
+                config, *space.psi.xy, (n_steps + 1) * dt
+            )
+            basis = GaussianExpBasis(space_params, time_params, **basis_kwargs)
+            Q = {
+                k: torch.ones(s, **basis.specs)
+                * sqrt(
+                    space_params[k]["sigma_x"]
+                    * space_params[k]["sigma_y"]
+                    / space.dx
+                    / space.dy
+                )
+                ** (-exp_cov)
+                for k, s in basis.shapes().items()
+            }
+
+        case _:
+            msg = f"Unrecognised basis type: {bt}."
+            raise ValueError(msg)
+    return basis, Q
