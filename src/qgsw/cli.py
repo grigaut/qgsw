@@ -56,8 +56,10 @@ class ScriptsArgsParser:
     has_gamma_reg_bkg = False
     has_no_reg = False
     has_no_alpha = False
+    has_alpha_lr = False
     has_reg_exp = False
     has_wind_optim = False
+    has_wind_lr = False
     has_gamma_sst = False
     has_no_ml_optim = False
     has_sst_forcing = False
@@ -68,7 +70,9 @@ class ScriptsArgsParser:
     has_sigma_ic = False
     has_sigma_bc = False
     has_basis_dyn = False
+    has_basis_dyn_lr = False
     has_basis_ext = False
+    has_basis_ext_lr = False
     has_model_type = False
 
     @property
@@ -198,6 +202,15 @@ class ScriptsArgsParser:
         return self.namespace.no_alpha
 
     @property
+    def alpha_lr(self) -> float:
+        """alpha_lr."""
+        self._check_attr(
+            self.has_alpha_lr,
+            "Alpha_lr not tracked.",
+        )
+        return self.namespace.alpha_lr
+
+    @property
     def reg_exp(self) -> int:
         """reg_exp."""
         self._check_attr(
@@ -214,6 +227,15 @@ class ScriptsArgsParser:
             "wind_optim not tracked.",
         )
         return self.namespace.wind_optim
+
+    @property
+    def wind_lr(self) -> float:
+        """wind_lr."""
+        self._check_attr(
+            self.has_wind_lr,
+            "wind_lr not tracked.",
+        )
+        return self.namespace.wind_lr
 
     @property
     def gamma_sst(self) -> float:
@@ -306,6 +328,15 @@ class ScriptsArgsParser:
         return self.namespace.basis_dyn
 
     @property
+    def basis_dyn_lr(self) -> float:
+        """basis_dyn_lr."""
+        self._check_attr(
+            self.has_basis_dyn_lr,
+            "basis_dyn_lr not tracked.",
+        )
+        return self.namespace.basis_dyn_lr
+
+    @property
     def basis_ext(self) -> str:
         """Basis external."""
         self._check_attr(
@@ -313,6 +344,15 @@ class ScriptsArgsParser:
             "basis_ext not tracked.",
         )
         return self.namespace.basis_ext
+
+    @property
+    def basis_ext_lr(self) -> float:
+        """basis_ext_lr."""
+        self._check_attr(
+            self.has_basis_ext_lr,
+            "basis_ext_lr not tracked.",
+        )
+        return self.namespace.basis_ext_lr
 
     @property
     def model_type(self) -> str:
@@ -581,12 +621,8 @@ class ScriptsArgsParser:
         self.add_gamma_reg_bkg(gamma_bkg_default)
         self.add_no_reg()
 
-    def add_alpha(self) -> None:
-        """Specify whether to use alpha or not.
-
-        Args:
-            parser (argparse.ArgumentParser): Arguments parser.
-        """
+    def add_alpha(self, lr_default: float) -> None:
+        """Specify whether to use alpha or not."""
         self._check_unretrieved()
         self.parser.add_argument(
             "--no-alpha",
@@ -594,6 +630,18 @@ class ScriptsArgsParser:
             help="Disable regularization.",
         )
         self.has_no_alpha = True
+        self.add_alpha_lr(lr_default)
+
+    def add_alpha_lr(self, default_value: float) -> None:
+        """Alpha learning rate."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--alpha-lr",
+            type=float,
+            default=default_value,
+            help="Learning rate for alpha.",
+        )
+        self.has_alpha_lr = True
 
     def add_reg_exp(self, default: int = 2) -> None:
         """Add regularization exponent."""
@@ -606,7 +654,7 @@ class ScriptsArgsParser:
         )
         self.has_reg_exp = True
 
-    def add_wind_optim(self) -> None:
+    def add_wind_optim(self, lr_default: float) -> None:
         """Add wind optimization."""
         self._check_unretrieved()
         self.parser.add_argument(
@@ -615,6 +663,18 @@ class ScriptsArgsParser:
             help="Whether to perform wind optimization.",
         )
         self.has_wind_optim = True
+        self.add_wind_lr(lr_default)
+
+    def add_wind_lr(self, default_value: float) -> None:
+        """Wind learning rate."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--wind-lr",
+            type=float,
+            default=default_value,
+            help="Learning rate for wind.",
+        )
+        self.has_wind_lr = True
 
     def add_gamma_sst(self, default: float = 1) -> None:
         """Add gamma sst."""
@@ -691,6 +751,14 @@ class ScriptsArgsParser:
         )
         self.has_dy = True
 
+    def add_dtdxdy(
+        self, dt_default: float, dx_default: int, dy_default: int
+    ) -> None:
+        """Add dt, dx and dy."""
+        self.add_dt(dt_default)
+        self.add_dx(dx_default)
+        self.add_dy(dy_default)
+
     def add_sigma_ic(self, default: float) -> None:
         """Add sigma_ic."""
         self._check_unretrieved()
@@ -715,7 +783,12 @@ class ScriptsArgsParser:
         )
         self.has_sigma_bc = True
 
-    def add_basis_dynamical(self) -> None:
+    def add_sigma_icbc(self, ic_default: float, bc_default: float) -> None:
+        """Add sigma_ic and sigma_bc."""
+        self.add_sigma_ic(ic_default)
+        self.add_sigma_bc(bc_default)
+
+    def add_bdyn(self) -> None:
         """Add basis_dyn to parser.
 
         Args:
@@ -725,7 +798,6 @@ class ScriptsArgsParser:
         self.parser.add_argument(
             "--basis-dyn",
             "--bdyn",
-            required=False,
             type=str,
             choices=[
                 MIOSTBasis.type,
@@ -736,7 +808,23 @@ class ScriptsArgsParser:
         )
         self.has_basis_dyn = True
 
-    def add_basis_external(self) -> None:
+    def add_bdyn_lr(self) -> None:
+        """Dynamic basis learning rate."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--basis-dyn-lr",
+            "--bdyn-lr",
+            type=float,
+            help="Learning rate for bdyn.",
+        )
+        self.has_basis_dyn_lr = True
+
+    def add_basis_dynamical(self) -> None:
+        """Add dynamical basis."""
+        self.add_bdyn()
+        self.add_bdyn_lr()
+
+    def add_bext(self) -> None:
         """Add basis_ext to parser.
 
         Args:
@@ -746,7 +834,6 @@ class ScriptsArgsParser:
         self.parser.add_argument(
             "--basis-ext",
             "--bext",
-            required=False,
             type=str,
             choices=[
                 MIOSTBasis.type,
@@ -756,6 +843,27 @@ class ScriptsArgsParser:
             help="Basis external identification.",
         )
         self.has_basis_ext = True
+
+    def add_bext_lr(self) -> None:
+        """External basis learning rate."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--basis-ext-lr",
+            "--bext-lr",
+            type=float,
+            help="Learning rate for bext.",
+        )
+        self.has_basis_ext_lr = True
+
+    def add_basis_external(self) -> None:
+        """Add external basis."""
+        self.add_bext()
+        self.add_bext_lr()
+
+    def add_bases_dynamical_external(self) -> None:
+        """Add dynamical and external bases."""
+        self.add_basis_dynamical()
+        self.add_basis_external()
 
     def add_model_type(self) -> None:
         """Add model-type to parser.
