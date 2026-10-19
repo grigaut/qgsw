@@ -37,12 +37,12 @@ def pre_cycle_bases_setup(
         case QGPSIQForced._type:
             model.basis_external = bases["external"]
         case QGPSIQRGPsi2TransportDR._type:
-            model.basis_dynamical = bases["dynamical"]
             model.alpha = alpha
+            model.basis_dynamical = bases["dynamical"]
         case QGPSIQForcedSurfML._type:
+            model.alpha = alpha
             model.basis_dynamical = bases["dynamical"]
             model.basis_external = bases["external"]
-            model.alpha = alpha
         case _:
             msg = f"Unsupported model type: {model.get_type()}."
             raise ValueError(msg)
