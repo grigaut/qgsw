@@ -38,6 +38,7 @@ class ModelWrapper(ABC, Generic[T]):
     linestyle: str = "solid"
     cycle = -1
     save_params = False
+    no_data = False
 
     show = True
     remember_psis = False
@@ -196,6 +197,11 @@ class ModelWrapper(ABC, Generic[T]):
             times (list[torch.Tensor]): Times values.
         """
         if self._output is not None:
+            nb_cycles = len(self.output.optim.load())
+            if self.cycle >= nb_cycles:
+                self.no_data = True
+                msg = f"No data for cycle {self.cycle}."
+                raise KeyError(msg)
             self.set_model_params()
 
     def new_cycle(self) -> None:
@@ -252,6 +258,8 @@ class ModelWrapper(ABC, Generic[T]):
 
     def step(self) -> None:
         """Make a step."""
+        if self.no_data:
+            return
         for _ in range(self.substep_ratio):
             self.model.step()
         if self.remember_psis:
@@ -268,7 +276,7 @@ class ModelsManager(Generic[M]):
 
     def __init__(self, *mw: M) -> None:
         """Instantiate the manager."""
-        self.model_wrappers = mw
+        self.model_wrappers: tuple[M] = mw
 
         self.save_params = self.model_wrappers[0].save_params
         self.loop_over_models(lambda mw: setattr(mw, "tracked", True))
@@ -325,7 +333,7 @@ class ModelsManager(Generic[M]):
             space (SpaceDiscretization2D): Space.
             name (str): Error name.
         """
-        psd = PowerSpectralDensity(
+        self.psd = PowerSpectralDensity(
             nx=space.psi.nx,
             ny=space.psi.ny,
             dx=space.psi.dx.item(),
@@ -333,7 +341,7 @@ class ModelsManager(Generic[M]):
         )
 
         def psd_err(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
-            return psd.iso_spec_w(f - f_ref) / psd.iso_spec_w(f_ref)
+            return self.psd.iso_spec_w(f - f_ref) / self.psd.iso_spec_w(f_ref)
 
         self.loss_fn[name] = psd_err
 
@@ -348,7 +356,7 @@ class ModelsManager(Generic[M]):
             space (SpaceDiscretization2D): Space.
             name (str): Error name.
         """
-        msc_ = MagnitudeSquaredCoherence(
+        self.msc = MagnitudeSquaredCoherence(
             nx=space.psi.nx,
             ny=space.psi.ny,
             dx=space.psi.dx.item(),
@@ -356,7 +364,7 @@ class ModelsManager(Generic[M]):
         )
 
         def msc(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
-            return msc_.iso_spec_w(f, f_ref)
+            return self.msc.iso_spec_w(f, f_ref)
 
         self.loss_fn[name] = msc
 
@@ -412,37 +420,9 @@ class ModelsManager(Generic[M]):
     def compute_loss(self, psi_ref: torch.Tensor) -> None:
         """Compute loss."""
         for loss_name in self.losses:
-            self.loop_over_models(
-                lambda mw, loss_name=loss_name: mw.add_loss(
-                    self.loss_fn[loss_name](mw.model.psi[0, 0], psi_ref[0, 0]),
-                    loss_name,
-                )
-            )
 
-    def compute_uv_losses(
-        self, u_ref: torch.Tensor, v_ref: torch.Tensor
-    ) -> None:
-        """Compute velocity losses."""
-        for loss_name in self.uv_losses:
-            self.loop_over_models(
-                lambda mw, loss_name=loss_name: mw.add_loss(
-                    self.uv_loss_fn[loss_name](
-                        mw.model.psi[0, 0],
-                        u_ref[0, 0],
-                        v_ref[0, 0],
-                    ),
-                    loss_name,
-                )
-            )
-
-    def compute_sst_losses(self, sst_ref: torch.Tensor) -> None:
-        """Compute velocity losses."""
-        for loss_name in self.sst_losses:
-
-            def compute(mw: ModelWrapper, loss_name: str) -> None:
-                try:
-                    sst = mw.model.sst
-                except AttributeError:
+            def compute(mw: M, loss_name: str) -> None:
+                if mw.no_data:
                     mw.add_loss(
                         torch.tensor(
                             torch.nan, **specs.from_tensor(mw.model.A)
@@ -450,6 +430,59 @@ class ModelsManager(Generic[M]):
                         loss_name,
                     )
                     return
+                mw.add_loss(
+                    self.loss_fn[loss_name](mw.model.psi[0, 0], psi_ref[0, 0]),
+                    loss_name,
+                )
+
+            self.loop_over_models(
+                lambda mw, loss_name=loss_name: compute(mw, loss_name)
+            )
+
+    def compute_uv_losses(
+        self, u_ref: torch.Tensor, v_ref: torch.Tensor
+    ) -> None:
+        """Compute velocity losses."""
+        for loss_name in self.uv_losses:
+
+            def compute(mw: M, loss_name: str) -> None:
+                if mw.no_data:
+                    mw.add_loss(
+                        torch.tensor(
+                            torch.nan, **specs.from_tensor(mw.model.A)
+                        ),
+                        loss_name,
+                    )
+                    return
+                mw.add_loss(
+                    self.uv_loss_fn[loss_name](
+                        mw.model.psi[0, 0], u_ref[0, 0], v_ref[0, 0]
+                    ),
+                    loss_name,
+                )
+
+            self.loop_over_models(
+                lambda mw, loss_name=loss_name: compute(mw, loss_name)
+            )
+
+    def compute_sst_losses(self, sst_ref: torch.Tensor) -> None:
+        """Compute velocity losses."""
+        for loss_name in self.sst_losses:
+
+            def compute(mw: M, loss_name: str) -> None:
+
+                no_data = mw.no_data or hasattr(mw.model, "sst")
+
+                if no_data:
+                    mw.add_loss(
+                        torch.tensor(
+                            torch.nan, **specs.from_tensor(mw.model.A)
+                        ),
+                        loss_name,
+                    )
+                    return
+
+                sst: torch.Tensor = mw.model.sst
                 mw.add_loss(
                     self.sst_loss_fn[loss_name](sst[0, 0], sst_ref[0, 0]),
                     loss_name,
