@@ -5,7 +5,7 @@ from ast import TypeVar
 import torch
 
 from qgsw.masks import Masks
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ, QGPSIQCore
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -18,6 +18,7 @@ MODELS = {
     QGPSIQForced.get_type(): QGPSIQForced,
     QGPSIQRGPsi2TransportDR.get_type(): QGPSIQRGPsi2TransportDR,
     QGPSIQForcedSurfML.get_type(): QGPSIQForcedSurfML,
+    "RG0": QGPSIQ,
 }
 
 M = TypeVar("M", bound=QGPSIQCore)
@@ -61,6 +62,8 @@ def setup_model(
     """
     if model_type == QGPSIQForced.get_type():
         model = _setup_forced(model_type, space, H, g_prime, beta_plane)
+    elif model_type == "RG0":
+        model = _setup_rg0(model_type, space, H, g_prime, beta_plane)
     else:
         model = _setup(model_type, space, H, g_prime, beta_plane)
     return set_inhomogeneous_model(model, dt, slip_coef)
@@ -73,6 +76,23 @@ def _setup_forced(
     g_prime: torch.Tensor,
     beta_plane: BetaPlane,
 ) -> QGPSIQForced:
+    model = MODELS[model_type](
+        space_2d=space,
+        H=H[:1] * H[1:2] / (H[:1] + H[1:2]),
+        beta_plane=beta_plane,
+        g_prime=g_prime[1:2],
+    )
+    model.wind_scaling = H[:1].item()
+    return model
+
+
+def _setup_rg0(
+    model_type: str,
+    space: SpaceDiscretization2D,
+    H: torch.Tensor,
+    g_prime: torch.Tensor,
+    beta_plane: BetaPlane,
+) -> QGPSIQ:
     model = MODELS[model_type](
         space_2d=space,
         H=H[:1] * H[1:2] / (H[:1] + H[1:2]),
