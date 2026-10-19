@@ -671,6 +671,7 @@ if __name__ == "__main__":
                 "nb_steps": o + 1,
                 "loss": best_loss.cpu().item(),
                 "max_memory_allocated": max_mem,
+                "losses": losses,
             }
         )
 
