@@ -441,9 +441,6 @@ if __name__ == "__main__":
                             reg(psi1, (psi1 - psi1_) / dt, time)
                             for reg in dynamical_reg_fns.values()
                         )
-                    if torch.isnan(model.psi).any():
-                        msg = f"NaN in stream function at {o=} in step {n=}"
-                        raise OverflowError(msg)
 
                     if (p := psis[n]) is not None:
                         obs_loss += mse(
@@ -460,8 +457,13 @@ if __name__ == "__main__":
                 )
                 loss = obs_loss + reg_loss
 
+            if torch.isnan(model.psi).any():
+                msg = f"NaN in stream function at {o=}."
+                logger.warning(box(msg))
+                break
+
             if torch.isnan(loss.detach()):
-                msg = "Loss has diverged."
+                msg = f"Loss has diverged at {o=}."
                 logger.warning(box(msg, style="="))
                 break
 
@@ -529,6 +531,7 @@ if __name__ == "__main__":
                 "nb_steps": o + 1,
                 "loss": best_loss.cpu().item(),
                 "max_memory_allocated": max_mem,
+                "losses": losses,
             }
         )
 
