@@ -11,7 +11,7 @@
     "basis_dyn_lr":1e0,
 
     "basis_ext": "wavelets",
-    "basis_ext_lr":1e-2,
+    "basis_ext_lr":5e-3,
 
     "no_alpha":false,
     "alpha_lr":1e-2,

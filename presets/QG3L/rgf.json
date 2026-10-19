@@ -8,7 +8,7 @@
     "obs_track":true,
 
     "basis_ext": "wavelets",
-    "basis_ext_lr":1e-2,
+    "basis_ext_lr":5e-3,
 
     "gamma_reg_bkg": 1e-2,
     "reg_exp":2,
