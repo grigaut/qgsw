@@ -96,7 +96,7 @@ class OutputFile:
             return json.load(f)
 
     def _load_pt(self) -> dict:
-        return torch.load(self._file, weights_only=True)
+        return torch.load(self._file, weights_only=False)
 
     def load(self) -> Any:  # noqa: ANN401
         """Load data from file.
@@ -135,7 +135,7 @@ class OutputFolder(NamedTuple):
 
 
 def build_output_folder(
-    output_folder: Path,
+    output_folder: Path | str,
     params: str = "params",
     results: str = "results",
     basis: str = "basis",
@@ -144,7 +144,7 @@ def build_output_folder(
     """Build output folder.
 
     Args:
-        output_folder (Path): Path to output folder
+        output_folder (Path|str): Path to output folder
         params (str, optional): Name of the params file. Defaults to "params".
         results (str, optional): Name of the results file.
             Defaults to "results".
@@ -154,6 +154,7 @@ def build_output_folder(
     Returns:
         OutputFolder: Output
     """
+    output_folder = Path(output_folder)
     if not output_folder.exists():
         msg = "The output folder does not exist."
         raise ValueError(msg)
