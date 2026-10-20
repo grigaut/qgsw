@@ -277,6 +277,7 @@ if __name__ == "__main__":
         dt,
         config.physics.slip_coef,
     )
+    model.y0 = y0
     if not args.no_wind:
         model.set_wind_forcing(
             tx[imin:imax, jmin : jmax + 1], ty[imin : imax + 1, jmin:jmax]
