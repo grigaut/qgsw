@@ -294,7 +294,7 @@ if __name__ == "__main__":
             "dynamical_reg": [],
             "background_reg": [],
         }
-
+        overflow_encountered = False
         torch.cuda.reset_peak_memory_stats()
 
         times = [model_3l.time.item()]
@@ -460,11 +460,13 @@ if __name__ == "__main__":
             if torch.isnan(model.psi).any():
                 msg = f"NaN in stream function at {o=}."
                 logger.warning(box(msg))
+                overflow_encountered = True
                 break
 
             if torch.isnan(loss.detach()):
                 msg = f"Loss has diverged at {o=}."
                 logger.warning(box(msg, style="="))
+                overflow_encountered = True
                 break
 
             losses["obs_losses"].append(obs_loss.detach().item())
@@ -532,6 +534,7 @@ if __name__ == "__main__":
                 "loss": best_loss.cpu().item(),
                 "max_memory_allocated": max_mem,
                 "losses": losses,
+                "overflow": overflow_encountered,
             }
         )
 
