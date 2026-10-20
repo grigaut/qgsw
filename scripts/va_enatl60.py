@@ -661,8 +661,7 @@ if __name__ == "__main__":
         outputs["results"].append(
             {
                 "cycle": c,
-                **{k: register_params.params[k] for k in bases},
-                "uv10_to_uvsurf": register_params.params["uv10_to_uvsurf"],
+                **register_params.params,
             }
         )
         outputs["basis"].append(
