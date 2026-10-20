@@ -74,6 +74,9 @@ install-dev:
 	@${BIN}/pre-commit install --hook-type pre-commit
 	@${BIN}/pre-commit install --hook-type pre-push
 
+dashboard-app:
+	@${BIN}/python -m streamlit run dashboard/main.py
+
 # GRID 5000 -----------------------------------------
 g5k-import-%:
 	rsync -avzP ${G5K_LOGIN}@rennes.g5k:${G5K_STORAGE}/$* ${G5K_IMPORT_STORAGE}

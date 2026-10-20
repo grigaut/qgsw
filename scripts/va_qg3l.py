@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import torch
@@ -295,6 +296,7 @@ if __name__ == "__main__":
             "background_reg": [],
         }
         overflow_encountered = False
+        t0 = time.time()
         torch.cuda.reset_peak_memory_stats()
 
         times = [model_3l.time.item()]
@@ -432,13 +434,13 @@ if __name__ == "__main__":
 
                 for n in range(1, n_steps_per_cyle):
                     psi1_ = model.psi
-                    time = model.time.clone()
+                    t = model.time.clone()
                     model.step()
                     psi1 = model.psi
 
                     if with_reg:
                         dynamical_reg += sum(
-                            reg(psi1, (psi1 - psi1_) / dt, time)
+                            reg(psi1, (psi1 - psi1_) / dt, t)
                             for reg in dynamical_reg_fns.values()
                         )
 
@@ -535,6 +537,7 @@ if __name__ == "__main__":
                 "max_memory_allocated": max_mem,
                 "losses": losses,
                 "overflow": overflow_encountered,
+                "elapsed": time.time() - t0,
             }
         )
 
@@ -544,7 +547,8 @@ if __name__ == "__main__":
 
         msg = f"Outputs saved to {output.folder}"
         logger.info(box(msg, style="="))
-
+        if c == (n_cycles - 1):
+            continue
         for _ in range(args.separation):
             model_3l.step()
         if args.separation > 0:

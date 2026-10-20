@@ -1,15 +1,18 @@
 """Browser results files."""
 
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import plotly.graph_objects as go
+import pytz
 import seaborn as sns
 import streamlit as st
 from st_copy import copy_button
 
+from qgsw.logging.utils import sec2text
 from qgsw.scripts.output import build_output_folder
 from qgsw.utils.storage import get_path_from_env
 
@@ -69,6 +72,11 @@ if folder is not None:
             copied_label=f"Copied {folder.name}",
             icon="st",
         )
+
+    date = datetime.strptime(folder.name[-24:-9], "%Y%m%d_%H%M%S").astimezone(
+        pytz.utc
+    )
+    st.subheader(date.strftime("%A %B %d %G - %X"), anchor=False)
 
     output_folder = build_output_folder(folder)
 
@@ -132,13 +140,12 @@ if folder is not None:
     col2.metric("Basis for external forcing", basis_external)
     col3.metric("Basis for dynamical forcing", basis_dynamical)
 
-    col1.metric("", "")
     col2.metric("Learning rate", basis_external_lr, format="%.1e")
     col3.metric("Learning rate", basis_dynamical_lr, format="%.1e")
 
     if not params["no_reg"]:
         col1, col2, col3 = st.columns(3)
-        col1.metric("", "")
+
         col2.metric(
             "Background regularization coefficient",
             gamma_reg_bkg,
@@ -168,7 +175,7 @@ if folder is not None:
         list(range(len(optim))),
         format_func=lambda i: f"Cycle {i + 1}",
     )
-    opt_cycle = optim[cycle]
+    opt_cycle: dict = optim[cycle]
     losses = opt_cycle["losses"]
 
     n_optim = opt_cycle["max_steps"]
@@ -296,10 +303,16 @@ if folder is not None:
 
     st.plotly_chart(fig)
 
-    st.metric(
+    col1, col2 = st.columns(2, border=True)
+
+    try:
+        elapsed = sec2text(opt_cycle["elapsed"], detailed=True)
+    except KeyError:
+        elapsed = None
+    col1.metric("Elapsed", elapsed)
+    col2.metric(
         "Allocated memory",
         f"{opt_cycle['max_memory_allocated']:.0f} MB",
-        border=True,
     )
 
     with st.expander("Optim JSON", expanded=False):
