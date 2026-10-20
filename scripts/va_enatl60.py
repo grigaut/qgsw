@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -349,6 +350,8 @@ if __name__ == "__main__":
             "dynamical_reg": [],
             "background_reg": [],
         }
+        overflow_encountered = False
+        t0 = time.time()
 
         torch.cuda.reset_peak_memory_stats()
 
@@ -571,13 +574,13 @@ if __name__ == "__main__":
                         model.set_wind_forcing(tauxs_i[n - 1], tauys_i[n - 1])
                     for _ in range(dt_ratios):
                         psi1_ = model.psi
-                        time = model.time.clone()
+                        t = model.time.clone()
                         model.step()
                         psi1 = model.psi
 
                         if with_reg:
                             dynamical_reg += sum(
-                                reg(psi1, (psi1 - psi1_) / dt, time)
+                                reg(psi1, (psi1 - psi1_) / dt, t)
                                 for reg in dynamical_reg_fns.values()
                             )
 
@@ -599,10 +602,12 @@ if __name__ == "__main__":
             if torch.isnan(model.psi).any():
                 msg = f"NaN in stream function at {o=}."
                 logger.warning(box(msg))
+                overflow_encountered = True
                 break
             if torch.isnan(loss.detach()):
                 msg = f"Loss has diverged at {o=}."
                 logger.warning(box(msg, style="="))
+                overflow_encountered = True
                 break
 
             losses["obs_losses"].append(obs_loss.detach().item())
@@ -672,6 +677,8 @@ if __name__ == "__main__":
                 "loss": best_loss.cpu().item(),
                 "max_memory_allocated": max_mem,
                 "losses": losses,
+                "overflow": overflow_encountered,
+                "elapsed": time.time() - t0,
             }
         )
 

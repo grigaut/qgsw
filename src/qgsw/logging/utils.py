@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import floor
 from typing import Any, Literal
 
 
@@ -129,7 +130,11 @@ def step(current: int, total: int | None = None) -> str:
 
 
 def sec2text(
-    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+    time: float,
+    *,
+    squeeze_unit: bool = False,
+    round_res: bool = False,
+    detailed: bool = False,
 ) -> str:
     """Convert time in seconds to text.
 
@@ -138,6 +143,7 @@ def sec2text(
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
         round_res (bool, optional): Whether to round result or not.
+        detailed (bool, optional): Whether to detail all units or not.
 
     Returns:
         str: Text.
@@ -148,11 +154,20 @@ def sec2text(
         if round_res:
             return f"{round(time)} {unit}"
         return f"{time:.1f} {unit}"
-    return min2text(time / 60, squeeze_unit=squeeze_unit, round_res=round_res)
+    return min2text(
+        time / 60,
+        squeeze_unit=squeeze_unit,
+        round_res=round_res,
+        detailed=detailed,
+    )
 
 
 def min2text(
-    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+    time: float,
+    *,
+    squeeze_unit: bool = False,
+    round_res: bool = False,
+    detailed: bool = False,
 ) -> str:
     """Convert time in minutes to text.
 
@@ -161,6 +176,7 @@ def min2text(
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
         round_res (bool, optional): Whether to round result or not.
+        detailed (bool, optional): Whether to detail all units or not.
 
     Returns:
         str: Text.
@@ -170,14 +186,24 @@ def min2text(
         unit = "min" if squeeze_unit else f"minute{s}"
         if round_res:
             return f"{round(time)} {unit}"
+        if detailed:
+            mins = floor(time)
+            return f"{mins} {unit} {sec2text((time - mins) * 60)}"
         return f"{time:.1f} {unit}"
     return hours2text(
-        time / 60, squeeze_unit=squeeze_unit, round_res=round_res
+        time / 60,
+        squeeze_unit=squeeze_unit,
+        round_res=round_res,
+        detailed=detailed,
     )
 
 
 def hours2text(
-    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+    time: float,
+    *,
+    squeeze_unit: bool = False,
+    round_res: bool = False,
+    detailed: bool = False,
 ) -> str:
     """Convert time in hours to text.
 
@@ -186,6 +212,7 @@ def hours2text(
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
         round_res (bool, optional): Whether to round result or not.
+        detailed (bool, optional): Whether to detail all units or not.
 
     Returns:
         str: Text.
@@ -195,12 +222,24 @@ def hours2text(
         unit = "h" if squeeze_unit else f"hour{s}"
         if round_res:
             return f"{round(time)} {unit}"
+        if detailed:
+            days = floor(time)
+            return f"{days} {unit} {min2text((time - days) * 24)}"
         return f"{time:.1f} {unit}"
-    return days2text(time / 24, squeeze_unit=squeeze_unit, round_res=round_res)
+    return days2text(
+        time / 24,
+        squeeze_unit=squeeze_unit,
+        round_res=round_res,
+        detailed=detailed,
+    )
 
 
 def days2text(
-    time: float, *, squeeze_unit: bool = False, round_res: bool = False
+    time: float,
+    *,
+    squeeze_unit: bool = False,
+    round_res: bool = False,
+    detailed: bool = False,
 ) -> str:
     """Convert time in days to text.
 
@@ -209,6 +248,7 @@ def days2text(
         squeeze_unit (bool, optional): Whether to display only unit symbol.
             Defaults to False.
         round_res (bool, optional): Whether to round result or not.
+        detailed (bool, optional): Whether to detail all units or not.
 
     Returns:
         str: Text.
@@ -217,6 +257,9 @@ def days2text(
     unit = "d" if squeeze_unit else f"day{s}"
     if round_res:
         return f"{round(time)} {unit}"
+    if detailed:
+        mins = floor(time)
+        return f"{mins} {unit} {sec2text((time - mins) * 60)}"
     return f"{time:.1f} {unit}"
 
 
