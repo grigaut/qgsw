@@ -50,6 +50,14 @@ matching_folders = sorted(
     if item.is_dir() and pattern.match(item.name)
 )
 
+prefixes = [m.name[:-25] for m in matching_folders]
+
+selected_prefixes = st.multiselect(
+    "Select prefixes to narrow selection",
+    np.unique(prefixes).tolist(),
+    default=None,
+)
+
 dates = [
     datetime.strptime(m.name[-24:-9], "%Y%m%d_%H%M%S")
     .astimezone(pytz.utc)
@@ -58,20 +66,26 @@ dates = [
 ]
 
 selected_dates = st.multiselect(
-    "Select experiment dates to narrow selection",
+    "Select dates to narrow selection",
     np.unique(dates).tolist(),
     default=None,
 )
 
-if selected_dates:
-    folders = [
-        f for f, d in zip(matching_folders, dates) if d in selected_dates
-    ]
+if selected_prefixes:
+    prefixes_folders = [p in selected_prefixes for p in prefixes]
 else:
-    folders = matching_folders
+    prefixes_folders = [True for d in prefixes]
+if selected_dates:
+    dates_folders = [d in selected_dates for d in dates]
+else:
+    dates_folders = [True for d in dates]
 folder = st.selectbox(
     "Select a folder",
-    folders,
+    [
+        f
+        for f, d, p in zip(matching_folders, dates_folders, prefixes_folders)
+        if d and p
+    ],
     index=None,
     format_func=lambda p: p.name,
 )
