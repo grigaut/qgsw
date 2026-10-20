@@ -133,6 +133,14 @@ class OutputFolder(NamedTuple):
     basis: OutputFile
     optim: OutputFile
 
+    def files_exist(self) -> bool:
+        """Check that all file exist."""
+        pexists = self.params.file.exists()
+        rexists = self.results.file.exists()
+        bexists = self.basis.file.exists()
+        oexists = self.optim.file.exists()
+        return pexists and rexists and bexists and oexists
+
 
 def build_output_folder(
     output_folder: Path | str,
