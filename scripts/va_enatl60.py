@@ -687,3 +687,6 @@ if __name__ == "__main__":
 
         msg = f"Outputs saved to {output.folder}"
         logger.info(box(msg, style="="))
+
+        torch.cuda.empty_cache()
+        gc.collect()

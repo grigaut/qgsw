@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import time
 from pathlib import Path
 
@@ -554,3 +555,6 @@ if __name__ == "__main__":
         if args.separation > 0:
             msg = f"Performed {args.separation} steps before next cycle."
             logger.info(box(msg, style="="))
+
+        torch.cuda.empty_cache()
+        gc.collect()
