@@ -105,8 +105,8 @@ if folder is not None:
             icon="st",
         )
 
-    date = datetime.strptime(folder.name[-24:-9], "%Y%m%d_%H%M%S").astimezone(
-        pytz.utc
+    date = datetime.strptime(folder.name[-24:-9], "%Y%m%d_%H%M%S").replace(
+        tzinfo=pytz.UTC
     )
     st.subheader(date.strftime("%A %B %d %G - %X"), anchor=False)
 
