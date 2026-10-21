@@ -25,7 +25,7 @@
     "alpha_lr":1e-2,
 
     "gamma_reg_dyn": 1e-3,
-    "gamma_reg_bkg": 1e-3,
+    "gamma_reg_bkg": 1e0,
     "reg_exp":2,
 
     "no_reg":false,
