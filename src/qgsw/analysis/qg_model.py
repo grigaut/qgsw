@@ -116,7 +116,6 @@ class ModelWrapper(ABC, Generic[T]):
         """
         params = output_folder.params.load()
         self.model_type = params["model_type"]
-        self.dt = params["dt"]
         self.no_wind = params["no_wind"]
         return params
 
