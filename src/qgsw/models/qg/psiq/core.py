@@ -757,15 +757,13 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         )
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
-            fcg_drag = torch.zeros_like(bottom_drag) + bottom_drag
+            fcg_drag = self._curl_tau + bottom_drag
         elif self.space.nl == 2:
-            fcg_drag = torch.cat(
-                [torch.zeros_like(bottom_drag), bottom_drag], dim=-3
-            )
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
         else:
             fcg_drag = torch.cat(
                 [
-                    torch.zeros_like(bottom_drag),
+                    self._curl_tau,
                     self.zeros_inside,
                     bottom_drag,
                 ],
@@ -789,15 +787,13 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         omega = interpolate(laplacian(sf_wide, self.space.dx, self.space.dy))
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
-            fcg_drag = torch.zeros_like(bottom_drag) + bottom_drag
+            fcg_drag = self._curl_tau + bottom_drag
         elif self.space.nl == 2:
-            fcg_drag = torch.cat(
-                [torch.zeros_like(bottom_drag), bottom_drag], dim=-3
-            )
+            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
         else:
             fcg_drag = torch.cat(
                 [
-                    torch.zeros_like(bottom_drag),
+                    self._curl_tau,
                     self.zeros_inside,
                     bottom_drag,
                 ],
