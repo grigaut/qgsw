@@ -13,39 +13,43 @@ from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.physics.coriolis.beta_plane import BetaPlane
-from qgsw.scripts.regularization import compute_regularization_func
+from qgsw.scripts.regularization import (
+    compute_dynamical_regularization_func,
+)
 from qgsw.scripts.setups.types import Bases
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 
 def inline_reg_setup(
     bases: Bases,
-    H: torch.Tensor,
-    g_prime: torch.Tensor,
-    alpha: torch.Tensor,
+    A: torch.Tensor,
     space: SpaceDiscretization2D,
-    beta_plane: BetaPlane,
+    f0: BetaPlane,
+    beta_effect: torch.Tensor,
     T: float,
+    *,
+    wide: bool,
 ) -> dict[
     str, Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 ]:
     """Setup inline regularizations.
 
     Args:
-        bases (dict[ str, Bases ]): Bases.
-        H (torch.Tensor): H.
-        g_prime (torch.Tensor): g_prime.
-        alpha (torch.Tensor): Alpha.
+        bases (Bases): Bases.
+        A (torch.Tensor): Stretching matrix.
         space (SpaceDiscretization2D): Space.
-        beta_plane (BetaPlane): Beta_plane.
-        T (float): Time sclae (L/U).
+        f0 (float): Coriolis parameter.
+        beta_effect (torch.Tensor): Beta-effect.
+        y0 (float): Reference
+        T (float): Time scale (L/U).
+        wide (bool): Whether to use wide stencil flux computation method or not.
 
     Returns:
         dict[ str, Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor] ]: Regularization functions mapping.
     """  # noqa: E501
     return {
         k: INLINE_REG_PRESETS[k][basis.type](
-            basis, H, g_prime, alpha, space, beta_plane, T
+            basis, A, space, f0, beta_effect, T=T, wide=wide
         )
         for k, basis in bases.items()
     }
@@ -107,58 +111,62 @@ def background_noreg(
 
 
 def dynamical_reg(
-    basis: Bases,
-    H: torch.Tensor,
-    g_prime: torch.Tensor,
-    alpha: torch.Tensor,
+    bases: Bases,
+    A: torch.Tensor,
     space: SpaceDiscretization2D,
-    beta_plane: BetaPlane,
+    f0: BetaPlane,
+    beta_effect: torch.Tensor,
     T: float,
+    *,
+    wide: bool,
 ) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
     """Dynamical regularization.
 
     Args:
-        basis (Bases): Basis.
-        H (torch.Tensor): H.
-        g_prime (torch.Tensor): g_prime.
-        alpha (torch.Tensor): Alpha.
+        bases (Bases): Bases.
+        A (torch.Tensor): Stretching matrix.
         space (SpaceDiscretization2D): Space.
-        beta_plane (BetaPlane): Beta plane.
+        f0 (float): Coriolis parameter.
+        beta_effect (torch.Tensor): Beta-effect.
+        y0 (float): Reference
         T (float): Time scale (L/U).
+        wide (bool): Whether to use wide stencil flux computation method or not.
 
     Returns:
         Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]: Regularization function.
     """  # noqa: E501
-    return compute_regularization_func(
-        basis,
-        H,
-        g_prime,
-        alpha,
+    return compute_dynamical_regularization_func(
+        bases,
+        A,
         space,
-        beta_plane,
+        f0,
+        beta_effect,
         scale=1 / T**2,
+        wide=wide,
     )
 
 
 def dynamical_noreg(
-    basis: Bases,  # noqa: ARG001
-    H: torch.Tensor,  # noqa: ARG001
-    g_prime: torch.Tensor,  # noqa: ARG001
-    alpha: torch.Tensor,  # noqa: ARG001
+    bases: Bases,  # noqa: ARG001
+    A: torch.Tensor,  # noqa: ARG001
     space: SpaceDiscretization2D,  # noqa: ARG001
-    beta_plane: BetaPlane,  # noqa: ARG001
+    f0: BetaPlane,  # noqa: ARG001
+    beta_effect: torch.Tensor,  # noqa: ARG001
     T: float,  # noqa: ARG001
+    *,
+    wide: bool,  # noqa: ARG001
 ) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
     """Dynamical no regularization.
 
     Args:
-        basis (Bases): Basis.
-        H (torch.Tensor): H.
-        g_prime (torch.Tensor): g_prime.
-        alpha (torch.Tensor): Alpha.
+        bases (dict[ str, Bases ]): Bases.
+        A (torch.Tensor): Stretching matrix.
         space (SpaceDiscretization2D): Space.
-        beta_plane (BetaPlane): Beta plane.
+        f0 (float): Coriolis parameter.
+        beta_effect (torch.Tensor): Beta-effect.
+        y0 (float): Reference
         T (float): Time scale (L/U).
+        wide (bool): Whether to use wide stencil flux computation method or not.
 
     Returns:
         Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]: Regularization function.

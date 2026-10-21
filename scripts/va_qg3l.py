@@ -402,7 +402,13 @@ if __name__ == "__main__":
                 pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
 
                 dynamical_reg_fns = inline_reg_setup(
-                    bases, H, g_prime, alpha, space_slice, beta_plane, T
+                    bases,
+                    model.A,
+                    space_slice,
+                    beta_plane.f0,
+                    beta_effect_wide[..., b:-b],
+                    T,
+                    wide=True,
                 )
                 background_reg_fns = post_cycle_reg_setup(bases, Qs)
 

@@ -335,9 +335,9 @@ if __name__ == "__main__":
     # PV computation
 
     y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
-    beta_effect = beta_plane.beta * (y_w - model.y0)
+    beta_effect_wide = beta_plane.beta * (y_w - model.y0)
     build_q_rg = build_pv_funcs(
-        dx, dy, beta_plane.f0, beta_effect, b, space_2d.nx
+        dx, dy, beta_plane.f0, beta_effect_wide, b, space_2d.nx
     )
 
     outputs = {"results": [], "optim": [], "basis": []}
@@ -537,7 +537,13 @@ if __name__ == "__main__":
                 pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
 
                 dynamical_reg_fns = inline_reg_setup(
-                    bases, H, g_prime, alpha, space_interior, beta_plane, T
+                    bases,
+                    model.A,
+                    space_interior,
+                    beta_plane.f0,
+                    beta_effect_wide[..., b:-b],
+                    T,
+                    wide=True,
                 )
                 background_reg_fns = post_cycle_reg_setup(bases, Qs)
 
