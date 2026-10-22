@@ -117,3 +117,32 @@ def test_slicing(
     assert (space_sliced.v.xy.y == space_ref.v.xy.y).all()
     assert (space_sliced.h.xy.x == space_ref.h.xy.x).all()
     assert (space_sliced.h.xy.y == space_ref.h.xy.y).all()
+
+
+def test_widening(
+    X_Y_H: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+) -> None:
+    """Test 2D space widening."""
+    X, Y, _ = X_Y_H
+    space_2d = SpaceDiscretization2D.from_coords(
+        x_1d=X,
+        y_1d=Y,
+    )
+    imin, imax = 64, 115
+    jmin, jmax = 32, 132
+    space_sliced = space_2d.slice(imin, imax + 1, jmin, jmax + 1)
+
+    i = 2
+    j = 3
+
+    space_widened = space_sliced.widen(i, j)
+
+    space_ref = space_2d.slice(imin - i, imax + i + 1, jmin - j, jmax + j + 1)
+    assert (space_widened.omega.xy.x == space_ref.omega.xy.x).all()
+    assert (space_widened.omega.xy.y == space_ref.omega.xy.y).all()
+    assert (space_widened.u.xy.x == space_ref.u.xy.x).all()
+    assert (space_widened.u.xy.y == space_ref.u.xy.y).all()
+    assert (space_widened.v.xy.x == space_ref.v.xy.x).all()
+    assert (space_widened.v.xy.y == space_ref.v.xy.y).all()
+    assert (space_widened.h.xy.x == space_ref.h.xy.x).all()
+    assert (space_widened.h.xy.y == space_ref.h.xy.y).all()
