@@ -351,7 +351,7 @@ if __name__ == "__main__":
             "background_reg": [],
         }
         overflow_encountered = False
-        t0 = time.time()
+        time0 = time.time()
 
         torch.cuda.reset_peak_memory_stats()
 
@@ -683,7 +683,7 @@ if __name__ == "__main__":
                 "max_memory_allocated": max_mem,
                 "losses": losses,
                 "overflow": overflow_encountered,
-                "elapsed": time.time() - t0,
+                "elapsed": time.time() - time0,
             }
         )
 
