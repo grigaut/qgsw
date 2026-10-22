@@ -93,14 +93,12 @@ def _setup_rg0(
     g_prime: torch.Tensor,
     beta_plane: BetaPlane,
 ) -> QGPSIQ:
-    model = MODELS[model_type](
+    return MODELS[model_type](
         space_2d=space,
-        H=H[:1] * H[1:2] / (H[:1] + H[1:2]),
+        H=H[:1],
         beta_plane=beta_plane,
-        g_prime=g_prime[1:2],
+        g_prime=g_prime[:1] * g_prime[1:2] / (g_prime[:1] + g_prime[1:2]),
     )
-    model.wind_scaling = H[:1].item()
-    return model
 
 
 def _setup(
