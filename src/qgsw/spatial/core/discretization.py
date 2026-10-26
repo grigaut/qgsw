@@ -635,8 +635,8 @@ class SpaceDiscretization2D:
         Returns:
             SpaceDiscretization2D: Cropped space.
         """
-        slice_x = slice(None, None, None) if i == 0 else slice(i, i, 1)
-        slice_y = slice(None, None, None) if j == 0 else slice(j, j, 1)
+        slice_x = slice(None, None, None) if i == 0 else slice(i, -i, 1)
+        slice_y = slice(None, None, None) if j == 0 else slice(j, -j, 1)
 
         x, y = self.omega.xy
         x_narrow = x.__getitem__([..., slice_x, slice_y])
