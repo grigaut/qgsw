@@ -17,11 +17,13 @@
 
     "basis_dyn": "gaussian-exps",
     "basis_dyn_lr":1e0,
+    "basys_dyn_bkg_reg":false,
+
+    "dyn_reg_qg":true,
+    "gamma_dyn_qg":1e-3,
 
     "no_alpha":false,
     "alpha_lr":1e-2,
-
-    "gamma_reg_dyn": 1e-3,
 
     "no_reg":false,
     "no_wind":true
