@@ -54,7 +54,7 @@ def crop(
             slice_y = slice(None, None, None)
         else:
             slice_y = slice(offset_y, -offset_y, 1)
-    return t.__getitem__([..., slice_x, slice_y])
+    return t[..., slice_x, slice_y]
 
 
 @overload
@@ -82,7 +82,7 @@ def crop_xr(
 def crop_xr(
     data: xr.DataArray | xr.Dataset,
     offset_both_or_x: int,
-    offset_y: int | None,
+    offset_y: int | None = None,
     *,
     x: str = "i",
     y: str = "j",
