@@ -11,6 +11,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
 )
+from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
@@ -18,6 +19,7 @@ MODELS = {
     QGPSIQForced.get_type(): QGPSIQForced,
     QGPSIQRGPsi2TransportDR.get_type(): QGPSIQRGPsi2TransportDR,
     QGPSIQForcedSurfML.get_type(): QGPSIQForcedSurfML,
+    SurfaceVorticity.get_type(): SurfaceVorticity,
     "RG0": QGPSIQ,
 }
 
@@ -28,11 +30,14 @@ def set_inhomogeneous_model(
     model: QGPSIQCore, dt: float, slip_coef: float
 ) -> QGPSIQCore:
     """Set up inhomogeneous model."""
-    nx, ny = model.space.nx, model.space.ny
-    model.masks = Masks.empty_tensor(nx, ny, device=model.device.get())
-    model.bottom_drag_coef = 0
+    try:
+        nx, ny = model.space.nx, model.space.ny
+        model.masks = Masks.empty_tensor(nx, ny, device=model.device.get())
+        model.slip_coef = slip_coef
+        model.bottom_drag_coef = 0
+    except AttributeError:
+        ...
     model.wide = True
-    model.slip_coef = slip_coef
     model.dt = dt
     return model
 
@@ -64,6 +69,8 @@ def setup_model(
         model = _setup_forced(model_type, space, H, g_prime, beta_plane)
     elif model_type == "RG0":
         model = _setup_rg0(model_type, space, H, g_prime, beta_plane)
+    elif model_type == SurfaceVorticity.get_type():
+        model = _setup_surface_vorticity(model_type, space, H, beta_plane)
     else:
         model = _setup(model_type, space, H, g_prime, beta_plane)
     return set_inhomogeneous_model(model, dt, slip_coef)
@@ -83,6 +90,19 @@ def _setup_forced(
         g_prime=g_prime[1:2],
     )
     model.wind_scaling = H[:1].item()
+    return model
+
+
+def _setup_surface_vorticity(
+    model_type: str,
+    space: SpaceDiscretization2D,
+    H: torch.Tensor,
+    beta_plane: BetaPlane,
+) -> SurfaceVorticity:
+    model: SurfaceVorticity = MODELS[model_type](
+        space_2d=space, beta_plane=beta_plane
+    )
+    model.wind_scaling = H[:1]
     return model
 
 
