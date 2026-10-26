@@ -40,6 +40,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
 
     _type = ModelName.SURFACE_VORTICITY
     wide = True
+    implements_alpha = False
 
     @property
     def basis_psi_a(
