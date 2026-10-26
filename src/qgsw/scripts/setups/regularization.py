@@ -4,76 +4,74 @@ from collections.abc import Callable
 
 import torch
 
-from qgsw import specs
-from qgsw.decomposition.base import SpaceTimeDecomposition
 from qgsw.decomposition.coefficients import DecompositionCoefs
-from qgsw.decomposition.exp_exp.core import GaussianExpBasis
-from qgsw.decomposition.supports.space.base import SpaceSupportFunction
-from qgsw.decomposition.supports.time.base import TimeSupportFunction
-from qgsw.decomposition.vardyn.core import MIOSTBasis
-from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.scripts.regularization import (
-    compute_dynamical_regularization_func,
+    compute_div_dynamical_regularization_func,
+    compute_qg_dynamical_regularization_func,
 )
 from qgsw.scripts.setups.types import Bases
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
-
-def inline_reg_setup(
-    bases: Bases,
-    A: torch.Tensor,
-    space: SpaceDiscretization2D,
-    f0: BetaPlane,
-    beta_effect: torch.Tensor,
-    T: float,
-    *,
-    wide: bool,
-) -> dict[
-    str, Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
-]:
-    """Setup inline regularizations.
-
-    Args:
-        bases (Bases): Bases.
-        A (torch.Tensor): Stretching matrix.
-        space (SpaceDiscretization2D): Space.
-        f0 (float): Coriolis parameter.
-        beta_effect (torch.Tensor): Beta-effect.
-        y0 (float): Reference
-        T (float): Time scale (L/U).
-        wide (bool): Whether to use wide stencil flux computation method or not.
-
-    Returns:
-        dict[ str, Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor] ]: Regularization functions mapping.
-    """  # noqa: E501
-    return {
-        k: INLINE_REG_PRESETS[k][basis.type](
-            basis, A, space, f0, beta_effect, T=T, wide=wide
-        )
-        for k, basis in bases.items()
-    }
+DynRegFn = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 
 
-def post_cycle_reg_setup(
-    bases: Bases,
+def setup_background_regs(
+    with_bkg_regs: dict[str, bool],
     Qs: dict[str, dict[str, torch.Tensor]],
-) -> dict[
-    str, Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
-]:
-    """Setup post cycle regularization.
+) -> dict[str, Callable[[DecompositionCoefs], torch.Tensor]]:
+    """Setup background regularizations.
 
     Args:
-        bases (Bases): Bases.
+        with_bkg_regs (dict[str, bool]): Whether to use background for basis.
         Qs (dict[str, dict[str, torch.Tensor]]): Covariances.
 
     Returns:
-        dict[ str, Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor] ]: Regularization functions mapping.
-    """  # noqa: E501
-    return {
-        k: POST_CYCLE_REG_PRESETS[k][basis.type](Qs[k])
-        for k, basis in bases.items()
-    }
+        dict[str, Callable[[DecompositionCoefs], torch.Tensor]]: Regularization
+            functions mapping.
+    """
+    fns = {}
+    for k, cond in with_bkg_regs.items():
+        if cond:
+            fns[k] = background_reg(Qs[k])
+    return fns
+
+
+def setup_dynamical_regs(
+    with_dyn_regs: dict[str, bool],
+    bases: Bases,
+    A: torch.Tensor,
+    space: SpaceDiscretization2D,
+    beta_plane: BetaPlane,
+    beta_effect: torch.Tensor,
+    T: float = 1,
+    *,
+    wide: bool = False,
+) -> dict[str, DynRegFn]:
+    """Setup dynamical rgeularizations.
+
+    Args:
+        with_dyn_regs (dict[str, bool]): Dynamical regularizations.
+        bases (Bases): Bases.
+        A (torch.Tensor): Stretching matrix.
+        space (SpaceDiscretization2D): Space.
+        beta_plane (BetaPlane): Beta plane.
+        beta_effect (torch.Tensor): Beta effect.
+        T (float, optional): Time scale (L/U). Defaults to 1.
+        wide (bool, optional): Whether to use wide stencil or not.
+            Defaults to False.
+
+    Returns:
+        dict[ str, DynRegFn ]:
+            Mapping reg_name -> reg function.
+    """
+    fns = {}
+    for k, cond in with_dyn_regs.items():
+        if cond:
+            fns[k] = DYN_FNS_MAPPINGS[k](
+                bases, A, space, beta_plane, beta_effect, T, wide=wide
+            )
+    return fns
 
 
 def background_reg(
@@ -96,133 +94,77 @@ def background_reg(
     return compute_reg
 
 
-def background_noreg(
-    Q: dict[int, torch.Tensor],  # noqa: ARG001
-) -> Callable[[DecompositionCoefs], torch.Tensor]:
-    """Backgroung no regularization.
-
-    Args:
-        Q (dict[int, torch.Tensor]): Covariances.
-
-    Returns:
-        Callable[[DecompositionCoefs], torch.Tensor]: Regularization function.
-    """
-    return lambda coefs: torch.tensor(0, **coefs.specs)
-
-
-def dynamical_reg(
+def qg_dynamical_reg(
     bases: Bases,
     A: torch.Tensor,
     space: SpaceDiscretization2D,
-    f0: BetaPlane,
+    beta_plane: BetaPlane,
     beta_effect: torch.Tensor,
     T: float,
     *,
     wide: bool,
-) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
+) -> DynRegFn:
     """Dynamical regularization.
 
     Args:
         bases (Bases): Bases.
         A (torch.Tensor): Stretching matrix.
         space (SpaceDiscretization2D): Space.
-        f0 (float): Coriolis parameter.
+        beta_plane (BetaPlane): Beta plane.
         beta_effect (torch.Tensor): Beta-effect.
         y0 (float): Reference
         T (float): Time scale (L/U).
         wide (bool): Whether to use wide stencil flux computation method or not.
 
     Returns:
-        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]: Regularization function.
+        DynRegFn: Regularization function.
     """  # noqa: E501
-    return compute_dynamical_regularization_func(
-        bases,
+    return compute_qg_dynamical_regularization_func(
+        bases["dynamical"],
         A,
         space,
-        f0,
+        beta_plane,
         beta_effect,
         scale=1 / T**2,
         wide=wide,
     )
 
 
-def dynamical_noreg(
-    bases: Bases,  # noqa: ARG001
+def div_dynamical_reg(
+    bases: Bases,
     A: torch.Tensor,  # noqa: ARG001
-    space: SpaceDiscretization2D,  # noqa: ARG001
-    f0: BetaPlane,  # noqa: ARG001
-    beta_effect: torch.Tensor,  # noqa: ARG001
-    T: float,  # noqa: ARG001
+    space: SpaceDiscretization2D,
+    beta_plane: BetaPlane,
+    beta_effect: torch.Tensor,
+    T: float,
     *,
-    wide: bool,  # noqa: ARG001
-) -> Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-    """Dynamical no regularization.
+    wide: bool,
+) -> DynRegFn:
+    """Dynamical regularization.
 
     Args:
-        bases (dict[ str, Bases ]): Bases.
+        bases (Bases): Bases.
         A (torch.Tensor): Stretching matrix.
         space (SpaceDiscretization2D): Space.
-        f0 (float): Coriolis parameter.
+        beta_plane (BetaPlane): Beta plane.
         beta_effect (torch.Tensor): Beta-effect.
         y0 (float): Reference
         T (float): Time scale (L/U).
         wide (bool): Whether to use wide stencil flux computation method or not.
 
     Returns:
-        Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]: Regularization function.
+        Callable[[torch.Tensor, torch.Tensor], torch.Tensor]: Regularization function.
     """  # noqa: E501
-    return lambda psi1, dpsi1, t: torch.tensor(0, **specs.from_tensor(psi1))  # noqa: ARG005
+    fn = compute_div_dynamical_regularization_func(
+        bases["psi"],
+        bases["chi"],
+        space,
+        beta_plane,
+        beta_effect,
+        scale=1 / T**2,
+        wide=wide,
+    )
+    return lambda psi1, dpsi1, time: fn(psi1, time)  # noqa: ARG005
 
 
-INLINE_REG_PRESETS: dict[
-    str,
-    dict[
-        str,
-        Callable[
-            [
-                SpaceTimeDecomposition[
-                    SpaceSupportFunction, TimeSupportFunction
-                ],
-                torch.Tensor,
-                torch.Tensor,
-                torch.Tensor,
-                SpaceDiscretization2D,
-                BetaPlane,
-                float,
-            ],
-            Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor],
-        ],
-    ],
-] = {
-    "external": {
-        MIOSTBasis.type: dynamical_noreg,
-        WaveletBasis.type: dynamical_noreg,
-        GaussianExpBasis.type: dynamical_noreg,
-    },
-    "dynamical": {
-        MIOSTBasis.type: dynamical_noreg,
-        WaveletBasis.type: dynamical_reg,
-        GaussianExpBasis.type: dynamical_reg,
-    },
-}
-POST_CYCLE_REG_PRESETS: dict[
-    str,
-    dict[
-        str,
-        Callable[
-            [dict[int, torch.Tensor]],
-            Callable[[DecompositionCoefs], torch.Tensor],
-        ],
-    ],
-] = {
-    "external": {
-        MIOSTBasis.type: background_reg,
-        WaveletBasis.type: background_reg,
-        GaussianExpBasis.type: background_reg,
-    },
-    "dynamical": {
-        MIOSTBasis.type: background_noreg,
-        WaveletBasis.type: background_noreg,
-        GaussianExpBasis.type: background_noreg,
-    },
-}
+DYN_FNS_MAPPINGS = {"qg": qg_dynamical_reg, "div": div_dynamical_reg}
