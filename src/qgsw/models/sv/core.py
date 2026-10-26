@@ -18,9 +18,10 @@ from qgsw.models.core.flux import (
     div_flux_5pts_with_bc,
 )
 from qgsw.models.core.utils import OptimizableFunction
+from qgsw.models.names import ModelName
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad_perp, laplacian, laplacian_h
+from qgsw.solver.finite_diff import grad, grad_perp, laplacian, laplacian_h
 from qgsw.solver.pv_inversion import (
     HomogeneousPVInversion,
     InhomogeneousPVInversion,
@@ -28,13 +29,16 @@ from qgsw.solver.pv_inversion import (
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.utils.interpolation import LinearInterpolation
+from qgsw.utils.named_object import NamedObject
+from qgsw.utils.reshaping import crop
 
 logger = getLogger(__name__)
 
 
-class SurfaceVorticity(metaclass=ABCCounter):
+class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     """Surface vorticity model."""
 
+    _type = ModelName.SURFACE_VORTICITY
     wide = True
 
     @property
@@ -72,15 +76,8 @@ class SurfaceVorticity(metaclass=ABCCounter):
         ],
     ) -> None:
         self._basis_chi_a = basis
-        self.f_chi_a = basis.localize(*self.space.q.xy)
-        self.f_div_a = basis.localize_laplacian(*self.space.q.xy)
-
-    @property
-    def wide_space(self) -> SpaceDiscretization2D:
-        """Wide space."""
-        if self.wide:
-            return self.space.widen(3, 3)
-        return self.space.widen(1, 1)
+        wide_space = self.space.widen(1, 1)
+        self.f_chi_a = basis.localize(*wide_space.q.xy)
 
     @property
     def _substep_time(self) -> torch.Tensor:
@@ -114,12 +111,43 @@ class SurfaceVorticity(metaclass=ABCCounter):
     @property
     def psi(self) -> torch.Tensor:
         """Total stream function."""
-        return self.f_psi_a(self.time)[None, None, ...] + self.psi_g
+        return self.psi_a + self.psi_g
 
     @property
-    def chi(self) -> torch.Tensor:
+    def psi_a(self) -> torch.Tensor:
+        """Ageostrophic streamfunction."""
+        return self.f_psi_a(self.time)[None, None, ...]
+
+    @property
+    def zeta_a(self) -> torch.Tensor:
+        """Ageostrophic vorticity."""
+        return self.f_zeta_a(self.time)[None, None, ...]
+
+    @property
+    def chi_a(self) -> torch.Tensor:
         """Potential."""
         return self.f_chi_a(self.time)[None, None, ...]
+
+    @property
+    def uv_g(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Geostrophic velocity."""
+        u_g, v_g = self.gradp(self.psi_g)
+        u_g /= self.space.dy
+        v_g /= self.space.dx
+        return (u_g, v_g)
+
+    @property
+    def uv_a(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Ageostrophic velocity."""
+        u_a, v_a = self.compute_ageostrophic_velocity(self.time)
+        return (u_a, v_a)
+
+    @property
+    def uv(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Velocity."""
+        u_g, v_g = self.uv_g
+        u_a, v_a = self.uv_a
+        return (u_g + u_a, v_g + v_a)
 
     @property
     def dt(self) -> float:
@@ -137,6 +165,19 @@ class SurfaceVorticity(metaclass=ABCCounter):
         self._dt = dt
         msg = f"{self.__class__.__name__}: dt set to {self.dt}"
         logger.info(msg)
+
+    @property
+    def wind_scaling(self) -> float:
+        """Wind scaling."""
+        try:
+            return self._wind_scaling
+        except AttributeError:
+            self._wind_scaling = 1
+            return self._wind_scaling
+
+    @wind_scaling.setter
+    def wind_scaling(self, value: float) -> None:
+        self._wind_scaling = value
 
     @property
     def masks(self) -> Masks:
@@ -199,6 +240,11 @@ class SurfaceVorticity(metaclass=ABCCounter):
     def f(self) -> torch.Tensor:
         """Coriolis."""
         return self.f0 + self.beta_effect
+
+    @property
+    def f_wide(self) -> torch.Tensor:
+        """Coriolis."""
+        return self.f0 + self.beta_effect_wide
 
     @property
     def flux_stencil(self) -> int:
@@ -276,12 +322,14 @@ class SurfaceVorticity(metaclass=ABCCounter):
         """
         if compile_fns:
             with logger.section("Compiling functions..."):
-                self.gp = OptimizableFunction(grad_perp)
+                self.grad = OptimizableFunction(grad)
+                self.gradp = OptimizableFunction(grad_perp)
                 self.interp = OptimizableFunction(interpolate)
                 self.lap_h = OptimizableFunction(laplacian_h)
                 self.lap = OptimizableFunction(laplacian)
         else:
-            self.gp = grad_perp
+            self.grad = grad
+            self.gradp = grad_perp
             self.interp = interpolate
             self.lap_h = laplacian_h
             self.lap = laplacian
@@ -413,7 +461,7 @@ class SurfaceVorticity(metaclass=ABCCounter):
             torch.diff(self.tauy, dim=-2) / self.space.dx
             - torch.diff(self.taux, dim=-1) / self.space.dy
         )
-        self.curl_tau = curl_tau.unsqueeze(0).unsqueeze(0)
+        self.curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.wind_scaling
 
     def reset_time(self) -> None:
         """Reset time."""
@@ -437,6 +485,9 @@ class SurfaceVorticity(metaclass=ABCCounter):
         if self.with_bc:
             return
         self.with_bc = True
+        self.wide_space = (
+            self.space.widen(3, 3) if self.wide else self.space.widen(1, 1)
+        )
         self.set_flux()
 
     def set_boundary_maps(
@@ -504,6 +555,72 @@ class SurfaceVorticity(metaclass=ABCCounter):
             )
         )
 
+    def compute_ageostrophic_velocity_contribution_from_psi_a(
+        self, time: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute ageostrophic velocity contribution from ѱₐ.
+
+        Args:
+            time (torch.Tensor): Time.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: ∇^⟂ѱₐ.
+        """
+        psi_a = self.f_psi_a(time)[None, None, ...]
+
+        dx, dy = self.space.dx, self.space.dy
+
+        u_sf_a, v_sf_a = self.gradp(psi_a)
+
+        u_sf_a /= dy
+        v_sf_a /= dx
+
+        return u_sf_a, v_sf_a
+
+    def compute_ageostrophic_velocity_contribution_from_chi_a(
+        self, time: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute ageostrophic velocity contribution from χₐ.
+
+        Args:
+            time (torch.Tensor): Time.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: ∇^χₐ.
+        """
+        chi_a = self.f_chi_a(time)[None, None, ...]
+        u_pot_a_, v_pot_a_ = self.grad(chi_a)
+        dx, dy = self.space.dx, self.space.dy
+
+        u_pot_a_ /= dx
+        v_pot_a_ /= dy
+
+        u_pot_a = crop(u_pot_a_, 0, 1)
+        v_pot_a = crop(v_pot_a_, 1, 0)
+
+        return u_pot_a, v_pot_a
+
+    def compute_ageostrophic_velocity(
+        self, time: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute ageostrophic velocity.
+
+        Args:
+            time (torch.Tensor): Time.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: u ageostrophic, v ageostrophic.
+        """
+        u_sf_a, v_sf_a = (
+            self.compute_ageostrophic_velocity_contribution_from_psi_a(time)
+        )
+
+        u_pot_a, v_pot_a = (
+            self.compute_ageostrophic_velocity_contribution_from_chi_a(time)
+        )
+
+        return (u_sf_a + u_pot_a, v_sf_a + v_pot_a)
+
     def compute_advection_homogeneous(
         self, psiz: PSIZeta, time: torch.Tensor
     ) -> torch.Tensor:
@@ -520,15 +637,20 @@ class SurfaceVorticity(metaclass=ABCCounter):
                 └──  (n_ens, nl, nx, ny)-shaped
         """
         psi_g, zeta_g = psiz
-        psi_a = self.f_psi_a(time)
 
         zeta_a = self.f_zeta_a(time)
 
-        u, v = self.gp(psi_g + psi_a)
-        u /= self.space.dy
-        v /= self.space.dx
+        u_g, v_g = self.gradp(psi_g)
+        u_g /= self.space.dy
+        v_g /= self.space.dx
+
+        u_a, v_a = self.compute_ageostrophic_velocity(time)
+
+        u = u_g + u_a
+        v = v_g + v_a
+
         return self.div_flux(
-            zeta_g + zeta_a + self.beta_effect,
+            zeta_g + zeta_a + self.f,
             u[..., 1:-1, :],
             v[..., 1:-1],
         )
@@ -550,19 +672,22 @@ class SurfaceVorticity(metaclass=ABCCounter):
                 └──  (n_ens, nl, nx, ny)-shaped
         """
         psi_g, zeta_g = psiz
-        psi_a = self.f_psi_a(time)
-        u, v = self.gp(psi_g + psi_a)
-        u /= self.space.dy
-        v /= self.space.dx
+        u_g, v_g = self.gradp(psi_g)
+        u_g /= self.space.dy
+        v_g /= self.space.dx
+
+        u_a, v_a = self.compute_ageostrophic_velocity(time)
+
+        u = u_g + u_a
+        v = v_g + v_a
+
         zeta_g_with_bc = zeta_g_bc.expand(zeta_g)
         zeta_a_with_bc = self.f_zeta_a_wide(time)
         return self.div_flux(
-            zeta_g_with_bc + zeta_a_with_bc + self.beta_effect_wide, u, v
+            zeta_g_with_bc + zeta_a_with_bc + self.f_wide, u, v
         )
 
-    def compute_forcing(
-        self, zeta_g: torch.Tensor, time: torch.Tensor
-    ) -> torch.Tensor:
+    def compute_forcing(self, time: torch.Tensor) -> torch.Tensor:
         """Compute forcing.
 
         Args:
@@ -572,11 +697,8 @@ class SurfaceVorticity(metaclass=ABCCounter):
         Returns:
             torch.Tensor: Forcing.
         """
-        zeta_a = self.f_zeta_a(time)
-        f = self.f0 + self.beta_effect
-        div = self.f_div_a(time)
         dt_zeta_a = self.f_zeta_a.dt(time)
-        return -(zeta_g + zeta_a + f) * div - dt_zeta_a
+        return -dt_zeta_a
 
     def compute_time_derivatives(self, prognostic: PSIZeta) -> PSIZeta:
         """Compute time derivatives.
@@ -616,7 +738,7 @@ class SurfaceVorticity(metaclass=ABCCounter):
             PSIZeta(psi_g, zeta_g + self.beta_effect), self._substep_time
         )
         # wind forcing + bottom drag
-        forcing = self.compute_forcing(zeta_g, self._substep_time)
+        forcing = self.compute_forcing(self._substep_time)
         dzeta_g = (-div_flux + self.curl_tau + forcing) * self.masks.h
         dzeta_g_i = self.interp(dzeta_g)
         # Solve Helmholtz equation
@@ -650,7 +772,7 @@ class SurfaceVorticity(metaclass=ABCCounter):
             PSIZeta(psi_g, zeta_g), self.zeta_g_bc, self._substep_time
         )
         # wind forcing + bottom drag
-        forcing = self.compute_forcing(zeta_g, self._substep_time)
+        forcing = self.compute_forcing(self._substep_time)
         dzeta_g = (-div_flux + self.curl_tau + forcing) * self.masks.h
         dzeta_g_i = self.interp(dzeta_g)
         # Solve Helmholtz equation
