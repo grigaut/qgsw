@@ -10,11 +10,12 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
 )
+from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.scripts.setups.types import Bases, Coefs
 
 
 def pre_cycle_bases_setup(
-    model: QGPSIQCore,
+    model: QGPSIQCore | SurfaceVorticity,
     bases: Bases,
     coefs: Coefs,
     alpha: torch.Tensor,
@@ -43,6 +44,9 @@ def pre_cycle_bases_setup(
             model.alpha = alpha
             model.basis_dynamical = bases["dynamical"]
             model.basis_external = bases["external"]
+        case SurfaceVorticity._type:
+            model.basis_psi_a = bases["psi"]
+            model.basis_chi_a = bases["chi"]
         case _:
             msg = f"Unsupported model type: {model.get_type()}."
             raise ValueError(msg)
