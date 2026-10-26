@@ -835,12 +835,13 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         """
         assert self.time_stepper == "rk3"
         self._rk3_step = 0
-        self.time += self.dt
-        return time_steppers.rk3_ssp(
+        psiz = time_steppers.rk3_ssp(
             prog=prognostic,
             dt=self.dt,
             time_derivation_func=self.compute_time_derivatives,
         )
+        self.time += self.dt
+        return psiz
 
     def update_homogeneous(self, prognostic: PSIZeta) -> PSIZeta:
         """Update prognostic tuple.
