@@ -52,8 +52,6 @@ class ScriptsArgsParser:
     has_optim = False
     has_separation = False
     has_season = False
-    has_gamma_reg_dyn = False
-    has_gamma_reg_bkg = False
     has_no_reg = False
     has_no_alpha = False
     has_alpha_lr = False
@@ -69,12 +67,12 @@ class ScriptsArgsParser:
     has_dy = False
     has_sigma_ic = False
     has_sigma_bc = False
-    has_basis_dyn = False
-    has_basis_dyn_lr = False
-    has_basis_ext = False
-    has_basis_ext_lr = False
     has_model_type = False
     has_perturbed_params = False
+    has_dyn_reg_qg = False
+    has_dyn_reg_div = False
+    has_gamma_dyn_qg = False
+    has_gamma_dyn_div = False
 
     @property
     def config(self) -> Path:
@@ -165,24 +163,6 @@ class ScriptsArgsParser:
             "Seasons not tracked.",
         )
         return self.namespace.season
-
-    @property
-    def gamma_reg_dyn(self) -> float:
-        """Gamma_reg_dyn."""
-        self._check_attr(
-            self.has_gamma_reg_dyn,
-            "Gamma_reg_dyn not tracked.",
-        )
-        return self.namespace.gamma_reg_dyn
-
-    @property
-    def gamma_reg_bkg(self) -> float:
-        """Gamma_reg_bkg."""
-        self._check_attr(
-            self.has_gamma_reg_bkg,
-            "Gamma_reg_bkg not tracked.",
-        )
-        return self.namespace.gamma_reg_bkg
 
     @property
     def no_reg(self) -> bool:
@@ -320,42 +300,6 @@ class ScriptsArgsParser:
         return self.namespace.sigma_bc
 
     @property
-    def basis_dyn(self) -> str:
-        """Basis dynamical."""
-        self._check_attr(
-            self.has_basis_dyn,
-            "basis_dyn not tracked.",
-        )
-        return self.namespace.basis_dyn
-
-    @property
-    def basis_dyn_lr(self) -> float:
-        """basis_dyn_lr."""
-        self._check_attr(
-            self.has_basis_dyn_lr,
-            "basis_dyn_lr not tracked.",
-        )
-        return self.namespace.basis_dyn_lr
-
-    @property
-    def basis_ext(self) -> str:
-        """Basis external."""
-        self._check_attr(
-            self.has_basis_ext,
-            "basis_ext not tracked.",
-        )
-        return self.namespace.basis_ext
-
-    @property
-    def basis_ext_lr(self) -> float:
-        """basis_ext_lr."""
-        self._check_attr(
-            self.has_basis_ext_lr,
-            "basis_ext_lr not tracked.",
-        )
-        return self.namespace.basis_ext_lr
-
-    @property
     def model_type(self) -> str:
         """Model type."""
         self._check_attr(
@@ -372,6 +316,42 @@ class ScriptsArgsParser:
             "perturbed_params not tracked.",
         )
         return self.namespace.perturbed_params
+
+    @property
+    def dyn_reg_qg(self) -> bool:
+        """QG dynamical regularization."""
+        self._check_attr(
+            self.has_dyn_reg_qg,
+            "dyn_reg_qg not tracked.",
+        )
+        return self.namespace.dyn_reg_qg
+
+    @property
+    def dyn_reg_div(self) -> bool:
+        """Divergence dynamical regularization."""
+        self._check_attr(
+            self.has_dyn_reg_div,
+            "dyn_reg_div not tracked.",
+        )
+        return self.namespace.dyn_reg_div
+
+    @property
+    def gamma_dyn_qg(self) -> bool:
+        """Divergence dynamical regularization coef."""
+        self._check_attr(
+            self.has_gamma_dyn_qg,
+            "gamma_dyn_qg not tracked.",
+        )
+        return self.namespace.gamma_dyn_qg
+
+    @property
+    def gamma_dyn_div(self) -> bool:
+        """Divergence dynamical regularization coef."""
+        self._check_attr(
+            self.has_gamma_dyn_div,
+            "gamma_dyn_div not tracked.",
+        )
+        return self.namespace.gamma_dyn_div
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -571,42 +551,6 @@ class ScriptsArgsParser:
         )
         self.has_season = True
 
-    def add_gamma_reg_dyn(self, default: float = 1) -> None:
-        """Dynamical regularization coef.
-
-        Args:
-            parser (argparse.ArgumentParser): Arguments parser.
-            default (float, optional): Default value. Defaults to 1.
-        """
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--gamma-reg-dyn",
-            "--gamma-dyn",
-            "--grdyn",
-            type=float,
-            default=default,
-            help="Gamma reg dyn value.",
-        )
-        self.has_gamma_reg_dyn = True
-
-    def add_gamma_reg_bkg(self, default: float = 1) -> None:
-        """Background regularization coef.
-
-        Args:
-            parser (argparse.ArgumentParser): Arguments parser.
-            default (float, optional): Default value. Defaults to 1.
-        """
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--gamma-reg-bkg",
-            "--gamma-bkg",
-            "--grbkg",
-            type=float,
-            default=default,
-            help="Gamma reg bkg value.",
-        )
-        self.has_gamma_reg_bkg = True
-
     def add_no_reg(self) -> None:
         """Specify whether to use regularization or not.
 
@@ -620,16 +564,6 @@ class ScriptsArgsParser:
             help="Disable regularization.",
         )
         self.has_no_reg = True
-
-    def add_regularization(
-        self,
-        gamma_dyn_default: float = 1,
-        gamma_bkg_default: float = 1,
-    ) -> None:
-        """Add regularization."""
-        self.add_gamma_reg_dyn(gamma_dyn_default)
-        self.add_gamma_reg_bkg(gamma_bkg_default)
-        self.add_no_reg()
 
     def add_alpha(self, lr_default: float) -> None:
         """Specify whether to use alpha or not."""
@@ -798,83 +732,6 @@ class ScriptsArgsParser:
         self.add_sigma_ic(ic_default)
         self.add_sigma_bc(bc_default)
 
-    def add_bdyn(self) -> None:
-        """Add basis_dyn to parser.
-
-        Args:
-            parser (argparse.ArgumentParser): Arguments parser.
-        """
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--basis-dyn",
-            "--bdyn",
-            type=str,
-            choices=[
-                MIOSTBasis.type,
-                WaveletBasis.type,
-                GaussianExpBasis.type,
-            ],
-            help="Basis dynamical identification.",
-        )
-        self.has_basis_dyn = True
-
-    def add_bdyn_lr(self) -> None:
-        """Dynamic basis learning rate."""
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--basis-dyn-lr",
-            "--bdyn-lr",
-            type=float,
-            help="Learning rate for bdyn.",
-        )
-        self.has_basis_dyn_lr = True
-
-    def add_basis_dynamical(self) -> None:
-        """Add dynamical basis."""
-        self.add_bdyn()
-        self.add_bdyn_lr()
-
-    def add_bext(self) -> None:
-        """Add basis_ext to parser.
-
-        Args:
-            parser (argparse.ArgumentParser): Arguments parser.
-        """
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--basis-ext",
-            "--bext",
-            type=str,
-            choices=[
-                MIOSTBasis.type,
-                WaveletBasis.type,
-                GaussianExpBasis.type,
-            ],
-            help="Basis external identification.",
-        )
-        self.has_basis_ext = True
-
-    def add_bext_lr(self) -> None:
-        """External basis learning rate."""
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--basis-ext-lr",
-            "--bext-lr",
-            type=float,
-            help="Learning rate for bext.",
-        )
-        self.has_basis_ext_lr = True
-
-    def add_basis_external(self) -> None:
-        """Add external basis."""
-        self.add_bext()
-        self.add_bext_lr()
-
-    def add_bases_dynamical_external(self) -> None:
-        """Add dynamical and external bases."""
-        self.add_basis_dynamical()
-        self.add_basis_external()
-
     def add_model_type(self) -> None:
         """Add model-type to parser.
 
@@ -905,6 +762,68 @@ class ScriptsArgsParser:
         )
         self.has_perturbed_params = True
 
+    def add_dyn_reg_qg(self) -> None:
+        """Dynamical regularization QG."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--dyn-reg-qg",
+            action="store_true",
+            help="Whether to use QG dynmical regularization.",
+        )
+        self.has_dyn_reg_qg = True
+
+    def add_gamma_reg_dyn_qg(self, default: float = 1) -> None:
+        """Dynamical regularization coef.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (float, optional): Default value. Defaults to 1.
+        """
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--gamma-dyn-qg",
+            type=float,
+            default=default,
+            help="Gamma reg dyn qg value.",
+        )
+        self.has_gamma_dyn_qg = True
+
+    def add_dyn_reg_div(self) -> None:
+        """Dynamical regularization div."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--dyn-reg-div",
+            action="store_true",
+            help="Whether to use div dynmical regularization.",
+        )
+        self.has_dyn_reg_div = True
+
+    def add_gamma_reg_dyn_div(self, default: float = 1) -> None:
+        """Dynamical regularization coef.
+
+        Args:
+            parser (argparse.ArgumentParser): Arguments parser.
+            default (float, optional): Default value. Defaults to 1.
+        """
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--gamma-dyn-div",
+            type=float,
+            default=default,
+            help="Gamma reg dyn div value.",
+        )
+        self.has_gamma_dyn_div = True
+
+    def add_regs(
+        self, dyn_qg_default: float = 1, dyn_div_default: float = 1
+    ) -> None:
+        """Add regularizations."""
+        self.add_no_reg()
+        self.add_dyn_reg_qg()
+        self.add_gamma_reg_dyn_qg(dyn_qg_default)
+        self.add_dyn_reg_div()
+        self.add_gamma_reg_dyn_div(dyn_div_default)
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_known_args(namespace=self.namespace)
@@ -914,7 +833,15 @@ class ScriptsArgsParser:
         """Set presets."""
         if not presets:
             return
-        self.parser.set_defaults(**presets)
+        tracked_dests = {
+            action.dest
+            for action in self.parser._actions  # noqa: SLF001
+            if action.dest
+        }
+        filtered_presets = {
+            k: v for k, v in presets.items() if k in tracked_dests
+        }
+        self.parser.set_defaults(**filtered_presets)
 
     @classmethod
     def va_setup(
@@ -934,6 +861,89 @@ class ScriptsArgsParser:
         obj.add_optim_max_step(default=200)
         obj.add_separation(default=0)
         obj.add_model_type()
-        obj.add_basis_dynamical()
-        obj.add_basis_external()
         return obj
+
+
+class BasisParser:
+    """Basis parser."""
+
+    retrieved = False
+
+    @property
+    def type(self) -> str:
+        """Basis type."""
+        return getattr(self.namespace, f"basis_{self.basis_name}")
+
+    @property
+    def learning_rate(self) -> float:
+        """Learning rate."""
+        return getattr(self.namespace, f"basis_{self.basis_name}_lr")
+
+    @property
+    def with_background(self) -> bool:
+        """With background regularization."""
+        return getattr(self.namespace, f"basis_{self.basis_name}_bkg_reg")
+
+    @property
+    def gamma(self) -> float:
+        """Gamma."""
+        return getattr(self.namespace, f"basis_{self.basis_name}_gamma")
+
+    def __init__(self, basis_name: str) -> None:
+        """Instantiate parser."""
+        self.basis_name = basis_name
+        self.parser = argparse.ArgumentParser(
+            description="Retrieve basis arguments.",
+        )
+        self.namespace = argparse.Namespace()
+        ## Basis type
+        self.parser.add_argument(
+            f"--basis-{basis_name}",
+            f"--b{basis_name}",
+            type=str,
+            choices=[
+                MIOSTBasis.type,
+                WaveletBasis.type,
+                GaussianExpBasis.type,
+            ],
+            help=f"Basis '{basis_name}' identification.",
+        )
+        ## Basis learning rate
+        self.parser.add_argument(
+            f"--basis-{basis_name}-lr",
+            f"--b{basis_name}-lr",
+            type=float,
+            help=f"Learning rate for b{basis_name}.",
+        )
+        ### Basis background regularization
+        self.parser.add_argument(
+            f"--basis-{basis_name}-bkg-reg",
+            f"--b{basis_name}-bkg-reg",
+            action="store_true",
+            help=f"Whether to use background regularization for b{basis_name}.",  # noqa: E501
+        )
+        ### Basis gamma for background
+        self.parser.add_argument(
+            f"--basis-{basis_name}-gamma",
+            f"--b{basis_name}-gamma",
+            type=float,
+            help=f"Background gamma for b{basis_name}.",
+        )
+
+    def retrieve(self) -> None:
+        """Retrieve arguments."""
+        self.parser.parse_known_args(namespace=self.namespace)
+
+    def set_presets(self, presets: dict | None = None) -> None:
+        """Set presets."""
+        if not presets:
+            return
+        tracked_dests = {
+            action.dest
+            for action in self.parser._actions  # noqa: SLF001
+            if action.dest
+        }
+        filtered_presets = {
+            k: v for k, v in presets.items() if k in tracked_dests
+        }
+        self.parser.set_defaults(**filtered_presets)
