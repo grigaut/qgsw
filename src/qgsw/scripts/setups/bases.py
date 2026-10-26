@@ -14,20 +14,30 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
 )
+from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
 T = TypeVar("T")
 
 
 def retrieve_bases_elements(
-    model_type: str, basis_dynamical: T | None, basis_external: T | None
+    model_type: str,
+    basis_dynamical: T | None,
+    basis_external: T | None,
+    basis_psi_a: T | None = None,
+    basis_chi_a: T | None = None,
+    *,
+    check: bool = False,
 ) -> dict[str, T]:
     """Build bases types dict.
 
     Args:
         model_type (str): Model type.
-        basis_dynamical (T): Dynamical basis
-        basis_external (T): External basis
+        basis_dynamical (T): Dynamical basis.
+        basis_external (T): External basis.
+        basis_psi_a (T): Ageostrophic stream function basis.
+        basis_chi_a (T): Ageostrophic potential basis.
+        check (bool): Whether to perform checks on basis.
 
     Raises:
         ValueError: If the model type is not recognised.
@@ -37,21 +47,28 @@ def retrieve_bases_elements(
     """
     without_bdyn = basis_dynamical is None
     without_bext = basis_external is None
+    without_bpsi = basis_psi_a is None
+    without_bchi = basis_chi_a is None
     if model_type == QGPSIQRGPsi2TransportDR.get_type():
-        if without_bdyn:
+        if check and without_bdyn:
             msg = "Dynamical basis was not given to script."
             raise ValueError(msg)
         return {"dynamical": basis_dynamical}
     if model_type == QGPSIQForced.get_type():
-        if without_bext:
+        if check and without_bext:
             msg = "External basis was not given to script."
             raise ValueError(msg)
         return {"external": basis_external}
     if model_type == QGPSIQForcedSurfML.get_type():
-        if (without_bdyn) and (without_bext):
+        if check and (without_bdyn) and (without_bext):
             msg = "Both dynamical and external bases must be given to script."
             raise ValueError(msg)
         return {"dynamical": basis_dynamical, "external": basis_external}
+    if model_type == SurfaceVorticity.get_type():
+        if check and (without_bpsi) and (without_bchi):
+            msg = "Both psi_a and chi_a bases must be given to script."
+            raise ValueError(msg)
+        return {"psi": basis_psi_a, "chi": basis_chi_a}
     msg = f"Unsupported model_type: {model_type}."
     raise ValueError(msg)
 
