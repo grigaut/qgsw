@@ -868,6 +868,10 @@ class BasisParser:
         """Gamma."""
         return getattr(self.namespace, f"basis_{self.basis_name}_gamma")
 
+    def __repr__(self) -> str:
+        """String representation."""
+        return self.namespace.__repr__()
+
     def __init__(self, basis_name: str) -> None:
         """Instantiate parser."""
         self.basis_name = basis_name
