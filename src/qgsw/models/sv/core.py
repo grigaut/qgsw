@@ -119,6 +119,11 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         return self.f_psi_a(self.time)[None, None, ...]
 
     @property
+    def zeta(self) -> torch.Tensor:
+        """Total vorticity."""
+        return self.zeta_a + self.zeta_g
+
+    @property
     def zeta_a(self) -> torch.Tensor:
         """Ageostrophic vorticity."""
         return self.f_zeta_a(self.time)[None, None, ...]
