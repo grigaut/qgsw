@@ -12,6 +12,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
 )
+from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.scripts.setups.types import Coefs
 
 SCALINGS = {
@@ -32,6 +33,17 @@ SCALINGS = {
         ),
     },
     QGPSIQForcedSurfML.get_type(): {
+        MIOSTBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
+        WaveletBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs.scale(
+            *(U**2 / L**2 for _ in range(coefs.order))
+        ),
+        GaussianExpBasis.type: lambda coefs, L, U, psi0_mean, T_tot: (
+            coefs.scale(
+                *(1e-1 * psi0_mean / (T_tot) ** k for k in range(coefs.order))
+            )
+        ),
+    },
+    SurfaceVorticity.get_type(): {
         MIOSTBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
         WaveletBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs.scale(
             *(U**2 / L**2 for _ in range(coefs.order))
