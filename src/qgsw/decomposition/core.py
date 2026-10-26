@@ -48,7 +48,7 @@ def build_basis_from_config(
     space: SpaceDiscretization2D,
     dt: float,
     n_steps: int,
-    exp_cov: float = 1,
+    exp_cov: float = 2,
 ) -> tuple[Basis, dict[str, torch.Tensor]]:
     """Build basis given configuration and parameters.
 

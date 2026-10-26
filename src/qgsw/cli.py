@@ -55,7 +55,6 @@ class ScriptsArgsParser:
     has_no_reg = False
     has_no_alpha = False
     has_alpha_lr = False
-    has_reg_exp = False
     has_wind_optim = False
     has_wind_lr = False
     has_gamma_sst = False
@@ -190,15 +189,6 @@ class ScriptsArgsParser:
             "Alpha_lr not tracked.",
         )
         return self.namespace.alpha_lr
-
-    @property
-    def reg_exp(self) -> int:
-        """reg_exp."""
-        self._check_attr(
-            self.has_reg_exp,
-            "reg_exp not tracked.",
-        )
-        return self.namespace.reg_exp
 
     @property
     def wind_optim(self) -> bool:
@@ -586,17 +576,6 @@ class ScriptsArgsParser:
             help="Learning rate for alpha.",
         )
         self.has_alpha_lr = True
-
-    def add_reg_exp(self, default: int = 2) -> None:
-        """Add regularization exponent."""
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--reg-exp",
-            type=int,
-            default=default,
-            help="Regularization exponent value.",
-        )
-        self.has_reg_exp = True
 
     def add_wind_optim(self, lr_default: float) -> None:
         """Add wind optimization."""
