@@ -625,6 +625,27 @@ class SpaceDiscretization2D:
             Grid2D(x=x_wide, y=y_wide)
         )
 
+    def crop(self, i: int, j: int) -> SpaceDiscretization2D:
+        """Crop the space.
+
+        Args:
+            i (int): number of element to add on each side on x.
+            j (int): number of element to add on each side on y.
+
+        Returns:
+            SpaceDiscretization2D: Cropped space.
+        """
+        slice_x = slice(None, None, None) if i == 0 else slice(i, i, 1)
+        slice_y = slice(None, None, None) if j == 0 else slice(j, j, 1)
+
+        x, y = self.omega.xy
+        x_narrow = x.__getitem__([..., slice_x, slice_y])
+        y_narrow = y.__getitem__([..., slice_x, slice_y])
+
+        return SpaceDiscretization2D.from_omega_grid(
+            Grid2D(x=x_narrow, y=y_narrow)
+        )
+
     @classmethod
     def from_config(cls, grid_config: SpaceConfig) -> Self:
         """Construct the SpaceDiscretization2D given a SpaceConfig object.
