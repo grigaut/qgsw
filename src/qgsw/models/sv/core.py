@@ -60,7 +60,9 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         self.f_psi_a = basis.localize(*self.space.psi.xy)
         self.f_zeta_a = basis.localize_laplacian(*self.space.q.xy)
         if self.with_bc:
-            self.f_zeta_a_wide = basis.localize(*self.wide_space.q.xy)
+            self.f_zeta_a_wide = basis.localize_laplacian(
+                *self.wide_space.q.xy
+            )
 
     @property
     def basis_chi_a(
@@ -86,13 +88,13 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             return self.time
         if self.time_stepper == "rk3":
             if self._rk3_step == 0:
-                coef = 1 / 2
+                coef = 0
                 return self.time + coef * self.dt
             if self._rk3_step == 1:
-                coef = 3 / 2
+                coef = 1
                 return self.time + coef * self.dt
             if self._rk3_step == 2:
-                coef = 1
+                coef = 1 / 2
                 return self.time + coef * self.dt
             msg = "SSPRK3 should only perform 3 steps."
             raise ValueError(msg)
@@ -741,7 +743,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         """
         psi_g, zeta_g = prognostic
         div_flux = self.compute_advection_homogeneous(
-            PSIZeta(psi_g, zeta_g + self.beta_effect), self._substep_time
+            PSIZeta(psi_g, zeta_g), self._substep_time
         )
         # wind forcing + bottom drag
         forcing = self.compute_forcing(self._substep_time)
@@ -788,19 +790,8 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         )
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
+            self.set_boundaries(self._substep_time.item())
             self._rk3_step += 1
-            if self._rk3_step == 1:
-                coef = 1
-                self.set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-                self.set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:
-                # There won't be any additional step.
-                ...
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         return PSIZeta(dpsi_g, dzeta_g)
 
     def update(self, prognostic: PSIZeta) -> PSIZeta:
