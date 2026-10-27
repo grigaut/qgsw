@@ -46,7 +46,7 @@ SCALINGS = {
     SurfaceVorticity.get_type(): {
         MIOSTBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
         WaveletBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs.scale(
-            *(U**2 / L**2 for _ in range(coefs.order))
+            *(1e-1 * psi0_mean for _ in range(coefs.order))
         ),
         GaussianExpBasis.type: lambda coefs, L, U, psi0_mean, T_tot: (
             coefs.scale(
