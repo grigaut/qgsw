@@ -172,19 +172,8 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
         )
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
+            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
-            if self._rk3_step == 1:
-                coef = 1
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:
-                # There won't be any additional step.
-                ...
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -242,19 +231,8 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
         )
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
+            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
-            if self._rk3_step == 1:
-                coef = 1
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:
-                # There won't be any additional step.
-                ...
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
 
@@ -569,19 +547,8 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         )
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
+            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
-            if self._rk3_step == 1:
-                coef = 1
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:
-                # There won't be any additional step.
-                ...
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -640,19 +607,8 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         )
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
+            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
-            if self._rk3_step == 1:
-                coef = 1
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:
-                # There won't be any additional step.
-                ...
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
 
@@ -836,19 +792,8 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
         )
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
+            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
-            if self._rk3_step == 1:
-                coef = 1
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:
-                # There won't be any additional step.
-                ...
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -909,17 +854,6 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
         )
         if self.time_stepper == "rk3":
             # Boundary condition interpolation
+            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
-            if self._rk3_step == 1:
-                coef = 1
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-                self._set_boundaries(self.time.item() + coef * self.dt)
-            elif self._rk3_step == 3:
-                # There won't be any additional step.
-                ...
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
         return PSIQ(dpsi, dq)
