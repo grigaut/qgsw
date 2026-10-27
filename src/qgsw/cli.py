@@ -72,6 +72,7 @@ class ScriptsArgsParser:
     has_dyn_reg_div = False
     has_gamma_dyn_qg = False
     has_gamma_dyn_div = False
+    has_dry_run = False
 
     @property
     def config(self) -> Path:
@@ -342,6 +343,15 @@ class ScriptsArgsParser:
             "gamma_dyn_div not tracked.",
         )
         return self.namespace.gamma_dyn_div
+
+    @property
+    def dry_run(self) -> bool:
+        """Dry run."""
+        self._check_attr(
+            self.has_dry_run,
+            "dry_run not tracked.",
+        )
+        return self.namespace.dry_run
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -803,6 +813,16 @@ class ScriptsArgsParser:
         self.add_dyn_reg_div()
         self.add_gamma_reg_dyn_div(dyn_div_default)
 
+    def add_dry_run(self) -> None:
+        """Dry run."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="To perform dry run.",
+        )
+        self.has_dry_run = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_known_args(namespace=self.namespace)
@@ -830,6 +850,7 @@ class ScriptsArgsParser:
     ) -> Self:
         """Pre-setup parser for variationla assimilaiton scripts."""
         obj = cls()
+        obj.add_dry_run()
         obj.add_config()
         obj.add_verbose()
         obj.add_prefix(default=prefix_default)
