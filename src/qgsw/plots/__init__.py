@@ -1,5 +1,7 @@
 """Plotting related tools."""
 
+import seaborn as sns
+
 from qgsw.plots.plt_wrapper import (
     blittable_suptitle,
     clamp_ylims,
@@ -25,3 +27,4 @@ __all__ = [
     "show",
     "subplots",
 ]
+sns.set_theme("notebook", style="dark")
