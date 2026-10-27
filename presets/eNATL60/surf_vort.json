@@ -12,18 +12,18 @@
 
     "optim":200,
 
-    "sigma_bc":14,
-    "sigma_ic":14,
+    "sigma_bc":12,
+    "sigma_ic":12,
 
     "basis_psi": "gaussian-exps",
-    "basis_psi_lr":1e-9,
+    "basis_psi_lr":5e-1,
     "basys_psi_bkg_reg":false,
     "basis_chi": "gaussian-exps",
-    "basis_chi_lr":1e-9,
+    "basis_chi_lr":5e-1,
     "basys_chi_bkg_reg":false,
 
     "dyn_reg_div":true,
-    "gamma_dyn_div":1e-5,
+    "gamma_dyn_div":1e-6,
 
     "no_alpha":false,
     "alpha_lr":1e-2,
