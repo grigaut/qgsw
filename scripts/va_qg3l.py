@@ -134,10 +134,12 @@ if __name__ == "__main__":
     config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 
     output_folder = create_output_folder(
-        config.io.output.directory, prefix=args.prefix + "_" + args.model_type
+        config.io.output.directory,
+        prefix=args.prefix + "_" + args.model_type,
+        mkdir=not args.dry_run,
     )
 
-    output = build_output_folder(output_folder)
+    output = build_output_folder(output_folder, dry_run=args.dry_run)
 
     # Simulation parameters
     dt = 7200
