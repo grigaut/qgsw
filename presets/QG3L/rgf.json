@@ -9,9 +9,8 @@
 
     "basis_ext": "wavelets",
     "basis_ext_lr":5e-3,
-
-    "gamma_reg_bkg": 1e1,
-    "reg_exp":2,
+    "basis_ext_bkg_reg":true,
+    "basis_ext_gamma":1e1,
 
     "no_reg":false,
     "no_wind":false

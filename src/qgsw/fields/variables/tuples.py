@@ -177,6 +177,13 @@ class BaseUVH(BaseTuple, metaclass=ABCMeta):
         """
 
 
+class _PSIZeta(NamedTuple):
+    """Stream function and vorticity."""
+
+    psi: torch.Tensor
+    zeta: torch.Tensor
+
+
 class _PSIQ(NamedTuple):
     """Stream function and potential vorticity."""
 
@@ -226,6 +233,20 @@ class _PSIQSSTTAlpha(NamedTuple):
     sst: torch.Tensor
     t: torch.Tensor
     alpha: torch.Tensor
+
+
+class PSIZeta(BaseTuple, _PSIZeta):
+    """Stream function and potential vorticity."""
+
+    @property
+    def psizeta(self) -> PSIZeta:
+        """PSIZeta."""
+        return self
+
+    @property
+    def parallel_slice(self) -> ParallelSlice[PSIZeta]:
+        """Parallel slicing object."""
+        return ParallelSlice(self, slice_depth=2)
 
 
 class PSIQ(BasePSIQ, _PSIQ):

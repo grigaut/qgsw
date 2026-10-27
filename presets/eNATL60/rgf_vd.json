@@ -17,8 +17,8 @@
 
     "basis_ext": "basis-miost",
     "basis_ext_lr":5e-14,
-
-    "gamma_reg_bkg": 1e18,
+    "basis_ext_bkg_reg":true,
+    "basis_ext_gamma":1e18,
 
     "no_reg":false,
     "no_wind":true

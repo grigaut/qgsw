@@ -84,6 +84,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qgsw import specs
 from qgsw.spatial.core.grid_conversion import interpolate
 
 try:
@@ -174,15 +175,22 @@ class SpaceDiscretization2D:
         self._u = u_grid
         self._v = v_grid
 
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
+
+        Returns:
+            list[str]: String representation parts.
+        """
+        return [
+            "3D Space",
+            "└── Dimensions:",
+            (f"\t├── X: {self.nx} points - dx = {self.dx} m"),
+            (f"\t└── Y: {self.ny} points - dy = {self.dy} m"),
+        ]
+
     def __repr__(self) -> str:
         """String representation of the Space."""
-        msg_parts = [
-            "2D Space.",
-            "└── Dimensions:",
-            (f"     ├── X: {self.nx} points - dx = {self.dx}"),
-            (f"     └── Y: {self.ny} points - dy = {self.dy}"),
-        ]
-        return "\n".join(msg_parts)
+        return "\n".join(self.get_repr_parts())
 
     @property
     def nx(self) -> int:
@@ -575,6 +583,68 @@ class SpaceDiscretization2D:
         x_sliced = self.omega.xy.x[imin:imax, jmin:jmax]
         y_sliced = self.omega.xy.y[imin:imax, jmin:jmax]
         return self.from_omega_grid(Grid2D(x=x_sliced, y=y_sliced))
+
+    def widen(self, i: int, j: int) -> SpaceDiscretization2D:
+        """Widen the space.
+
+        Args:
+            i (int): number of element to add on each side on x.
+            j (int): number of element to add on each side on y.
+
+        Returns:
+            SpaceDiscretization2D: Widened space.
+        """
+        x, y = self.omega.xy
+        dx = self.dx
+        dy = self.dy
+        nx, ny = x.shape
+        tspecs = specs.from_tensor(x)
+        x_left = (
+            dx * torch.arange(-i, 0, **tspecs).reshape((i, 1)).tile((1, ny))
+        ) + x[:1, :]
+        x_right = (
+            dx * torch.arange(1, i + 1, **tspecs).reshape((i, 1)).tile((1, ny))
+        ) + x[-1:, :]
+        x_ = torch.concatenate([x_left, x, x_right])
+        x_wide = torch.concatenate(
+            [*[x_[:, :1]] * j, x_, *[x_[:, -1:]] * j], dim=1
+        )
+
+        y_bot = (
+            dy * torch.arange(-j, 0, **tspecs).reshape((1, j)).tile((nx, 1))
+        ) + y[:, :1]
+        y_top = (
+            dy * torch.arange(1, j + 1, **tspecs).reshape((1, j)).tile((nx, 1))
+        ) + y[:, -1:]
+        y_ = torch.concatenate([y_bot, y, y_top], dim=1)
+        y_wide = torch.concatenate(
+            [*[y_[:1, :]] * i, y_, *[y_[-1:, :]] * i], dim=0
+        )
+
+        return SpaceDiscretization2D.from_omega_grid(
+            Grid2D(x=x_wide, y=y_wide)
+        )
+
+    def crop(self, i: int, j: int) -> SpaceDiscretization2D:
+        """Crop the space.
+
+        Args:
+            i (int): number of element to add on each side on x.
+            j (int): number of element to add on each side on y.
+
+        Returns:
+            SpaceDiscretization2D: Cropped space.
+        """
+        slice_x = slice(None, None, None) if i == 0 else slice(i, -i, 1)
+        slice_y = slice(None, None, None) if j == 0 else slice(j, -j, 1)
+
+        x, y = self.omega.xy
+        x_narrow = x.__getitem__([..., slice_x, slice_y])
+        y_narrow = y.__getitem__([..., slice_x, slice_y])
+
+        return SpaceDiscretization2D.from_omega_grid(
+            Grid2D(x=x_narrow, y=y_narrow)
+        )
 
     @classmethod
     def from_config(cls, grid_config: SpaceConfig) -> Self:

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import torch
 
-from qgsw.cli import ScriptsArgsParser, parse_presets
+from qgsw.cli import BasisParser, ScriptsArgsParser, parse_presets
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.fields.variables.tuples import UVH
@@ -19,6 +19,7 @@ from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
+from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
@@ -27,6 +28,7 @@ from qgsw.scripts.boundaries import (
     extract_wide_psi_bc,
 )
 from qgsw.scripts.loss import mse
+from qgsw.scripts.model_interactions import init_model, retrieve_psi_g
 from qgsw.scripts.output import build_output_folder, create_output_folder
 from qgsw.scripts.parameterizations import kappa_to_alpha
 from qgsw.scripts.pv import build_pv_funcs
@@ -37,8 +39,8 @@ from qgsw.scripts.setups.callbacks import (
 from qgsw.scripts.setups.model import setup_model
 from qgsw.scripts.setups.optim import optim_setup
 from qgsw.scripts.setups.regularization import (
-    inline_reg_setup,
-    post_cycle_reg_setup,
+    setup_background_regs,
+    setup_dynamical_regs,
 )
 from qgsw.scripts.setups.scaling import retrieve_scaling_func
 from qgsw.spatial.core.discretization import (
@@ -62,13 +64,25 @@ if __name__ == "__main__":
         prefix_default="QG3L",
         cycles_default=4,
     )
-    args.add_regularization(gamma_dyn_default=1, gamma_bkg_default=1)
+    args.add_regs(1, 1)
     args.add_indices()
-    args.add_reg_exp(default=2)
     args.add_alpha(1e-2)
     args.add_perturbed_params()
     args.set_presets(presets)
     args.retrieve()
+
+    basis_dyn = BasisParser("dyn")
+    basis_dyn.set_presets(presets)
+    basis_dyn.retrieve()
+    basis_ext = BasisParser("ext")
+    basis_ext.set_presets(presets)
+    basis_ext.retrieve()
+    basis_psi = BasisParser("psi")
+    basis_psi.set_presets(presets)
+    basis_psi.retrieve()
+    basis_chi = BasisParser("chi")
+    basis_chi.set_presets(presets)
+    basis_chi.retrieve()
 
     with_alpha = not args.no_alpha
     with_reg = not args.no_reg
@@ -82,23 +96,50 @@ if __name__ == "__main__":
 
     bases_types = retrieve_bases_elements(
         args.model_type,
-        args.basis_dyn,
-        args.basis_ext,
+        basis_dyn.type,
+        basis_ext.type,
+        basis_psi.type,
+        basis_chi.type,
+        check=True,
     )
+
     bases_lrs = retrieve_bases_elements(
         args.model_type,
-        args.basis_dyn_lr,
-        args.basis_ext_lr,
+        basis_dyn.learning_rate,
+        basis_ext.learning_rate,
+        basis_psi.learning_rate,
+        basis_chi.learning_rate,
     )
+    bases_with_bkg = retrieve_bases_elements(
+        args.model_type,
+        basis_dyn.with_background,
+        basis_ext.with_background,
+        basis_psi.with_background,
+        basis_chi.with_background,
+    )
+    bases_gammas = retrieve_bases_elements(
+        args.model_type,
+        basis_dyn.gamma,
+        basis_ext.gamma,
+        basis_psi.gamma,
+        basis_chi.gamma,
+    )
+
+    dyn_regs = {}
+    dyn_regs["qg"] = args.dyn_reg_qg and (not args.no_reg)
+    dyn_regs["div"] = args.dyn_reg_div and (not args.no_reg)
+    dyn_gammas = {"qg": args.gamma_dyn_qg, "div": args.gamma_dyn_div}
 
     ROOT_PATH = Path(__file__).parent.parent
     config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 
     output_folder = create_output_folder(
-        config.io.output.directory, prefix=args.prefix + "_" + args.model_type
+        config.io.output.directory,
+        prefix=args.prefix + "_" + args.model_type,
+        mkdir=not args.dry_run,
     )
 
-    output = build_output_folder(output_folder)
+    output = build_output_folder(output_folder, dry_run=args.dry_run)
 
     # Simulation parameters
     dt = 7200
@@ -166,13 +207,11 @@ if __name__ == "__main__":
 
     ## Regularization
 
-    gamma_dyn = args.gamma_reg_dyn
-    gamma_bkg = args.gamma_reg_bkg
-
     if with_reg:
         msg_reg = (
-            f"[Dynamical regularization] ɣ_dyn = {gamma_dyn:#8.3g}"  # noqa: RUF001
-            f"\n[Background regularization] ɣ_reg = {gamma_bkg:#8.3g}"  # noqa: RUF001
+            f"[Dynamical regularization] {dyn_regs} with ɣ_dyn = {dyn_gammas}"  # noqa: RUF001
+            f"\n[Background regularization] {bases_with_bkg}"
+            f" with ɣ_reg = {bases_gammas}"  # noqa: RUF001
         )
     else:
         msg_reg = "No regularization."
@@ -189,7 +228,13 @@ if __name__ == "__main__":
         )
     msg_area = f"Focusing on i in [{imin}, {imax}] and j in [{jmin}, {jmax}]"
     msg_output = f"Output will be saved to {output.folder}."
-    output.params.save(args.namespace.__dict__)
+    output.params.save(
+        args.namespace.__dict__
+        | basis_dyn.namespace.__dict__
+        | basis_ext.namespace.__dict__
+        | basis_psi.namespace.__dict__
+        | basis_chi.namespace.__dict__
+    )
 
     logger.info(
         box(msg_simu, msg_area, msg_obs, msg_reg, msg_output, style="=")
@@ -284,7 +329,12 @@ if __name__ == "__main__":
         )
     # PV computation
     build_q_rg = build_pv_funcs(
-        dx, dy, beta_plane.f0, beta_effect_wide, b, space_slice_wide.nx
+        dx,
+        dy,
+        beta_plane.f0,
+        beta_effect_wide * (args.model_type != SurfaceVorticity.get_type()),
+        b,
+        space_slice_wide.nx,
     )
 
     outputs = {"results": [], "optim": [], "basis": []}
@@ -345,7 +395,7 @@ if __name__ == "__main__":
             space_slice,
             dt,
             n_steps_per_cyle,
-            args.reg_exp,
+            2,
             None,
             None,
         )
@@ -401,30 +451,35 @@ if __name__ == "__main__":
                 alpha = kappa_to_alpha(kappa)
                 pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
 
-                dynamical_reg_fns = inline_reg_setup(
+                try:
+                    A = model.A
+                except AttributeError:
+                    A = torch.zeros((1, 1), **specs)
+
+                dynamical_reg_fns = setup_dynamical_regs(
+                    dyn_regs,
                     bases,
-                    model.A,
+                    A,
                     space_slice,
-                    beta_plane.f0,
+                    beta_plane,
                     beta_effect_wide[..., b:-b],
                     T,
                     wide=True,
                 )
-                background_reg_fns = post_cycle_reg_setup(bases, Qs)
+                background_reg_fns = setup_background_regs(bases_with_bkg, Qs)
 
-                if model.A.shape[1] == 1:
-                    A11 = model.A[:1, :1]
+                if A.shape[1] == 1:
+                    A11 = A[:1, :1]
                     A12 = torch.zeros_like(A11)
                 else:
-                    A11 = model.A[:1, :1]
-                    A12 = model.A[:1, 1:2]
+                    A11 = A[:1, :1]
+                    A12 = A[:1, 1:2]
 
                 q_rg, q_rg_bc = build_q_rg(A11, A12)
                 q0 = crop(q_rg(psi0), b - 1)
                 q_bcs = [q_rg_bc(p1) for p1 in psi_bcs_w]
                 q_bc_interp = QuadraticInterpolation(times, q_bcs)
-
-                model.set_psiq(crop(psi0[:, :1], b), q0)
+                init_model(model, crop(psi0[:, :1], b), q0)
                 model.set_boundary_maps(psi_bc_interp, q_bc_interp)
 
                 obs_loss = torch.tensor(0, **specs)
@@ -435,39 +490,39 @@ if __name__ == "__main__":
 
                 if (p := psis[0]) is not None:
                     obs_loss += mse(
-                        model.psi[0, 0].ravel()[masks_psi[0]],
+                        retrieve_psi_g(model)[0, 0].ravel()[masks_psi[0]],
                         p,
                         variance=var_psi,
                     )
 
                 for n in range(1, n_steps_per_cyle):
-                    psi1_ = model.psi
+                    psi1_ = retrieve_psi_g(model)
                     t = model.time.clone()
                     model.step()
-                    psi1 = model.psi
+                    psi1 = retrieve_psi_g(model)
 
                     if with_reg:
                         dynamical_reg += sum(
-                            reg(psi1, (psi1 - psi1_) / dt, t)
-                            for reg in dynamical_reg_fns.values()
+                            dyn_gammas[k] * f(psi1, (psi1 - psi1_) / dt, t)
+                            for k, f in dynamical_reg_fns.items()
                         )
 
                     if (p := psis[n]) is not None:
                         obs_loss += mse(
-                            model.psi[0, 0].ravel()[masks_psi[n]],
+                            retrieve_psi_g(model)[0, 0].ravel()[masks_psi[n]],
                             p,
                             variance=var_psi,
                         )
                 if with_reg:
                     background_reg += sum(
-                        f(coefs[k]) for k, f in background_reg_fns.items()
+                        bases_gammas[k] * f(coefs[k])
+                        if bases_with_bkg[k]
+                        else 0
+                        for k, f in background_reg_fns.items()
                     )
-                reg_loss = (
-                    gamma_dyn * dynamical_reg + gamma_bkg * background_reg
-                )
-                loss = obs_loss + reg_loss
+                loss = obs_loss + dynamical_reg + background_reg
 
-            if torch.isnan(model.psi).any():
+            if torch.isnan(retrieve_psi_g(model)).any():
                 msg = f"NaN in stream function at {o=}."
                 logger.warning(box(msg))
                 overflow_encountered = True

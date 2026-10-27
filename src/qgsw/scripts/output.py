@@ -65,16 +65,19 @@ class OutputFile:
     _load: Callable[[], Any]
     _save: Callable[[Any], None]
 
-    def __init__(self, filename: Path) -> None:
+    def __init__(self, filename: Path, *, dry_run: bool = False) -> None:
         """Instantiate OutputFile.
 
         Args:
             filename (Path): Filename.
+            dry_run (bool, optional): NOthing will be saved if True.
+                Defaults to False.
 
         Raises:
             ValueError: If the file suffix is not valid.
         """
         self._file = filename
+        self.dry_run = dry_run
         match filename.suffix[1:]:
             case "json":
                 self._load = self._load_json
@@ -112,9 +115,13 @@ class OutputFile:
         Args:
             obj (Any): Data to save.
         """
-        self._save(obj)
-        msg = f"Saved to {self._file}."
-        logger.detail(msg)
+        if not self.dry_run:
+            self._save(obj)
+            msg = f"Saved to {self._file}."
+            logger.detail(msg)
+        else:
+            msg = f"[dry run] Saved to {self._file}."
+            logger.detail(msg)
 
     def _save_json(self, obj: Any) -> None:  # noqa: ANN401
         with self.file.open("w", encoding="utf-8") as f:
@@ -148,6 +155,8 @@ def build_output_folder(
     results: str = "results",
     basis: str = "basis",
     optim: str = "optim",
+    *,
+    dry_run: bool = False,
 ) -> OutputFolder:
     """Build output folder.
 
@@ -158,18 +167,20 @@ def build_output_folder(
             Defaults to "results".
         basis (str, optional): Name of the basis file. Defaults to "basis".
         optim (str, optional): Name of the optim file. Defaults to "optim".
+        dry_run (bool, optional): NOthing will be saved if True.
+                Defaults to False.
 
     Returns:
         OutputFolder: Output
     """
     output_folder = Path(output_folder)
-    if not output_folder.exists():
+    if not output_folder.exists() and not dry_run:
         msg = "The output folder does not exist."
         raise ValueError(msg)
-    paramsf = OutputFile(output_folder / f"{params}.json")
-    resultsf = OutputFile(output_folder / f"{results}.pt")
-    basisf = OutputFile(output_folder / f"{basis}.pt")
-    optimf = OutputFile(output_folder / f"{optim}.json")
+    paramsf = OutputFile(output_folder / f"{params}.json", dry_run=dry_run)
+    resultsf = OutputFile(output_folder / f"{results}.pt", dry_run=dry_run)
+    basisf = OutputFile(output_folder / f"{basis}.pt", dry_run=dry_run)
+    optimf = OutputFile(output_folder / f"{optim}.json", dry_run=dry_run)
     return OutputFolder(
         folder=output_folder,
         params=paramsf,
