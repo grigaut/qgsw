@@ -255,6 +255,14 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         return self._compute_vort_from_psi(self.psi)
 
     @property
+    def uv(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Geostrophic velocity."""
+        u, v = self._grad_perp(self.psi)
+        u /= self.space.dy
+        v /= self.space.dx
+        return (u, v)
+
+    @property
     def time_stepper(self) -> str:
         """Time stepper."""
         return self._time_stepper

@@ -13,13 +13,10 @@ logger = getLogger(__name__)
 
 def optim_setup(
     bases_optim: dict[str, bool],
-    coefs_lr: dict[str, float],
     coefs: Coefs,
     *,
     alpha_optim: bool,
     wind_optim: bool,
-    alpha_lr: float | None = None,
-    wind_lr: float | None = None,
 ) -> tuple[
     list[{dict[str, Any]}],
     Coefs,
@@ -31,12 +28,9 @@ def optim_setup(
 
     Args:
         bases_optim (dict[str, bool]): Whether to perform optim on bases.
-        coefs_lr (dict[str, float]): Learning rates for coefficients.
         coefs (Coefs): Coefficients.
         alpha_optim (bool): Whether to perform optimization on alpha.
         wind_optim (bool): Whether to perform optimization on wind.
-        alpha_lr (float): Alpha learning rate.
-        wind_lr (float): Wind learning rate.
 
 
     Returns:
@@ -53,39 +47,27 @@ def optim_setup(
     for k, coef in coefs.items():
         if bases_optim[k]:
             coefs_grad[k] = coef.requires_grad_()
-            params += [
-                {
-                    "params": list(coefs_grad[k].values()),
-                    "lr": coefs_lr[k],
-                    "name": f"Basis coefs ({k})",
-                }
-            ]
+            params += list(coefs_grad[k].values())
             numel += coef.numel()
         else:
             coefs_grad[k] = coef
     if alpha_optim:
-        if alpha_lr is None:
-            msg = "No learning rate specified for alpha."
-            raise ValueError(msg)
         kappa = kappa.requires_grad_()
-        params += [{"params": [kappa], "lr": alpha_lr, "name": "κ"}]
+        params += [kappa]
         numel += kappa.numel()
         logger.info("ɑ added to optimisable params.")  # noqa: RUF001
     if wind_optim:
-        if wind_lr is None:
-            msg = "No learning rate specified for the wind."
-            raise ValueError(msg)
         uv10_to_uvsurf = uv10_to_uvsurf.requires_grad_()
-        params += [
-            {
-                "params": [uv10_to_uvsurf],
-                "lr": wind_lr,
-                "name": "Wind conversion",
-            }
-        ]
+        params += [uv10_to_uvsurf]
         numel += uv10_to_uvsurf.numel()
         logger.info("Wind conversion matrix added to optimisable params.")
 
     msg = f"Control vector contains {numel} elements."
     logger.info(box(msg, style="round"))
-    return params, coefs_grad, kappa, uv10_to_uvsurf, numel
+    return (
+        params,
+        coefs_grad,
+        kappa,
+        uv10_to_uvsurf,
+        numel,
+    )

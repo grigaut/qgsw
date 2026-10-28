@@ -1,5 +1,7 @@
 """Variational analysis."""
 
+# ruff: noqa: B023
+
 from __future__ import annotations
 
 import gc
@@ -8,7 +10,13 @@ from pathlib import Path
 
 import torch
 
-from qgsw.cli import BasisParser, ScriptsArgsParser, parse_presets
+from qgsw import logging
+from qgsw.cli import (
+    OptimBasisParser,
+    OptimParamParser,
+    ScriptsArgsParser,
+    parse_presets,
+)
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.fields.variables.tuples import UVH
@@ -21,14 +29,14 @@ from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
-from qgsw.optim.callbacks import LRChangeCallback
 from qgsw.optim.utils import EarlyStop, RegisterParams
+from qgsw.plots.live_plots import LivePlot
 from qgsw.scripts.boundaries import (
     extract_psi_bc,
     extract_wide_psi_bc,
 )
 from qgsw.scripts.loss import mse
-from qgsw.scripts.model_interactions import init_model, retrieve_psi_g
+from qgsw.scripts.model_interactions import get_psi_g, init_model
 from qgsw.scripts.output import build_output_folder, create_output_folder
 from qgsw.scripts.parameterizations import kappa_to_alpha
 from qgsw.scripts.pv import build_pv_funcs
@@ -66,25 +74,27 @@ if __name__ == "__main__":
     )
     args.add_regs(1, 1)
     args.add_indices()
-    args.add_alpha(1e-2)
     args.add_perturbed_params()
     args.set_presets(presets)
     args.retrieve()
 
-    basis_dyn = BasisParser("dyn")
+    basis_dyn = OptimBasisParser("basis-dyn")
     basis_dyn.set_presets(presets)
     basis_dyn.retrieve()
-    basis_ext = BasisParser("ext")
+    basis_ext = OptimBasisParser("basis-ext")
     basis_ext.set_presets(presets)
     basis_ext.retrieve()
-    basis_psi = BasisParser("psi")
+    basis_psi = OptimBasisParser("basis-psi")
     basis_psi.set_presets(presets)
     basis_psi.retrieve()
-    basis_chi = BasisParser("chi")
+    basis_chi = OptimBasisParser("basis-chi")
     basis_chi.set_presets(presets)
     basis_chi.retrieve()
+    alpha_param = OptimParamParser("alpha")
+    alpha_param.set_presets(presets)
+    alpha_param.retrieve()
 
-    with_alpha = not args.no_alpha
+    with_alpha_optim = alpha_param.optim
     with_reg = not args.no_reg
     with_obs_track = args.obs_track
     with_wind = not args.no_wind
@@ -102,13 +112,12 @@ if __name__ == "__main__":
         basis_chi.type,
         check=True,
     )
-
-    bases_lrs = retrieve_bases_elements(
+    bases_scales = retrieve_bases_elements(
         args.model_type,
-        basis_dyn.learning_rate,
-        basis_ext.learning_rate,
-        basis_psi.learning_rate,
-        basis_chi.learning_rate,
+        basis_dyn.scaling_factor,
+        basis_ext.scaling_factor,
+        basis_psi.scaling_factor,
+        basis_chi.scaling_factor,
     )
     bases_with_bkg = retrieve_bases_elements(
         args.model_type,
@@ -399,7 +408,7 @@ if __name__ == "__main__":
         bases, Qs = setup_basis(
             bases_types,
             None,
-            space_slice,
+            space_slice.widen(3, 3),
             dt,
             n_steps_per_cyle,
             2,
@@ -419,24 +428,25 @@ if __name__ == "__main__":
 
         params, coefs, kappa, t, numel = optim_setup(
             bases_optims,
-            bases_lrs,
             coefs,
-            alpha_optim=model.implements_alpha and with_alpha,
+            alpha_optim=model.implements_alpha and with_alpha_optim,
             wind_optim=False,
-            alpha_lr=args.alpha_lr,
-            wind_lr=None,
         )
 
-        optimizer = torch.optim.Adam(params)
-
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, factor=0.5, patience=5
+        max_iter = 20
+        optimizer = torch.optim.LBFGS(
+            params,
+            lr=1,
+            line_search_fn="strong_wolfe",
+            history_size=20,
+            max_iter=max_iter,
         )
-        lr_callback = LRChangeCallback(optimizer)
+
         early_stop = EarlyStop()
 
         scaling_fn = retrieve_scaling_func(
             {k: basis.type for k, basis in bases.items()},
+            bases_scales,
             model.get_type(),
             L,
             U,
@@ -444,146 +454,140 @@ if __name__ == "__main__":
             n_steps_per_cyle * dt,
         )
 
-        alpha = kappa_to_alpha(kappa)
+        alpha = kappa_to_alpha(kappa * alpha_param.scaling_factor)
         register_params = RegisterParams(
             **scaling_fn(coefs),
             **{"alpha": alpha} if model.implements_alpha else {},
         )
+        live_plot = LivePlot(model, active=args.live_plot)
+        tracker: dict[str, torch.Tensor] = {}
 
-        for o in range(args.optim):
+        def closure() -> torch.Tensor:  # noqa: PLR0915
+            """Closure for optimizer."""
             optimizer.zero_grad()
             model.reset_time()
+            coefs_scaled = scaling_fn(coefs)
+            alpha = kappa_to_alpha(kappa * alpha_param.scaling_factor)
+            pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
 
-            with torch.enable_grad():
-                coefs_scaled = scaling_fn(coefs)
-                alpha = kappa_to_alpha(kappa)
-                pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
+            try:
+                A = model.A
+            except AttributeError:
+                A = torch.zeros((1, 1), **specs)
 
-                try:
-                    A = model.A
-                except AttributeError:
-                    A = torch.zeros((1, 1), **specs)
+            if A.shape[1] == 1:
+                A11 = A[:1, :1]
+                A12 = torch.zeros_like(A11)
+            else:
+                A11 = A[:1, :1]
+                A12 = A[:1, 1:2]
 
-                dynamical_reg_fns = setup_dynamical_regs(
-                    dyn_regs,
-                    bases,
-                    A,
-                    space_slice,
-                    beta_plane,
-                    beta_effect_wide[..., b:-b],
-                    T,
-                    wide=True,
+            dyn_reg_fns = setup_dynamical_regs(
+                dyn_regs,
+                bases,
+                A,
+                space_slice,
+                beta_plane,
+                beta_effect_wide[..., b:-b],
+                T,
+                wide=True,
+            )
+            bkg_reg_fns = setup_background_regs(bases_with_bkg, Qs)
+
+            q_rg, q_rg_bc = build_q_rg(A11, A12)
+            q0 = crop(q_rg(psi0), b - 1)
+            q_bcs = [q_rg_bc(p1) for p1 in psi_bcs_w]
+            q_bc_interp = QuadraticInterpolation(times, q_bcs)
+            init_model(model, crop(psi0[:, :1], b), q0)
+            model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+
+            obs = torch.tensor(0, **specs)
+            dyn = torch.tensor(0, **specs)
+            bkg = torch.tensor(0, **specs)
+
+            if (p := psis[0]) is not None:
+                obs += mse(
+                    get_psi_g(model)[0, 0].ravel()[masks_psi[0]],
+                    p,
+                    variance=var_psi,
                 )
-                background_reg_fns = setup_background_regs(bases_with_bkg, Qs)
 
-                if A.shape[1] == 1:
-                    A11 = A[:1, :1]
-                    A12 = torch.zeros_like(A11)
-                else:
-                    A11 = A[:1, :1]
-                    A12 = A[:1, 1:2]
-
-                q_rg, q_rg_bc = build_q_rg(A11, A12)
-                q0 = crop(q_rg(psi0), b - 1)
-                q_bcs = [q_rg_bc(p1) for p1 in psi_bcs_w]
-                q_bc_interp = QuadraticInterpolation(times, q_bcs)
-                init_model(model, crop(psi0[:, :1], b), q0)
-                model.set_boundary_maps(psi_bc_interp, q_bc_interp)
-
-                obs_loss = torch.tensor(0, **specs)
-                dynamical_reg = torch.tensor(0, **specs)
-                background_reg = torch.tensor(0, **specs)
-
-                loss = torch.tensor(0, **specs)
-
-                if (p := psis[0]) is not None:
-                    obs_loss += mse(
-                        retrieve_psi_g(model)[0, 0].ravel()[masks_psi[0]],
-                        p,
-                        variance=var_psi,
-                    )
-
-                for n in range(1, n_steps_per_cyle):
-                    psi1_ = retrieve_psi_g(model)
-                    t = model.time.clone()
-                    model.step()
-                    psi1 = retrieve_psi_g(model)
-
-                    if with_reg:
-                        dynamical_reg += sum(
-                            dyn_gammas[k] * f(psi1, (psi1 - psi1_) / dt, t)
-                            for k, f in dynamical_reg_fns.items()
-                        )
-
-                    if (p := psis[n]) is not None:
-                        obs_loss += mse(
-                            retrieve_psi_g(model)[0, 0].ravel()[masks_psi[n]],
-                            p,
-                            variance=var_psi,
-                        )
+            for n in range(1, n_steps_per_cyle):
+                psi_ = get_psi_g(model)
+                t = model.time.clone()
+                model.step()
+                psi = get_psi_g(model)
+                dpsi = (psi - psi_) / model.dt
                 if with_reg:
-                    background_reg += sum(
-                        bases_gammas[k] * f(coefs[k])
-                        if bases_with_bkg[k]
-                        else 0
-                        for k, f in background_reg_fns.items()
+                    dyn += sum(
+                        dyn_gammas[k] * f(psi, dpsi, t)
+                        for k, f in dyn_reg_fns.items()
                     )
-                loss = obs_loss + dynamical_reg + background_reg
 
-            if torch.isnan(retrieve_psi_g(model)).any():
-                msg = f"NaN in stream function at {o=}."
-                logger.warning(box(msg))
-                overflow_encountered = True
-                break
-
-            if torch.isnan(loss.detach()):
-                msg = f"Loss has diverged at {o=}."
-                logger.warning(box(msg, style="="))
-                overflow_encountered = True
-                break
-
-            losses["obs_losses"].append(obs_loss.detach().item())
-            losses["dynamical_reg"].append(dynamical_reg.detach().item())
-            losses["background_reg"].append(background_reg.detach().item())
-
+                if (p := psis[n]) is not None:
+                    obs += mse(
+                        psi[0, 0].ravel()[masks_psi[n]], p, variance=var_psi
+                    )
+            if with_reg:
+                bkg += sum(
+                    bases_gammas[k] * f(coefs[k]) if bases_with_bkg[k] else 0
+                    for k, f in bkg_reg_fns.items()
+                )
+            loss = obs + dyn + bkg
             register_params.step(
                 loss,
                 **{k: c.to_dict() for k, c in coefs_scaled.items()},
                 **{"alpha": alpha} if model.implements_alpha else {},
             )
+            live_plot.step()
+
+            msg = (
+                f"[Substep {step(tracker['counter'] + 1, max_iter)}] "
+                f"Loss: {loss.detach().item():>#10.5g}"
+                f" | Obs: {obs.detach().item():>#10.5g}"
+                f" | Dyn Reg: {dyn.detach().item():>#10.5g}"
+                f" | Bkg Reg: {bkg.detach().item():>#10.5g}"
+            )
+            logger.detail(msg)
+            loss.backward()
+            tracker["tot"] = loss.detach()
+            tracker["obs"] = obs.detach()
+            tracker["dyn"] = dyn.detach()
+            tracker["bkg"] = bkg.detach()
+            tracker["counter"] += 1
+            return loss
+
+        for o in range(args.optim):
+            tracker["counter"] = 0
+            with logger.section(
+                f"Starting optimizer step: {step(o + 1, args.optim)}",
+                level=logging.DETAIL,
+            ):
+                optimizer.step(closure)
+
+            losses["obs_losses"].append(tracker["obs"])
+            losses["dynamical_reg"].append(tracker["dyn"])
+            losses["background_reg"].append(tracker["bkg"])
+
+            loss = tracker["tot"]
+            best_loss = register_params.best_loss
 
             if early_stop.step(loss):
                 msg = f"Convergence reached after {o + 1} iterations."
                 logger.info(msg)
                 break
 
-            loss_ = loss.cpu().item()
-
             msg = (
                 f"Cycle {step(c + 1, args.cycles)} | "
                 f"Optimization step {step(o + 1, args.optim)} | "
-                f"Loss: {loss_:>#10.5g} | "
-                f"Best loss: {register_params.best_loss:>#10.5g}"
+                f"Loss: {loss:>#10.5g} | "
+                f"Best loss: {best_loss:>#10.5g}"
+                f"\n\tObs: {tracker['obs'].item():>#10.5g}"
+                f" | Dyn Reg: {tracker['dyn'].item():>#10.5g}"
+                f" | Bkg Reg: {tracker['bkg'].item():>#10.5g}"
             )
             logger.info(msg)
 
-            msg = (
-                f"\tObs: {obs_loss.detach().item():>#10.5g}"
-                f" | Dyn Reg: {dynamical_reg.detach().item():>#10.5g}"
-                f" | Bkg Reg: {background_reg.detach().item():>#10.5g}"
-            )
-            logger.detail(msg)
-
-            loss.backward()
-
-            for p in params:
-                torch.nn.utils.clip_grad_norm_(p["params"], max_norm=1)
-
-            optimizer.step()
-            scheduler.step(loss)
-            lr_callback.step()
-
-        best_loss = register_params.best_loss
         msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
         max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
         msg_mem = f"Max memory allocated: {max_mem:.1f} MB."

@@ -56,6 +56,14 @@ class DecompositionCoefs:
         """Use dict's __iter__ method."""
         return iter(self._coefs)
 
+    def __mul__(self, other: float) -> "DecompositionCoefs":
+        """Multiplication."""
+        return self.scale(*[other for _ in range(self.order)])
+
+    def __rmul__(self, other: float) -> "DecompositionCoefs":
+        """Multiplication."""
+        return self.__mul__(other)
+
     def items(self) -> ItemsView[int, torch.Tensor]:
         """Return coefs items."""
         return self._coefs.items()

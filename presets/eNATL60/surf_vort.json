@@ -15,11 +15,11 @@
     "sigma_bc":12,
     "sigma_ic":12,
 
-    "basis_psi": "gaussian-exps",
-    "basis_psi_lr":5e-1,
+    "basis_psi": "wavelets",
+    "basis_psi_lr":1e0,
     "basys_psi_bkg_reg":false,
-    "basis_chi": "gaussian-exps",
-    "basis_chi_lr":5e-1,
+    "basis_chi": "wavelets",
+    "basis_chi_lr":1e0,
     "basys_chi_bkg_reg":false,
 
     "dyn_reg_div":true,
@@ -29,5 +29,7 @@
     "alpha_lr":1e-2,
 
     "no_reg":false,
-    "no_wind":true
+    "no_wind":true,
+
+    "wind_no_optim":true
 }
