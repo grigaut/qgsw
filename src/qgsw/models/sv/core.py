@@ -81,6 +81,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         self._basis_chi_a = basis
         wide_space = self.space.widen(1, 1)
         self.f_chi_a = basis.localize(*wide_space.q.xy)
+        self.f_div = basis.localize_laplacian(*wide_space.q.xy)
 
     @property
     def _substep_time(self) -> torch.Tensor:
@@ -135,6 +136,11 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     def chi_a(self) -> torch.Tensor:
         """Potential."""
         return self.f_chi_a(self.time)[None, None, ...]
+
+    @property
+    def div(self) -> torch.Tensor:
+        """Potential."""
+        return self.f_div(self.time)[None, None, ...]
 
     @property
     def uv_g(self) -> tuple[torch.Tensor, torch.Tensor]:
