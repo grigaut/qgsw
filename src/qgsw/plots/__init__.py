@@ -1,6 +1,7 @@
 """Plotting related tools."""
 
 import seaborn as sns
+from matplotlib import pyplot as plt
 
 from qgsw.plots.plt_wrapper import (
     blittable_suptitle,
@@ -27,4 +28,5 @@ __all__ = [
     "show",
     "subplots",
 ]
+plt.rcParams["figure.raise_window"] = False
 sns.set_theme("notebook", style="dark")
