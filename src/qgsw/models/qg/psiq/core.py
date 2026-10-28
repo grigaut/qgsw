@@ -136,13 +136,13 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             return self.time
         if self.time_stepper == "rk3":
             if self._rk3_step == 0:
-                coef = 1 / 2
+                coef = 0
                 return self.time + coef * self.dt
             if self._rk3_step == 1:
-                coef = 3 / 2
+                coef = 1
                 return self.time + coef * self.dt
             if self._rk3_step == 2:
-                coef = 1
+                coef = 1 / 2
                 return self.time + coef * self.dt
             msg = "SSPRK3 should only perform 3 steps."
             raise ValueError(msg)
