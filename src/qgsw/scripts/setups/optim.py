@@ -12,6 +12,7 @@ logger = getLogger(__name__)
 
 
 def optim_setup(
+    bases_optim: dict[str, bool],
     coefs_lr: dict[str, float],
     coefs: Coefs,
     *,
@@ -29,6 +30,7 @@ def optim_setup(
     """Setup optimization.
 
     Args:
+        bases_optim (dict[str, bool]): Whether to perform optim on bases.
         coefs_lr (dict[str, float]): Learning rates for coefficients.
         coefs (Coefs): Coefficients.
         alpha_optim (bool): Whether to perform optimization on alpha.
@@ -49,15 +51,18 @@ def optim_setup(
     coefs_grad: Coefs = {}
     params = []
     for k, coef in coefs.items():
-        coefs_grad[k] = coef.requires_grad_()
-        params += [
-            {
-                "params": list(coefs_grad[k].values()),
-                "lr": coefs_lr[k],
-                "name": f"Basis coefs ({k})",
-            }
-        ]
-        numel += coef.numel()
+        if bases_optim[k]:
+            coefs_grad[k] = coef.requires_grad_()
+            params += [
+                {
+                    "params": list(coefs_grad[k].values()),
+                    "lr": coefs_lr[k],
+                    "name": f"Basis coefs ({k})",
+                }
+            ]
+            numel += coef.numel()
+        else:
+            coefs_grad[k] = coef
     if alpha_optim:
         if alpha_lr is None:
             msg = "No learning rate specified for alpha."

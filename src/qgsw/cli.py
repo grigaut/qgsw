@@ -889,6 +889,11 @@ class BasisParser:
         """Gamma."""
         return getattr(self.namespace, f"basis_{self.basis_name}_gamma")
 
+    @property
+    def optim(self) -> bool:
+        """Whether to optim the basis coefficients or not."""
+        return not getattr(self.namespace, f"basis_{self.basis_name}_no_optim")
+
     def __repr__(self) -> str:
         """String representation."""
         return self.namespace.__repr__()
@@ -932,6 +937,12 @@ class BasisParser:
             f"--b{basis_name}-gamma",
             type=float,
             help=f"Background gamma for b{basis_name}.",
+        )
+        ### Basis optim
+        self.parser.add_argument(
+            f"--basis-{basis_name}-no-optim",
+            action="store_true",
+            help=f"Whether to optim b{basis_name} coefficients.",
         )
 
     def retrieve(self) -> None:
