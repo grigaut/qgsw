@@ -124,6 +124,13 @@ if __name__ == "__main__":
         basis_psi.gamma,
         basis_chi.gamma,
     )
+    bases_optims = retrieve_bases_elements(
+        args.model_type,
+        basis_dyn.optim,
+        basis_ext.optim,
+        basis_psi.optim,
+        basis_chi.optim,
+    )
 
     dyn_regs = {}
     dyn_regs["qg"] = args.dyn_reg_qg and (not args.no_reg)
@@ -411,6 +418,7 @@ if __name__ == "__main__":
         }
 
         params, coefs, kappa, t, numel = optim_setup(
+            bases_optims,
             bases_lrs,
             coefs,
             alpha_optim=model.implements_alpha and with_alpha,
