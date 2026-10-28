@@ -10,12 +10,21 @@ from qgsw.models.sv.core import SurfaceVorticity
 class LivePlot:
     """Live plot."""
 
-    def __init__(self, model: QGPSIQCore | SurfaceVorticity) -> None:
+    def __init__(
+        self,
+        model: QGPSIQCore | SurfaceVorticity,
+        *,
+        active: bool = False,
+    ) -> None:
         """Instantiate live plot.
 
         Args:
             model (QGPSIQCore | SurfaceVorticity): Model.
+            active (bool): Whether the plot is actove or not.
         """
+        if not active:
+            self._plot = self._no_plot
+            return
         if not plt.isinteractive():
             plt.ion()
 
@@ -41,7 +50,8 @@ class LivePlot:
             )
             self._plot = self._plot_qg
 
-    def _plot_qg(self, model: QGPSIQCore) -> None:
+    def _plot_qg(self) -> None:
+        model: QGPSIQCore = self.model
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],
@@ -60,8 +70,10 @@ class LivePlot:
 
         plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
         plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.pause(0.05)
 
-    def _plot_sv(self, model: SurfaceVorticity) -> None:
+    def _plot_sv(self) -> None:
+        model: SurfaceVorticity = self.model
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],
@@ -119,8 +131,11 @@ class LivePlot:
             model.uv_a[1][0, 0],
             ax=self.vel_axs[2, 1],
         )
+        plt.pause(0.05)
+
+    def _no_plot(self) -> None:
+        return
 
     def step(self) -> None:
         """Make a step."""
-        self._plot(self.model)
-        plt.pause(0.05)
+        self._plot()
