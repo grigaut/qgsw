@@ -46,11 +46,11 @@ SCALINGS = {
     SurfaceVorticity.get_type(): {
         MIOSTBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs,
         WaveletBasis.type: lambda coefs, L, U, psi0_mean, T_tot: coefs.scale(
-            *(1e-1 * psi0_mean for _ in range(coefs.order))
+            *(1 * psi0_mean for _ in range(coefs.order))
         ),
         GaussianExpBasis.type: lambda coefs, L, U, psi0_mean, T_tot: (
             coefs.scale(
-                *(1e-1 * psi0_mean / (T_tot) ** k for k in range(coefs.order))
+                *(1 * psi0_mean / (T_tot) ** k for k in range(coefs.order))
             )
         ),
     },
@@ -59,6 +59,7 @@ SCALINGS = {
 
 def retrieve_scaling_func(
     basis_types: dict[str, str],
+    basis_scalings: dict[str, float],
     model_type: str,
     L: float,
     U: float,
@@ -69,6 +70,7 @@ def retrieve_scaling_func(
 
     Args:
         basis_types (dict[str, str]): Basis types.
+        basis_scalings (dict[str, float]): Basis scalings values.
         model_type (str): Model type.
         L (float): Horizontal scale.
         U (float): Horizontal velocity scale.
@@ -83,7 +85,13 @@ def retrieve_scaling_func(
         coefs: Coefs,
     ) -> Coefs:
         return {
-            k: SCALINGS[model_type][basis](coefs[k], L, U, psi0_mean, T_tot)
+            k: SCALINGS[model_type][basis](
+                coefs[k] * basis_scalings[k],
+                L,
+                U,
+                psi0_mean,
+                T_tot,
+            )
             for k, basis in basis_types.items()
         }
 
