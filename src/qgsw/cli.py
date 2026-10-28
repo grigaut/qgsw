@@ -53,10 +53,6 @@ class ScriptsArgsParser:
     has_separation = False
     has_season = False
     has_no_reg = False
-    has_no_alpha = False
-    has_alpha_lr = False
-    has_wind_optim = False
-    has_wind_lr = False
     has_gamma_sst = False
     has_no_ml_optim = False
     has_sst_forcing = False
@@ -73,6 +69,8 @@ class ScriptsArgsParser:
     has_gamma_dyn_qg = False
     has_gamma_dyn_div = False
     has_dry_run = False
+    has_live_plot = False
+    has_optimizer = False
 
     @property
     def config(self) -> Path:
@@ -172,42 +170,6 @@ class ScriptsArgsParser:
             "Regularization not tracked.",
         )
         return self.namespace.no_reg
-
-    @property
-    def no_alpha(self) -> bool:
-        """No alpha."""
-        self._check_attr(
-            self.has_no_alpha,
-            "Alpha not tracked.",
-        )
-        return self.namespace.no_alpha
-
-    @property
-    def alpha_lr(self) -> float:
-        """alpha_lr."""
-        self._check_attr(
-            self.has_alpha_lr,
-            "Alpha_lr not tracked.",
-        )
-        return self.namespace.alpha_lr
-
-    @property
-    def wind_optim(self) -> bool:
-        """wind_optim."""
-        self._check_attr(
-            self.has_wind_optim,
-            "wind_optim not tracked.",
-        )
-        return self.namespace.wind_optim
-
-    @property
-    def wind_lr(self) -> float:
-        """wind_lr."""
-        self._check_attr(
-            self.has_wind_lr,
-            "wind_lr not tracked.",
-        )
-        return self.namespace.wind_lr
 
     @property
     def gamma_sst(self) -> float:
@@ -352,6 +314,24 @@ class ScriptsArgsParser:
             "dry_run not tracked.",
         )
         return self.namespace.dry_run
+
+    @property
+    def live_plot(self) -> bool:
+        """Live."""
+        self._check_attr(
+            self.has_live_plot,
+            "live_plot not tracked.",
+        )
+        return self.namespace.live_plot
+
+    @property
+    def optimizer(self) -> str:
+        """Optmizer name."""
+        self._check_attr(
+            self.has_optimizer,
+            "Optimizer not tracked.",
+        )
+        return self.namespace.optimizer
 
     def __init__(self) -> None:
         """Instantiate parser."""
@@ -564,50 +544,6 @@ class ScriptsArgsParser:
             help="Disable regularization.",
         )
         self.has_no_reg = True
-
-    def add_alpha(self, lr_default: float) -> None:
-        """Specify whether to use alpha or not."""
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--no-alpha",
-            action="store_true",
-            help="Disable regularization.",
-        )
-        self.has_no_alpha = True
-        self.add_alpha_lr(lr_default)
-
-    def add_alpha_lr(self, default_value: float) -> None:
-        """Alpha learning rate."""
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--alpha-lr",
-            type=float,
-            default=default_value,
-            help="Learning rate for alpha.",
-        )
-        self.has_alpha_lr = True
-
-    def add_wind_optim(self, lr_default: float) -> None:
-        """Add wind optimization."""
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--wind-optim",
-            action="store_true",
-            help="Whether to perform wind optimization.",
-        )
-        self.has_wind_optim = True
-        self.add_wind_lr(lr_default)
-
-    def add_wind_lr(self, default_value: float) -> None:
-        """Wind learning rate."""
-        self._check_unretrieved()
-        self.parser.add_argument(
-            "--wind-lr",
-            type=float,
-            default=default_value,
-            help="Learning rate for wind.",
-        )
-        self.has_wind_lr = True
 
     def add_gamma_sst(self, default: float = 1) -> None:
         """Add gamma sst."""
@@ -823,6 +759,27 @@ class ScriptsArgsParser:
         )
         self.has_dry_run = True
 
+    def add_optimizer(self) -> None:
+        """Optimizer."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--optimizer",
+            type=str,
+            choices=["adam", "lbfgs"],
+            help="Optimizer.",
+        )
+        self.has_optimizer = True
+
+    def add_live_plot(self) -> None:
+        """Live plot."""
+        self._check_unretrieved()
+        self.parser.add_argument(
+            "--live-plot",
+            action="store_true",
+            help="To show live plot.",
+        )
+        self.has_live_plot = True
+
     def retrieve(self) -> None:
         """Retrieve arguments."""
         self.parser.parse_known_args(namespace=self.namespace)
@@ -850,6 +807,7 @@ class ScriptsArgsParser:
     ) -> Self:
         """Pre-setup parser for variationla assimilaiton scripts."""
         obj = cls()
+        obj.add_live_plot()
         obj.add_dry_run()
         obj.add_config()
         obj.add_verbose()
@@ -864,85 +822,47 @@ class ScriptsArgsParser:
         return obj
 
 
-class BasisParser:
-    """Basis parser."""
+class OptimParamParser:
+    """Optimizable parameter CLI parser."""
 
     retrieved = False
 
     @property
-    def type(self) -> str:
-        """Basis type."""
-        return getattr(self.namespace, f"basis_{self.basis_name}")
-
-    @property
-    def learning_rate(self) -> float:
+    def scaling_factor(self) -> float:
         """Learning rate."""
-        return getattr(self.namespace, f"basis_{self.basis_name}_lr")
-
-    @property
-    def with_background(self) -> bool:
-        """With background regularization."""
-        return getattr(self.namespace, f"basis_{self.basis_name}_bkg_reg")
-
-    @property
-    def gamma(self) -> float:
-        """Gamma."""
-        return getattr(self.namespace, f"basis_{self.basis_name}_gamma")
+        scale = getattr(self.namespace, f"{self.name_sc}_scale")
+        if scale is None:
+            return 1
+        return scale
 
     @property
     def optim(self) -> bool:
         """Whether to optim the basis coefficients or not."""
-        return not getattr(self.namespace, f"basis_{self.basis_name}_no_optim")
+        return not getattr(self.namespace, f"{self.name_sc}_no_optim")
 
     def __repr__(self) -> str:
         """String representation."""
         return self.namespace.__repr__()
 
-    def __init__(self, basis_name: str) -> None:
+    def __init__(self, name: str) -> None:
         """Instantiate parser."""
-        self.basis_name = basis_name
+        self.name_kc = name.replace("_", "-")
+        self.name_sc = name.replace("-", "_")
         self.parser = argparse.ArgumentParser(
             description="Retrieve basis arguments.",
         )
         self.namespace = argparse.Namespace()
-        ## Basis type
+        ## Basis scale
         self.parser.add_argument(
-            f"--basis-{basis_name}",
-            f"--b{basis_name}",
-            type=str,
-            choices=[
-                MIOSTBasis.type,
-                WaveletBasis.type,
-                GaussianExpBasis.type,
-            ],
-            help=f"Basis '{basis_name}' identification.",
-        )
-        ## Basis learning rate
-        self.parser.add_argument(
-            f"--basis-{basis_name}-lr",
-            f"--b{basis_name}-lr",
+            f"--{self.name_kc}-scale",
             type=float,
-            help=f"Learning rate for b{basis_name}.",
-        )
-        ### Basis background regularization
-        self.parser.add_argument(
-            f"--basis-{basis_name}-bkg-reg",
-            f"--b{basis_name}-bkg-reg",
-            action="store_true",
-            help=f"Whether to use background regularization for b{basis_name}.",  # noqa: E501
-        )
-        ### Basis gamma for background
-        self.parser.add_argument(
-            f"--basis-{basis_name}-gamma",
-            f"--b{basis_name}-gamma",
-            type=float,
-            help=f"Background gamma for b{basis_name}.",
+            help=f"Scaling factor for {name}.",
         )
         ### Basis optim
         self.parser.add_argument(
-            f"--basis-{basis_name}-no-optim",
+            f"--{self.name_kc}-no-optim",
             action="store_true",
-            help=f"Whether to optim b{basis_name} coefficients.",
+            help=f"Whether to optim {name} coefficients.",
         )
 
     def retrieve(self) -> None:
@@ -962,3 +882,49 @@ class BasisParser:
             k: v for k, v in presets.items() if k in tracked_dests
         }
         self.parser.set_defaults(**filtered_presets)
+
+
+class OptimBasisParser(OptimParamParser):
+    """Optim basis CLI parser."""
+
+    @property
+    def type(self) -> str:
+        """Basis type."""
+        return getattr(self.namespace, f"{self.name_sc}")
+
+    @property
+    def with_background(self) -> bool:
+        """With background regularization."""
+        return getattr(self.namespace, f"{self.name_sc}_bkg_reg")
+
+    @property
+    def gamma(self) -> float:
+        """Gamma."""
+        return getattr(self.namespace, f"{self.name_sc}_gamma")
+
+    def __init__(self, name: str) -> None:
+        """Instantiate the parser."""
+        super().__init__(name)
+        ## Basis type
+        self.parser.add_argument(
+            f"--{self.name_kc}",
+            type=str,
+            choices=[
+                MIOSTBasis.type,
+                WaveletBasis.type,
+                GaussianExpBasis.type,
+            ],
+            help=f"Basis '{name}' identification.",
+        )
+        ### Basis background regularization
+        self.parser.add_argument(
+            f"--{self.name_kc}-bkg-reg",
+            action="store_true",
+            help=f"Whether to use background regularization for {name}.",
+        )
+        ### Basis gamma for background
+        self.parser.add_argument(
+            f"--{self.name_kc}-gamma",
+            type=float,
+            help=f"Background gamma for {name}.",
+        )
