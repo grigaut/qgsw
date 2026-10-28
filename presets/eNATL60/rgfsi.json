@@ -10,26 +10,31 @@
     "dx":10000,
     "dy":10000,
 
-    "optim":200,
+    "optim":20,
+    "optimizer": "lbfgs",
 
     "sigma_bc":14,
     "sigma_ic":14,
 
     "basis_dyn": "gaussian-exps",
-    "basis_dyn_lr":1e0,
+    "basis_dyn_scale":1e0,
     "basys_dyn_bkg_reg":false,
+    "basis_dyn_no_optim":false,
+
+    "alpha_no_optim":false,
+    "alpha_scale":1e-2,
 
     "dyn_reg_qg":true,
     "gamma_dyn_qg":1e-3,
 
     "basis_ext": "wavelets",
-    "basis_ext_lr":1e-2,
+    "basis_ext_scale":1e-2,
     "basis_ext_bkg_reg":true,
-    "basis_ext_gamma":1e0,
-
-    "no_alpha":false,
-    "alpha_lr":1e-2,
+    "basis_ext_gamma":1e3,
+    "basis_ext_no_optim":false,
 
     "no_reg":false,
-    "no_wind":true
+    "no_wind":true,
+
+    "wind_no_optim":true
 }

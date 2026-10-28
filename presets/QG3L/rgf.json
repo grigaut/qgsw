@@ -3,14 +3,18 @@
     "prefix": "QG3L",
     "cycles": 12,
     "separation":250,
-    "optim":200,
+    "optim":20,
+    "optimizer": "lbfgs",
 
     "obs_track":true,
 
     "basis_ext": "wavelets",
-    "basis_ext_lr":5e-3,
+    "basis_ext_scale":5e-3,
     "basis_ext_bkg_reg":true,
     "basis_ext_gamma":1e1,
+    "basis_ext_no_optim":false,
+
+    "alpha_no_optim":true,
 
     "no_reg":false,
     "no_wind":false

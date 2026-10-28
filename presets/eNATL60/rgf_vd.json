@@ -10,16 +10,20 @@
     "dx":10000,
     "dy":10000,
 
-    "optim":200,
+    "optim":20,
+    "optimizer": "lbfgs",
 
     "sigma_bc":14,
     "sigma_ic":14,
 
     "basis_ext": "basis-miost",
-    "basis_ext_lr":5e-14,
+    "basis_ext_scale":5e-14,
     "basis_ext_bkg_reg":true,
     "basis_ext_gamma":1e18,
+    "basis_ext_no_optim":false,
 
     "no_reg":false,
-    "no_wind":true
+    "no_wind":true,
+
+    "wind_no_optim":true
 }
