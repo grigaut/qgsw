@@ -25,7 +25,7 @@ def init_model(
     model.set_psiq(psi_g, q_or_zeta)
 
 
-def retrieve_psi_g(
+def get_psi_g(
     model: QGPSIQCore | SurfaceVorticity,
 ) -> torch.Tensor:
     """Init model.
