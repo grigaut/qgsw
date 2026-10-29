@@ -10,7 +10,7 @@
     "dx":10000,
     "dy":10000,
 
-    "optim":200,
+    "optim":100,
 
     "sigma_bc":12,
     "sigma_ic":12,

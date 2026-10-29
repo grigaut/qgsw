@@ -3,7 +3,7 @@
     "prefix": "QG3L",
     "cycles": 12,
     "separation":250,
-    "optim":200,
+    "optim":100,
 
     "obs_track":true,
 
