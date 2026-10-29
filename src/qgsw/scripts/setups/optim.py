@@ -1,7 +1,5 @@
 """Optimization params setups."""
 
-from typing import Any
-
 import torch
 
 from qgsw.logging.core import getLogger
@@ -18,7 +16,7 @@ def optim_setup(
     alpha_optim: bool,
     wind_optim: bool,
 ) -> tuple[
-    list[{dict[str, Any]}],
+    list[torch.Tensor],
     Coefs,
     torch.Tensor,
     torch.Tensor,
@@ -34,7 +32,7 @@ def optim_setup(
 
 
     Returns:
-        tuple[list[{dict[str, Any]}],Coefs,torch.Tensor,torch.Tensor,int]: Optim params, coefs, kappa, ub10_to_uvsurf, numel
+        tuple[list[torch.Tensor],Coefs,torch.Tensor,torch.Tensor,int]: Optim params, coefs, kappa, ub10_to_uvsurf, numel
     """  # noqa: E501
     specs = next(iter(coefs.values())).specs
 
