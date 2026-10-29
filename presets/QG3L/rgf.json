@@ -9,7 +9,7 @@
     "obs_track":true,
 
     "basis_ext": "wavelets",
-    "basis_ext_scale":5e-3,
+    "basis_ext_lr":5e-3,
     "basis_ext_bkg_reg":true,
     "basis_ext_gamma":1e1,
     "basis_ext_no_optim":false,

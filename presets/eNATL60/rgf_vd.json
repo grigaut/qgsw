@@ -17,9 +17,9 @@
     "sigma_ic":14,
 
     "basis_ext": "basis-miost",
-    "basis_ext_scale":5e-14,
+    "basis_ext_lr":1e-9,
     "basis_ext_bkg_reg":true,
-    "basis_ext_gamma":1e18,
+    "basis_ext_gamma":1e-3,
     "basis_ext_no_optim":false,
 
     "no_reg":false,

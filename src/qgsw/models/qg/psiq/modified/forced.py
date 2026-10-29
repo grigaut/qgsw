@@ -66,6 +66,11 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
         self._fext = self._ext_basis.localize(*self.space.remove_h().q.xy)
 
     @property
+    def forcing(self) -> torch.Tensor:
+        """Forcing."""
+        return self._fext(self.time)[None, None, ...]
+
+    @property
     def wind_scaling(self) -> torch.Tensor:
         """Wind forcing scaling."""
         try:
@@ -266,6 +271,11 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             .widen(1 + 2 * self.wide, 1 + 2 * self.wide)
             .q.xy
         )
+
+    @property
+    def psi2(self) -> torch.Tensor:
+        """Psi2."""
+        return self._fpsi2(self.time)[None, None, ...]
 
     def __init__(
         self,
@@ -718,6 +728,11 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
     ) -> None:
         self._ext_basis = basis
         self._fext = self._ext_basis.localize(*self.space.remove_h().q.xy)
+
+    @property
+    def forcing(self) -> torch.Tensor:
+        """Forcing."""
+        return self._fext(self.time)[None, None, ...]
 
     def _compute_time_derivatives_homogeneous(
         self,

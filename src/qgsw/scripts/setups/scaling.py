@@ -59,7 +59,7 @@ SCALINGS = {
 
 def retrieve_scaling_func(
     basis_types: dict[str, str],
-    basis_scalings: dict[str, float],
+    basis_lrs: dict[str, float],
     model_type: str,
     L: float,
     U: float,
@@ -70,7 +70,7 @@ def retrieve_scaling_func(
 
     Args:
         basis_types (dict[str, str]): Basis types.
-        basis_scalings (dict[str, float]): Basis scalings values.
+        basis_lrs (dict[str, float]): Basis learning rates values.
         model_type (str): Model type.
         L (float): Horizontal scale.
         U (float): Horizontal velocity scale.
@@ -86,7 +86,7 @@ def retrieve_scaling_func(
     ) -> Coefs:
         return {
             k: SCALINGS[model_type][basis](
-                coefs[k] * basis_scalings[k],
+                coefs[k] * basis_lrs[k],
                 L,
                 U,
                 psi0_mean,

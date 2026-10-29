@@ -16,6 +16,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
 )
+from qgsw.optim.optimizers import OptimizerName
 
 try:
     from typing import Self
@@ -289,7 +290,7 @@ class ScriptsArgsParser:
         return self.namespace.dyn_reg_div
 
     @property
-    def gamma_dyn_qg(self) -> bool:
+    def gamma_dyn_qg(self) -> float:
         """Divergence dynamical regularization coef."""
         self._check_attr(
             self.has_gamma_dyn_qg,
@@ -298,7 +299,7 @@ class ScriptsArgsParser:
         return self.namespace.gamma_dyn_qg
 
     @property
-    def gamma_dyn_div(self) -> bool:
+    def gamma_dyn_div(self) -> float:
         """Divergence dynamical regularization coef."""
         self._check_attr(
             self.has_gamma_dyn_div,
@@ -325,7 +326,7 @@ class ScriptsArgsParser:
         return self.namespace.live_plot
 
     @property
-    def optimizer(self) -> str:
+    def optimizer(self) -> OptimizerName:
         """Optmizer name."""
         self._check_attr(
             self.has_optimizer,
@@ -764,8 +765,7 @@ class ScriptsArgsParser:
         self._check_unretrieved()
         self.parser.add_argument(
             "--optimizer",
-            type=str,
-            choices=["adam", "lbfgs"],
+            type=OptimizerName,
             help="Optimizer.",
         )
         self.has_optimizer = True
@@ -819,6 +819,7 @@ class ScriptsArgsParser:
         obj.add_optim_max_step(default=200)
         obj.add_separation(default=0)
         obj.add_model_type()
+        obj.add_optimizer()
         return obj
 
 
@@ -828,12 +829,12 @@ class OptimParamParser:
     retrieved = False
 
     @property
-    def scaling_factor(self) -> float:
+    def learning_rate(self) -> float:
         """Learning rate."""
-        scale = getattr(self.namespace, f"{self.name_sc}_scale")
-        if scale is None:
+        lr = getattr(self.namespace, f"{self.name_sc}_lr")
+        if lr is None:
             return 1
-        return scale
+        return lr
 
     @property
     def optim(self) -> bool:
@@ -852,13 +853,13 @@ class OptimParamParser:
             description="Retrieve basis arguments.",
         )
         self.namespace = argparse.Namespace()
-        ## Basis scale
+        ## Learning rate
         self.parser.add_argument(
-            f"--{self.name_kc}-scale",
+            f"--{self.name_kc}-lr",
             type=float,
             help=f"Scaling factor for {name}.",
         )
-        ### Basis optim
+        ### Whether to optim
         self.parser.add_argument(
             f"--{self.name_kc}-no-optim",
             action="store_true",
