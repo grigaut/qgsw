@@ -12,13 +12,25 @@ if TYPE_CHECKING:
 
 @overload
 def crop(
-    t: torch.Tensor, offset_both_or_x: int, offset_y: int | None
+    t: torch.Tensor, offset_both_or_x: int, offset_y: None = None
 ) -> torch.Tensor: ...
 
 
 @overload
 def crop(
-    t: np.ndarray, offset_both_or_x: int, offset_y: int | None
+    t: torch.Tensor, offset_both_or_x: int, offset_y: int
+) -> torch.Tensor: ...
+
+
+@overload
+def crop(
+    t: np.ndarray, offset_both_or_x: int, offset_y: None = None
+) -> np.ndarray: ...
+
+
+@overload
+def crop(
+    t: np.ndarray, offset_both_or_x: int, offset_y: int
 ) -> np.ndarray: ...
 
 
@@ -61,7 +73,16 @@ def crop(
 def crop_xr(
     t: xr.DataArray,
     offset_both_or_x: int,
-    offset_y: int | None,
+    offset_y: None = None,
+    *,
+    x: str = "i",
+    y: str = "j",
+) -> xr.DataArray: ...
+@overload
+def crop_xr(
+    t: xr.DataArray,
+    offset_both_or_x: int,
+    offset_y: int,
     *,
     x: str = "i",
     y: str = "j",
@@ -72,7 +93,18 @@ def crop_xr(
 def crop_xr(
     t: xr.Dataset,
     offset_both_or_x: int,
-    offset_y: int | None,
+    offset_y: None = None,
+    *,
+    x: str = "i",
+    y: str = "j",
+) -> xr.Dataset: ...
+
+
+@overload
+def crop_xr(
+    t: xr.Dataset,
+    offset_both_or_x: int,
+    offset_y: int,
     *,
     x: str = "i",
     y: str = "j",
