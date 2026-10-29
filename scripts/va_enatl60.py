@@ -552,6 +552,8 @@ if __name__ == "__main__":
 
         optimizer = build_optimizer(args.optimizer, params)
         optimizer.max_epoch = args.optim
+        optimizer.cycle = c
+        optimizer.max_cycle = args.cycles
 
         scaling_fn = retrieve_scaling_func(
             {k: basis.type for k, basis in bases.items()},
