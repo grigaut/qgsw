@@ -10,7 +10,6 @@ from pathlib import Path
 
 import torch
 
-from qgsw import logging
 from qgsw.cli import (
     OptimBasisParser,
     OptimParamParser,
@@ -29,14 +28,15 @@ from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
-from qgsw.optim.utils import EarlyStop, RegisterParams
+from qgsw.optim.optimizers import EarlyStopError, build_optimizer
+from qgsw.optim.utils import RegisterParams
 from qgsw.plots.live_plots import LivePlot
 from qgsw.scripts.boundaries import (
     extract_psi_bc,
     extract_wide_psi_bc,
 )
 from qgsw.scripts.loss import mse
-from qgsw.scripts.model_interactions import get_psi_g, init_model
+from qgsw.scripts.model_interactions import get_As, get_psi_g, init_model
 from qgsw.scripts.output import build_output_folder, create_output_folder
 from qgsw.scripts.parameterizations import kappa_to_alpha
 from qgsw.scripts.pv import build_pv_funcs
@@ -56,7 +56,6 @@ from qgsw.spatial.core.discretization import (
 )
 from qgsw.specs import defaults
 from qgsw.utils import covphys
-from qgsw.utils.interpolation import QuadraticInterpolation
 from qgsw.utils.reshaping import crop
 
 torch.backends.cudnn.deterministic = True
@@ -275,7 +274,6 @@ if __name__ == "__main__":
         ),
     )
     dx, dy = space.dx, space.dy
-    nx, ny = space.nx, space.ny
 
     wind = WindForcing.from_config(
         config.windstress,
@@ -358,11 +356,6 @@ if __name__ == "__main__":
     L: float = dx.item()
 
     for c in range(args.cycles):
-        losses = {
-            "obs_losses": [],
-            "dynamical_reg": [],
-            "background_reg": [],
-        }
         overflow_encountered = False
         time0 = time.time()
         torch.cuda.reset_peak_memory_stats()
@@ -403,12 +396,10 @@ if __name__ == "__main__":
         msg = f"Cycle {step(c + 1, n_cycles)}: Model spin-up completed."
         logger.info(box(msg, style="round"))
 
-        psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
-
         bases, Qs = setup_basis(
             bases_types,
             None,
-            space_slice.widen(3, 3),
+            space_slice,
             dt,
             n_steps_per_cyle,
             2,
@@ -433,16 +424,8 @@ if __name__ == "__main__":
             wind_optim=False,
         )
 
-        max_iter = 20
-        optimizer = torch.optim.LBFGS(
-            params,
-            lr=1,
-            line_search_fn="strong_wolfe",
-            history_size=20,
-            max_iter=max_iter,
-        )
-
-        early_stop = EarlyStop()
+        optimizer = build_optimizer(args.optimizer, params)
+        optimizer.max_epoch = args.optim
 
         scaling_fn = retrieve_scaling_func(
             {k: basis.type for k, basis in bases.items()},
@@ -460,32 +443,18 @@ if __name__ == "__main__":
             **{"alpha": alpha} if model.implements_alpha else {},
         )
         live_plot = LivePlot(model, active=args.live_plot)
-        tracker: dict[str, torch.Tensor] = {}
 
-        def closure() -> torch.Tensor:  # noqa: PLR0915
+        def closure(*args, **kwargs) -> torch.Tensor:  # noqa: ANN002, ANN003, ARG001
             """Closure for optimizer."""
-            optimizer.zero_grad()
             model.reset_time()
             coefs_scaled = scaling_fn(coefs)
             alpha = kappa_to_alpha(kappa * alpha_param.scaling_factor)
             pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
 
-            try:
-                A = model.A
-            except AttributeError:
-                A = torch.zeros((1, 1), **specs)
-
-            if A.shape[1] == 1:
-                A11 = A[:1, :1]
-                A12 = torch.zeros_like(A11)
-            else:
-                A11 = A[:1, :1]
-                A12 = A[:1, 1:2]
-
             dyn_reg_fns = setup_dynamical_regs(
                 dyn_regs,
                 bases,
-                A,
+                get_As(model)[0],
                 space_slice,
                 beta_plane,
                 beta_effect_wide[..., b:-b],
@@ -494,12 +463,7 @@ if __name__ == "__main__":
             )
             bkg_reg_fns = setup_background_regs(bases_with_bkg, Qs)
 
-            q_rg, q_rg_bc = build_q_rg(A11, A12)
-            q0 = crop(q_rg(psi0), b - 1)
-            q_bcs = [q_rg_bc(p1) for p1 in psi_bcs_w]
-            q_bc_interp = QuadraticInterpolation(times, q_bcs)
-            init_model(model, crop(psi0[:, :1], b), q0)
-            model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+            init_model(model, psi0, psi_bcs, psi_bcs_w, build_q_rg, times, b)
 
             obs = torch.tensor(0, **specs)
             dyn = torch.tensor(0, **specs)
@@ -520,8 +484,8 @@ if __name__ == "__main__":
                 dpsi = (psi - psi_) / model.dt
                 if with_reg:
                     dyn += sum(
-                        dyn_gammas[k] * f(psi, dpsi, t)
-                        for k, f in dyn_reg_fns.items()
+                        dyn_gammas[k] * dyn_reg_fns[k](psi, dpsi, t)
+                        for k in dyn_reg_fns
                     )
 
                 if (p := psis[n]) is not None:
@@ -530,9 +494,14 @@ if __name__ == "__main__":
                     )
             if with_reg:
                 bkg += sum(
-                    bases_gammas[k] * f(coefs[k]) if bases_with_bkg[k] else 0
-                    for k, f in bkg_reg_fns.items()
+                    bases_gammas[k] * bkg_reg_fns[k](coefs[k])
+                    if bases_with_bkg[k]
+                    else 0
+                    for k in bkg_reg_fns
                 )
+            if torch.isnan(psi).any():
+                msg = "Overflow"
+                raise OverflowError(msg)
             loss = obs + dyn + bkg
             register_params.step(
                 loss,
@@ -540,54 +509,29 @@ if __name__ == "__main__":
                 **{"alpha": alpha} if model.implements_alpha else {},
             )
             live_plot.step()
-
-            msg = (
-                f"[Substep {step(tracker['counter'] + 1, max_iter)}] "
-                f"Loss: {loss.detach().item():>#10.5g}"
-                f" | Obs: {obs.detach().item():>#10.5g}"
-                f" | Dyn Reg: {dyn.detach().item():>#10.5g}"
-                f" | Bkg Reg: {bkg.detach().item():>#10.5g}"
-            )
-            logger.detail(msg)
             loss.backward()
-            tracker["tot"] = loss.detach()
-            tracker["obs"] = obs.detach()
-            tracker["dyn"] = dyn.detach()
-            tracker["bkg"] = bkg.detach()
-            tracker["counter"] += 1
-            return loss
+            return {
+                "tot": loss,
+                "obs": obs,
+                "dyn": dyn,
+                "bkg": bkg,
+                "best": register_params.best_loss,
+            }
 
-        for o in range(args.optim):
-            tracker["counter"] = 0
-            with logger.section(
-                f"Starting optimizer step: {step(o + 1, args.optim)}",
-                level=logging.DETAIL,
-            ):
-                optimizer.step(closure)
+        optimizer.set_closure(closure)
 
-            losses["obs_losses"].append(tracker["obs"])
-            losses["dynamical_reg"].append(tracker["dyn"])
-            losses["background_reg"].append(tracker["bkg"])
-
-            loss = tracker["tot"]
-            best_loss = register_params.best_loss
-
-            if early_stop.step(loss):
-                msg = f"Convergence reached after {o + 1} iterations."
+        for _ in range(args.optim):
+            try:
+                optimizer.step()
+            except (EarlyStopError, OverflowError) as e:
+                msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)
+                overflow_encountered = isinstance(e, OverflowError)
                 break
 
-            msg = (
-                f"Cycle {step(c + 1, args.cycles)} | "
-                f"Optimization step {step(o + 1, args.optim)} | "
-                f"Loss: {loss:>#10.5g} | "
-                f"Best loss: {best_loss:>#10.5g}"
-                f"\n\tObs: {tracker['obs'].item():>#10.5g}"
-                f" | Dyn Reg: {tracker['dyn'].item():>#10.5g}"
-                f" | Bkg Reg: {tracker['bkg'].item():>#10.5g}"
-            )
-            logger.info(msg)
+        live_plot.close()
 
+        best_loss = register_params.best_loss
         msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
         max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
         msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
@@ -607,10 +551,10 @@ if __name__ == "__main__":
                 "cycle": c,
                 "numel": numel,
                 "max_steps": args.optim,
-                "nb_steps": o + 1,
+                "nb_steps": optimizer.epoch + 1,
                 "loss": best_loss.cpu().item(),
                 "max_memory_allocated": max_mem,
-                "losses": losses,
+                "losses": optimizer.losses,
                 "overflow": overflow_encountered,
                 "elapsed": time.time() - time0,
             }
