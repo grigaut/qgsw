@@ -124,6 +124,8 @@ if folder is not None:
 
     badges = []
 
+    badges.append(f":green-badge[optimizer: {params['optimizer']}]")
+
     if params["obs_track"]:
         badges.append(":blue-badge[Observations sampled along tracks]")
     else:
@@ -162,40 +164,54 @@ if folder is not None:
     if badges:
         st.markdown(" ".join(badges))
 
-    col1, col2, col3 = st.columns(3, border=True)
-
     model_type = params["model_type"]
-    basis_external = params["basis_ext"]
-    basis_dynamical = params["basis_dyn"]
-    basis_external_lr = params["basis_ext_lr"]
-    basis_dynamical_lr = params["basis_dyn_lr"]
-    gamma_reg_dyn = params["gamma_reg_dyn"]
-    gamma_reg_bkg = params["gamma_reg_bkg"]
+    st.header(f"Model type: {model_type}", text_alignment="center")
 
-    col1.metric("Model type", model_type)
-    col2.metric("Basis for external forcing", basis_external)
-    col3.metric("Basis for dynamical forcing", basis_dynamical)
+    st.header("Bases")
 
-    col2.metric("Learning rate", basis_external_lr, format="%.1e")
-    col3.metric("Learning rate", basis_dynamical_lr, format="%.1e")
+    bases_names = ["dyn", "ext", "psi", "chi"]
 
-    if not params["no_reg"]:
-        col1, col2, col3 = st.columns(3)
+    tabs = st.columns(len(bases_names), border=True)
 
-        col2.metric(
-            "Background regularization coefficient",
-            gamma_reg_bkg,
-            format="%.1e",
-            border=True,
-        )
-        col3.metric(
-            "Dynamical regularizaiton coefficient",
-            gamma_reg_dyn,
-            format="%.1e",
-            border=True,
-        )
+    for name, tab in zip(bases_names, tabs):
+        with tab:
+            basis = (
+                params[f"basis_{name}"],
+                params[f"basis_{name}_lr"],
+                params[f"basis_{name}_bkg_reg"],
+                params[f"basis_{name}_no_optim"],
+            )
+            st.header(f"Basis '{name}'")
+            st.metric("Basis type", basis[0])
+            st.metric("Learning rate", basis[1])
+            st.metric(
+                "Background reg",
+                f":{'green' if basis[2] else 'red'}[{basis[2]}]",
+            )
+            with_optim = not basis[3]
+            st.metric(
+                "With optim",
+                f":{'green' if with_optim else 'red'}[{with_optim}]",
+            )
 
-    model_type = params["model_type"]
+    reg_names = ["qg", "div"]
+
+    st.header("Dynamical regularizations")
+
+    tabs = st.columns(len(reg_names), border=True)
+
+    for name, tab in zip(reg_names, tabs):
+        with tab:
+            reg = (
+                params[f"dyn_reg_{name}"],
+                params[f"gamma_dyn_{name}"],
+            )
+            st.header(f"Regularization type '{name}'")
+            st.metric(
+                "With regularization",
+                f":{'green' if reg[0] else 'red'}[{reg[0]}]",
+            )
+            st.metric("Gamma", reg[1])
 
     with st.expander("Parameters JSON", expanded=False):
         st.write(params)
@@ -219,7 +235,8 @@ if folder is not None:
         overflow = opt_cycle["overflow"]
     except KeyError:
         overflow = False
-    if (n_optim != (conv := opt_cycle["nb_steps"])) and (not overflow):
+
+    if (n_optim > (conv := opt_cycle["nb_steps"])) and (not overflow):
         st.badge(
             f"Convergence reached in {conv} epochs",
             icon=":material/check:",
@@ -239,27 +256,24 @@ if folder is not None:
     fig = go.Figure()
 
     losses_arr = {
-        k: np.concatenate([np.array(v), np.ones(n_optim - len(v)) * np.nan])
+        k: np.array(
+            v
+        )  # np.concatenate([np.array(v), np.ones(n_optim - len(v)) * np.nan])
         for k, v in losses.items()
     }
-    losses_arr["background_reg"] = gamma_reg_bkg * losses_arr["background_reg"]
-    losses_arr["dynamical_reg"] = gamma_reg_dyn * losses_arr["dynamical_reg"]
 
     loss_names = {
-        "obs_losses": "Observation loss",
-        "dynamical_reg": "Dynamical regularization",
-        "background_reg": "Background regularization",
+        "obs": "Observation loss",
+        "dyn": "Dynamical regularization",
+        "bkg": "Background regularization",
+        "best": "Best loss",
     }
 
-    loss_tot = (
-        losses_arr["obs_losses"]
-        + losses_arr["background_reg"]
-        + losses_arr["dynamical_reg"]
-    )
+    loss_tot = losses_arr["obs"] + losses_arr["bkg"] + losses_arr["dyn"]
 
     fig.add_trace(
         go.Scatter(
-            x=list(range(n_optim)),
+            x=list(range(len(loss_tot))),
             y=loss_tot,
             name="Total loss",
         )
@@ -268,7 +282,7 @@ if folder is not None:
     for key, loss in losses_arr.items():
         fig.add_trace(
             go.Scatter(
-                x=list(range(n_optim)),
+                x=list(range(len(loss))),
                 y=loss,
                 name=loss_names[key],
             )
@@ -283,14 +297,14 @@ if folder is not None:
     argmin_loss = np.nanargmin(loss_tot)
 
     best_loss = loss_tot[argmin_loss]
-    best_obs_loss = losses_arr["obs_losses"][argmin_loss]
-    best_dyn_reg = losses_arr["dynamical_reg"][argmin_loss]
-    best_bkg_reg = losses_arr["background_reg"][argmin_loss]
+    best_obs_loss = losses_arr["obs"][argmin_loss]
+    best_dyn_reg = losses_arr["dyn"][argmin_loss]
+    best_bkg_reg = losses_arr["bkg"][argmin_loss]
 
     col1.metric(
         "Final loss",
         best_loss,
-        format="%.1f",
+        format="%06.4f",
         height="stretch",
         delta_color="blue",
         delta=f"{1 - best_loss / loss_tot[0]:.2%}",
@@ -303,10 +317,10 @@ if folder is not None:
         "Final observation loss",
         best_obs_loss,
         f"{best_obs_loss / best_loss:.0%}",
-        format="%.1f",
+        format="%06.4f",
         delta_arrow="off",
         delta_color="blue",
-        chart_data=np.round(losses_arr["obs_losses"] / loss_tot * 100, 2),
+        chart_data=np.round(losses_arr["obs"] / loss_tot * 100, 2),
         delta_description="of final loss",
         chart_type="area",
     )
@@ -314,17 +328,12 @@ if folder is not None:
         "Final background regularization",
         best_bkg_reg,
         f"{best_bkg_reg / best_loss:.0%}",
-        format="%.1f",
+        format="%06.4f",
         delta_arrow="off",
         delta_color="off"
-        if (
-            losses_arr["background_reg"][
-                ~np.isnan(losses_arr["background_reg"])
-            ]
-            == 0
-        ).all()
+        if (losses_arr["bkg"][~np.isnan(losses_arr["bkg"])] == 0).all()
         else "blue",
-        chart_data=np.round(losses_arr["background_reg"] / loss_tot * 100, 2),
+        chart_data=np.round(losses_arr["bkg"] / loss_tot * 100, 2),
         delta_description="of final loss",
         chart_type="area",
     )
@@ -335,12 +344,9 @@ if folder is not None:
         format="%.1f",
         delta_arrow="off",
         delta_color="off"
-        if (
-            losses_arr["dynamical_reg"][~np.isnan(losses_arr["dynamical_reg"])]
-            == 0
-        ).all()
+        if (losses_arr["dyn"][~np.isnan(losses_arr["dyn"])] == 0).all()
         else "blue",
-        chart_data=np.round(losses_arr["dynamical_reg"] / loss_tot * 100, 2),
+        chart_data=np.round(losses_arr["dyn"] / loss_tot * 100, 2),
         delta_description="of final loss",
         chart_type="area",
     )
