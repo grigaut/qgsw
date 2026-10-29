@@ -9,15 +9,15 @@
     "obs_track":true,
 
     "basis_dyn": "gaussian-exps",
-    "basis_dyn_scale":1e0,
+    "basis_dyn_lr":1e0,
     "basis_dyn_bkg_reg":false,
     "basis_dyn_no_optim":false,
 
     "alpha_no_optim":false,
-    "alpha_scale":1e-2,
+    "alpha_lr":1e-2,
 
     "basis_ext": "wavelets",
-    "basis_ext_scale":5e-3,
+    "basis_ext_lr":5e-3,
     "basis_ext_bkg_reg":true,
     "basis_ext_gamma":1e1,
     "basis_ext_no_optim":false,

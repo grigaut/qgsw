@@ -122,6 +122,7 @@ class LivePlot:
 
         plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
         plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.tight_layout()
         plt.pause(0.05)
 
     def _plot_rgf(self) -> None:
@@ -145,6 +146,7 @@ class LivePlot:
 
         plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
         plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.tight_layout()
         plt.pause(0.05)
 
     def _plot_rgfsi(self) -> None:
@@ -172,6 +174,7 @@ class LivePlot:
 
         plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
         plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.tight_layout()
         plt.pause(0.05)
 
     def _plot_sv(self) -> None:
@@ -233,6 +236,7 @@ class LivePlot:
             model.uv_a[1][0, 0],
             ax=self.vel_axs[2, 1],
         )
+        plt.tight_layout()
         plt.pause(0.05)
 
     def _no_plot(self) -> None:

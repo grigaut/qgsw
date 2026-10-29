@@ -155,12 +155,12 @@ if __name__ == "__main__":
         basis_chi.type,
         check=True,
     )
-    bases_scales = retrieve_bases_elements(
+    bases_lrs = retrieve_bases_elements(
         args.model_type,
-        basis_dyn.scaling_factor,
-        basis_ext.scaling_factor,
-        basis_psi.scaling_factor,
-        basis_chi.scaling_factor,
+        basis_dyn.learning_rate,
+        basis_ext.learning_rate,
+        basis_psi.learning_rate,
+        basis_chi.learning_rate,
     )
     bases_with_bkg = retrieve_bases_elements(
         args.model_type,
@@ -555,7 +555,7 @@ if __name__ == "__main__":
 
         scaling_fn = retrieve_scaling_func(
             {k: basis.type for k, basis in bases.items()},
-            bases_scales,
+            bases_lrs,
             model.get_type(),
             L,
             U,
@@ -563,10 +563,10 @@ if __name__ == "__main__":
             n_steps_per_cyle * dt,
         )
 
-        alpha = kappa_to_alpha(kappa * alpha_param.scaling_factor)
+        alpha = kappa_to_alpha(kappa * alpha_param.learning_rate)
         register_params = RegisterParams(
             **scaling_fn(coefs),
-            uv10_to_uvsurf=uv10_to_uvsurf * wind_param.scaling_factor,
+            uv10_to_uvsurf=uv10_to_uvsurf * wind_param.learning_rate,
             **{"alpha": alpha} if model.implements_alpha else {},
         )
 
@@ -578,13 +578,13 @@ if __name__ == "__main__":
             if with_wind:
                 tauxs_i, tauys_i = compute_windstress(
                     uv10,
-                    uv10_to_uvsurf * wind_param.scaling_factor,
+                    uv10_to_uvsurf * wind_param.learning_rate,
                     rho_water=config.physics.rho,
                     rho_air=1.225,
                 )
 
             coefs_scaled = scaling_fn(coefs)
-            alpha = kappa_to_alpha(kappa * alpha_param.scaling_factor)
+            alpha = kappa_to_alpha(kappa * alpha_param.learning_rate)
             pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
 
             dyn_reg_fns = setup_dynamical_regs(

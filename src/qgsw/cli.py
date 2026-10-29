@@ -829,12 +829,12 @@ class OptimParamParser:
     retrieved = False
 
     @property
-    def scaling_factor(self) -> float:
+    def learning_rate(self) -> float:
         """Learning rate."""
-        scale = getattr(self.namespace, f"{self.name_sc}_scale")
-        if scale is None:
+        lr = getattr(self.namespace, f"{self.name_sc}_lr")
+        if lr is None:
             return 1
-        return scale
+        return lr
 
     @property
     def optim(self) -> bool:
@@ -853,13 +853,13 @@ class OptimParamParser:
             description="Retrieve basis arguments.",
         )
         self.namespace = argparse.Namespace()
-        ## Basis scale
+        ## Learning rate
         self.parser.add_argument(
-            f"--{self.name_kc}-scale",
+            f"--{self.name_kc}-lr",
             type=float,
             help=f"Scaling factor for {name}.",
         )
-        ### Basis optim
+        ### Whether to optim
         self.parser.add_argument(
             f"--{self.name_kc}-no-optim",
             action="store_true",

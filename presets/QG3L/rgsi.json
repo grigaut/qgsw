@@ -9,12 +9,12 @@
     "obs_track":true,
 
     "basis_dyn": "gaussian-exps",
-    "basis_dyn_scale":1e0,
+    "basis_dyn_lr":1e0,
     "basis_dyn_bkg_reg":false,
     "basis_dyn_no_optim":false,
 
     "alpha_no_optim":false,
-    "alpha_scale":1e-2,
+    "alpha_lr":1e-2,
 
 
     "dyn_reg_qg":true,
