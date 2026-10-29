@@ -267,6 +267,11 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             .q.xy
         )
 
+    @property
+    def psi2(self) -> torch.Tensor:
+        """Psi2."""
+        return self._fpsi2(self.time)[None, None, ...]
+
     def __init__(
         self,
         *,
