@@ -4,6 +4,11 @@ from matplotlib import pyplot as plt
 
 from qgsw import plots
 from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.modified.forced import (
+    QGPSIQForced,
+    QGPSIQForcedSurfML,
+    QGPSIQRGPsi2TransportDR,
+)
 from qgsw.models.sv.core import SurfaceVorticity
 
 
@@ -24,6 +29,7 @@ class LivePlot:
         """
         if not active:
             self._plot = self._no_plot
+            self._close = self._no_plot
             return
         if not plt.isinteractive():
             plt.ion()
@@ -42,6 +48,32 @@ class LivePlot:
             )
             plots.set_rowtitles(["uv_g + uv_a ", "uv_g", "uv_a"], self.vel_axs)
             self._plot = self._plot_sv
+        elif model.get_type() == QGPSIQRGPsi2TransportDR.get_type():
+            self.state_fig, self.state_axs = plots.subplots(1, 4)
+            plots.set_coltitles(["ѱ_1", "q", "ζ_1", "ѱ_2"], self.state_axs)
+            self.vel_fig, self.vel_axs = plots.subplots(1, 2)
+            plots.set_coltitles(
+                ["Zonal velocity", "Meridional velocity"], self.vel_axs
+            )
+            self._plot = self._plot_rgsi
+        elif model.get_type() == QGPSIQForced.get_type():
+            self.state_fig, self.state_axs = plots.subplots(1, 4)
+            plots.set_coltitles(["ѱ_1", "q", "ζ_1", "f"], self.state_axs)
+            self.vel_fig, self.vel_axs = plots.subplots(1, 2)
+            plots.set_coltitles(
+                ["Zonal velocity", "Meridional velocity"], self.vel_axs
+            )
+            self._plot = self._plot_rgf
+        elif model.get_type() == QGPSIQForcedSurfML.get_type():
+            self.state_fig, self.state_axs = plots.subplots(1, 5)
+            plots.set_coltitles(
+                ["ѱ_1", "q", "ζ_1", "ѱ_2", "f"], self.state_axs
+            )
+            self.vel_fig, self.vel_axs = plots.subplots(1, 2)
+            plots.set_coltitles(
+                ["Zonal velocity", "Meridional velocity"], self.vel_axs
+            )
+            self._plot = self._plot_rgfsi
         else:
             self.state_fig, self.state_axs = plots.subplots(1, 3)
             self.vel_fig, self.vel_axs = plots.subplots(1, 2)
@@ -55,17 +87,87 @@ class LivePlot:
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],
-            title="Surface geostrophic stream function",
         )
         plots.imshow(
             model.q[0, 0],
             ax=self.state_axs[0, 1],
-            title="Surface potential vorticity",
         )
         plots.imshow(
             model.vorticity[0, 0],
             ax=self.state_axs[0, 2],
-            title="Surface vorticity",
+        )
+
+        plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
+        plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.pause(0.05)
+
+    def _plot_rgsi(self) -> None:
+        model: QGPSIQRGPsi2TransportDR = self.model
+        plots.imshow(
+            model.psi[0, 0],
+            ax=self.state_axs[0, 0],
+        )
+        plots.imshow(
+            model.q[0, 0],
+            ax=self.state_axs[0, 1],
+        )
+        plots.imshow(
+            model.vorticity[0, 0],
+            ax=self.state_axs[0, 2],
+        )
+        plots.imshow(
+            model.psi2[0, 0],
+            ax=self.state_axs[0, 3],
+        )
+
+        plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
+        plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.pause(0.05)
+
+    def _plot_rgf(self) -> None:
+        model: QGPSIQForced = self.model
+        plots.imshow(
+            model.psi[0, 0],
+            ax=self.state_axs[0, 0],
+        )
+        plots.imshow(
+            model.q[0, 0],
+            ax=self.state_axs[0, 1],
+        )
+        plots.imshow(
+            model.vorticity[0, 0],
+            ax=self.state_axs[0, 2],
+        )
+        plots.imshow(
+            model.forcing[0, 0],
+            ax=self.state_axs[0, 3],
+        )
+
+        plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
+        plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.pause(0.05)
+
+    def _plot_rgfsi(self) -> None:
+        model: QGPSIQForcedSurfML = self.model
+        plots.imshow(
+            model.psi[0, 0],
+            ax=self.state_axs[0, 0],
+        )
+        plots.imshow(
+            model.q[0, 0],
+            ax=self.state_axs[0, 1],
+        )
+        plots.imshow(
+            model.vorticity[0, 0],
+            ax=self.state_axs[0, 2],
+        )
+        plots.imshow(
+            model.psi2[0, 0],
+            ax=self.state_axs[0, 3],
+        )
+        plots.imshow(
+            model.forcing[0, 0],
+            ax=self.state_axs[0, 4],
         )
 
         plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
@@ -139,3 +241,9 @@ class LivePlot:
     def step(self) -> None:
         """Make a step."""
         self._plot()
+
+    def _close(self) -> None:
+        """Close figure."""
+        plt.close()
+
+    close = _close
