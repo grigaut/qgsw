@@ -36,16 +36,19 @@ class OptimizerWrapper(
 ):
     """Optimizer base class."""
 
+    eps = 1e-12
     optimizer: torch.optim.Optimizer
     _pre_closure: Callable[[], ClosureInput]
     _post_closure: Callable[[ClosureOutput], torch.Tensor]
     epoch = 0
     max_epoch: int | None = None
+    cycle = 0
+    max_cycle = None
 
     @property
     def current_epoch(self) -> list[tuple[str, int]]:
         """Current epoch."""
-        return [("epoch", self.epoch)]
+        return [("cycle", self.cycle), ("epoch", self.epoch)]
 
     @property
     def epoch_repr(self) -> str:
@@ -79,6 +82,12 @@ class OptimizerWrapper(
             if losses is None
             else losses
         )
+
+    def restart(self) -> None:
+        """Restart optimizer."""
+        self.optimizer.state.clear()
+        msg = "Optimizer restarted"
+        logger.info(msg)
 
     def _step_no_closure(self) -> torch.Tensor:
         msg = "Set closure using set_closure first"
@@ -169,27 +178,32 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
 
         def post_closure(losses: dict[str, torch.Tensor]) -> torch.Tensor:
 
-            tot = losses["tot"].detach()
+            tot_ = losses["tot"].detach()
+            tot = tot_.item()
             obs = losses["obs"].detach().item()
             dyn = losses["dyn"].detach().item()
             bkg = losses["bkg"].detach().item()
             best = losses["best"].detach().item()
 
             msg = (
-                f"[Epoch {step(self.epoch + 1, self.max_epoch)}]"
-                f"[Eval {step(self.eval + 1, self.max_eval)}]"
-                f"[Best loss: {best:>#10.5g}]"
-                f" Loss: {tot.item():>#10.5g}"
-                f" | Obs: {obs:>#10.5g}"
-                f" | Dyn Reg: {dyn:>#10.5g}"
-                f" | Bkg Reg: {bkg:>#10.5g}"
+                f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
+                f" [{step(self.epoch + 1, self.max_epoch)} |"
+                f" {step(self.eval + 1, self.max_eval)}]"
+                f" Loss: {tot_:>#10.5g}"
+                f" ({best:>#10.5g})"
             )
             logger.info(msg)
+            msg = (
+                f"\t└─ Obs: {obs:>#10.5g} [{obs / (tot + self.eps):>7.2%}]"
+                f" | Dyn Reg: {dyn:>#10.5g} [{dyn / (tot + self.eps):>7.2%}]"
+                f" | Bkg Reg: {bkg:>#10.5g} [{bkg / (tot + self.eps):>7.2%}]"
+            )
+            logger.detail(msg)
             self.losses["obs"].append(obs)
             self.losses["dyn"].append(dyn)
             self.losses["bkg"].append(bkg)
             self.losses["best"].append(best)
-            if self.early_stop.step(tot):
+            if self.early_stop.step(tot_):
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
             self.eval += 1
@@ -235,26 +249,31 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
 
         def post_closure(losses: dict[str, torch.Tensor]) -> torch.Tensor:
 
-            tot = losses["tot"].detach()
+            tot_ = losses["tot"].detach()
+            tot = tot_.item()
             obs = losses["obs"].detach().item()
             dyn = losses["dyn"].detach().item()
             bkg = losses["bkg"].detach().item()
             best = losses["best"].detach().item()
 
             msg = (
-                f"[Epoch {step(self.epoch + 1, self.max_epoch)}]"
-                f"[Best loss: {best:>#10.5g}]"
-                f" Loss: {tot.item():>#10.5g}"
-                f" | Obs: {obs:>#10.5g}"
-                f" | Dyn Reg: {dyn:>#10.5g}"
-                f" | Bkg Reg: {bkg:>#10.5g}"
+                f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
+                f" [{step(self.epoch + 1, self.max_epoch)}]"
+                f" Loss: {tot_:>#10.5g}"
+                f" ({best:>#10.5g})"
             )
             logger.info(msg)
+            msg = (
+                f"\t└─ Obs: {obs:>#10.5g} [{obs / (tot + self.eps):>7.2%}]"
+                f" | Dyn Reg: {dyn:>#10.5g} [{dyn / (tot + self.eps):>7.2%}]"
+                f" | Bkg Reg: {bkg:>#10.5g} [{bkg / (tot + self.eps):>7.2%}]"
+            )
+            logger.detail(msg)
             self.losses["obs"].append(obs)
             self.losses["dyn"].append(dyn)
             self.losses["bkg"].append(bkg)
             self.losses["best"].append(best)
-            if self.early_stop.step(tot):
+            if self.early_stop.step(tot_):
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
             self.scheduler.step(tot)
