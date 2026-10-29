@@ -29,7 +29,7 @@ class OptimizerName(Name):
     ADAM = "adam"
 
 
-class Optimizer(
+class OptimizerWrapper(
     NamedObject[OptimizerName],
     ABC,
     Generic[ClosureInput, ClosureOutput],
@@ -119,7 +119,7 @@ class Optimizer(
         self.step = self._step
 
 
-class LBFGS(Optimizer[None, dict[str, list[torch.Tensor]]]):
+class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
     """LBFGS optimizer wrapper."""
 
     _type = OptimizerName.LBFGS
@@ -203,7 +203,7 @@ class LBFGS(Optimizer[None, dict[str, list[torch.Tensor]]]):
         return super()._step()
 
 
-class Adam(Optimizer[None, dict[str, list[torch.Tensor]]]):
+class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
     """Adam optimizer wrapper."""
 
     _type = OptimizerName.ADAM
@@ -267,7 +267,7 @@ class Adam(Optimizer[None, dict[str, list[torch.Tensor]]]):
 
 def build_optimizer(
     optimizer_type: OptimizerName, params: list[torch.Tensor]
-) -> Optimizer:
+) -> OptimizerWrapper:
     """Build optimizer.
 
     Args:
