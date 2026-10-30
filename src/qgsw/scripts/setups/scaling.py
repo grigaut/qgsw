@@ -4,6 +4,8 @@
 
 from collections.abc import Callable
 
+from qgsw.cli import OptimBasisParser
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.decomposition.wavelets.core import WaveletBasis
@@ -13,7 +15,6 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQRGPsi2TransportDR,
 )
 from qgsw.models.sv.core import SurfaceVorticity
-from qgsw.scripts.setups.types import Coefs
 
 SCALINGS = {
     QGPSIQForced.get_type(): {
@@ -58,18 +59,17 @@ SCALINGS = {
 
 
 def retrieve_scaling_func(
-    basis_types: dict[str, str],
-    basis_lrs: dict[str, float],
+    bases_parsers: dict[str, OptimBasisParser],
     model_type: str,
     L: float,
     U: float,
     psi0_mean: float,
     T_tot: float,
-) -> Callable[[Coefs], Coefs]:
+) -> dict[str, Callable[[DecompositionCoefs], DecompositionCoefs]]:
     """Build coefficient scaling function.
 
     Args:
-        basis_types (dict[str, str]): Basis types.
+        bases_parsers (dict[str, OptimBasisParser]): Basis parsers.
         basis_lrs (dict[str, float]): Basis learning rates values.
         model_type (str): Model type.
         L (float): Horizontal scale.
@@ -80,19 +80,13 @@ def retrieve_scaling_func(
     Returns:
         Callable[[Coefs], Coefs]: Coefficient scaling function.
     """
-
-    def scale(
-        coefs: Coefs,
-    ) -> Coefs:
-        return {
-            k: SCALINGS[model_type][basis](
-                coefs[k] * basis_lrs[k],
-                L,
-                U,
-                psi0_mean,
-                T_tot,
-            )
-            for k, basis in basis_types.items()
-        }
-
-    return scale
+    return {
+        k: lambda coef, t=b.type: SCALINGS[model_type][t](
+            coef,
+            L,
+            U,
+            psi0_mean,
+            T_tot,
+        )
+        for k, b in bases_parsers.items()
+    }

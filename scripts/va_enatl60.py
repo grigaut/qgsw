@@ -50,7 +50,7 @@ from qgsw.logging.utils import box, sec2text, step
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
 from qgsw.optim.optimizers import EarlyStopError, build_optimizer
-from qgsw.optim.utils import RegisterParams
+from qgsw.optim.utils import TrackParams
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.plots.live_plots import LivePlot
@@ -72,14 +72,14 @@ from qgsw.scripts.output import build_output_folder, create_output_folder
 from qgsw.scripts.parameterizations import kappa_to_alpha
 from qgsw.scripts.pv import build_pv_funcs
 from qgsw.scripts.setups.bases import (
-    retrieve_bases_elements,
+    retrieve_bases_params,
     setup_basis,
 )
 from qgsw.scripts.setups.callbacks import (
     pre_cycle_bases_setup,
 )
 from qgsw.scripts.setups.model import setup_model
-from qgsw.scripts.setups.optim import optim_setup
+from qgsw.scripts.setups.optim import init_optim_params
 from qgsw.scripts.setups.regularization import (
     setup_background_regs,
     setup_dynamical_regs,
@@ -129,59 +129,25 @@ if __name__ == "__main__":
     basis_chi = OptimBasisParser("basis-chi")
     basis_chi.set_presets(presets)
     basis_chi.retrieve()
-    alpha_param = OptimParamParser("alpha")
-    alpha_param.set_presets(presets)
-    alpha_param.retrieve()
-    wind_param = OptimParamParser("wind")
-    wind_param.set_presets(presets)
-    wind_param.retrieve()
+    alpha_parser = OptimParamParser("alpha")
+    alpha_parser.set_presets(presets)
+    alpha_parser.retrieve()
+    wind_parser = OptimParamParser("wind")
+    wind_parser.set_presets(presets)
+    wind_parser.retrieve()
 
-    with_alpha_optim = alpha_param.optim
-    with_wind_optim = wind_param.optim
     with_reg = not args.no_reg
     with_obs_track = args.obs_track
     with_wind = not args.no_wind
+    wind_parser.optim = wind_parser.optim and with_wind
 
     specs = defaults.get()
 
     setup_root_logger(args.verbose)
     logger = getLogger(__name__)
 
-    bases_types = retrieve_bases_elements(
-        args.model_type,
-        basis_dyn.type,
-        basis_ext.type,
-        basis_psi.type,
-        basis_chi.type,
-        check=True,
-    )
-    bases_lrs = retrieve_bases_elements(
-        args.model_type,
-        basis_dyn.learning_rate,
-        basis_ext.learning_rate,
-        basis_psi.learning_rate,
-        basis_chi.learning_rate,
-    )
-    bases_with_bkg = retrieve_bases_elements(
-        args.model_type,
-        basis_dyn.with_background,
-        basis_ext.with_background,
-        basis_psi.with_background,
-        basis_chi.with_background,
-    )
-    bases_gammas = retrieve_bases_elements(
-        args.model_type,
-        basis_dyn.gamma,
-        basis_ext.gamma,
-        basis_psi.gamma,
-        basis_chi.gamma,
-    )
-    bases_optims = retrieve_bases_elements(
-        args.model_type,
-        basis_dyn.optim,
-        basis_ext.optim,
-        basis_psi.optim,
-        basis_chi.optim,
+    bases_parsers = retrieve_bases_params(
+        args.model_type, basis_dyn, basis_ext, basis_psi, basis_chi
     )
 
     dyn_regs = {}
@@ -317,9 +283,11 @@ if __name__ == "__main__":
     ## Regularization
 
     if with_reg:
+        bases_bkg = {k: b.with_background for k, b in bases_parsers.items()}
+        bases_gammas = {k: b.gamma for k, b in bases_parsers.items()}
         msg_reg = (
             f"[Dynamical regularization] {dyn_regs} with ɣ_dyn = {dyn_gammas}"  # noqa: RUF001
-            f"\n[Background regularization] {bases_with_bkg}"
+            f"\n[Background regularization] {bases_bkg}"
             f" with ɣ_reg = {bases_gammas}"  # noqa: RUF001
         )
     else:
@@ -348,7 +316,7 @@ if __name__ == "__main__":
     )
     if with_wind:
         msg_wind = "Using wind from ERA interim DFS5."
-        if with_wind_optim:
+        if wind_parser.optim:
             msg_wind += "\nOptimizing wind surface conversion."
     else:
         msg_wind = "No wind considered."
@@ -391,6 +359,7 @@ if __name__ == "__main__":
         dt,
         config.physics.slip_coef,
     )
+    alpha_parser.optim = alpha_parser.optim and model.implements_alpha
     # PV computation
 
     y_w = space_2d.q.xy.y[0, :].unsqueeze(0)
@@ -409,7 +378,6 @@ if __name__ == "__main__":
     L: float = dx.item()
 
     for c in range(args.cycles):
-        overflow_encountered = False
         time0 = time.time()
 
         torch.cuda.reset_peak_memory_stats()
@@ -520,7 +488,7 @@ if __name__ == "__main__":
         logger.info(box(msg, style="round"))
 
         bases, Qs = setup_basis(
-            bases_types,
+            bases_parsers,
             (
                 interpolate(crop(np.rad2deg(lons), b)),
                 interpolate(crop(np.rad2deg(lats), b)),
@@ -543,51 +511,57 @@ if __name__ == "__main__":
             for k, basis in bases.items()
         }
 
-        params, coefs, kappa, uv10_to_uvsurf, numel = optim_setup(
-            bases_optims,
+        coefs_params, alpha_param, wind_param = init_optim_params(
+            bases_parsers,
             coefs,
-            alpha_optim=model.implements_alpha and with_alpha_optim,
-            wind_optim=with_wind and with_wind_optim,
+            alpha_parser=alpha_parser,
+            wind_parser=wind_parser,
         )
 
-        optimizer = build_optimizer(args.optimizer, params)
-        optimizer.max_epoch = args.optim
-        optimizer.cycle = c
-        optimizer.max_cycle = args.cycles
-
-        scaling_fn = retrieve_scaling_func(
-            {k: basis.type for k, basis in bases.items()},
-            bases_lrs,
+        coefs_scaling_fns = retrieve_scaling_func(
+            bases_parsers,
             model.get_type(),
             L,
             U,
             psi0_mean,
             n_steps_per_cyle * dt,
         )
+        for k, coef in coefs_params.items():
+            coef.with_scaling(coefs_scaling_fns[k])
 
-        alpha = kappa_to_alpha(kappa * alpha_param.learning_rate)
-        register_params = RegisterParams(
-            **scaling_fn(coefs),
-            uv10_to_uvsurf=uv10_to_uvsurf * wind_param.learning_rate,
-            **{"alpha": alpha} if model.implements_alpha else {},
+        tensor_params = {
+            "alpha": alpha_param.with_scaling(kappa_to_alpha),
+            "uv10_to_uvsurf": wind_param.with_scaling(None),
+        }
+
+        params_tracker = TrackParams(coefs_params, tensor_params)
+        numel = params_tracker.get_optim_numel()
+        msg = f"Control vector contains {numel} elements."
+        logger.info(box(msg, style="round"))
+
+        optimizer = build_optimizer(
+            args.optimizer, params_tracker.get_optim_list()
         )
-
+        optimizer.max_epoch = args.optim
+        optimizer.cycle = c
+        optimizer.max_cycle = args.cycles
         live_plot = LivePlot(model, active=args.live_plot)
 
         def closure(*args, **kwargs) -> torch.Tensor:  # noqa: ANN002, ANN003, ARG001
             """Closure for optimizer."""
             model.reset_time()
+
+            coefs_scaled, tensors = params_tracker.retrieve_scaled()
+
             if with_wind:
                 tauxs_i, tauys_i = compute_windstress(
                     uv10,
-                    uv10_to_uvsurf * wind_param.learning_rate,
+                    tensors["uv10_to_uvsurf"],
                     rho_water=config.physics.rho,
                     rho_air=1.225,
                 )
 
-            coefs_scaled = scaling_fn(coefs)
-            alpha = kappa_to_alpha(kappa * alpha_param.learning_rate)
-            pre_cycle_bases_setup(model, bases, coefs_scaled, alpha)
+            pre_cycle_bases_setup(model, bases, coefs_scaled, tensors["alpha"])
 
             dyn_reg_fns = setup_dynamical_regs(
                 dyn_regs,
@@ -599,7 +573,7 @@ if __name__ == "__main__":
                 T,
                 wide=True,
             )
-            bkg_reg_fns = setup_background_regs(bases_with_bkg, Qs)
+            bkg_reg_fns = setup_background_regs(bases_parsers, Qs)
 
             init_model(model, psi0, psi_bcs, psi_bcs_w, build_q_rg, times, b)
 
@@ -637,21 +611,14 @@ if __name__ == "__main__":
                     )
             if with_reg:
                 bkg += sum(
-                    bases_gammas[k] * bkg_reg_fns[k](coefs[k])
-                    if bases_with_bkg[k]
-                    else 0
+                    bases_parsers[k].gamma * bkg_reg_fns[k](coefs[k])
                     for k in bkg_reg_fns
                 )
             if torch.isnan(psi).any():
                 msg = "Overflow"
                 raise OverflowError(msg)
             loss = obs + dyn + bkg
-            register_params.step(
-                loss,
-                **{k: c.to_dict() for k, c in scaling_fn(coefs).items()},
-                uv10_to_uvsurf=uv10_to_uvsurf,
-                **{"alpha": alpha} if model.implements_alpha else {},
-            )
+            params_tracker.step(loss)
             live_plot.step()
             loss.backward()
             return {
@@ -659,32 +626,50 @@ if __name__ == "__main__":
                 "obs": obs,
                 "dyn": dyn,
                 "bkg": bkg,
-                "best": register_params.best_loss,
+                "best": params_tracker.best_loss,
             }
 
         optimizer.set_closure(closure)
-
+        epoch_restart = ""
+        overflow_encountered = False
         for _ in range(args.optim):
             try:
                 optimizer.step()
-            except (EarlyStopError, OverflowError) as e:
+            except EarlyStopError as e:
                 msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)
-                overflow_encountered = isinstance(e, OverflowError)
                 break
+            except OverflowError:
+                epoch_repr = optimizer.epoch_repr
+                if epoch_repr == epoch_restart:
+                    msg = "Unable to solve overflow with optimizer restart."
+                    logger.warning(box(msg))
+                    overflow_encountered = True
+                    break
+                epoch_restart = epoch_repr
+                msg = f"Overflow at {epoch_repr}, restarting optimizer."
+                logger.info(msg)
+                params_tracker.restore_best()
+                optimizer.restart_from_params(params_tracker.get_optim_list())
+                msg = "Optimizer restarted from best loss state."
+                logger.info(msg)
+                continue
 
         live_plot.close()
 
-        best_loss = register_params.best_loss
+        best_loss = params_tracker.best_loss
         msg = f"Optimization completed with loss: {best_loss:>#10.5g}"
         max_mem = torch.cuda.max_memory_allocated() / 1024 / 1024
         msg_mem = f"Max memory allocated: {max_mem:.1f} MB."
         logger.info(box(msg, msg_mem, style="round"))
 
+        best_coefs, best_tensors = params_tracker.retrieve_best_data_scaled()
+
         outputs["results"].append(
             {
                 "cycle": c,
-                **register_params.params,
+                **best_coefs,
+                **best_tensors,
             }
         )
         outputs["basis"].append(
