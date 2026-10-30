@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 import torch
 
-from qgsw.fields.variables.tuples import PSIZeta
 from qgsw.models.qg.psiq.core import QGPSIQCore
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.solver.boundary_conditions.base import Boundaries
@@ -26,6 +25,8 @@ def init_model(
     ],
     times: list[float],
     b: int,
+    sst0: torch.Tensor | None = None,
+    sst_bcs: list[Boundaries] | None = None,
 ) -> None:
     """Init model.
 
@@ -39,6 +40,8 @@ def init_model(
         build_q_or_zeta (Callable[ [torch.Tensor, torch.Tensor], tuple[ Callable[[torch.Tensor], torch.Tensor], Callable[[Boundaries], Boundaries], ], ]): Build Pv or vorticity computation fonctions.
         times (list[float]): Times.
         b (int): Offset.
+        sst0 (torch.Tensor | None, optional): Initial condition for SST. Defaults to None.
+        sst_bcs (list[Boundaries]|None, optional): Boundary conditions for SST. Defaults to None.
     """  # noqa: E501
     _, A11, A12 = get_As(model)
     q_or_zetas, q_or_zetas_bc = build_q_or_zeta(A11, A12)
@@ -48,10 +51,17 @@ def init_model(
     psi_bc_interp = QuadraticInterpolation(times, psi_bcs)
 
     if model.get_type() == SurfaceVorticity.get_type():
-        model.psiz = PSIZeta(crop(psi0[:, :1], b), q_or_zeta)
+        model.set_psiz(crop(psi0[:, :1], b), q_or_zeta)
     else:
         model.set_psiq(crop(psi0[:, :1], b), q_or_zeta)
-    model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+
+    if sst_bcs is None:
+        model.set_boundary_maps(psi_bc_interp, q_bc_interp)
+        return
+    model.set_sst(sst0)
+    model.set_boundary_maps(
+        psi_bc_interp, q_bc_interp, QuadraticInterpolation(times, sst_bcs)
+    )
 
 
 def get_psi_g(
