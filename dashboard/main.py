@@ -341,7 +341,7 @@ if folder is not None:
         "Final dynamical regularization",
         best_dyn_reg,
         f"{best_dyn_reg / best_loss:.0%}",
-        format="%.1f",
+        format="%6.4f",
         delta_arrow="off",
         delta_color="off"
         if (losses_arr["dyn"][~np.isnan(losses_arr["dyn"])] == 0).all()
