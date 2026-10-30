@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import torch
 
+from qgsw.cli import OptimBasisParser
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.physics.coriolis.beta_plane import BetaPlane
 from qgsw.scripts.regularization import (
@@ -17,13 +18,13 @@ DynRegFn = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 
 
 def setup_background_regs(
-    with_bkg_regs: dict[str, bool],
+    bases_parsers: dict[str, OptimBasisParser],
     Qs: dict[str, dict[str, torch.Tensor]],
 ) -> dict[str, Callable[[DecompositionCoefs], torch.Tensor]]:
     """Setup background regularizations.
 
     Args:
-        with_bkg_regs (dict[str, bool]): Whether to use background for basis.
+        bases_parsers (dict[str, OptimBasisParser]): bases parsers.
         Qs (dict[str, dict[str, torch.Tensor]]): Covariances.
 
     Returns:
@@ -31,8 +32,8 @@ def setup_background_regs(
             functions mapping.
     """
     fns = {}
-    for k, cond in with_bkg_regs.items():
-        if cond:
+    for k, basis in bases_parsers.items():
+        if basis.with_background:
             fns[k] = background_reg(Qs[k])
     return fns
 

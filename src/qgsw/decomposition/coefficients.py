@@ -16,6 +16,11 @@ except ImportError:
 class DecompositionCoefs:
     """Decomposition coefficients."""
 
+    @property
+    def requires_grad(self) -> bool:
+        """Whether the coefs require grad."""
+        return self._coefs[0].requires_grad
+
     def __init__(self, *coefs: torch.Tensor) -> None:
         """Instantiate the decomposition coefs.
 

@@ -28,7 +28,7 @@
     "gamma_dyn_qg":1e-3,
 
     "basis_ext": "wavelets",
-    "basis_ext_lr":1e-2,
+    "basis_ext_lr":1e0,
     "basis_ext_bkg_reg":true,
     "basis_ext_gamma":1e3,
     "basis_ext_no_optim":false,

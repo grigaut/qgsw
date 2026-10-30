@@ -2,7 +2,7 @@
 
 import torch
 
-from qgsw.optim.utils import EarlyStop, RegisterParams
+from qgsw.optim.utils import EarlyStop
 
 
 def test_early_stop() -> None:
@@ -15,18 +15,3 @@ def test_early_stop() -> None:
             has_stopped = True
             break
     assert has_stopped
-
-
-def test_register_params() -> None:
-    """Test parameter registration."""
-    register_params = RegisterParams()
-    for n in range(1, 500):
-        param = torch.tensor(n)
-        loss = (param / 250 - 1) ** 2
-        register_params.step(loss, n=param)
-    assert "n" in register_params.params
-    assert register_params.params["n"] == 250
-    assert register_params.best_loss == 0
-    assert param.item() == 499
-    register_params.restore(n=param)
-    assert param.item() == 250

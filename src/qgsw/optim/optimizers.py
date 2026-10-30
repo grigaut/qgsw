@@ -59,7 +59,6 @@ class OptimizerWrapper(
     def __init__(
         self,
         params: list[torch.Tensor],
-        losses: dict[str, list[float]] | None = None,
         **kwargs: Any,  # noqa: ANN401
     ) -> None:
         """Instantiate the optimizer.
@@ -72,22 +71,22 @@ class OptimizerWrapper(
         """
         msg = f"Instantiating: {self.get_type().value} optimizer."
         logger.info(msg)
-        self.losses: dict[str, list[float]] = (
-            {
-                "obs": [],
-                "dyn": [],
-                "bkg": [],
-                "best": [],
-            }
-            if losses is None
-            else losses
-        )
+        self.losses: dict[str, list[float]] = {
+            "obs": [],
+            "dyn": [],
+            "bkg": [],
+            "best": [],
+        }
 
-    def restart(self) -> None:
+    def hot_restart(self) -> None:
         """Restart optimizer."""
         self.optimizer.state.clear()
         msg = "Optimizer restarted"
         logger.info(msg)
+
+    @abstractmethod
+    def restart_from_params(self, params: list[torch.Tensor]) -> None:
+        """Restart optimizer from params."""
 
     def _step_no_closure(self) -> torch.Tensor:
         msg = "Set closure using set_closure first"
@@ -148,7 +147,6 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         params: list[torch.Tensor],
         max_iter: int = 20,
         history_size: int = 20,
-        losses: dict[str, list[torch.Tensor]] | None = None,
     ) -> None:
         """Instantiate LBFGS optimizer wrapper.
 
@@ -159,17 +157,12 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             losses (dict[str, list[torch.Tensor]] | None, optional): Losses.
                 Defaults to None.
         """
-        super().__init__(
-            params, losses, max_iter=max_iter, history_size=history_size
-        )
+        super().__init__(params, max_iter=max_iter, history_size=history_size)
 
-        self.optimizer = torch.optim.LBFGS(
-            params,
-            lr=1,
-            line_search_fn="strong_wolfe",
-            history_size=history_size,
-            max_iter=max_iter,
-        )
+        self.max_iter = max_iter
+        self.history_size = history_size
+
+        self.restart_from_params(params)
         self.early_stop = EarlyStop()
         self.eval = 0
 
@@ -207,7 +200,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
             self.eval += 1
-            return tot
+            return losses["tot"]
 
         self._pre_closure = pre_closure
         self._post_closure = post_closure
@@ -215,6 +208,16 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
     def _step(self) -> torch.Tensor:
         self.eval = 0
         return super()._step()
+
+    def restart_from_params(self, params: list[torch.Tensor]) -> None:
+        """Restart optimizer from params."""
+        self.optimizer = torch.optim.LBFGS(
+            params,
+            lr=1,
+            line_search_fn="strong_wolfe",
+            history_size=self.history_size,
+            max_iter=self.max_iter,
+        )
 
 
 class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
@@ -226,7 +229,6 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         self,
         params: list[torch.Tensor],
         lr: float = 1,
-        losses: dict[str, list[torch.Tensor]] | None = None,
     ) -> None:
         """Instantiate the optimizer.
 
@@ -236,18 +238,18 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             losses (dict[str, list[torch.Tensor]] | None, optional): losses.
                 Defaults to None.
         """
-        super().__init__(params, losses, lr=lr)
-        self.optimizer = torch.optim.Adam(params, lr=lr)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, factor=0.5, patience=5
-        )
-        self.lr_callback = LRChangeCallback(self.optimizer)
+        super().__init__(params, lr=lr)
+        self.lr = lr
+        self.restart_from_params(params)
         self.early_stop = EarlyStop()
 
         def pre_closure() -> None:
             self.optimizer.zero_grad()
 
         def post_closure(losses: dict[str, torch.Tensor]) -> torch.Tensor:
+
+            for p in self.optimizer.param_groups:
+                torch.nn.utils.clip_grad_norm_(p["params"], max_norm=1)
 
             tot_ = losses["tot"].detach()
             tot = tot_.item()
@@ -278,10 +280,18 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
                 raise EarlyStopError(msg)
             self.scheduler.step(tot)
             self.lr_callback.step()
-            return tot
+            return losses["tot"]
 
         self._pre_closure = pre_closure
         self._post_closure = post_closure
+
+    def restart_from_params(self, params: list[torch.Tensor]) -> None:
+        """Restart optimizer from params."""
+        self.optimizer = torch.optim.Adam(params, lr=self.lr)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, factor=0.5, patience=5
+        )
+        self.lr_callback = LRChangeCallback(self.optimizer)
 
 
 def build_optimizer(

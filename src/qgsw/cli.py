@@ -841,6 +841,10 @@ class OptimParamParser:
         """Whether to optim the basis coefficients or not."""
         return not getattr(self.namespace, f"{self.name_sc}_no_optim")
 
+    @optim.setter
+    def optim(self, value: bool) -> bool:
+        setattr(self.namespace, f"{self.name_sc}_no_optim", not value)
+
     def __repr__(self) -> str:
         """String representation."""
         return self.namespace.__repr__()
