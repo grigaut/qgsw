@@ -915,6 +915,8 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_pert_i, q_pert_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_pert_i + psi_bc + self._sf_bar
@@ -952,8 +954,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
         return PSIQ(dpsi, dq)
 

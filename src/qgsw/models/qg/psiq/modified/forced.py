@@ -157,6 +157,8 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_i, q_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
@@ -176,8 +178,6 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
@@ -535,6 +535,8 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_i, q_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
@@ -556,8 +558,6 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
@@ -784,6 +784,8 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_i, q_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
@@ -806,8 +808,6 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
             ensure_mass_conservation=False,
         )
         if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
             self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
