@@ -509,6 +509,9 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
 
     def set_sst(self, sst: torch.Tensor) -> None:
         """Set sst."""
+        if not self.advect_sst:
+            msg = f"{self.get_type().value} will advect SST."
+            logger.info(msg)
         self.advect_sst = True
         self.sst_mean = torch.mean(sst)
         sst_anom = sst - self.sst_mean
