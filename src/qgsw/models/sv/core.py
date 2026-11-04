@@ -306,7 +306,6 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         # Beta-plane
         with logger.section("Setting model parameters..."):
             self.beta_plane = beta_plane
-        self.specs = specs.from_tensor(self.space.psi.xy.x)
         self.switch_to_homogeneous()
         self._set_utils(compile_fns)
         self.set_flux()
@@ -797,9 +796,14 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             ) * self.masks.h
         else:
             dsst_anom = torch.zeros_like(sst_anom)
+        dprog = PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
         if self.time_stepper == "rk3":
+            if self._rk3_step == 0:
+                self.dprog = dprog
             self._rk3_step += 1
-        return PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
+        else:
+            self.dprog = dprog
+        return dprog
 
     def compute_time_derivatives_inhomogeneous(
         self,
@@ -858,11 +862,14 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             ) * self.masks.h
         else:
             dsst_anom = torch.zeros_like(sst_anom)
-
+        dprog = PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
         if self.time_stepper == "rk3":
-            # Boundary condition interpolation
+            if self._rk3_step == 0:
+                self.dprog = dprog
             self._rk3_step += 1
-        return PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
+        else:
+            self.dprog = dprog
+        return dprog
 
     def update(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Update prognostic.
