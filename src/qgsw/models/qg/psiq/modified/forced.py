@@ -134,7 +134,7 @@ class QGPSIQRGPsi2Transport(QGPSIQ):
     """QGPSIQ with psi2 wv material derivation forcing."""
 
     _dyn_basis: Basis
-    implement_alpha = True
+    implements_alpha = True
 
     @property
     def basis_dynamical(
