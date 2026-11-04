@@ -40,20 +40,52 @@ class GaussianExpBasis(
         NormalizedGaussianSupport, GaussianTimeSupport
     ].shapes.__doc__
 
+    def retrieve_space_support(
+        self, lvl: int, xx: torch.Tensor, yy: torch.Tensor
+    ) -> NormalizedGaussianSupport:
+        """Retrieve space support at given level.
+
+        Args:
+            lvl (int): Level.
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            NormalizedGaussianSupport: Space support.
+        """
+        params = self._space[lvl]
+        sx: float = params["sigma_x"]
+        sy: float = params["sigma_y"]
+
+        x, y = self._compute_space_params(params, xx, yy)
+
+        E = GaussianSupport(x, y, sx, sy)
+        return NormalizedGaussianSupport(E)
+
+    def retrieve_space_supports(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, NormalizedGaussianSupport]:
+        """Retrieve space supports.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            dict[int, NormalizedGaussianSupport]: Space supports mapping.
+        """
+        return {
+            lvl: self.retrieve_space_support(lvl, xx, yy)
+            for lvl in range(self.order)
+        }
+
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> dict[int, torch.Tensor]:
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.field)
         return fields
 
@@ -63,14 +95,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx)
         return fields
 
@@ -80,14 +105,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy)
         return fields
 
@@ -97,14 +115,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx2)
         return fields
 
@@ -114,14 +125,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy2)
         return fields
 
@@ -131,14 +135,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx3)
         return fields
 
@@ -148,14 +145,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy3)
         return fields
 
@@ -165,14 +155,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dydx2)
         return fields
 
@@ -182,14 +165,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dxdy2)
         return fields
 
