@@ -3,7 +3,7 @@
 from matplotlib import pyplot as plt
 
 from qgsw import plots
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -17,14 +17,14 @@ class LivePlot:
 
     def __init__(
         self,
-        model: QGPSIQCore | SurfaceVorticity,
+        model: QGPSIQ | SurfaceVorticity,
         *,
         active: bool = False,
     ) -> None:
         """Instantiate live plot.
 
         Args:
-            model (QGPSIQCore | SurfaceVorticity): Model.
+            model (QGPSIQ | SurfaceVorticity): Model.
             active (bool): Whether the plot is actove or not.
         """
         if not active:
@@ -83,7 +83,7 @@ class LivePlot:
             self._plot = self._plot_qg
 
     def _plot_qg(self) -> None:
-        model: QGPSIQCore = self.model
+        model: QGPSIQ = self.model
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],

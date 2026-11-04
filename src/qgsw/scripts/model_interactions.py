@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 import torch
 
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.utils.interpolation import QuadraticInterpolation
@@ -12,7 +12,7 @@ from qgsw.utils.reshaping import crop
 
 
 def init_model(
-    model: QGPSIQCore | SurfaceVorticity,
+    model: QGPSIQ | SurfaceVorticity,
     psi0: torch.Tensor,
     psi_bcs: list[Boundaries],
     psi_bcs_w: list[Boundaries],
@@ -31,7 +31,7 @@ def init_model(
     """Init model.
 
     Args:
-        model (QGPSIQCore | SurfaceVorticity): Model.
+        model (QGPSIQ | SurfaceVorticity): Model.
         psi0 (torch.Tensor): Initial surface (geostrophic) stream function.
         psi_bcs (list[Boundaries]): Surface (geostrophic) stream function
             boundaries.
@@ -65,12 +65,12 @@ def init_model(
 
 
 def get_psi_g(
-    model: QGPSIQCore | SurfaceVorticity,
+    model: QGPSIQ | SurfaceVorticity,
 ) -> torch.Tensor:
     """Init model.
 
     Args:
-        model (QGPSIQCore | SurfaceVorticity): Model.
+        model (QGPSIQ | SurfaceVorticity): Model.
 
     Returns:
         torch.Tensor: Geostrophic stream function.
@@ -81,12 +81,12 @@ def get_psi_g(
 
 
 def get_As(  # noqa: N802
-    model: QGPSIQCore | SurfaceVorticity,
+    model: QGPSIQ | SurfaceVorticity,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Retrieve stretching matrix components.
 
     Args:
-        model (QGPSIQCore | SurfaceVorticity): Model
+        model (QGPSIQ | SurfaceVorticity): Model
 
     Returns:
         tuple[torch.Tensor, torch.Tensor, torch.Tensor]: A,A11,A12

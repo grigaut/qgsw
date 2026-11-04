@@ -17,7 +17,7 @@ from qgsw.metrics.spectral import (
     MagnitudeSquaredCoherence,
     PowerSpectralDensity,
 )
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -28,7 +28,7 @@ from qgsw.scripts.loss import rmse, uv_rmse
 from qgsw.scripts.output import OutputFolder, build_output_folder
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
-T = TypeVar("T", bound=QGPSIQCore | SurfaceVorticity)
+T = TypeVar("T", bound=QGPSIQ | SurfaceVorticity)
 
 
 class ModelWrapper(ABC, Generic[T]):
@@ -299,7 +299,7 @@ class ModelWrapper(ABC, Generic[T]):
             self.psis.append(self.model.psi.clone())
 
 
-M = TypeVar("M", bound=ModelWrapper[QGPSIQCore])
+M = TypeVar("M", bound=ModelWrapper[QGPSIQ])
 
 
 class ModelsManager(Generic[M]):

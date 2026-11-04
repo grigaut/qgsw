@@ -22,7 +22,7 @@ from qgsw.logging import getLogger
 from qgsw.models.core import time_steppers
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.solver.boundary_conditions.base import Boundaries
 from qgsw.solver.finite_diff import laplacian, nabla4
 from qgsw.spatial.core.grid_conversion import interpolate
@@ -46,7 +46,7 @@ State = TypeVar("State", bound=BaseStatePSIQSST)
 logger = getLogger(__name__)
 
 
-class QGPSIQSSTCore(QGPSIQCore[T, State]):
+class QGPSIQSSTCore(QGPSIQ[T, State]):
     """Finite volume multi-layer QG solver with mixed layer."""
 
     _H_ml = torch.tensor(100, **defaults.get())  # Mixed layer depth in meters
@@ -986,7 +986,7 @@ class QGPSIQSSTAdv(QGPSIQSST):
             tauy (torch.Tensor): Wind stress in the y direction.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        QGPSIQCore.set_wind_forcing(self, taux, tauy)
+        QGPSIQ.set_wind_forcing(self, taux, tauy)
 
     def _compute_time_derivatives_homogeneous(
         self,

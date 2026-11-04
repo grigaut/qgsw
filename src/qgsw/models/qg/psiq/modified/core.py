@@ -12,7 +12,7 @@ from qgsw.filters.base import _Filter
 from qgsw.filters.high_pass import GaussianHighPass2D
 from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.stretching_matrix import (
     compute_layers_to_mode_decomposition,
 )
@@ -37,7 +37,7 @@ from qgsw.specs import DEVICE, defaults
 logger = getLogger(__name__)
 
 
-class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+class QGPSIQCollinearFilteredSF(QGPSIQ[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ model with collinearity coefficient and filtered sf."""
 
     _sigma = 1
@@ -250,7 +250,7 @@ class QGPSIQCollinearFilteredSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self.helmholtz_dst = laplace_dst - self.beta_plane.f0**2 * self.lambd
 
 
-class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+class QGPSIQCollinearSF(QGPSIQ[PSIQTAlpha, StatePSIQAlpha]):
     """Collinear QGPSIQ model."""
 
     def __init__(
@@ -415,7 +415,7 @@ class QGPSIQCollinearSF(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self._state.update_psiq(PSIQ(self.psi, q))
 
 
-class QGPSIQFixeddSF2(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
+class QGPSIQFixeddSF2(QGPSIQ[PSIQTAlpha, StatePSIQAlpha]):
     """QGPSIQ model with given dpsi2 value."""
 
     _psi2 = None

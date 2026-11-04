@@ -4,7 +4,7 @@
 
 import torch
 
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -15,7 +15,7 @@ from qgsw.scripts.setups.types import Bases, Coefs
 
 
 def pre_cycle_bases_setup(
-    model: QGPSIQCore | SurfaceVorticity,
+    model: QGPSIQ | SurfaceVorticity,
     bases: Bases,
     coefs: Coefs,
     alpha: torch.Tensor,
@@ -23,7 +23,7 @@ def pre_cycle_bases_setup(
     """Sets the basis.
 
     Args:
-        model (QGPSIQCore): Model.
+        model (QGPSIQ): Model.
         bases (Bases): Bases dict.
         coefs (Coefs): Coefs dict.
         alpha (torch.Tensor): Alpha

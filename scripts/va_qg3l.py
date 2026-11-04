@@ -270,11 +270,6 @@ if __name__ == "__main__":
         g_prime=g_prime,
     )
     model_3l.set_wind_forcing(tx, ty)
-    model_3l.masks = Masks.empty_tensor(
-        model_3l.space.nx,
-        model_3l.space.ny,
-        device=specs["device"],
-    )
     model_3l.bottom_drag_coef = bottom_drag_coef
     model_3l.slip_coef = slip_coef
     model_3l.dt = dt
