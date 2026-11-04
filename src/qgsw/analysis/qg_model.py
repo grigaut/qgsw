@@ -23,11 +23,12 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
 )
+from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.scripts.loss import rmse, uv_rmse
 from qgsw.scripts.output import OutputFolder, build_output_folder
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 
-T = TypeVar("T", bound=QGPSIQCore)
+T = TypeVar("T", bound=QGPSIQCore | SurfaceVorticity)
 
 
 class ModelWrapper(ABC, Generic[T]):
@@ -106,7 +107,7 @@ class ModelWrapper(ABC, Generic[T]):
         else:
             self._output = None
             self.model_type = "RG0"
-        self.losses: dict[str, list[list[torch.Tensor]]] = {}
+        self.losses: dict[str, list[torch.Tensor]] = {}
 
     def parse_params(self, output_folder: OutputFolder) -> dict[str, Any]:
         """Parse parameters.
@@ -161,6 +162,30 @@ class ModelWrapper(ABC, Generic[T]):
         self.basis_dynamical.set_coefs(coefs)
         self.model.basis_dynamical = self.basis_dynamical
 
+    def set_basis_psi_a(self, bases_params: dict, results: dict) -> None:
+        """Set basis for psi_a.
+
+        Args:
+            bases_params (dict): Basis parameters.
+            results (dict): Results dict.
+        """
+        self.basis_psi_a = build_basis_from_params_dict(bases_params["psi"])
+        coefs = DecompositionCoefs.from_dict(results["psi"])
+        self.basis_psi_a.set_coefs(coefs)
+        self.model.basis_psi_a = self.basis_psi_a
+
+    def set_basis_chi_a(self, bases_params: dict, results: dict) -> None:
+        """Set basis for chi_a.
+
+        Args:
+            bases_params (dict): Basis parameters.
+            results (dict): Results dict.
+        """
+        self.basis_chi_a = build_basis_from_params_dict(bases_params["chi"])
+        coefs = DecompositionCoefs.from_dict(results["chi"])
+        self.basis_chi_a.set_coefs(coefs)
+        self.model.basis_chi_a = self.basis_chi_a
+
     def set_alpha(self, results: dict) -> None:
         """Set alpha."""
         try:
@@ -182,6 +207,9 @@ class ModelWrapper(ABC, Generic[T]):
             self.set_alpha(results)
             self.set_basis_dynamical(bases_params, results)
             self.set_basis_external(bases_params, results)
+        elif self.model.get_type() == SurfaceVorticity.get_type():
+            self.set_basis_psi_a(bases_params, results)
+            self.set_basis_chi_a(bases_params, results)
         return results
 
     def setup(
@@ -207,7 +235,7 @@ class ModelWrapper(ABC, Generic[T]):
         """New cycle."""
         self.cycle += 1
         for loss in self.losses.values():
-            loss.append([])
+            loss.append(None)
         if self.remember_psis:
             self.psis = []
 
@@ -218,7 +246,13 @@ class ModelWrapper(ABC, Generic[T]):
             loss_value (torch.Tensor): Loss value.
             loss_name (str): Loss name.
         """
-        self.losses[loss_name][-1].append(loss_value)
+        if self.losses[loss_name][-1] is None:
+            self.losses[loss_name][-1] = loss_value.cpu()[None, ...]
+            return
+        t = self.losses[loss_name].pop(-1)
+        self.losses[loss_name].append(
+            torch.cat([t, loss_value.cpu()[None, ...]], dim=0)
+        )
 
     def plot_loss(
         self,
@@ -248,7 +282,7 @@ class ModelWrapper(ABC, Generic[T]):
             steps = np.arange(len(self.losses[loss_name][c]))
             times = self.data_dt * steps / 3600 / 24 + time_offset
             time_offset = times[-1] + self.data_dt / 3600 / 24
-            loss = torch.stack(self.losses[loss_name][c]).cpu().numpy()
+            loss = self.losses[loss_name][c].cpu().numpy()
             kwargs = self.plot_kwargs.copy()
             if i != 0:
                 kwargs.pop("label")
@@ -296,6 +330,11 @@ class ModelsManager(Generic[M]):
             str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
         ] = {}
         self.uv_losses = list(self.uv_loss_fn.keys())
+
+        self.psi2_loss_fn: dict[
+            str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
+        ] = {}
+        self.psi2_losses = list(self.psi2_loss_fn.keys())
 
         for name in self.uv_losses:
             self.loop_over_models(
@@ -372,7 +411,7 @@ class ModelsManager(Generic[M]):
         self.loop_over_models(lambda mw: mw.losses.update({name: []}))
 
     def add_gradient_RMSE(  # noqa: N802
-        self, space: SpaceDiscretization2D, name: str = "uv_rmse"
+        self, name: str = "uv_rmse"
     ) -> None:
         """Add gradient RMSE.
 
@@ -380,10 +419,19 @@ class ModelsManager(Generic[M]):
             space (SpaceDiscretization2D): Space.
             name (str): Error name.
         """
-        self.uv_loss_fn[name] = lambda psi, u, v: uv_rmse(
-            psi, u, v, space.dx, space.dy
-        )
+        self.uv_loss_fn[name] = uv_rmse
         self.uv_losses = list(self.uv_loss_fn.keys())
+        self.loop_over_models(lambda mw: mw.losses.update({name: []}))
+
+    def add_psi2_rmse(self, name: str = "psi2_rmse") -> None:
+        """Add psi2 RMSE.
+
+        Args:
+            space (SpaceDiscretization2D): Space.
+            name (str): Error name.
+        """
+        self.psi2_loss_fn[name] = rmse
+        self.psi2_losses = list(self.psi2_loss_fn.keys())
         self.loop_over_models(lambda mw: mw.losses.update({name: []}))
 
     def init_models(self, space: SpaceDiscretization2D) -> None:
@@ -455,8 +503,38 @@ class ModelsManager(Generic[M]):
                     return
                 mw.add_loss(
                     self.uv_loss_fn[loss_name](
-                        mw.model.psi[0, 0], u_ref[0, 0], v_ref[0, 0]
+                        mw.model.uv[0][0, 0],
+                        mw.model.uv[1][0, 0],
+                        u_ref[0, 0],
+                        v_ref[0, 0],
                     ),
+                    loss_name,
+                )
+
+            self.loop_over_models(
+                lambda mw, loss_name=loss_name: compute(mw, loss_name)
+            )
+
+    def compute_psi2_losses(self, psi_ref: torch.Tensor) -> None:
+        """Compute velocity losses."""
+        for loss_name in self.psi2_losses:
+
+            def compute(mw: M, loss_name: str) -> None:
+
+                no_data = mw.no_data or (not hasattr(mw.model, "psi2"))
+
+                if no_data:
+                    mw.add_loss(
+                        torch.tensor(
+                            torch.nan, **specs.from_tensor(mw.model.A)
+                        ),
+                        loss_name,
+                    )
+                    return
+
+                psi2: torch.Tensor = mw.model.psi2
+                mw.add_loss(
+                    self.psi2_loss_fn[loss_name](psi2[0, 0], psi_ref[0, 1]),
                     loss_name,
                 )
 
