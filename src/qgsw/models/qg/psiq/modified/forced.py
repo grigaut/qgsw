@@ -177,8 +177,6 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -198,6 +196,8 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_pert_i, q_pert_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_pert_i + psi_bc + self._sf_bar
@@ -234,10 +234,6 @@ class QGPSIQForced(QGPSIQCore[PSIQT, StatePSIQ]):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
 
@@ -558,8 +554,6 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -579,6 +573,8 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_pert_i, q_pert_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_pert_i + psi_bc + self._sf_bar
@@ -616,10 +612,6 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
 
@@ -808,8 +800,6 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
@@ -829,6 +819,8 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_pert_i, q_pert_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_pert_i + psi_bc + self._sf_bar
@@ -868,8 +860,4 @@ class QGPSIQForcedSurfML(QGPSIQRGPsi2TransportDR):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)

@@ -818,20 +818,29 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └──  q : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+            PSIQ: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
             if self._with_mean_flow:
-                return self._compute_time_derivatives_mean_flow(prognostic)
-            return self._compute_time_derivatives_inhomogeneous(prognostic)
-        return self._compute_time_derivatives_homogeneous(prognostic)
+                dprog = self._compute_time_derivatives_mean_flow(prognostic)
+            else:
+                dprog = self._compute_time_derivatives_inhomogeneous(
+                    prognostic
+                )
+        else:
+            dprog = self._compute_time_derivatives_homogeneous(prognostic)
+        if self.time_stepper != "rk3" or self._rk3_step == 0:
+            self.dprog = dprog
+        elif self.time_stepper == "rk3":
+            self._rk3_step += 1
+        return dprog
 
     def _compute_time_derivatives_homogeneous(
         self,
         prognostic: PSIQ,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> PSIQ:
         """Compute time derivatives for homogeneous problem.
 
         Args:
@@ -840,7 +849,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └──  q : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+            PSIQ: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
@@ -861,7 +870,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
     def _compute_time_derivatives_inhomogeneous(
         self,
         prognostic: PSIQ,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> PSIQ:
         """Compute time derivatives for inhomogeneous problem.
 
         Args:
@@ -871,10 +880,12 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └──  q : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+            PSIQ: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
+        if self.time_stepper == "rk3":
+            self._set_boundaries(self._substep_time.item())
         psi_i, q_i = prognostic
         psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
@@ -892,16 +903,12 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self._set_boundaries(self._substep_time.item())
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
     def _compute_time_derivatives_mean_flow(
         self,
         prognostic: PSIQ,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> PSIQ:
         """Compute time derivatives for inhomogeneous problem.
 
         Args:
@@ -911,7 +918,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └──  q : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            tuple[torch.Tensor, torch.Tensor]: dpsi, dq
+            PSIQ: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
                 └──  dq : (n_ens, nl, nx, ny)-shaped
         """
@@ -953,8 +960,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             dq_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            self._rk3_step += 1
         return PSIQ(dpsi, dq)
 
     def set_p(self, p: torch.Tensor) -> None:
@@ -1133,7 +1138,6 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         psi_bar, q_bar = self.mean_flow
         return PSIQ(psiq_i.psi + psi_bc + psi_bar, psiq_i.q + q_bar)
 
-    @torch.enable_grad()
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self._state.update_psiq(self.update(self._state.prognostic.psiq))
