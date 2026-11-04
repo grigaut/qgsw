@@ -18,6 +18,7 @@ from qgsw.cli import (
 )
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
+from qgsw.exceptions import BackwardPassError
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
@@ -479,7 +480,10 @@ if __name__ == "__main__":
             loss = obs + dyn + bkg
             params_tracker.step(loss)
             live_plot.step()
-            loss.backward()
+            try:
+                loss.backward()
+            except RuntimeError as e:
+                raise BackwardPassError from e
             return {
                 "tot": loss,
                 "obs": obs,
@@ -494,20 +498,25 @@ if __name__ == "__main__":
         for _ in range(args.optim):
             try:
                 optimizer.step()
-            except (EarlyStopError, RuntimeError) as e:
+            except EarlyStopError as e:
                 msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)
                 runtime_error = isinstance(e, RuntimeError)
                 break
-            except OverflowError:
+            except (OverflowError, BackwardPassError) as e:
                 epoch_repr = optimizer.epoch_repr
+                err_type = (
+                    "overflow error"
+                    if isinstance(e, OverflowError)
+                    else "backward pass error"
+                )
                 if epoch_repr == epoch_restart:
-                    msg = "Unable to solve overflow with optimizer restart."
+                    msg = f"Unable to solve {err_type} with optimizer restart."
                     logger.warning(box(msg))
                     runtime_error = True
                     break
                 epoch_restart = epoch_repr
-                msg = f"Overflow at {epoch_repr}, restarting optimizer."
+                msg = f"Restarting optimizer after {err_type} at {epoch_repr}."
                 logger.info(msg)
                 params_tracker.restore_best()
                 optimizer.restart_from_params(params_tracker.get_optim_list())
