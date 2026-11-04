@@ -19,7 +19,7 @@ from qgsw.fields.variables.tuples import (
 from qgsw.logging.core import getLogger
 from qgsw.models.io import IO
 from qgsw.models.names import ModelName
-from qgsw.models.qg.psiq.core import QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.mixed_layer.core import QGPSIQSST, QGPSIQSSTCore
 from qgsw.models.qg.stretching_matrix import compute_A_tilde
 from qgsw.solver.finite_diff import grad, laplacian
@@ -639,7 +639,7 @@ class QGPSIQSSTAdvRGSI(QGPSIQSSTRGSI):
             tauy (torch.Tensor): Wind stress in the y direction.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        QGPSIQCore.set_wind_forcing(self, taux, tauy)
+        QGPSIQ.set_wind_forcing(self, taux, tauy)
 
     def _compute_time_derivatives_homogeneous(
         self,

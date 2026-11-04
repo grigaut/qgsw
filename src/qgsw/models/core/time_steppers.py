@@ -69,3 +69,17 @@ def validate(time_stepper: str) -> None:
     if time_stepper not in AVAILABLE:
         msg = f"Invalid time stepper: {time_stepper}"
         raise ValueError(msg)
+
+
+def compute_rk3_substep_coefs(rk3_step_nb: int) -> float:
+    """Compute time RK3 time substep coef."""
+    match rk3_step_nb:
+        case 0:
+            return 0
+        case 1:
+            return 1
+        case 2:
+            return 1 / 2
+        case _:
+            msg = "SSPRK3 should only perform 3 steps."
+            raise ValueError(msg)

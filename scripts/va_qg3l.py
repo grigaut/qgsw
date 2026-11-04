@@ -18,6 +18,7 @@ from qgsw.cli import (
 )
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
+from qgsw.exceptions import BackwardPassError
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
@@ -269,11 +270,6 @@ if __name__ == "__main__":
         g_prime=g_prime,
     )
     model_3l.set_wind_forcing(tx, ty)
-    model_3l.masks = Masks.empty_tensor(
-        model_3l.space.nx,
-        model_3l.space.ny,
-        device=specs["device"],
-    )
     model_3l.bottom_drag_coef = bottom_drag_coef
     model_3l.slip_coef = slip_coef
     model_3l.dt = dt
@@ -457,10 +453,10 @@ if __name__ == "__main__":
                 t = model.time.clone()
                 model.step()
                 psi = get_psi_g(model)
-                dpsi = (psi - psi_) / model.dt
+                dpsi = model.dprog.psi
                 if with_reg:
                     dyn += sum(
-                        dyn_gammas[k] * dyn_reg_fns[k](psi, dpsi, t)
+                        dyn_gammas[k] * dyn_reg_fns[k](psi_, dpsi, t)
                         for k in dyn_reg_fns
                     )
 
@@ -479,7 +475,10 @@ if __name__ == "__main__":
             loss = obs + dyn + bkg
             params_tracker.step(loss)
             live_plot.step()
-            loss.backward()
+            try:
+                loss.backward()
+            except RuntimeError as e:
+                raise BackwardPassError from e
             return {
                 "tot": loss,
                 "obs": obs,
@@ -490,23 +489,29 @@ if __name__ == "__main__":
 
         optimizer.set_closure(closure)
         epoch_restart = ""
-        overflow_encountered = False
+        runtime_error = False
         for _ in range(args.optim):
             try:
                 optimizer.step()
             except EarlyStopError as e:
                 msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)
+                runtime_error = isinstance(e, RuntimeError)
                 break
-            except OverflowError:
+            except (OverflowError, BackwardPassError) as e:
                 epoch_repr = optimizer.epoch_repr
+                err_type = (
+                    "overflow error"
+                    if isinstance(e, OverflowError)
+                    else "backward pass error"
+                )
                 if epoch_repr == epoch_restart:
-                    msg = "Unable to solve overflow with optimizer restart."
+                    msg = f"Unable to solve {err_type} with optimizer restart."
                     logger.warning(box(msg))
-                    overflow_encountered = True
+                    runtime_error = True
                     break
                 epoch_restart = epoch_repr
-                msg = f"Overflow at {epoch_repr}, restarting optimizer."
+                msg = f"Restarting optimizer after {err_type} at {epoch_repr}."
                 logger.info(msg)
                 params_tracker.restore_best()
                 optimizer.restart_from_params(params_tracker.get_optim_list())
@@ -543,7 +548,7 @@ if __name__ == "__main__":
                 "loss": best_loss.cpu().item(),
                 "max_memory_allocated": max_mem,
                 "losses": optimizer.losses,
-                "overflow": overflow_encountered,
+                "runtime_error": runtime_error,
                 "elapsed": time.time() - time0,
             }
         )

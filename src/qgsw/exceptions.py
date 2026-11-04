@@ -83,3 +83,7 @@ class StateBindingError(Exception):
 
 class SlicingError(Exception):
     """When error occurs while slicing."""
+
+
+class BackwardPassError(Exception):
+    """When error occurs during backward pass."""

@@ -12,6 +12,12 @@ T = TypeVar("T")
 class _Interpolation(Generic[T], metaclass=ABCMeta):
     """Interpolation base class."""
 
+    _ys: T
+
+    @property
+    def ys(self) -> list[T]:
+        return self._ys
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -92,7 +98,7 @@ class ConstantInterpolation(_Interpolation[T], Generic[T]):
         Args:
             y (T): Y value.
         """
-        self._y = y
+        self._ys = [y]
 
     def __call__(self, x: float) -> T:  # noqa: ARG002
         """Get the y value at a specific x.
@@ -103,7 +109,7 @@ class ConstantInterpolation(_Interpolation[T], Generic[T]):
         Returns:
             T: Interpolation of ys evaluated at x.
         """
-        return self._y
+        return self._ys[0]
 
 
 class QuadraticInterpolation(_Interpolation[T], Generic[T]):

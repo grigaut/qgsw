@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import torch
 
-from qgsw.solver.finite_diff import grad_perp
-
 
 def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
     """RMSE."""
@@ -13,18 +11,12 @@ def rmse(f: torch.Tensor, f_ref: torch.Tensor) -> torch.Tensor:
 
 
 def uv_rmse(
-    psi: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
     u_ref: torch.Tensor,
     v_ref: torch.Tensor,
-    dx: float,
-    dy: float,
 ) -> torch.Tensor:
     """Gradient RMSE."""
-    u, v = grad_perp(psi)
-
-    u /= dy
-    v /= dx
-
     return (
         (u - u_ref).square().mean() + (v - v_ref).square().mean()
     ).sqrt() / (u_ref.square().mean() + v_ref.square().mean()).sqrt()

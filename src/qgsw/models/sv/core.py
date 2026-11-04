@@ -7,7 +7,7 @@ from qgsw.decomposition.base import SpaceTimeDecomposition
 from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.exceptions import InvalidModelParameterError, UnsetTimestepError
-from qgsw.fields.variables.tuples import PSIZeta
+from qgsw.fields.variables.tuples import PSIZetaSST
 from qgsw.logging.core import getLogger
 from qgsw.masks import Masks
 from qgsw.models.base import ABCCounter
@@ -28,7 +28,7 @@ from qgsw.solver.pv_inversion import (
 )
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid_conversion import interpolate
-from qgsw.utils.interpolation import LinearInterpolation
+from qgsw.utils.interpolation import ConstantInterpolation, _Interpolation
 from qgsw.utils.named_object import NamedObject
 from qgsw.utils.reshaping import crop
 
@@ -41,6 +41,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     _type = ModelName.SURFACE_VORTICITY
     wide = True
     implements_alpha = False
+    advect_sst = False
 
     @property
     def basis_psi_a(
@@ -81,36 +82,32 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         self._basis_chi_a = basis
         wide_space = self.space.widen(1, 1)
         self.f_chi_a = basis.localize(*wide_space.q.xy)
-        self.f_div = basis.localize_laplacian(*wide_space.q.xy)
+        self.f_div = basis.localize_laplacian(*self.space.q.xy)
 
     @property
     def _substep_time(self) -> torch.Tensor:
         if self.time_stepper == "euler":
             return self.time
         if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 0
-                return self.time + coef * self.dt
-            if self._rk3_step == 1:
-                coef = 1
-                return self.time + coef * self.dt
-            if self._rk3_step == 2:
-                coef = 1 / 2
-                return self.time + coef * self.dt
-            msg = "SSPRK3 should only perform 3 steps."
-            raise ValueError(msg)
+            coef = time_steppers.compute_rk3_substep_coefs(self._rk3_step)
+            return self.time + coef * self.dt
         msg = "Supported time steppers are 'rk3' and 'euler'."
         raise ValueError(msg)
 
     @property
     def psi_g(self) -> torch.Tensor:
         """Geostrophic streamfunction."""
-        return self.psiz.psi
+        return self.psizsst.psi
 
     @property
     def zeta_g(self) -> torch.Tensor:
         """Geostrophic vorticity."""
-        return self.psiz.zeta
+        return self.psizsst.zeta
+
+    @property
+    def sst_anom(self) -> torch.Tensor:
+        """SST anomaly."""
+        return self.psizsst.sst
 
     @property
     def psi(self) -> torch.Tensor:
@@ -131,6 +128,11 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     def zeta_a(self) -> torch.Tensor:
         """Ageostrophic vorticity."""
         return self.f_zeta_a(self.time)[None, None, ...]
+
+    @property
+    def sst(self) -> torch.Tensor:
+        """SST."""
+        return self.sst_anom + self.sst_mean
 
     @property
     def chi_a(self) -> torch.Tensor:
@@ -177,7 +179,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             msg = "Timestep must be greater than 0."
             raise InvalidModelParameterError(msg)
         self._dt = dt
-        msg = f"{self.__class__.__name__}: dt set to {self.dt}"
+        msg = f"{self.name}: dt set to {self.dt}"
         logger.info(msg)
 
     @property
@@ -216,7 +218,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         if not isinstance(beta_plane, BetaPlane):
             msg = "beta_plane should be of type `BetaPlane`."
             raise TypeError(msg)
-        msg = f"{self.__class__.__name__}: Beta-plane set to {beta_plane}"
+        msg = f"{self.name}: Beta-plane set to {beta_plane}"
         logger.detail(msg)
         self._beta_plane = beta_plane
         self.f0 = beta_plane.f0
@@ -286,21 +288,22 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         """
         self.compile_fns = compile_fns
         self.__instance_nb = next(self._instance_count)
-        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
-        msg = f"Creating {self.__class__.__name__} model..."
+        self.class_name = self.__class__.__name__
+        self.name = f"{self.class_name}-{self.__instance_nb}"
+        msg = f"Creating {self.name}..."
         logger.info(msg)
         ## Space
         self.space = space_2d
+        self.specs = specs.from_tensor(self.space.psi.xy.x)
         # Beta-plane
         with logger.section("Setting model parameters..."):
             self.beta_plane = beta_plane
-        self.specs = specs.from_tensor(self.space.psi.xy.x)
         self.switch_to_homogeneous()
         self._set_utils(compile_fns)
         self.set_flux()
         self.reset_state()
         self.set_solver()
-        self.set_wind_forcing(0, 0)
+        self.set_wind_forcing(0.0, 0.0)
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -488,7 +491,30 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         self.reset_time()
         psi_g = torch.zeros_like(self.space.psi.xy.x)[None, None, ...]
         zeta_g = self.compute_zeta_g_from_psi_g(psi_g)
-        self.psiz = PSIZeta(psi_g, zeta_g)
+        sst_anom = torch.zeros_like(zeta_g)
+        self.psizsst = PSIZetaSST(psi_g, zeta_g, sst_anom)
+        self.sst_mean = torch.tensor(0, **self.specs)
+
+    def set_psiz(self, psi_g: torch.Tensor, zeta_g: torch.Tensor) -> None:
+        """Set psi_g and zeta_g."""
+        self.psizsst = PSIZetaSST(psi_g, zeta_g, self.sst_anom)
+
+    def set_sst(self, sst: torch.Tensor) -> None:
+        """Set sst."""
+        if not self.advect_sst:
+            msg = f"{self.get_type().value} will advect SST."
+            logger.info(msg)
+        self.advect_sst = True
+        self.sst_mean = torch.mean(sst)
+        sst_anom = sst - self.sst_mean
+        self.psizsst = PSIZetaSST(self.psi_g, self.zeta_g, sst_anom)
+
+    def set_psizsst(
+        self, psi_g: torch.Tensor, zeta_g: torch.Tensor, sst: torch.Tensor
+    ) -> None:
+        """Set psi_g, zeta_g and sst."""
+        self.set_psiz(psi_g, zeta_g)
+        self.set_sst(sst)
 
     def switch_to_homogeneous(self) -> None:
         """Switch to an inhomogeneous solver."""
@@ -506,25 +532,33 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
 
     def set_boundary_maps(
         self,
-        sf_bc_interp: LinearInterpolation[Boundaries],
-        zeta_g_bc_interp: LinearInterpolation[Boundaries],
+        sf_bc_interp: _Interpolation[Boundaries],
+        zeta_g_bc_interp: _Interpolation[Boundaries],
+        sst_bc_interp: _Interpolation[Boundaries] | None = None,
     ) -> None:
         """Set the boundary maps.
 
         Args:
-            sf_bc_interp (LinearInterpolation[Boundaries]): Boundary map
+            sf_bc_interp (_Interpolation[Boundaries]): Boundary map
                 for stream function at locations
                 (imin,imax+1,jmin,jmax+1).
-            zeta_g_bc_interp (LinearInterpolation[Boundaries]): Boundary map
+            zeta_g_bc_interp (_Interpolation[Boundaries]): Boundary map
                 for vorticity at locations
                 (imin,imax,jmin,jmax).
-            wide_space (SpaceDiscretization2D): Wide space.
+            sst_bc_interp (_Interpolation[Boundaries]): Boundary map
+                for SST at locations
+                (imin,imax,jmin,jmax).
         """
         self.switch_to_inhomogeneous()
         self.basis_psi_a = self.basis_psi_a
         self.basis_chi_a = self.basis_chi_a
+        if sst_bc_interp is None:
+            sst_bc_interp = ConstantInterpolation(
+                Boundaries.zeros_like(zeta_g_bc_interp.ys[0])
+            )
         self.sf_bc_interp = sf_bc_interp
         self.zeta_g_bc_interp = zeta_g_bc_interp
+        self.sst_bc_interp = sst_bc_interp
         self.set_boundaries(self.time.item())
 
     def set_boundaries(self, time: float) -> None:
@@ -537,13 +571,16 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
 
         self.solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
         zeta_g_bc = self.zeta_g_bc_interp(time)
+        sst_anom_bc: Boundaries = self.sst_bc_interp(time) - self.sst_mean
         if self.wide:
             if zeta_g_bc.width != 3:
                 msg = "For wide boundary, zeta_g_bc must be 3 points wide."
                 raise ValueError(msg)
             self.zeta_g_bc = zeta_g_bc
+            self.sst_anom_bc = sst_anom_bc
         else:
             self.zeta_g_bc = zeta_g_bc.get_band(0)
+            self.sst_anom_bc = sst_anom_bc.get_band(0)
 
     def compute_zeta_g_from_psi_g(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute vorticity from streamfunction.
@@ -635,71 +672,96 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
 
         return (u_sf_a + u_pot_a, v_sf_a + v_pot_a)
 
-    def compute_advection_homogeneous(
-        self, psiz: PSIZeta, time: torch.Tensor
+    def compute_div_flux_homogeneous(
+        self, u: torch.Tensor, v: torch.Tensor, tracer: torch.Tensor
     ) -> torch.Tensor:
-        """Compute advection pv advection for homogeneous problem.
+        """Compute homogeneous advection.
 
         Args:
-            psiz (PSIZeta): Geostrophic stream function and vorticity.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
-            time (torch.Tensor): Time to evaluate parameterized fields.
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meridional velocity.
+            tracer (torch.Tensor): Tracer.
 
         Returns:
-            torch.Tensor: RHS: J(ѱ_g, ζ_g)
-                └──  (n_ens, nl, nx, ny)-shaped
+            torch.Tensor: ∇·(u tracer)
         """
-        psi_g, zeta_g = psiz
-
-        zeta_a = self.f_zeta_a(time)
-
-        u_g, v_g = self.gradp(psi_g)
-        u_g /= self.space.dy
-        v_g /= self.space.dx
-
-        u_a, v_a = self.compute_ageostrophic_velocity(time)
-
-        u = u_g + u_a
-        v = v_g + v_a
-
         return self.div_flux(
-            zeta_g + zeta_a + self.f,
+            tracer,
             u[..., 1:-1, :],
             v[..., 1:-1],
         )
 
-    def compute_advection_inhomogeneous(
-        self, psiz: PSIZeta, zeta_g_bc: Boundaries, time: torch.Tensor
+    def compute_div_flux_inhomogeneous(
+        self, u: torch.Tensor, v: torch.Tensor, tracer: torch.Tensor
     ) -> torch.Tensor:
-        """Compute advection pv advection for inhomogeneous problem.
+        """Compute inhomogeneous advection.
 
         Args:
-            psiz (PSIZeta): Geostrophic stream function and vorticity.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
-            zeta_g_bc (Boundaries): Boundaries for geostrophic vorticity.
-            time (torch.Tensor): Time to evaluate parameterized fields.
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meridional velocity.
+            tracer (torch.Tensor): Tracer.
 
         Returns:
-            torch.Tensor: RHS: J(ѱ_g, ζ_g)
-                └──  (n_ens, nl, nx, ny)-shaped
+            torch.Tensor: ∇·(u tracer)
         """
-        psi_g, zeta_g = psiz
-        u_g, v_g = self.gradp(psi_g)
-        u_g /= self.space.dy
-        v_g /= self.space.dx
+        return self.div_flux(tracer, u, v)
 
-        u_a, v_a = self.compute_ageostrophic_velocity(time)
+    def compute_dsst_homogeneous(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute dsst for homogeneous situations.
 
-        u = u_g + u_a
-        v = v_g + v_a
+        Args:
+            u (torch.Tensor): Zonal velocity.
+                └── sst: (n_ens, nl, nx+1, ny)-shaped
+            v (torch.Tensor): Meridional velocity.
+                └── sst: (n_ens, nl, nx, ny+1)-shaped
+            sst_anom (torch.Tensor): SST anomaly.
+                └── sst: (n_ens, nl, nx, ny)-shaped
 
-        zeta_g_with_bc = zeta_g_bc.expand(zeta_g)
-        zeta_a_with_bc = self.f_zeta_a_wide(time)
-        return self.div_flux(
-            zeta_g_with_bc + zeta_a_with_bc + self.f_wide, u, v
-        )
+        Returns:
+            torch.Tensor: dsst.
+                └── dsst: (n_ens, nl, nx, ny)-shaped
+        """
+        if self.advect_sst:
+            div = self.f_div(self._substep_time)
+            return (
+                -self.compute_div_flux_homogeneous(u, v, sst_anom)
+                + sst_anom * div
+            ) * self.masks.h
+        return torch.zeros_like(sst_anom)
+
+    def compute_dsst_inhomogeneous(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute dsst for inhomogeneous situations.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+                └── sst: (n_ens, nl, nx+1, ny)-shaped
+            v (torch.Tensor): Meridional velocity.
+                └── sst: (n_ens, nl, nx, ny+1)-shaped
+            sst_anom (torch.Tensor): SST anomaly.
+                └── sst: (n_ens, nl, nx+1, ny+1)-shaped (+3 if wide)
+
+        Returns:
+            torch.Tensor: dsst.
+                └── dsst: (n_ens, nl, nx, ny)-shaped
+        """
+        if self.advect_sst:
+            sst_anom_wide = self.sst_anom_bc.expand(sst_anom)
+            div = self.f_div(self._substep_time)
+            return (
+                -self.compute_div_flux_inhomogeneous(u, v, sst_anom_wide)
+                + sst_anom * div
+            ) * self.masks.h
+        return torch.zeros_like(sst_anom)
 
     def compute_forcing(self, time: torch.Tensor) -> torch.Tensor:
         """Compute forcing.
@@ -714,42 +776,63 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         dt_zeta_a = self.f_zeta_a.dt(time)
         return -dt_zeta_a
 
-    def compute_time_derivatives(self, prognostic: PSIZeta) -> PSIZeta:
+    def compute_time_derivatives(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Compute time derivatives.
 
         Args:
-            prognostic (PSIZeta): prognostic tuple.
+            prognostic (PSIZetaSST): prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIZeta: dpsi_g, dzeta_g
+            PSIZetaSST: dpsi_g, dzeta_g
                 ├── dpsi_g : (n_ens, nl, nx+1, ny+1)-shaped
-                └── dzeta_g : (n_ens, nl, nx, ny)-shaped
+                ├── dzeta_g : (n_ens, nl, nx, ny)-shaped
+                └── dsst : (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
-            return self.compute_time_derivatives_inhomogeneous(prognostic)
-        return self.compute_time_derivatives_homogeneous(prognostic)
+            dprog = self.compute_time_derivatives_inhomogeneous(prognostic)
+        else:
+            dprog = self.compute_time_derivatives_homogeneous(prognostic)
+        if self.time_stepper != "rk3" or self._rk3_step == 0:
+            self.dprog = dprog
+        elif self.time_stepper == "rk3":
+            self._rk3_step += 1
+        return dprog
 
     def compute_time_derivatives_homogeneous(
         self,
-        prognostic: PSIZeta,
-    ) -> PSIZeta:
+        prognostic: PSIZetaSST,
+    ) -> PSIZetaSST:
         """Compute time derivatives for homogeneous problem.
 
         Args:
-            prognostic (PSIZeta): prognostic tuple.
+            prognostic (PSIZetaSST): prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIZeta: dpsi_g, dzeta_g
+            PSIZetaSST: dpsi_g, dzeta_g
                 ├── dpsi_g : (n_ens, nl, nx+1, ny+1)-shaped
-                └── dzeta_g : (n_ens, nl, nx, ny)-shaped
+                ├── dzeta_g : (n_ens, nl, nx, ny)-shaped
+                └── dsst : (n_ens, nl, nx, ny)-shaped
         """
-        psi_g, zeta_g = prognostic
-        div_flux = self.compute_advection_homogeneous(
-            PSIZeta(psi_g, zeta_g), self._substep_time
+        psi_g, zeta_g, sst_anom = prognostic
+        zeta_a = self.f_zeta_a(self._substep_time)
+
+        u_g, v_g = self.gradp(psi_g)
+        u_g /= self.space.dy
+        v_g /= self.space.dx
+
+        u_a, v_a = self.compute_ageostrophic_velocity(self._substep_time)
+
+        u = u_g + u_a
+        v = v_g + v_a
+
+        div_flux = self.compute_div_flux_homogeneous(
+            u, v, zeta_g + zeta_a + self.f
         )
         # wind forcing + bottom drag
         forcing = self.compute_forcing(self._substep_time)
@@ -760,30 +843,47 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             dzeta_g_i,
             ensure_mass_conservation=True,
         )
-        return PSIZeta(dpsi_g, dzeta_g)
+        dsst_anom = self.compute_dsst_homogeneous(u, v, sst_anom)
+        return PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
 
     def compute_time_derivatives_inhomogeneous(
         self,
-        prognostic: PSIZeta,
-    ) -> PSIZeta:
+        prognostic: PSIZetaSST,
+    ) -> PSIZetaSST:
         """Compute time derivatives for inhomogeneous problem.
 
         Args:
-            prognostic (PSIZeta): prognostic tuple.
+            prognostic (PSIZetaSST): prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIZeta: dpsi_g, dzeta_g
+            PSIZetaSST: dpsi_g, dzeta_g
                 ├── dpsi_g : (n_ens, nl, nx+1, ny+1)-shaped
-                └── dzeta_g : (n_ens, nl, nx, ny)-shaped
+                ├── dzeta_g : (n_ens, nl, nx, ny)-shaped
+                └── dsst : (n_ens, nl, nx, ny)-shaped
         """
-        psi_g_i, zeta_g_i = prognostic
+        if self.time_stepper == "rk3":
+            self.set_boundaries(self._substep_time.item())
+        psi_g_i, zeta_g_i, sst_anom = prognostic
         psi_g_bc, zeta_g_bc = self.solver_inhomogeneous.psiq_bc
         psi_g = psi_g_i + psi_g_bc
         zeta_g = zeta_g_i + zeta_g_bc
-        div_flux = self.compute_advection_inhomogeneous(
-            PSIZeta(psi_g, zeta_g), self.zeta_g_bc, self._substep_time
+
+        u_g, v_g = self.gradp(psi_g)
+        u_g /= self.space.dy
+        v_g /= self.space.dx
+
+        u_a, v_a = self.compute_ageostrophic_velocity(self._substep_time)
+
+        u = u_g + u_a
+        v = v_g + v_a
+
+        zeta_g_with_bc = self.zeta_g_bc.expand(zeta_g)
+        zeta_a_with_bc = self.f_zeta_a_wide(self._substep_time)
+        div_flux = self.compute_div_flux_inhomogeneous(
+            u, v, zeta_g_with_bc + zeta_a_with_bc + self.f_wide
         )
         # wind forcing + bottom drag
         forcing = self.compute_forcing(self._substep_time)
@@ -794,88 +894,100 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             dzeta_g_i,
             ensure_mass_conservation=False,
         )
-        if self.time_stepper == "rk3":
-            # Boundary condition interpolation
-            self.set_boundaries(self._substep_time.item())
-            self._rk3_step += 1
-        return PSIZeta(dpsi_g, dzeta_g)
+        dsst_anom = self.compute_dsst_inhomogeneous(u, v, sst_anom)
+        return PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
 
-    def update(self, prognostic: PSIZeta) -> PSIZeta:
+    def update(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Update prognostic.
 
         Args:
-            prognostic (PSIZeta): Prognostic tuple.
+            prognostic (PSIZetaSST): Prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIZeta: Updated prognostic tuple.
+            PSIZetaSST: Updated prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
             return self.update_inhomogeneous(prognostic)
         return self.update_homogeneous(prognostic)
 
-    def timestep(self, prognostic: PSIZeta) -> PSIZeta:
+    def timestep(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Timesteps prognostic variables.
 
         Args:
-            prognostic (PSIZeta): Prognostic tuple.
+            prognostic (PSIZetaSST): Prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIZeta: Timesteped prognostic tuple.
+            PSIZetaSST: Timesteped prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
         """
         assert self.time_stepper == "rk3"
         self._rk3_step = 0
-        psiz = time_steppers.rk3_ssp(
+        psizsst = time_steppers.rk3_ssp(
             prog=prognostic,
             dt=self.dt,
             time_derivation_func=self.compute_time_derivatives,
         )
         self.time += self.dt
-        return psiz
+        return psizsst
 
-    def update_homogeneous(self, prognostic: PSIZeta) -> PSIZeta:
+    def update_homogeneous(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Update prognostic tuple.
 
         Args:
-            prognostic (PSIZeta): Prognostic variable to advect.
+            prognostic (PSIZetaSST): Prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIZeta: Updated prognostic variable to advect.
+            PSIZetaSST: Updated prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
         """
         return self.timestep(prognostic)
 
-    def update_inhomogeneous(self, prognostic: PSIZeta) -> PSIZeta:
+    def update_inhomogeneous(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Update prognostic tuple.
 
         Args:
-            prognostic (PSIZeta): Prognostic variable to advect.
+            prognostic (PSIZetaSST): Prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIZeta: Updated prognostic variable to advect.
+            PSIZetaSST: Updated prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └── zeta : (n_ens, nl, nx, ny)-shaped
+                ├── zeta : (n_ens, nl, nx, ny)-shaped
+                └── sst : (n_ens, nl, nx, ny)-shaped
         """
         psi_bc = self.solver_inhomogeneous.psiq_bc.psi
-        prognostic_i = PSIZeta(prognostic.psi - psi_bc, prognostic.zeta)
-        psiz_g_i = self.timestep(prognostic_i)
+        prognostic_i = PSIZetaSST(
+            prognostic.psi - psi_bc,
+            prognostic.zeta,
+            prognostic.sst,
+        )
+        psizsst_g_i = self.timestep(prognostic_i)
         self.set_boundaries(self.time.item())
         psi_bc = self.solver_inhomogeneous.psiq_bc.psi
-        return PSIZeta(psiz_g_i.psi + psi_bc, psiz_g_i.zeta)
+        return PSIZetaSST(
+            psizsst_g_i.psi + psi_bc,
+            psizsst_g_i.zeta,
+            psizsst_g_i.sst,
+        )
 
-    @torch.enable_grad()
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        self.psiz = self.update(self.psiz)
+        self.psizsst = self.update(self.psizsst)

@@ -18,7 +18,7 @@ n_zones=0
 [ "$z4" = true ] && (( n_zones++ ))
 
 # Compute walltime
-walltime=6
+walltime=12
 [ "$long_optim" = true ] && (( walltime *= 4 ))
 [ "$long" = true ]       && (( walltime *= 4 ))
 [ "$contiguous" = true ] && (( walltime *= n_zones ))

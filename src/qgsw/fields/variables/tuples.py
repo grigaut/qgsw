@@ -184,6 +184,14 @@ class _PSIZeta(NamedTuple):
     zeta: torch.Tensor
 
 
+class _PSIZetaSST(NamedTuple):
+    """Stream function, vorticity and SST."""
+
+    psi: torch.Tensor
+    zeta: torch.Tensor
+    sst: torch.Tensor
+
+
 class _PSIQ(NamedTuple):
     """Stream function and potential vorticity."""
 
@@ -245,6 +253,25 @@ class PSIZeta(BaseTuple, _PSIZeta):
 
     @property
     def parallel_slice(self) -> ParallelSlice[PSIZeta]:
+        """Parallel slicing object."""
+        return ParallelSlice(self, slice_depth=2)
+
+
+class PSIZetaSST(BaseTuple, _PSIZetaSST):
+    """Stream function, potential vorticity and SST."""
+
+    @property
+    def psizeta(self) -> PSIZeta:
+        """PSIZeta."""
+        return PSIZeta(self.psi, self.zeta)
+
+    @property
+    def psizetasst(self) -> PSIZetaSST:
+        """PSIZeta."""
+        return self
+
+    @property
+    def parallel_slice(self) -> ParallelSlice[PSIZetaSST]:
         """Parallel slicing object."""
         return ParallelSlice(self, slice_depth=2)
 

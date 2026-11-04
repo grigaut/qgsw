@@ -71,12 +71,7 @@ class OptimizerWrapper(
         """
         msg = f"Instantiating: {self.get_type().value} optimizer."
         logger.info(msg)
-        self.losses: dict[str, list[float]] = {
-            "obs": [],
-            "dyn": [],
-            "bkg": [],
-            "best": [],
-        }
+        self.losses: dict[str, list[float]] = {}
 
     def hot_restart(self) -> None:
         """Restart optimizer."""
@@ -146,6 +141,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         self,
         params: list[torch.Tensor],
         max_iter: int = 20,
+        max_eval: int | None = None,
         history_size: int = 20,
     ) -> None:
         """Instantiate LBFGS optimizer wrapper.
@@ -153,6 +149,8 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         Args:
             params (list[torch.Tensor]): Parameters to optim.
             max_iter (int, optional): Max number of iterations. Defaults to 20.
+            max_eval (int | None, optional): Max number of evaluations.
+                Defaults to None.
             history_size (int, optional): History size. Defaults to 20.
             losses (dict[str, list[torch.Tensor]] | None, optional): Losses.
                 Defaults to None.
@@ -160,6 +158,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         super().__init__(params, max_iter=max_iter, history_size=history_size)
 
         self.max_iter = max_iter
+        self._max_eval = max_eval
         self.history_size = history_size
 
         self.restart_from_params(params)
@@ -171,36 +170,38 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
 
         def post_closure(losses: dict[str, torch.Tensor]) -> torch.Tensor:
 
-            tot_ = losses["tot"].detach()
+            tot_ = losses.pop("tot").detach()
             tot = tot_.item()
-            obs = losses["obs"].detach().item()
-            dyn = losses["dyn"].detach().item()
-            bkg = losses["bkg"].detach().item()
-            best = losses["best"].detach().item()
+
+            msg_parts = []
+
+            for k, lo in losses.items():
+                self.losses.setdefault(k, []).append(lo.detach().item())
+                if k == "best":
+                    best = lo.detach().item()
+                    continue
+                k_str = k.replace("_", " ")
+                msg_parts.append(
+                    f"{k_str}: {lo:>#10.5g} [{lo / (tot + self.eps):7.2%}]"
+                )
 
             msg = (
                 f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
                 f" [{step(self.epoch + 1, self.max_epoch)} |"
-                f" {step(self.eval + 1, self.max_eval)}]"
+                f" {self.eval + 1} ]"
                 f" Loss: {tot_:>#10.5g}"
                 f" ({best:>#10.5g})"
             )
             logger.info(msg)
-            msg = (
-                f"\t└─ Obs: {obs:>#10.5g} [{obs / (tot + self.eps):>7.2%}]"
-                f" | Dyn Reg: {dyn:>#10.5g} [{dyn / (tot + self.eps):>7.2%}]"
-                f" | Bkg Reg: {bkg:>#10.5g} [{bkg / (tot + self.eps):>7.2%}]"
-            )
-            logger.detail(msg)
-            self.losses["obs"].append(obs)
-            self.losses["dyn"].append(dyn)
-            self.losses["bkg"].append(bkg)
-            self.losses["best"].append(best)
+
+            if msg_parts:
+                msg = "\t└─ " + " | ".join(msg_parts)
+                logger.detail(msg)
             if self.early_stop.step(tot_):
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
             self.eval += 1
-            return losses["tot"]
+            return tot_
 
         self._pre_closure = pre_closure
         self._post_closure = post_closure
@@ -215,6 +216,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             params,
             lr=1,
             line_search_fn="strong_wolfe",
+            max_eval=self._max_eval,
             history_size=self.history_size,
             max_iter=self.max_iter,
         )
@@ -250,13 +252,20 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
 
             for p in self.optimizer.param_groups:
                 torch.nn.utils.clip_grad_norm_(p["params"], max_norm=1)
-
-            tot_ = losses["tot"].detach()
+            tot_ = losses.pop("tot").detach()
             tot = tot_.item()
-            obs = losses["obs"].detach().item()
-            dyn = losses["dyn"].detach().item()
-            bkg = losses["bkg"].detach().item()
-            best = losses["best"].detach().item()
+
+            msg_parts = []
+
+            for k, lo in losses.items():
+                self.losses.setdefault(k, []).append(lo.detach().item())
+                if k == "best":
+                    best = lo.detach().item()
+                    continue
+                k_str = k.replace("_", " ")
+                msg_parts.append(
+                    f"{k_str}: {lo:>#10.5g} [{lo / (tot + self.eps):7.2%}]"
+                )
 
             msg = (
                 f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
@@ -265,22 +274,15 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
                 f" ({best:>#10.5g})"
             )
             logger.info(msg)
-            msg = (
-                f"\t└─ Obs: {obs:>#10.5g} [{obs / (tot + self.eps):>7.2%}]"
-                f" | Dyn Reg: {dyn:>#10.5g} [{dyn / (tot + self.eps):>7.2%}]"
-                f" | Bkg Reg: {bkg:>#10.5g} [{bkg / (tot + self.eps):>7.2%}]"
-            )
-            logger.detail(msg)
-            self.losses["obs"].append(obs)
-            self.losses["dyn"].append(dyn)
-            self.losses["bkg"].append(bkg)
-            self.losses["best"].append(best)
+            if msg_parts:
+                msg = "\t└─ " + " | ".join(msg_parts)
+                logger.detail(msg)
             if self.early_stop.step(tot_):
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
             self.scheduler.step(tot)
             self.lr_callback.step()
-            return losses["tot"]
+            return tot_
 
         self._pre_closure = pre_closure
         self._post_closure = post_closure
@@ -311,7 +313,7 @@ def build_optimizer(
     """
     match optimizer_type:
         case OptimizerName.LBFGS:
-            return LBFGS(params, max_iter=20, history_size=20)
+            return LBFGS(params, max_iter=20, max_eval=30, history_size=20)
         case OptimizerName.ADAM:
             return Adam(params, lr=1)
         case _:
