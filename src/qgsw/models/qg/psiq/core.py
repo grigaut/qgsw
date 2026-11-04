@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-import contextlib
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING
 
 import torch
 
-from qgsw.exceptions import InvalidLayerNumberError, UnsetStencilError
-from qgsw.fields.variables.state import BaseStatePSIQ, StatePSIQ
-from qgsw.fields.variables.tuples import (
-    PSIQ,
-    PSIQT,
-    BasePSIQ,
+from qgsw import specs
+from qgsw.exceptions import (
+    InvalidLayerNumberError,
+    InvalidModelParameterError,
+    UnsetTimestepError,
 )
+from qgsw.fields.variables.tuples import PSIQSST
 from qgsw.logging import getLogger
 from qgsw.masks import Masks
-from qgsw.models.base import _Model
+from qgsw.models.base import ABCCounter
 from qgsw.models.core import time_steppers
 from qgsw.models.core.flux import (
     div_flux_3pts,
@@ -27,14 +26,13 @@ from qgsw.models.core.flux import (
     div_flux_5pts_with_bc,
 )
 from qgsw.models.core.utils import OptimizableFunction
-from qgsw.models.io import IO
 from qgsw.models.names import ModelName
-from qgsw.models.parameters import ModelParamChecker
-from qgsw.models.qg.psiq.variable_sets import QGPSIQVariableSet
 from qgsw.models.qg.stretching_matrix import (
     compute_A,
 )
-from qgsw.solver.finite_diff import grad_perp, laplacian, laplacian_h
+from qgsw.physics.coriolis.beta_plane import BetaPlane
+from qgsw.solver.boundary_conditions.base import Boundaries
+from qgsw.solver.finite_diff import grad, grad_perp, laplacian, laplacian_h
 from qgsw.solver.pv_inversion import (
     BasePVInversion,
     HomogeneousPVInversion,
@@ -42,143 +40,104 @@ from qgsw.solver.pv_inversion import (
 )
 from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.specs import DEVICE
+from qgsw.utils.interpolation import ConstantInterpolation, _Interpolation
+from qgsw.utils.named_object import NamedObject
 
 if TYPE_CHECKING:
-    from qgsw.configs.models import ModelConfig
-    from qgsw.configs.physics import PhysicsConfig
-    from qgsw.configs.space import SpaceConfig
-    from qgsw.fields.variables.base import DiagnosticVariable
-    from qgsw.physics.coriolis.beta_plane import BetaPlane
-    from qgsw.solver.boundary_conditions.base import Boundaries
     from qgsw.spatial.core.discretization import SpaceDiscretization2D
-    from qgsw.utils.interpolation import LinearInterpolation
-
-T = TypeVar("T", bound=BasePSIQ)
-State = TypeVar("State", bound=BaseStatePSIQ)
 
 
 logger = getLogger(__name__)
 
 
-class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
+class QGPSIQ(NamedObject[ModelName], metaclass=ABCCounter):
     """Finite volume multi-layer QG solver."""
 
-    _has_alpha: bool = False
+    _name = ModelName.QUASI_GEOSTROPHIC
 
     _flux_stencil = 5
+    _time_stepper = "rk3"
 
-    _time_stepper: str = "rk3"
-    wide = False
-    _with_mean_flow = False
-
-    def __init__(
-        self,
-        *,
-        space_2d: SpaceDiscretization2D,
-        H: torch.Tensor,
-        beta_plane: BetaPlane,
-        g_prime: torch.Tensor,
-        optimize=True,  # noqa: ANN001
-    ) -> None:
-        """Model Instantiation.
-
-        Args:
-            space_2d (SpaceDiscretization2D): Space Discretization
-            H (torch.Tensor): Reference layer depths tensor.
-                └── (nl,) shaped.
-            g_prime (torch.Tensor): Reduced Gravity Tensor.
-                └── (nl,) shaped.
-            beta_plane (Beta_Plane): Beta plane.
-            optimize (bool, optional): Whether to precompile functions or
-            not. Defaults to True.
-        """
-        # physical params
-        self._switch_to_homogeneous()
-        _Model.__init__(
-            self,
-            space_2d=space_2d,
-            H=H,
-            g_prime=g_prime,
-            beta_plane=beta_plane,
-            optimize=True,
-        )
-
-        # grid params
-        self.y0 = 0.5 * (self._space.q.xyh.y.max() + self._space.q.xyh.y.min())
-
-        # auxillary matrices for elliptic equation
-        self.compute_auxillary_matrices()
-
-        # initialize state variables
-        self._set_utils(optimize)
-        self._optim = optimize
-
-        self.zeros_inside = (
-            torch.zeros(
-                (self.n_ens, self.space.nl - 2, self.space.nx, self.space.ny),
-                dtype=torch.float64,
-                device=DEVICE.get(),
-            )
-            if (self.space.nl - 2) > 0
-            else None
-        )
-        # wind forcing
-        self.set_wind_forcing(0.0, 0.0)
-
-    @property
-    def implements_alpha(self) -> bool:
-        """Whether the model implements alpha or not."""
-        return self._has_alpha
+    n_ens = 1
+    wide = True
+    implements_alpha = False
+    advect_sst = False
 
     @property
     def _substep_time(self) -> torch.Tensor:
         if self.time_stepper == "euler":
             return self.time
         if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 0
-                return self.time + coef * self.dt
-            if self._rk3_step == 1:
-                coef = 1
-                return self.time + coef * self.dt
-            if self._rk3_step == 2:
-                coef = 1 / 2
-                return self.time + coef * self.dt
-            msg = "SSPRK3 should only perform 3 steps."
-            raise ValueError(msg)
+            coef = time_steppers.compute_rk3_substep_coefs(self._rk3_step)
+            return self.time + coef * self.dt
         msg = "Supported time steppers are 'rk3' and 'euler'."
         raise ValueError(msg)
 
     @property
     def y0(self) -> float:
         """Reference y0."""
-        return self._y0
+        try:
+            return self._y0
+        except AttributeError:
+            self._y0 = 0.5 * (
+                self.space.q.xyh.y.max() + self.space.q.xyh.y.min()
+            )
+            return self._y0
 
     @y0.setter
     def y0(self, y0: float) -> None:
         """Set y0."""
         self._y0 = y0
-        # Beta effect
-        y = self.space.q.xyh.y[0, 0, :].unsqueeze(0)
-        beta_effect = self.beta_plane.beta * (y - self.y0)
-        if hasattr(self, "_state"):
-            msg = (
-                "WARNING: The β-effect has been modified."
-                "The potential vorticity might be inconsistent with actual"
-                "β-effect value. Best would be setting y0 "
-                "right after instantiation."
-            )
-            logger.warning(msg)
-        self._beta_effect = beta_effect
+
+    @property
+    def beta_effect(self) -> torch.Tensor:
+        """Beta effect."""
+        y = self.space.q.xyh.y[0, :].unsqueeze(0)
+        return self.beta_plane.beta * (y - self.y0)
+
+    @property
+    def slip_coef(self) -> float:
+        """Slip coefficient."""
+        return self._slip_coef
+
+    @slip_coef.setter
+    def slip_coef(self, slip_coefficient: float) -> None:
+        # Verify value in [0,1]
+        if (slip_coefficient < 0) or (slip_coefficient > 1):
+            msg = f"slip coefficient must be in [0, 1], got {slip_coefficient}"
+            raise InvalidModelParameterError(msg)
+        self._slip_coef = slip_coefficient
+        msg = f"{self.name}: Slip coefficient set to {slip_coefficient}"
+        logger.detail(msg)
+
+    @property
+    def bottom_drag_coef(self) -> float:
+        """Bottom drag coefficient."""
+        return self._bottom_drag
+
+    @bottom_drag_coef.setter
+    def bottom_drag_coef(self, bottom_drag: float) -> None:
+        self._bottom_drag = bottom_drag
+        msg = f"{self.name}: Bottom drag set to {bottom_drag}"
+        logger.detail(msg)
+
+    @property
+    def wind_scaling(self) -> float:
+        """Wind scaling."""
+        try:
+            return self._wind_scaling
+        except AttributeError:
+            self._wind_scaling = self.H[:1, 0, 0]
+            return self._wind_scaling
+
+    @wind_scaling.setter
+    def wind_scaling(self, wind_scaling: torch.Tensor) -> None:
+        self._wind_scaling = wind_scaling
 
     @property
     def flux_stencil(self) -> int:
         """Flux stencil size."""
-        try:
-            return self._flux_stencil
-        except AttributeError as e:
-            msg = "Please set the flux stencil."
-            raise UnsetStencilError(msg) from e
+        return self._flux_stencil
 
     @flux_stencil.setter
     def flux_stencil(self, stencil: int) -> None:
@@ -187,7 +146,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             msg = "The stencil can only be 3 or 5."
             raise ValueError(msg)
         self._flux_stencil = stencil
-        self._set_flux()
+        self.set_flux()
 
     @property
     def masks(self) -> Masks:
@@ -195,32 +154,45 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         try:
             return self._masks
         except AttributeError:
-            self.masks = Masks.empty_tensor(
+            self._masks = Masks.empty(
                 self.space.nx,
                 self.space.ny,
-                device=DEVICE.get(),
+                device=self.specs["device"],
             )
             return self._masks
 
-    @masks.setter
-    def masks(self, mask: torch.Tensor) -> None:
-        """Masks setter."""
-        ModelParamChecker.masks.fset(self, mask)
-        # Set state
-        if hasattr(self, "_state"):
-            msg = (
-                "WARNING: The masks have been modified."
-                " The stream function and potential have"
-                " therefore been set to 0."
-            )
-            logger.warning(msg)
-        self._set_state()
-        self._create_diagnostic_vars(self._state)
-        # Set solver
-        self._set_solver()
-        # flux computations
-        with contextlib.suppress(UnsetStencilError):
-            self._set_flux()
+    @property
+    def beta_plane(self) -> BetaPlane:
+        """Beta Plane paramters."""
+        return self._beta_plane
+
+    @beta_plane.setter
+    def beta_plane(self, beta_plane: BetaPlane) -> None:
+        if not isinstance(beta_plane, BetaPlane):
+            msg = "beta_plane should be of type `BetaPlane`."
+            raise TypeError(msg)
+        msg = f"{self.name}: Beta-plane set to {beta_plane}"
+        logger.detail(msg)
+        self._beta_plane = beta_plane
+        self.f0 = beta_plane.f0
+        self.beta = beta_plane.beta
+
+    @property
+    def dt(self) -> float:
+        """Timestep value."""
+        try:
+            return self._dt
+        except AttributeError as e:
+            raise UnsetTimestepError from e
+
+    @dt.setter
+    def dt(self, dt: float) -> None:
+        if dt <= 0:
+            msg = "Timestep must be greater than 0."
+            raise InvalidModelParameterError(msg)
+        self._dt = dt
+        msg = f"{self.name}: dt set to {self.dt}"
+        logger.info(msg)
 
     @property
     def psi(self) -> torch.Tensor:
@@ -228,7 +200,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         └── (n_ens, nl, nx+1,ny+1)-shaped.
         """
-        return self._state.psi.get()
+        return self.psiqsst.psi
 
     @property
     def q(self) -> torch.Tensor:
@@ -236,7 +208,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         └── (n_ens, nl, nx,ny)-shaped.
         """
-        return self._state.q.get()
+        return self.psiqsst.q
 
     @property
     def q_anom(self) -> torch.Tensor:
@@ -244,7 +216,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         └── (n_ens, nl, nx,ny)-shaped.
         """
-        return self.q - self._beta_effect
+        return self.q - self.beta_effect
 
     @property
     def vorticity(self) -> torch.Tensor:
@@ -252,15 +224,20 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         └── (n_ens, nl, nx,ny)-shaped.
         """
-        return self._compute_vort_from_psi(self.psi)
+        return self.compute_vort_from_psi(self.psi)
 
     @property
     def uv(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Geostrophic velocity."""
-        u, v = self._grad_perp(self.psi)
+        u, v = self.gradp(self.psi)
         u /= self.space.dy
         v /= self.space.dx
         return (u, v)
+
+    @property
+    def sst_anom(self) -> torch.Tensor:
+        """SST anomaly."""
+        return self.psiqsst.sst
 
     @property
     def time_stepper(self) -> str:
@@ -284,70 +261,124 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
     def solver(self) -> BasePVInversion:
         """Solver for PVInversion."""
         return (
-            self._solver_inhomogeneous
+            self.solver_inhomogeneous
             if self.with_bc
-            else self._solver_homogeneous
+            else self.solver_homogeneous
         )
 
-    @property
-    def mean_flow(self) -> PSIQ:
-        """Mean flow."""
-        if not self._with_mean_flow:
-            msg = "No mean flow specified."
-            raise ValueError(msg)
-        return PSIQ(
-            psi=self._sf_bar,
-            q=self._pv_bar,
+    def __init__(
+        self,
+        *,
+        space_2d: SpaceDiscretization2D,
+        H: torch.Tensor,
+        beta_plane: BetaPlane,
+        g_prime: torch.Tensor,
+        compile_fns=True,  # noqa: ANN001
+    ) -> None:
+        """Model Instantiation.
+
+        Args:
+            space_2d (SpaceDiscretization2D): Space Discretization
+            H (torch.Tensor): Reference layer depths tensor.
+                └── (nl,) shaped.
+            g_prime (torch.Tensor): Reduced Gravity Tensor.
+                └── (nl,) shaped.
+            beta_plane (Beta_Plane): Beta plane.
+            compile_fns (bool, optional): Whether to precompile functions or
+            not. Defaults to True.
+        """
+        self.compile_fns = compile_fns
+        self.__instance_nb = next(self._instance_count)
+        self.class_name = self.__class__.__name__
+        self.name = f"{self.class_name}-{self.__instance_nb}"
+        msg = f"Creating {self.name}..."
+        logger.info(msg)
+        ## Space
+        self.space = space_2d.add_h_coords(H)
+        self.specs = specs.from_tensor(self.space.psi.xyh.x)
+        # grid params
+        self.y0 = 0.5 * (self.space.q.xyh.y.max() + self.space.q.xyh.y.min())
+        # Beta-plane
+        with logger.section("Setting model parameters..."):
+            self.beta_plane = beta_plane
+            self.H = H[:, None, None]
+            self.g_prime = g_prime[:, None, None]
+            msg = f"{self.name}: g' set to {g_prime.squeeze().tolist()}"
+            logger.detail(msg)
+            msg = f"{self.name}: H set to {H.squeeze().tolist()}"
+            logger.detail(msg)
+            self.compute_auxillary_matrices()
+        self.switch_to_homogeneous()
+        self._set_utils(compile_fns)
+        self.set_flux()
+        self.reset_state()
+        self.set_solver()
+        self.set_wind_forcing(0.0, 0.0)
+
+        # auxillary matrices for elliptic equation
+        self.compute_auxillary_matrices()
+
+        self.zeros_inside = (
+            torch.zeros(
+                (self.n_ens, self.space.nl - 2, self.space.nx, self.space.ny),
+                dtype=torch.float64,
+                device=DEVICE.get(),
+            )
+            if (self.space.nl - 2) > 0
+            else None
         )
 
-    @property
-    def perturbation(self) -> PSIQ:
-        """Perturbation."""
-        if not self._with_mean_flow:
-            msg = "No mean flow specified."
-            raise ValueError(msg)
-        return PSIQ(self.psi, self.q) - self.mean_flow
+    def get_repr_parts(self) -> list[str]:
+        """String representations parts.
 
-    def _set_solver(self) -> None:
-        """Set Helmholtz equation solver."""
-        # PV equation solver
-        self._solver_homogeneous = HomogeneousPVInversion(
-            self.A,
-            self._beta_plane.f0,
-            self.space.dx,
-            self.space.dy,
-            self._masks,
-        )
-        self._solver_inhomogeneous = InhomogeneousPVInversion(
-            self.A,
-            self._beta_plane.f0,
-            self.space.dx,
-            self.space.dy,
-            self._masks,
-        )
-        if self._with_bc:
-            sf_bc = self._sf_bc_interp(self.time.item())
-            if self._with_mean_flow:
-                sf_bar_bc = self._sf_bar_bc_interp(self.time.item())
-                self._solver_inhomogeneous.set_boundaries(
-                    sf_bc.get_band(0) - sf_bar_bc.get_band(0)
-                )
-            else:
-                self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
+        Returns:
+            list[str]: String representation parts.
+        """
+        msg_parts = [
+            f"Model: {self.__class__}",
+            (
+                f"├── Beta plane: f0 = {self.beta_plane.f0} "
+                f"- β = {self.beta_plane.beta}"
+            ),
+        ]
+        try:
+            msg_parts.append(f"├── dt: {self.dt} s")
+        except UnsetTimestepError:
+            msg_parts.append("├── dt: unset yet")
+        space_repr_ = self.space.get_repr_parts()
+        space_repr = ["└── " + space_repr_.pop(0)]
+        space_repr = space_repr + ["\t" + txt for txt in space_repr_]
+        return msg_parts + space_repr
 
-    def reset_time(self) -> None:
-        """Reset time."""
-        _Model.reset_time(self)
-        if self.with_bc:
-            self._set_boundaries(self.time.item())
+    def _set_utils(self, compile_fns: bool) -> None:  # noqa: FBT001
+        """Set utils.
 
-    def _set_flux(self) -> None:
+        Args:
+            compile_fns (bool): Whether to compile_fns or not.
+        """
+        if compile_fns:
+            with logger.section("Compiling functions..."):
+                self.grad = OptimizableFunction(grad)
+                self.gradp = OptimizableFunction(grad_perp)
+                self.interp = OptimizableFunction(interpolate)
+                lap_h = lambda t: laplacian_h(t, self.space.dx, self.space.dy)
+                self.lap_h = OptimizableFunction(lap_h)
+                lap = lambda t: laplacian(t, self.space.dx, self.space.dy)
+                self.lap = OptimizableFunction(lap)
+        else:
+            self.grad = grad
+            self.gradp = grad_perp
+            self.interp = interpolate
+            self.lap_h = lap_h
+            self.lap = lap
+
+    def set_flux(self) -> None:
         """Set the fluxes utils."""
         if self.with_bc:
-            return self._set_flux_inhomogeneous()
-        return self._set_flux_homogeneous()
+            return self.set_flux_inhomogeneous()
+        return self.set_flux_homogeneous()
 
-    def _set_flux_homogeneous(self) -> None:
+    def set_flux_homogeneous(self) -> None:
         """Set the flux.
 
         Raises:
@@ -403,10 +434,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         with logger.section("Compiling function..."):
             self.div_flux = (
-                OptimizableFunction(div_flux) if self._optim else div_flux
+                OptimizableFunction(div_flux) if self.compile_fns else div_flux
             )
 
-    def _set_flux_inhomogeneous(self) -> None:
+    def set_flux_inhomogeneous(self) -> None:
         """Set the flux.
 
         Raises:
@@ -447,53 +478,140 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         with logger.section("Compiling function..."):
             self.div_flux = (
-                OptimizableFunction(div_flux) if self._optim else div_flux
+                OptimizableFunction(div_flux) if self.compile_fns else div_flux
             )
 
-    def _switch_to_inhomogeneous(self) -> None:
+    def set_solver(self) -> None:
+        """Set Helmholtz equation solver."""
+        # PV equation solver
+        self.solver_homogeneous = HomogeneousPVInversion(
+            self.A,
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+        self.solver_inhomogeneous = InhomogeneousPVInversion(
+            self.A,
+            self._beta_plane.f0,
+            self.space.dx,
+            self.space.dy,
+            self._masks,
+        )
+        if self._with_bc:
+            sf_bc = self.sf_bc_interp(self.time.item())
+            self.solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
+
+    def reset_time(self) -> None:
+        """Reset time."""
+        self.time = torch.tensor(0, **self.specs)
+        if self.with_bc:
+            self.set_boundaries(self.time.item())
+
+    def reset_state(self) -> None:
+        """Set the state."""
+        self.reset_time()
+        psi_g = torch.zeros_like(self.space.psi.xyh.x)[None, ...]
+        zeta_g = self.compute_q_from_psi(psi_g)
+        sst_anom = torch.zeros_like(zeta_g)
+        self.psiqsst = PSIQSST(psi_g, zeta_g, sst_anom)
+        self.sst_mean = torch.tensor(0, **self.specs)
+
+    def set_psi(self, psi: torch.Tensor) -> None:
+        """Set the value of stream function.
+
+        WARNING: with inhomogeneous boundary condition this might introduce
+        errors in q due to different beta effects.
+        You should use the `set_psiq` method instead.
+
+        Args:
+            psi (torch.Tensor): Stream function.
+                └── (n_ens, nl, nx+1, ny+1)-shaped
+        """
+        q = self.compute_q_from_psi(psi)
+        self.set_psiq(psi, q)
+
+    def set_psiq(self, psi: torch.Tensor, q: torch.Tensor) -> None:
+        """Set psi and q."""
+        self.psiqsst = PSIQSST(psi, q, self.sst_anom)
+
+    def set_sst(self, sst: torch.Tensor) -> None:
+        """Set sst."""
+        if not self.advect_sst:
+            msg = f"{self.get_type().value} will advect SST."
+            logger.info(msg)
+        self.advect_sst = True
+        self.sst_mean = torch.mean(sst)
+        sst_anom = sst - self.sst_mean
+        self.psiqsst = PSIQSST(self.psi, self.q, sst_anom)
+
+    def set_psiqsst(
+        self, psi: torch.Tensor, q: torch.Tensor, sst: torch.Tensor
+    ) -> None:
+        """Set psi, q and sst."""
+        self.set_psiq(psi, q)
+        self.set_sst(sst)
+
+    def switch_to_homogeneous(self) -> None:
+        """Switch to an inhomogeneous solver."""
+        self._with_bc = False
+
+    def switch_to_inhomogeneous(self) -> None:
         """Switch to an inhomogeneous solver."""
         if self.with_bc:
             return
         self._with_bc = True
-        self._set_flux()
+        self.set_flux()
 
-    def _switch_to_homogeneous(self) -> None:
-        """Switch to an inhomogeneous solver."""
-        self._with_bc = False
-
-    def _set_io(self, state: StatePSIQ) -> None:
-        self._io = IO(state.t, state.psi, state.q)
-
-    def _set_state(self) -> None:
-        """Set the state."""
-        with torch.no_grad():
-            self._state = StatePSIQ.steady(
-                n_ens=self.n_ens,
-                nl=self.space.nl,
-                nx=self.space.nx,
-                ny=self.space.ny,
-                dtype=self.dtype,
-                device=self.device.get(),
-            )
-        self._set_io(self._state)
-        q = self._compute_q_from_psi(self.psi)
-        self._state.update_psiq(PSIQ(self.psi, q))
-
-    def _set_utils(self, optimize: bool) -> None:  # noqa: FBT001
-        """Set utils.
+    def set_boundary_maps(
+        self,
+        sf_bc_interp: _Interpolation[Boundaries],
+        q_bc_interp: _Interpolation[Boundaries],
+        sst_bc_interp: _Interpolation[Boundaries] | None = None,
+    ) -> None:
+        """Set the boundary maps.
 
         Args:
-            optimize (bool): Whether to optimize or not.
+            sf_bc_interp (_Interpolation[Boundaries]): Boundary map
+                for stream function at locations
+                (imin,imax+1,jmin,jmax+1).
+            q_bc_interp (_Interpolation[Boundaries]): Boundary map
+                for vorticity at locations
+                (imin,imax,jmin,jmax).
+            sst_bc_interp (_Interpolation[Boundaries]): Boundary map
+                for SST at locations
+                (imin,imax,jmin,jmax).
         """
-        if optimize:
-            with logger.section("Compiling functions..."):
-                self._grad_perp = OptimizableFunction(grad_perp)
-                self._interpolate = OptimizableFunction(interpolate)
-                self._laplacian_h = OptimizableFunction(laplacian_h)
+        self.switch_to_inhomogeneous()
+        if sst_bc_interp is None:
+            sst_bc_interp = ConstantInterpolation(
+                Boundaries.zeros_like(q_bc_interp.ys[0])
+            )
+        self.sf_bc_interp = sf_bc_interp
+        self.q_bc_interp = q_bc_interp
+        self.sst_bc_interp = sst_bc_interp
+        self.set_boundaries(self.time.item())
+
+    def set_boundaries(self, time: float) -> None:
+        """Set the boundaries to match given time.
+
+        Args:
+            time (float): Time.
+        """
+        sf_bc = self.sf_bc_interp(time)
+
+        self.solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
+        q_bc = self.q_bc_interp(time)
+        sst_anom_bc: Boundaries = self.sst_bc_interp(time) - self.sst_mean
+        if self.wide:
+            if q_bc.width != 3:
+                msg = "For wide boundary, q_bc must be 3 points wide."
+                raise ValueError(msg)
+            self.q_bc = q_bc
+            self.sst_anom_bc = sst_anom_bc
         else:
-            self._grad_perp = grad_perp
-            self._interpolate = interpolate
-            self._laplacian_h = laplacian_h
+            self.q_bc = q_bc.get_band(0)
+            self.sst_anom_bc = sst_anom_bc.get_band(0)
 
     def compute_auxillary_matrices(self) -> None:
         """Compute auxiliary matrix."""
@@ -505,7 +623,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             device=DEVICE.get(),
         )
 
-    def _compute_q_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
+    def compute_q_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute stream function from stream function.
 
         Args:
@@ -517,11 +635,10 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └── (n_ens, nl, nx, ny)-shaped
         """
         return (
-            self._compute_q_anom_from_psi(psi)
-            + self.masks.h * self._beta_effect
+            self.compute_q_anom_from_psi(psi) + self.masks.h * self.beta_effect
         )
 
-    def _compute_q_anom_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
+    def compute_q_anom_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute potential vorticity anomaly from stream function.
 
         Args:
@@ -532,19 +649,17 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Potential vorticity anomaly.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        vort = self._compute_vort_from_psi(psi)
+        vort = self.compute_vort_from_psi(psi)
         stretching = self.beta_plane.f0**2 * torch.einsum(
             "lm,...mxy->...lxy",
             self.A,
             psi,
         )
         if self.with_bc:
-            return vort - self.masks.h * self._interpolate(stretching)
-        return vort - self.masks.h * self._interpolate(
-            self.masks.psi * stretching
-        )
+            return vort - self.masks.h * self.interp(stretching)
+        return vort - self.masks.h * self.interp(self.masks.psi * stretching)
 
-    def _compute_vort_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
+    def compute_vort_from_psi(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute vorticity from streamfunction.
 
         Args:
@@ -556,30 +671,17 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
                 └── (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
-            boundary = self._sf_bc_interp(self.time.item())
+            boundary = self.sf_bc_interp(self.time.item())
             psi_with_bc = boundary.get_band(1).expand(psi)
             self.p = psi_with_bc
-            lap_psi = laplacian(psi_with_bc, self.space.dx, self.space.dy)
-            return self.masks.h * self._interpolate(lap_psi)
-        lap_psi = laplacian_h(psi, self.space.dx, self.space.dy)
+            lap_psi = self.lap(psi_with_bc)
+            return self.masks.h * self.interp(lap_psi)
+        lap_psi = self.lap_h(psi)
         return self.masks.h * (
-            self._interpolate(
+            self.interp(
                 self.masks.psi * (lap_psi),
             )
         )
-
-    def _compute_psi_from_q(self, q: torch.Tensor) -> torch.Tensor:
-        """Compute stream function from potential vorticity.
-
-        Args:
-            q (torch.Tensor): Potential vorticity.
-                └── (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            torch.Tensor: Stream function.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
-        """
-        return self.solver.compute_stream_function(self._interpolate(q))
 
     def set_wind_forcing(
         self,
@@ -594,161 +696,122 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             tauy (torch.Tensor): Wind stress in the y direction.
                 └── (n_ens, nl, nx, ny)-shaped
         """
-        if isinstance(taux, float):
-            self._taux = (
+        if isinstance(taux, float | int):
+            self.taux = (
                 torch.ones(
                     (self.space.nx, self.space.ny + 1),
-                    dtype=torch.float64,
-                    device=DEVICE.get(),
+                    **self.specs,
                 )
                 * taux
             )
         else:
-            self._taux = taux
-        if isinstance(tauy, float):
-            self._tauy = (
+            self.taux = taux
+        if isinstance(tauy, float | int):
+            self.tauy = (
                 torch.ones(
                     (self.space.nx + 1, self.space.ny),
-                    dtype=torch.float64,
-                    device=DEVICE.get(),
+                    **self.specs,
                 )
                 * tauy
             )
         else:
-            self._tauy = tauy
+            self.tauy = tauy
         curl_tau = (
-            torch.diff(self._tauy, dim=-2) / self._space.dx
-            - torch.diff(self._taux, dim=-1) / self._space.dy
+            torch.diff(self.tauy, dim=-2) / self.space.dx
+            - torch.diff(self.taux, dim=-1) / self.space.dy
         )
-        self._curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.H[0]
+        self.curl_tau = curl_tau.unsqueeze(0).unsqueeze(0) / self.wind_scaling
 
-    def set_boundary_maps(
-        self,
-        sf_bc_interp: LinearInterpolation[Boundaries],
-        pv_bc_interp: LinearInterpolation[Boundaries],
-    ) -> None:
-        """Set the boundary maps.
+    def compute_div_flux_homogeneous(
+        self, u: torch.Tensor, v: torch.Tensor, tracer: torch.Tensor
+    ) -> torch.Tensor:
+        """Compute homogeneous flux divergence.
 
         Args:
-            sf_bc_interp (LinearInterpolation[Boundaries]): Boundary map
-                for stream function at locations
-                (imin,imax+1,jmin,jmax+1).
-            pv_bc_interp (LinearInterpolation[Boundaries]): Boundary map
-                for potential vorticity at locations
-                (imin,imax,jmin,jmax).
-        """
-        self._switch_to_inhomogeneous()
-        self._sf_bc_interp = sf_bc_interp
-        self._pv_bc_interp = pv_bc_interp
-        self._set_boundaries(self.time.item())
-
-    def _set_boundaries(self, time: float) -> None:
-        """Set the boundaries to match given time.
-
-        Args:
-            time (float): Time.
-        """
-        sf_bc = self._sf_bc_interp(time)
-        if self._with_mean_flow:
-            self._sf_bar = self._sf_bar_interp(time)
-            sf_bc -= self._sf_bar_bc_interp(time)
-
-        self._solver_inhomogeneous.set_boundaries(sf_bc.get_band(0))
-
-        pv_bc = self._pv_bc_interp(time)
-        if self.wide:
-            if pv_bc.width != 3:
-                msg = "For wide boundary, pv_bc must be 3 points wide."
-                raise ValueError(msg)
-            self._pv_bc = pv_bc
-            if self._with_mean_flow:
-                self._pv_bar = self._pv_bar_interp(time)
-                self._pv_bar_bc = self._pv_bar_bc_interp(time)
-                self._pv_bc -= self._pv_bar_bc
-
-        else:
-            self._pv_bc = pv_bc.get_band(0)
-            if self._with_mean_flow:
-                self._pv_bar = self._pv_bar_interp(time)
-                self._pv_bar_bc = self._pv_bar_bc_interp(time).get_band(0)
-                self._pv_bc -= self._pv_bar_bc
-
-    def set_mean_flow(
-        self,
-        sf_bar_interp: LinearInterpolation[torch.Tensor],
-        pv_bar_interp: LinearInterpolation[torch.Tensor],
-        sf_bar_bc_interp: LinearInterpolation[Boundaries],
-        pv_bar_bc_interp: LinearInterpolation[Boundaries],
-    ) -> None:
-        """Set the mean flow.
-
-        Args:
-            sf_bar_interp (LinearInterpolation[torch.Tensor]): Mean stream
-                function flow.
-            pv_bar_interp (LinearInterpolation[torch.Tensor]): Associated mean
-                potential vorticity flow.
-            sf_bar_bc_interp (LinearInterpolation[Boundaries]): Boundary
-                conditions for stream function's mean flow.
-            pv_bar_bc_interp (LinearInterpolation[Boundaries]): Boundary
-                conditions for potential vorticity's mean flow.
-        """
-        if not self.with_bc:
-            msg = (
-                "Mean flow only works with inhomogeneous boundary conditions."
-            )
-            raise ValueError(msg)
-        self._with_mean_flow = True
-        self._sf_bar_interp = sf_bar_interp
-        self._pv_bar_interp = pv_bar_interp
-        self._sf_bar_bc_interp = sf_bar_bc_interp
-        self._pv_bar_bc_interp = pv_bar_bc_interp
-        self._set_boundaries(self.time.item())
-
-    def _compute_advection_homogeneous(self, psiq: PSIQ) -> torch.Tensor:
-        """Compute advection pv advection for homogeneous problem.
-
-        Args:
-            psiq (PSIQ): Prognostic tuple.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meridional velocity.
+            tracer (torch.Tensor): Tracer.
 
         Returns:
-            torch.Tensor: RHS: J(ѱ, q)
-                └──  (n_ens, nl, nx, ny)-shaped
+            torch.Tensor: ∇·(u tracer)
         """
-        psi, q = psiq
-        u, v = self._grad_perp(psi)
-        u /= self.space.dy
-        v /= self.space.dx
         return self.div_flux(
-            q,
+            tracer,
             u[..., 1:-1, :],
             v[..., 1:-1],
         )
 
-    def _compute_advection_inhomogeneous(
-        self, psiq: PSIQ, q_bc: Boundaries
+    def compute_div_flux_inhomogeneous(
+        self, u: torch.Tensor, v: torch.Tensor, tracer: torch.Tensor
     ) -> torch.Tensor:
-        """Compute advection pv advection for inhomogeneous problem.
+        """Compute inhomogeneous flux divergence.
 
         Args:
-            psiq (PSIQ): Prognostic tuple.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-            q_bc (Boundaries): Boundary conditions for potential vorticity.
+            u (torch.Tensor): Zonal velocity.
+            v (torch.Tensor): Meridional velocity.
+            tracer (torch.Tensor): Tracer with boundaries.
 
         Returns:
-            torch.Tensor: RHS: J(ѱ, q)
-                └──  (n_ens, nl, nx, ny)-shaped
+            torch.Tensor: ∇·(u tracer)
         """
-        psi, q = psiq
-        u, v = self._grad_perp(psi)
-        u /= self.space.dy
-        v /= self.space.dx
-        q_with_bc = q_bc.expand(q)
-        return self.div_flux(q_with_bc, u, v)
+        return self.div_flux(tracer, u, v)
 
-    def _compute_drag_homogeneous(self, psi: torch.Tensor) -> torch.Tensor:
+    def compute_dsst_homogeneous(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute dsst for homogeneous situations.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+                └── sst: (n_ens, nl, nx+1, ny)-shaped
+            v (torch.Tensor): Meridional velocity.
+                └── sst: (n_ens, nl, nx, ny+1)-shaped
+            sst_anom (torch.Tensor): SST anomaly.
+                └── sst: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: dsst.
+                └── dsst: (n_ens, nl, nx, ny)-shaped
+        """
+        if self.advect_sst:
+            return (
+                -self.compute_div_flux_homogeneous(u, v, sst_anom)
+                * self.masks.h
+            )
+        return torch.zeros_like(sst_anom)
+
+    def compute_dsst_inhomogeneous(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute dsst for inhomogeneous situations.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+                └── sst: (n_ens, nl, nx+1, ny)-shaped
+            v (torch.Tensor): Meridional velocity.
+                └── sst: (n_ens, nl, nx, ny+1)-shaped
+            sst_anom (torch.Tensor): SST anomaly.
+                └── sst: (n_ens, nl, nx+1, ny+1)-shaped (+3 if wide)
+
+        Returns:
+            torch.Tensor: dsst.
+                └── dsst: (n_ens, nl, nx, ny)-shaped
+        """
+        if self.advect_sst:
+            sst_anom_wide = self.sst_anom_bc.expand(sst_anom)
+            return (
+                -self.compute_div_flux_inhomogeneous(u, v, sst_anom_wide)
+                * self.masks.h
+            )
+        return torch.zeros_like(sst_anom)
+
+    def compute_drag_homogeneous(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute wind and bottom drag contribution.
 
         Args:
@@ -759,19 +822,16 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Wind and bottom drag.
                 └──  (n_ens, nl, nx, ny)-shaped
         """
-        omega = self._interpolate(
-            self._laplacian_h(psi, self.space.dx, self.space.dy)
-            * self.masks.psi,
-        )
+        omega = self.interp(self.lap_h(psi) * self.masks.psi)
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
-            fcg_drag = self._curl_tau + bottom_drag
+            fcg_drag = self.curl_tau + bottom_drag
         elif self.space.nl == 2:
-            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
+            fcg_drag = torch.cat([self.curl_tau, bottom_drag], dim=-3)
         else:
             fcg_drag = torch.cat(
                 [
-                    self._curl_tau,
+                    self.curl_tau,
                     self.zeros_inside,
                     bottom_drag,
                 ],
@@ -779,7 +839,7 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             )
         return fcg_drag
 
-    def _compute_drag_inhomogeneous(self, psi: torch.Tensor) -> torch.Tensor:
+    def compute_drag_inhomogeneous(self, psi: torch.Tensor) -> torch.Tensor:
         """Compute wind and bottom drag contribution.
 
         Args:
@@ -790,18 +850,18 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             torch.Tensor: Wind and bottom drag.
                 └──  (n_ens, nl, nx, ny)-shaped
         """
-        sf_boundary = self._sf_bc_interp(self.time.item())
+        sf_boundary = self.sf_bc_interp(self.time.item())
         sf_wide = sf_boundary.expand(psi[..., 1:-1, 1:-1])
-        omega = interpolate(laplacian(sf_wide, self.space.dx, self.space.dy))
+        omega = self.interp(self.lap(sf_wide))
         bottom_drag = -self.bottom_drag_coef * omega[..., [-1], :, :]
         if self.space.nl == 1:
-            fcg_drag = self._curl_tau + bottom_drag
+            fcg_drag = self.curl_tau + bottom_drag
         elif self.space.nl == 2:
-            fcg_drag = torch.cat([self._curl_tau, bottom_drag], dim=-3)
+            fcg_drag = torch.cat([self.curl_tau, bottom_drag], dim=-3)
         else:
             fcg_drag = torch.cat(
                 [
-                    self._curl_tau,
+                    self.curl_tau,
                     self.zeros_inside,
                     bottom_drag,
                 ],
@@ -809,158 +869,113 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
             )
         return fcg_drag
 
-    def compute_time_derivatives(self, prognostic: PSIQ) -> PSIQ:
+    def compute_time_derivatives(self, prognostic: PSIQSST) -> PSIQSST:
         """Compute time derivatives.
 
         Args:
-            prognostic (PSIQ): prognostic tuple.
+            prognostic (PSIQSST): prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIQ: dpsi, dq
+            PSIQSST: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  dq : (n_ens, nl, nx, ny)-shaped
+                ├──  dq : (n_ens, nl, nx, ny)-shaped
+                └── dsst: (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
-            if self._with_mean_flow:
-                dprog = self._compute_time_derivatives_mean_flow(prognostic)
-            else:
-                dprog = self._compute_time_derivatives_inhomogeneous(
-                    prognostic
-                )
+            dprog = self.compute_time_derivatives_inhomogeneous(prognostic)
         else:
-            dprog = self._compute_time_derivatives_homogeneous(prognostic)
+            dprog = self.compute_time_derivatives_homogeneous(prognostic)
         if self.time_stepper != "rk3" or self._rk3_step == 0:
             self.dprog = dprog
         elif self.time_stepper == "rk3":
             self._rk3_step += 1
         return dprog
 
-    def _compute_time_derivatives_homogeneous(
+    def compute_time_derivatives_homogeneous(
         self,
-        prognostic: PSIQ,
-    ) -> PSIQ:
+        prognostic: PSIQSST,
+    ) -> PSIQSST:
         """Compute time derivatives for homogeneous problem.
 
         Args:
-            prognostic (PSIQ): prognostic tuple.
+            prognostic (PSIQSST): prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIQ: dpsi, dq
+            PSIQSST: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  dq : (n_ens, nl, nx, ny)-shaped
+                ├──  dq : (n_ens, nl, nx, ny)-shaped
+                └── dsst: (n_ens, nl, nx, ny)-shaped
         """
-        psi, q = prognostic
-        div_flux = self._compute_advection_homogeneous(PSIQ(psi, q))
+        psi, q, sst_anom = prognostic
+
+        u, v = self.gradp(psi)
+        u /= self.space.dy
+        v /= self.space.dx
+
+        div_flux = self.compute_div_flux_homogeneous(u, v, q)
         # wind forcing + bottom drag
-        fcg_drag = self._compute_drag_homogeneous(psi)
+        fcg_drag = self.compute_drag_homogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
         self.dq = dq
-        dq_i = self._interpolate(dq)
+        dq_i = self.interp(dq)
         # Solve Helmholtz equation
-        dpsi = self._solver_homogeneous.compute_stream_function(
+        dpsi = self.solver_homogeneous.compute_stream_function(
             dq_i,
             ensure_mass_conservation=True,
         )
-        return PSIQ(dpsi, dq)
+        dsst_anom = self.compute_dsst_homogeneous(u, v, sst_anom)
+        return PSIQSST(dpsi, dq, dsst_anom)
 
-    def _compute_time_derivatives_inhomogeneous(
+    def compute_time_derivatives_inhomogeneous(
         self,
-        prognostic: PSIQ,
-    ) -> PSIQ:
+        prognostic: PSIQSST,
+    ) -> PSIQSST:
         """Compute time derivatives for inhomogeneous problem.
 
         Args:
-            prognostic (PSIQ): Homogeneous contribution
-                of prognostic variables.
+            prognostic (PSIQSST): prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIQ: dpsi, dq
+            PSIQSST: dpsi, dq
                 ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  dq : (n_ens, nl, nx, ny)-shaped
+                ├──  dq : (n_ens, nl, nx, ny)-shaped
+                └── dsst: (n_ens, nl, nx, ny)-shaped
         """
         if self.time_stepper == "rk3":
-            self._set_boundaries(self._substep_time.item())
-        psi_i, q_i = prognostic
-        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
+            self.set_boundaries(self._substep_time.item())
+        psi_i, q_i, sst_anom = prognostic
+        psi_bc, q_bc = self.solver_inhomogeneous.psiq_bc
         psi = psi_i + psi_bc
+
+        u, v = self.gradp(psi)
+        u /= self.space.dy
+        v /= self.space.dx
+
         q = q_i + q_bc
-        advection_psi_q = self._compute_advection_inhomogeneous(
-            PSIQ(psi, q), self._pv_bc
-        )
-        div_flux = advection_psi_q
+
+        q_with_bc = self.q_bc.expand(q)
+
+        div_flux = self.compute_div_flux_inhomogeneous(u, v, q_with_bc)
         # wind forcing + bottom drag
-        fcg_drag = self._compute_drag_inhomogeneous(psi)
+        fcg_drag = self.compute_drag_inhomogeneous(psi)
         dq = (-div_flux + fcg_drag) * self.masks.h
-        dq_i = self._interpolate(dq)
+        dq_i = self.interp(dq)
         # Solve Helmholtz equation
-        dpsi = self._solver_homogeneous.compute_stream_function(
+        dpsi = self.solver_homogeneous.compute_stream_function(
             dq_i,
             ensure_mass_conservation=False,
         )
-        return PSIQ(dpsi, dq)
-
-    def _compute_time_derivatives_mean_flow(
-        self,
-        prognostic: PSIQ,
-    ) -> PSIQ:
-        """Compute time derivatives for inhomogeneous problem.
-
-        Args:
-            prognostic (PSIQ): Homogeneous contribution
-                of prognostic variables.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            PSIQ: dpsi, dq
-                ├── dpsi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  dq : (n_ens, nl, nx, ny)-shaped
-        """
-        if self.time_stepper == "rk3":
-            self._set_boundaries(self._substep_time.item())
-        psi_pert_i, q_pert_i = prognostic
-        psi_bc, q_bc = self._solver_inhomogeneous.psiq_bc
-        psi = psi_pert_i + psi_bc + self._sf_bar
-        q = q_pert_i + q_bc + self._pv_bar
-        advection_psi_q = self._compute_advection_inhomogeneous(
-            PSIQ(psi, q), self._pv_bc + self._pv_bar_bc
-        )
-        div_flux = advection_psi_q
-        if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 0
-            elif self._rk3_step == 1:
-                coef = 1
-            elif self._rk3_step == 2:
-                coef = 1 / 2
-            else:
-                msg = "SSPRK3 should only perform 3 steps."
-                raise ValueError(msg)
-            dt = self.dt
-            t = self.time.item() + coef * dt
-            q_bar_t_dt = self._pv_bar_interp(t + dt)
-            q_bar_t = self._pv_bar_interp(t)
-            dt_q_bar = (q_bar_t_dt - q_bar_t) / dt
-        else:
-            dt = self.dt
-            t = self.time.item()
-            dt_q_bar = (self._pv_bar_interp(t + dt) - self._pv_bar) / dt
-        # wind forcing + bottom drag
-        fcg_drag = self._compute_drag_inhomogeneous(psi)
-        dq = (-(div_flux + dt_q_bar) + fcg_drag) * self.masks.h
-        dq_i = self._interpolate(dq)
-        # Solve Helmholtz equation
-        dpsi = self._solver_homogeneous.compute_stream_function(
-            dq_i,
-            ensure_mass_conservation=False,
-        )
-        return PSIQ(dpsi, dq)
+        dsst_anom = self.compute_dsst_inhomogeneous(u, v, sst_anom)
+        return PSIQSST(dpsi, dq, dsst_anom)
 
     def set_p(self, p: torch.Tensor) -> None:
         """Set the initial pressure.
@@ -980,96 +995,35 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
 
         return self.set_psi(p[:, :nl] / self.beta_plane.f0)
 
-    def set_q(self, q: torch.Tensor) -> None:
-        """Set the value of potential vorticity.
-
-        WARNING: with inhomogeneous boundary condition this might introduce
-        errors in ѱ due to interpolation of q.
-        You should use the `set_psiq` method instead.
-
-        Args:
-            q (torch.Tensor): Potential vorticity.
-                └── (n_ens, nl, nx, ny)-shaped
-        """
-        self.set_q_anomaly(q_anom=q - self._beta_effect)
-
-    def set_q_anomaly(self, q_anom: torch.Tensor) -> None:
-        """Set the value of potential vorticity.
-
-        WARNING: with inhomogeneous boundary condition this might introduce
-        errors in ѱ due to interpolation of q_anom.
-        You should use the `set_psiq` method instead.
-
-        Args:
-            q_anom (torch.Tensor): Potential vorticity anomaly.
-                └── (n_ens, nl, nx, ny)-shaped
-        """
-        psi = self.solver.compute_stream_function(self._interpolate(q_anom))
-        self._state.update_psiq(PSIQ(psi, q_anom + self._beta_effect))
-
-    def set_psi(self, psi: torch.Tensor) -> None:
-        """Set the value of stream function.
-
-        WARNING: with inhomogeneous boundary condition this might introduce
-        errors in q due to different beta effects.
-        You should use the `set_psiq` method instead.
-
-        Args:
-            psi (torch.Tensor): Stream function.
-                └── (n_ens, nl, nx+1, ny+1)-shaped
-        """
-        q = self._compute_q_from_psi(psi)
-        self._state.update_psiq(PSIQ(psi, q))
-
-    def set_psiq(self, psi: torch.Tensor, q: torch.Tensor) -> None:
-        """Set both psi and q.
-
-        Args:
-            psi (torch.Tensor): Stream function tensor.
-            q (torch.Tensor): Potential vorticity tensor.
-        """
-        self._state.update_psiq(PSIQ(psi, q))
-
-    def set_psiqanom(self, psi: torch.Tensor, q: torch.Tensor) -> None:
-        """Set both psi and q.
-
-        Args:
-            psi (torch.Tensor): Stream function tensor.
-            q (torch.Tensor): Potential vorticity tensor.
-        """
-        self._state.update_psiq(
-            PSIQ(psi, q + self._masks.h * self._beta_effect)
-        )
-
-    def update(self, prognostic: PSIQ) -> PSIQ:
+    def update(self, prognostic: PSIQSST) -> PSIQSST:
         """Update prognostic.
 
         Args:
-            prognostic (PSIQ): Prognostic tuple.
+            prognostic (PSIQSST): Prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIQ: Updated prognostic tuple.
+            PSIQSST: Updated prognostic tuple.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
         """
         if self.with_bc:
-            if self._with_mean_flow:
-                return self._update_mean_flow(prognostic)
             return self._update_inhomogeneous(prognostic)
         return self._update_homogeneous(prognostic)
 
-    def _timestep(self, prognostic: PSIQ) -> PSIQ:
+    def _timestep(self, prognostic: PSIQSST) -> PSIQSST:
         if self.time_stepper == "rk3":
             self._rk3_step = 0
-            psiq = time_steppers.rk3_ssp(
+            psiqsst = time_steppers.rk3_ssp(
                 prog=prognostic,
                 dt=self.dt,
                 time_derivation_func=self.compute_time_derivatives,
             )
         elif self.time_stepper == "euler":
-            psiq = time_steppers.euler(
+            psiqsst = time_steppers.euler(
                 prog=prognostic,
                 dt=self.dt,
                 time_derivation_func=self.compute_time_derivatives,
@@ -1077,92 +1031,51 @@ class QGPSIQCore(_Model[T, State, PSIQ], Generic[T, State]):
         else:
             msg = f"Invalid time stepper: {self.time_stepper}"
             raise ValueError(msg)
-        self._state.increment_time(self.dt)
-        return psiq
+        self.time += self.dt
+        return psiqsst
 
-    def _update_homogeneous(self, prognostic: PSIQ) -> PSIQ:
+    def _update_homogeneous(self, prognostic: PSIQSST) -> PSIQSST:
         """Update prognostic tuple.
 
         Args:
-            prognostic (PSIQ): Prognostic variable to advect.
+            prognostic (PSIQSST): Prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIQ: Updated prognostic variable to advect.
+            PSIQSST: Updated prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
         """
         prognostic_i = prognostic
         return self._timestep(prognostic_i)
 
-    def _update_inhomogeneous(self, prognostic: PSIQ) -> PSIQ:
+    def _update_inhomogeneous(self, prognostic: PSIQSST) -> PSIQSST:
         """Update prognostic tuple.
 
         Args:
-            prognostic (PSIQ): Prognostic variable to advect.
+            prognostic (PSIQSST): Prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
 
         Returns:
-            PSIQ: Updated prognostic variable to advect.
+            PSIQSST: Updated prognostic variable to advect.
                 ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
+                ├──  q : (n_ens, nl, nx, ny)-shaped
+                └── sst: (n_ens, nl, nx, ny)-shaped
         """
-        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
-        prognostic_i = PSIQ(prognostic.psi - psi_bc, prognostic.q)
-        psiq_i = self._timestep(prognostic_i)
-        self._set_boundaries(self.time.item())
-        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
-        return PSIQ(psiq_i.psi + psi_bc, psiq_i.q)
-
-    def _update_mean_flow(self, prognostic: PSIQ) -> PSIQ:
-        """Update prognostic tuple.
-
-        Args:
-            prognostic (PSIQ): Prognostic variable to advect.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-
-        Returns:
-            PSIQ: Updated prognostic variable to advect.
-                ├── psi: (n_ens, nl, nx+1, ny+1)-shaped
-                └──  q : (n_ens, nl, nx, ny)-shaped
-        """
-        prognostic_pert = prognostic - self.mean_flow
-        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
-        prognostic_i = PSIQ(prognostic_pert.psi - psi_bc, prognostic_pert.q)
-        psiq_i = self._timestep(prognostic_i)
-        self._set_boundaries(self.time.item())
-        psi_bc = self._solver_inhomogeneous.psiq_bc.psi
-        psi_bar, q_bar = self.mean_flow
-        return PSIQ(psiq_i.psi + psi_bc + psi_bar, psiq_i.q + q_bar)
+        psi_bc = self.solver_inhomogeneous.psiq_bc.psi
+        prognostic_i = PSIQSST(
+            prognostic.psi - psi_bc, prognostic.q, prognostic.sst
+        )
+        psiqsst_i = self._timestep(prognostic_i)
+        self.set_boundaries(self.time.item())
+        psi_bc = self.solver_inhomogeneous.psiq_bc.psi
+        return PSIQSST(psiqsst_i.psi + psi_bc, psiqsst_i.q, psiqsst_i.sst)
 
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
-        self._state.update_psiq(self.update(self._state.prognostic.psiq))
-
-    @classmethod
-    def get_variable_set(
-        cls,
-        space: SpaceConfig,
-        physics: PhysicsConfig,
-        model: ModelConfig,
-    ) -> dict[str, DiagnosticVariable]:
-        """Create variable set.
-
-        Args:
-            space (SpaceConfig): Space configuration.
-            physics (PhysicsConfig): Physics configuration.
-            model (ModelConfig): Model configuaration.
-
-        Returns:
-            dict[str, DiagnosticVariable]: Variables dictionnary.
-        """
-        return QGPSIQVariableSet.get_variable_set(space, physics, model)
-
-
-class QGPSIQ(QGPSIQCore[PSIQT, StatePSIQ]):
-    """Usual Quasi Geostrophic Model (psi / pv formulation)."""
-
-    _type = ModelName.QUASI_GEOSTROPHIC_USUAL
+        self.psiqsst = self.update(self.psiqsst)
