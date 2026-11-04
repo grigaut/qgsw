@@ -4,8 +4,7 @@ from ast import TypeVar
 
 import torch
 
-from qgsw.masks import Masks
-from qgsw.models.qg.psiq.core import QGPSIQ, QGPSIQCore
+from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -23,16 +22,14 @@ MODELS = {
     "RG0": QGPSIQ,
 }
 
-M = TypeVar("M", bound=QGPSIQCore)
+M = TypeVar("M", bound=QGPSIQ)
 
 
 def set_inhomogeneous_model(
-    model: QGPSIQCore, dt: float, slip_coef: float
-) -> QGPSIQCore:
+    model: QGPSIQ, dt: float, slip_coef: float
+) -> QGPSIQ:
     """Set up inhomogeneous model."""
     try:
-        nx, ny = model.space.nx, model.space.ny
-        model.masks = Masks.empty_tensor(nx, ny, device=model.device.get())
         model.slip_coef = slip_coef
         model.bottom_drag_coef = 0
     except AttributeError:
@@ -50,7 +47,7 @@ def setup_model(
     beta_plane: BetaPlane,
     dt: float,
     slip_coef: float,
-) -> QGPSIQCore:
+) -> QGPSIQ:
     """Setup model.
 
     Args:
@@ -63,7 +60,7 @@ def setup_model(
         slip_coef (float): Slip coefficient.
 
     Returns:
-        QGPSIQCore: Model.
+        QGPSIQ: Model.
     """
     if model_type == QGPSIQForced.get_type():
         model = _setup_forced(model_type, space, H, g_prime, beta_plane)
@@ -127,7 +124,7 @@ def _setup(
     H: torch.Tensor,
     g_prime: torch.Tensor,
     beta_plane: BetaPlane,
-) -> QGPSIQCore:
+) -> QGPSIQ:
     return MODELS[model_type](
         space_2d=space,
         H=H[:2],
