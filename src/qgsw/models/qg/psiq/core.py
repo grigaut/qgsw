@@ -240,6 +240,11 @@ class QGPSIQ(NamedObject[ModelName], metaclass=ABCCounter):
         return self.psiqsst.sst
 
     @property
+    def sst(self) -> torch.Tensor:
+        """SST."""
+        return self.sst_anom + self.sst_mean
+
+    @property
     def time_stepper(self) -> str:
         """Time stepper."""
         return self._time_stepper
