@@ -190,8 +190,9 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             )
             logger.info(msg)
 
-            msg = "\t└─ " + " | ".join(msg_parts)
-            logger.detail(msg)
+            if msg_parts:
+                msg = "\t└─ " + " | ".join(msg_parts)
+                logger.detail(msg)
             if self.early_stop.step(tot_):
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
@@ -252,7 +253,7 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             msg_parts = []
 
             for k, lo in losses.items():
-                self.losses[k].append(lo.detach().item())
+                self.losses.setdefault(k, []).append(lo.detach().item())
                 if k == "best":
                     best = lo.detach().item()
                     continue
@@ -268,9 +269,9 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
                 f" ({best:>#10.5g})"
             )
             logger.info(msg)
-
-            msg = "\t└─ " + " | ".join(msg_parts)
-            logger.detail(msg)
+            if msg_parts:
+                msg = "\t└─ " + " | ".join(msg_parts)
+                logger.detail(msg)
             if self.early_stop.step(tot_):
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
