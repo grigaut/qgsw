@@ -141,6 +141,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         self,
         params: list[torch.Tensor],
         max_iter: int = 20,
+        max_eval: int | None = None,
         history_size: int = 20,
     ) -> None:
         """Instantiate LBFGS optimizer wrapper.
@@ -148,6 +149,8 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         Args:
             params (list[torch.Tensor]): Parameters to optim.
             max_iter (int, optional): Max number of iterations. Defaults to 20.
+            max_eval (int | None, optional): Max number of evaluations.
+                Defaults to None.
             history_size (int, optional): History size. Defaults to 20.
             losses (dict[str, list[torch.Tensor]] | None, optional): Losses.
                 Defaults to None.
@@ -155,6 +158,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
         super().__init__(params, max_iter=max_iter, history_size=history_size)
 
         self.max_iter = max_iter
+        self._max_eval = max_eval
         self.history_size = history_size
 
         self.restart_from_params(params)
@@ -184,7 +188,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             msg = (
                 f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
                 f" [{step(self.epoch + 1, self.max_epoch)} |"
-                f" {step(self.eval + 1, self.max_eval)}]"
+                f" {self.eval + 1} ]"
                 f" Loss: {tot_:>#10.5g}"
                 f" ({best:>#10.5g})"
             )
@@ -212,6 +216,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             params,
             lr=1,
             line_search_fn="strong_wolfe",
+            max_eval=self._max_eval,
             history_size=self.history_size,
             max_iter=self.max_iter,
         )
@@ -308,7 +313,7 @@ def build_optimizer(
     """
     match optimizer_type:
         case OptimizerName.LBFGS:
-            return LBFGS(params, max_iter=20, history_size=20)
+            return LBFGS(params, max_iter=20, max_eval=30, history_size=20)
         case OptimizerName.ADAM:
             return Adam(params, lr=1)
         case _:
