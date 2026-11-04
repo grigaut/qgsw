@@ -631,20 +631,22 @@ if __name__ == "__main__":
 
         optimizer.set_closure(closure)
         epoch_restart = ""
-        overflow_encountered = False
+        runtime_error = False
+
         for _ in range(args.optim):
             try:
                 optimizer.step()
-            except EarlyStopError as e:
+            except (EarlyStopError, RuntimeError) as e:
                 msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)
+                runtime_error = isinstance(e, RuntimeError)
                 break
             except OverflowError:
                 epoch_repr = optimizer.epoch_repr
                 if epoch_repr == epoch_restart:
                     msg = "Unable to solve overflow with optimizer restart."
                     logger.warning(box(msg))
-                    overflow_encountered = True
+                    runtime_error = True
                     break
                 epoch_restart = epoch_repr
                 msg = f"Overflow at {epoch_repr}, restarting optimizer."
@@ -684,7 +686,7 @@ if __name__ == "__main__":
                 "loss": best_loss.cpu().item(),
                 "max_memory_allocated": max_mem,
                 "losses": optimizer.losses,
-                "overflow": overflow_encountered,
+                "runtime_error": runtime_error,
                 "elapsed": time.time() - time0,
             }
         )
