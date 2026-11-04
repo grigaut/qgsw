@@ -36,47 +36,49 @@ class LivePlot:
 
         self.model = model
 
+        self.sst_fig, self.sst_axs = plots.subplots(1, 1, num="SST")
+
         if model.get_type() == SurfaceVorticity.get_type():
-            self.state_fig, self.state_axs = plots.subplots(4, 2)
+            self.state_fig, self.state_axs = plots.subplots(4, 2, num="State")
             plots.set_coltitles(["Field", "Laplacian"], self.state_axs)
             plots.set_rowtitles(
                 ["ѱ_g + ѱ_a ", "ѱ_g", "ѱ_a", "χ_a"], self.state_axs
             )
-            self.vel_fig, self.vel_axs = plots.subplots(3, 2)
+            self.vel_fig, self.vel_axs = plots.subplots(3, 2, num="Velocity")
             plots.set_coltitles(
                 ["Zonal velocity", "Meridional velocity"], self.vel_axs
             )
             plots.set_rowtitles(["uv_g + uv_a ", "uv_g", "uv_a"], self.vel_axs)
             self._plot = self._plot_sv
         elif model.get_type() == QGPSIQRGPsi2TransportDR.get_type():
-            self.state_fig, self.state_axs = plots.subplots(1, 4)
+            self.state_fig, self.state_axs = plots.subplots(1, 4, num="State")
             plots.set_coltitles(["ѱ_1", "q", "ζ_1", "ѱ_2"], self.state_axs)
-            self.vel_fig, self.vel_axs = plots.subplots(1, 2)
+            self.vel_fig, self.vel_axs = plots.subplots(1, 2, num="Velocity")
             plots.set_coltitles(
                 ["Zonal velocity", "Meridional velocity"], self.vel_axs
             )
             self._plot = self._plot_rgsi
         elif model.get_type() == QGPSIQForced.get_type():
-            self.state_fig, self.state_axs = plots.subplots(1, 4)
+            self.state_fig, self.state_axs = plots.subplots(1, 4, num="State")
             plots.set_coltitles(["ѱ_1", "q", "ζ_1", "f"], self.state_axs)
-            self.vel_fig, self.vel_axs = plots.subplots(1, 2)
+            self.vel_fig, self.vel_axs = plots.subplots(1, 2, num="Velocity")
             plots.set_coltitles(
                 ["Zonal velocity", "Meridional velocity"], self.vel_axs
             )
             self._plot = self._plot_rgf
         elif model.get_type() == QGPSIQForcedSurfML.get_type():
-            self.state_fig, self.state_axs = plots.subplots(1, 5)
+            self.state_fig, self.state_axs = plots.subplots(1, 5, num="State")
             plots.set_coltitles(
                 ["ѱ_1", "q", "ζ_1", "ѱ_2", "f"], self.state_axs
             )
-            self.vel_fig, self.vel_axs = plots.subplots(1, 2)
+            self.vel_fig, self.vel_axs = plots.subplots(1, 2, num="Velocity")
             plots.set_coltitles(
                 ["Zonal velocity", "Meridional velocity"], self.vel_axs
             )
             self._plot = self._plot_rgfsi
         else:
-            self.state_fig, self.state_axs = plots.subplots(1, 3)
-            self.vel_fig, self.vel_axs = plots.subplots(1, 2)
+            self.state_fig, self.state_axs = plots.subplots(1, 3, num="State")
+            self.vel_fig, self.vel_axs = plots.subplots(1, 2, num="Velocity")
             plots.set_coltitles(
                 ["Zonal velocity", "Meridional velocity"], self.vel_axs
             )
@@ -84,6 +86,14 @@ class LivePlot:
 
     def _plot_qg(self) -> None:
         model: QGPSIQ = self.model
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
+
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],
@@ -103,6 +113,20 @@ class LivePlot:
 
     def _plot_rgsi(self) -> None:
         model: QGPSIQRGPsi2TransportDR = self.model
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],
@@ -127,6 +151,13 @@ class LivePlot:
 
     def _plot_rgf(self) -> None:
         model: QGPSIQForced = self.model
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],
@@ -151,6 +182,13 @@ class LivePlot:
 
     def _plot_rgfsi(self) -> None:
         model: QGPSIQForcedSurfML = self.model
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],
@@ -179,6 +217,13 @@ class LivePlot:
 
     def _plot_sv(self) -> None:
         model: SurfaceVorticity = self.model
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
         plots.imshow(
             model.psi[0, 0],
             ax=self.state_axs[0, 0],

@@ -225,6 +225,7 @@ class SubplotsKwargs(TypedDict, total=False):
     dpi: int
     sharey: bool
     sharex: bool
+    num: str
 
 
 def subplots(
