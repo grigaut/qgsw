@@ -302,6 +302,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         logger.info(msg)
         ## Space
         self.space = space_2d
+        self.specs = specs.from_tensor(self.space.psi.xy.x)
         # Beta-plane
         with logger.section("Setting model parameters..."):
             self.beta_plane = beta_plane
