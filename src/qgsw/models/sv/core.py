@@ -89,17 +89,8 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         if self.time_stepper == "euler":
             return self.time
         if self.time_stepper == "rk3":
-            if self._rk3_step == 0:
-                coef = 0
-                return self.time + coef * self.dt
-            if self._rk3_step == 1:
-                coef = 1
-                return self.time + coef * self.dt
-            if self._rk3_step == 2:
-                coef = 1 / 2
-                return self.time + coef * self.dt
-            msg = "SSPRK3 should only perform 3 steps."
-            raise ValueError(msg)
+            coef = time_steppers.compute_rk3_substep_coefs(self._rk3_step)
+            return self.time + coef * self.dt
         msg = "Supported time steppers are 'rk3' and 'euler'."
         raise ValueError(msg)
 
@@ -188,7 +179,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             msg = "Timestep must be greater than 0."
             raise InvalidModelParameterError(msg)
         self._dt = dt
-        msg = f"{self.__class__.__name__}: dt set to {self.dt}"
+        msg = f"{self.name}: dt set to {self.dt}"
         logger.info(msg)
 
     @property
@@ -227,7 +218,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         if not isinstance(beta_plane, BetaPlane):
             msg = "beta_plane should be of type `BetaPlane`."
             raise TypeError(msg)
-        msg = f"{self.__class__.__name__}: Beta-plane set to {beta_plane}"
+        msg = f"{self.name}: Beta-plane set to {beta_plane}"
         logger.detail(msg)
         self._beta_plane = beta_plane
         self.f0 = beta_plane.f0
@@ -297,8 +288,9 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         """
         self.compile_fns = compile_fns
         self.__instance_nb = next(self._instance_count)
-        self.name = f"{self.__class__.__name__}-{self.__instance_nb}"
-        msg = f"Creating {self.__class__.__name__} model..."
+        self.class_name = self.__class__.__name__
+        self.name = f"{self.class_name}-{self.__instance_nb}"
+        msg = f"Creating {self.name}..."
         logger.info(msg)
         ## Space
         self.space = space_2d
@@ -311,7 +303,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         self.set_flux()
         self.reset_state()
         self.set_solver()
-        self.set_wind_forcing(0, 0)
+        self.set_wind_forcing(0.0, 0.0)
 
     def get_repr_parts(self) -> list[str]:
         """String representations parts.
@@ -680,7 +672,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
 
         return (u_sf_a + u_pot_a, v_sf_a + v_pot_a)
 
-    def compute_advection_homogeneous(
+    def compute_div_flux_homogeneous(
         self, u: torch.Tensor, v: torch.Tensor, tracer: torch.Tensor
     ) -> torch.Tensor:
         """Compute homogeneous advection.
@@ -699,7 +691,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             v[..., 1:-1],
         )
 
-    def compute_advection_inhomogeneous(
+    def compute_div_flux_inhomogeneous(
         self, u: torch.Tensor, v: torch.Tensor, tracer: torch.Tensor
     ) -> torch.Tensor:
         """Compute inhomogeneous advection.
@@ -713,6 +705,63 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             torch.Tensor: ∇·(u tracer)
         """
         return self.div_flux(tracer, u, v)
+
+    def compute_dsst_homogeneous(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute dsst for homogeneous situations.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+                └── sst: (n_ens, nl, nx+1, ny)-shaped
+            v (torch.Tensor): Meridional velocity.
+                └── sst: (n_ens, nl, nx, ny+1)-shaped
+            sst_anom (torch.Tensor): SST anomaly.
+                └── sst: (n_ens, nl, nx, ny)-shaped
+
+        Returns:
+            torch.Tensor: dsst.
+                └── dsst: (n_ens, nl, nx, ny)-shaped
+        """
+        if self.advect_sst:
+            div = self.f_div(self._substep_time)
+            return (
+                -self.compute_div_flux_homogeneous(u, v, sst_anom)
+                + sst_anom * div
+            ) * self.masks.h
+        return torch.zeros_like(sst_anom)
+
+    def compute_dsst_inhomogeneous(
+        self,
+        u: torch.Tensor,
+        v: torch.Tensor,
+        sst_anom: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute dsst for inhomogeneous situations.
+
+        Args:
+            u (torch.Tensor): Zonal velocity.
+                └── sst: (n_ens, nl, nx+1, ny)-shaped
+            v (torch.Tensor): Meridional velocity.
+                └── sst: (n_ens, nl, nx, ny+1)-shaped
+            sst_anom (torch.Tensor): SST anomaly.
+                └── sst: (n_ens, nl, nx+1, ny+1)-shaped (+3 if wide)
+
+        Returns:
+            torch.Tensor: dsst.
+                └── dsst: (n_ens, nl, nx, ny)-shaped
+        """
+        if self.advect_sst:
+            sst_anom_wide = self.sst_anom_bc.expand(sst_anom)
+            div = self.f_div(self._substep_time)
+            return (
+                -self.compute_div_flux_inhomogeneous(u, v, sst_anom_wide)
+                + sst_anom * div
+            ) * self.masks.h
+        return torch.zeros_like(sst_anom)
 
     def compute_forcing(self, time: torch.Tensor) -> torch.Tensor:
         """Compute forcing.
@@ -782,7 +831,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         u = u_g + u_a
         v = v_g + v_a
 
-        div_flux = self.compute_advection_homogeneous(
+        div_flux = self.compute_div_flux_homogeneous(
             u, v, zeta_g + zeta_a + self.f
         )
         # wind forcing + bottom drag
@@ -794,14 +843,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             dzeta_g_i,
             ensure_mass_conservation=True,
         )
-        if self.advect_sst:
-            div = self.f_div(self._substep_time)
-            dsst_anom = (
-                -self.compute_advection_homogeneous(u, v, sst_anom)
-                + sst_anom * div
-            ) * self.masks.h
-        else:
-            dsst_anom = torch.zeros_like(sst_anom)
+        dsst_anom = self.compute_dsst_homogeneous(u, v, sst_anom)
         return PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
 
     def compute_time_derivatives_inhomogeneous(
@@ -840,7 +882,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
 
         zeta_g_with_bc = self.zeta_g_bc.expand(zeta_g)
         zeta_a_with_bc = self.f_zeta_a_wide(self._substep_time)
-        div_flux = self.compute_advection_inhomogeneous(
+        div_flux = self.compute_div_flux_inhomogeneous(
             u, v, zeta_g_with_bc + zeta_a_with_bc + self.f_wide
         )
         # wind forcing + bottom drag
@@ -852,15 +894,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             dzeta_g_i,
             ensure_mass_conservation=False,
         )
-        if self.advect_sst:
-            sst_anom_wide = self.sst_anom_bc.expand(sst_anom)
-            div = self.f_div(self._substep_time)
-            dsst_anom = (
-                -self.compute_advection_inhomogeneous(u, v, sst_anom_wide)
-                + sst_anom * div
-            ) * self.masks.h
-        else:
-            dsst_anom = torch.zeros_like(sst_anom)
+        dsst_anom = self.compute_dsst_inhomogeneous(u, v, sst_anom)
         return PSIZetaSST(dpsi_g, dzeta_g, dsst_anom)
 
     def update(self, prognostic: PSIZetaSST) -> PSIZetaSST:
@@ -954,7 +988,6 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             psizsst_g_i.sst,
         )
 
-    @torch.enable_grad()
     def step(self) -> None:
         """Performs one step time-integration with RK3-SSP scheme."""
         self.psizsst = self.update(self.psizsst)
