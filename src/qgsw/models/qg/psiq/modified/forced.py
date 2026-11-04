@@ -266,6 +266,7 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
         self._dyn_basis = basis
         space = self.space.remove_h()
         self._fpsi2 = basis.localize(space.q.xy.x, space.q.xy.y)
+        self._fpsi2_psi_grid = basis.localize(space.psi.xy.x, space.psi.xy.y)
         self._fpsi2_wide = basis.localize(
             *self.space.remove_h()
             .widen(1 + 2 * self.wide, 1 + 2 * self.wide)
@@ -275,7 +276,7 @@ class QGPSIQRGPsi2Transport(QGPSIQCore[PSIQTAlpha, StatePSIQAlpha]):
     @property
     def psi2(self) -> torch.Tensor:
         """Psi2."""
-        return self._fpsi2(self.time)[None, None, ...]
+        return self._fpsi2_psi_grid(self.time)[None, None, ...]
 
     def __init__(
         self,
