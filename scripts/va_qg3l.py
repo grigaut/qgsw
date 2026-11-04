@@ -453,10 +453,10 @@ if __name__ == "__main__":
                 t = model.time.clone()
                 model.step()
                 psi = get_psi_g(model)
-                dpsi = (psi - psi_) / model.dt
+                dpsi = model.dprog.psi
                 if with_reg:
                     dyn += sum(
-                        dyn_gammas[k] * dyn_reg_fns[k](psi, dpsi, t)
+                        dyn_gammas[k] * dyn_reg_fns[k](psi_, dpsi, t)
                         for k in dyn_reg_fns
                     )
 
