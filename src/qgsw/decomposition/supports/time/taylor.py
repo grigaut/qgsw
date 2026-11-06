@@ -29,7 +29,7 @@ class TaylorSeriesTimeSupport(TimeSupportFunction):
             fact_lvl = factorial(lvl)
 
             fields[lvl] = torch.einsum(
-                "t,txy->xy", t**lvl / fact_lvl, self._space[lvl]
+                "...t,txy->...xy", t**lvl / fact_lvl, self._space[lvl]
             )
         return fields
 
@@ -49,7 +49,7 @@ class TaylorSeriesTimeSupport(TimeSupportFunction):
                 continue
             fact_lvl = factorial(lvl - 1)
             fields[lvl] = torch.einsum(
-                "t,txy->xy", t ** (lvl - 1) / fact_lvl, self._space[lvl]
+                "...t,txy->...xy", t ** (lvl - 1) / fact_lvl, self._space[lvl]
             )
         return fields
 

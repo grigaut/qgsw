@@ -37,9 +37,11 @@ class GaussianTimeSupport(TimeSupportFunction):
         Returns:
             torch.Tensor: Normalized field.
         """
-        if self.norms and (t >= self.freeze_t).cpu().item():
-            return exp / self.norms[lvl]
-        return exp / exp.sum(dim=0)
+        denom = exp.sum(dim=-1, keepdim=True)
+        if self.norms:
+            frozen = (t >= self.freeze_t).unsqueeze(-1)
+            denom = torch.where(frozen, self.norms[lvl], denom)
+        return exp / denom
 
     def freeze_normalization(self, t: torch.Tensor) -> None:
         """Freeze normalization after a given time.
@@ -57,26 +59,73 @@ class GaussianTimeSupport(TimeSupportFunction):
             tc = torch.tensor(centers, **tspecs)
 
             self.norms[lvl] = torch.exp(-((t - tc) ** 2) / (st) ** 2).sum(
-                dim=0
+                dim=-1
             )
 
     def unfreeze_normalization(self) -> None:
         """Unfreeze normalization."""
         self.norms = {}
 
+    def retrieve_support(self, lvl: int, t: torch.Tensor) -> torch.Tensor:
+        """Retrieve time support at given level.
+
+        Args:
+            lvl (int): Level.
+            t (torch.Tensor): T locations.
+
+        Returns:
+            torch.Tensor: Time support.
+        """
+        centers = self.params[lvl]["centers"]
+        st: float = self.params[lvl]["sigma_t"]
+        tc = torch.tensor(centers, **specs.from_tensor(t))
+        exp = torch.exp(-((t[..., None] - tc) ** 2) / (st) ** 2)
+        return self.normalize(t, lvl, exp)
+
+    def retrieve_supports(self, t: torch.Tensor) -> dict[int, torch.Tensor]:
+        """Retrieve time supports.
+
+        Args:
+            t (torch.Tensor): T locations.
+
+        Returns:
+            torch.Tensor: Time supports mapping.
+        """
+        return {lvl: self.retrieve_support(lvl, t) for lvl in self.params}
+
+    def retrieve_dt_support(self, lvl: int, t: torch.Tensor) -> torch.Tensor:
+        """Retrieve dt time support at given level.
+
+        Args:
+            lvl (int): Level.
+            t (torch.Tensor): T locations.
+
+        Returns:
+            torch.Tensor: dt time support.
+        """
+        centers = self.params[lvl]["centers"]
+        st: float = self.params[lvl]["sigma_t"]
+        tc = torch.tensor(centers, **specs.from_tensor(t))
+        exp = torch.exp(-((t[..., None] - tc) ** 2) / (st) ** 2)
+        dt_exp = -2 * (t[..., None] - tc) / st**2 * exp
+        return self.dt_normalized(t, lvl, exp, dt_exp)
+
+    def retrieve_dt_supports(self, t: torch.Tensor) -> dict[int, torch.Tensor]:
+        """Retrieve dt time supports.
+
+        Args:
+            t (torch.Tensor): T locations.
+
+        Returns:
+            torch.Tensor: dt time supports mapping.
+        """
+        return {lvl: self.retrieve_dt_support(lvl, t) for lvl in self.params}
+
     def decompose(self, t: Tensor) -> dict[int, Tensor]:
         fields = {}
-        tspecs = specs.from_tensor(t)
-        for lvl, params in self.params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            exp_ = self.normalize(t, lvl, exp)
-
-            fields[lvl] = torch.einsum("t,txy->xy", exp_, self._space[lvl])
+        for lvl in self.params:
+            e = self.retrieve_support(lvl, t)
+            fields[lvl] = torch.einsum("...t,txy->...xy", e, self._space[lvl])
         return fields
 
     decompose.__doc__ = TimeSupportFunction.decompose.__doc__
@@ -105,28 +154,24 @@ class GaussianTimeSupport(TimeSupportFunction):
         Returns:
             torch.Tensor: Time derivative of normalized field.
         """
-        if self.norms and (t >= self.freeze_t).cpu().item():
-            return dt_exp / self.norms[lvl]
-        exp_s = exp.sum(dim=0)
-
-        return (dt_exp * exp_s - exp * dt_exp.sum(dim=0)) / exp_s**2
+        exp_s = exp.sum(dim=-1, keepdim=True)
+        if self.norms:
+            frozen = (t >= self.freeze_t).unsqueeze(-1)
+            exp_s = torch.where(frozen, torch.ones_like(exp_s), exp_s)
+        softmax_grad = (
+            dt_exp * exp_s - exp * dt_exp.sum(dim=-1, keepdim=True)
+        ) / exp_s**2
+        if not self.norms:
+            return softmax_grad
+        return torch.where(frozen, dt_exp / self.norms[lvl], softmax_grad)
 
     def decompose_dt(self, t: Tensor) -> dict[int, Tensor]:
         fields = {}
-        tspecs = specs.from_tensor(t)
-        for lvl, params in self.params.items():
-            centers = params["centers"]
-            st: float = params["sigma_t"]
-            space = self._space[lvl]
-
-            tc = torch.tensor(centers, **tspecs)
-
-            exp = torch.exp(-((t - tc) ** 2) / (st) ** 2)
-            dt_exp = -2 * (t - tc) / st**2 * exp
-
-            dt_e = self.dt_normalized(t, lvl, exp, dt_exp)
-
-            fields[lvl] = torch.einsum("t,txy->xy", dt_e, space)
+        for lvl in self.params:
+            dt_e = self.retrieve_dt_support(lvl, t)
+            fields[lvl] = torch.einsum(
+                "...t,txy->...xy", dt_e, self._space[lvl]
+            )
         return fields
 
     decompose_dt.__doc__ = TimeSupportFunction.decompose_dt.__doc__

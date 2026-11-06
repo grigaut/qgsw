@@ -5,6 +5,7 @@ from typing import Any
 import torch
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
@@ -40,20 +41,52 @@ class GaussianExpBasis(
         NormalizedGaussianSupport, GaussianTimeSupport
     ].shapes.__doc__
 
+    def retrieve_space_support(
+        self, lvl: int, xx: torch.Tensor, yy: torch.Tensor
+    ) -> NormalizedGaussianSupport:
+        """Retrieve space support at given level.
+
+        Args:
+            lvl (int): Level.
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            NormalizedGaussianSupport: Space support.
+        """
+        params = self._space[lvl]
+        sx: float = params["sigma_x"]
+        sy: float = params["sigma_y"]
+
+        x, y = self._compute_space_params(params, xx, yy)
+
+        E = GaussianSupport(x, y, sx, sy)
+        return NormalizedGaussianSupport(E)
+
+    def retrieve_space_supports(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, NormalizedGaussianSupport]:
+        """Retrieve space supports.
+
+        Args:
+            xx (torch.Tensor): X locations.
+            yy (torch.Tensor): Y locations.
+
+        Returns:
+            dict[int, NormalizedGaussianSupport]: Space supports mapping.
+        """
+        return {
+            lvl: self.retrieve_space_support(lvl, xx, yy)
+            for lvl in range(self.order)
+        }
+
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> dict[int, torch.Tensor]:
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.field)
         return fields
 
@@ -63,14 +96,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx)
         return fields
 
@@ -80,14 +106,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy)
         return fields
 
@@ -97,14 +116,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx2)
         return fields
 
@@ -114,14 +126,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy2)
         return fields
 
@@ -131,14 +136,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dx3)
         return fields
 
@@ -148,14 +146,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dy3)
         return fields
 
@@ -165,14 +156,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dydx2)
         return fields
 
@@ -182,14 +166,7 @@ class GaussianExpBasis(
         fields = {}
 
         for lvl, c in self._coefs.items():
-            params = self._space[lvl]
-            sx: float = params["sigma_x"]
-            sy: float = params["sigma_y"]
-
-            x, y = self._compute_space_params(params, xx, yy)
-
-            E = GaussianSupport(x, y, sx, sy)
-            e = NormalizedGaussianSupport(E)
+            e = self.retrieve_space_support(lvl, xx, yy)
             fields[lvl] = torch.einsum("tc,cxy->txy", c, e.dxdy2)
         return fields
 
@@ -244,3 +221,85 @@ class GaussianExpBasis(
         return GaussianTimeSupport(time_params, space_fields)
 
     generate_time_support = _generate_time_support
+
+
+def invert_basis_coefs(
+    basis: GaussianExpBasis,
+    ys: torch.Tensor,
+    ts: torch.Tensor,
+    space_xy: tuple[torch.Tensor, torch.Tensor],
+) -> tuple[DecompositionCoefs, torch.Tensor]:
+    """Retrieve basis coef from inverison of direct field values.
+
+    Args:
+        basis (GaussianExpBasis): BAsis, must be or order 1.
+        ys (torch.Tensor): Targets.
+        ts (torch.Tensor): Times to evaluate at.
+        space_xy (tuple[torch.Tensor, torch.Tensor]): Space to evaluate on.
+
+    Raises:
+        ValueError: If the basis is not of order 1.
+
+    Returns:
+        tuple[DecompositionCoefs, torch.Tensor]: Coefs, residual.
+    """
+    if basis.type != GaussianExpBasis.type:
+        msg = "Inversion is only possible for Gaussian-exps bases."
+        raise ValueError(msg)
+
+    if basis.order != 1:
+        msg = "Inversion is only possible for order 1 bases."
+        raise ValueError(msg)
+    S = basis.retrieve_space_supports(*space_xy)[0]
+    T = basis.localize(*space_xy).retrieve_supports(ts)[0]
+
+    Z: torch.Tensor = (
+        torch.linalg.pinv(T)
+        @ ys.flatten(-2, -1)
+        @ torch.linalg.pinv(S.field.flatten(-2, -1))
+    )
+
+    ys_ = (T @ Z @ S.field.flatten(-2, -1)).reshape(ys.shape)
+    res = (ys_ - ys).norm() / ys.norm()
+    return DecompositionCoefs.from_dict({0: Z}), res
+
+
+def invert_basis_coefs_from_laplacian(
+    basis: GaussianExpBasis,
+    ys: torch.Tensor,
+    ts: torch.Tensor,
+    space_xy: tuple[torch.Tensor, torch.Tensor],
+) -> tuple[DecompositionCoefs, torch.Tensor]:
+    """Retrieve basis coef from inverison of laplacian field values.
+
+    Args:
+        basis (GaussianExpBasis): BAsis, must be or order 1.
+        ys (torch.Tensor): Targets.
+        ts (torch.Tensor): Times to evaluate at.
+        space_xy (tuple[torch.Tensor, torch.Tensor]): Space to evaluate on.
+
+    Raises:
+        ValueError: If the basis is not of order 1.
+
+    Returns:
+        tuple[DecompositionCoefs, torch.Tensor]: Coefs, residual.
+    """
+    if basis.type != GaussianExpBasis.type:
+        msg = "Inversion is only possible for Gaussian-exps bases."
+        raise ValueError(msg)
+
+    if basis.order != 1:
+        msg = "Inversion is only possible for order 1 bases."
+        raise ValueError(msg)
+    S = basis.retrieve_space_supports(*space_xy)[0]
+    T = basis.localize(*space_xy).retrieve_supports(ts)[0]
+
+    Z: torch.Tensor = (
+        torch.linalg.pinv(T)
+        @ ys.flatten(-2, -1)
+        @ torch.linalg.pinv((S.dx2 + S.dy2).flatten(-2, -1))
+    )
+
+    ys_ = (T @ Z @ (S.dx2 + S.dy2).flatten(-2, -1)).reshape(ys.shape)
+    res = (ys_ - ys).norm() / ys.norm()
+    return DecompositionCoefs.from_dict({0: Z}), res

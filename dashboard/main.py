@@ -232,19 +232,19 @@ if folder is not None:
 
     n_optim = opt_cycle["max_steps"]
     try:
-        overflow = opt_cycle["overflow"]
+        runtime_error = opt_cycle["runtime_error"]
     except KeyError:
-        overflow = False
+        runtime_error = False
 
-    if (n_optim > (conv := opt_cycle["nb_steps"])) and (not overflow):
+    if (n_optim > (conv := opt_cycle["nb_steps"])) and (not runtime_error):
         st.badge(
             f"Convergence reached in {conv} epochs",
             icon=":material/check:",
             color="green",
         )
-    elif (n_optim != opt_cycle["nb_steps"]) and overflow:
+    elif (n_optim != opt_cycle["nb_steps"]) and runtime_error:
         st.badge(
-            "Overflow during minimization",
+            "Runtime error during minimization",
             icon=":material/error:",
             color="red",
         )
