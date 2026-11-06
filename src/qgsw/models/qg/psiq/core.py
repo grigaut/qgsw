@@ -53,7 +53,7 @@ logger = getLogger(__name__)
 class QGPSIQ(NamedObject[ModelName], metaclass=ABCCounter):
     """Finite volume multi-layer QG solver."""
 
-    _name = ModelName.QUASI_GEOSTROPHIC
+    _type = ModelName.QUASI_GEOSTROPHIC
 
     _flux_stencil = 5
     _time_stepper = "rk3"
