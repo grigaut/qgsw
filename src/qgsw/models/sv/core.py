@@ -337,13 +337,15 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         Args:
             compile_fns (bool): Whether to compile_fns or not.
         """
+        lap_h = lambda t: laplacian_h(t, self.space.dx, self.space.dy)
+        lap = lambda t: laplacian(t, self.space.dx, self.space.dy)
         if compile_fns:
             with logger.section("Compiling functions..."):
                 self.grad = OptimizableFunction(grad)
                 self.gradp = OptimizableFunction(grad_perp)
                 self.interp = OptimizableFunction(interpolate)
-                self.lap_h = OptimizableFunction(laplacian_h)
-                self.lap = OptimizableFunction(laplacian)
+                self.lap_h = OptimizableFunction(lap_h)
+                self.lap = OptimizableFunction(lap)
         else:
             self.grad = grad
             self.gradp = grad_perp
@@ -599,7 +601,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             self.p = psi_with_bc
             lap_psi = self.lap(psi_with_bc, self.space.dx, self.space.dy)
             return self.masks.h * self.interp(lap_psi)
-        lap_psi = self.lap_h(psi, self.space.dx, self.space.dy)
+        lap_psi = self.lap_h(psi)
         return self.masks.h * (
             self.interp(
                 self.masks.psi * (lap_psi),
@@ -820,7 +822,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
                 └── dsst : (n_ens, nl, nx, ny)-shaped
         """
         psi_g, zeta_g, sst_anom = prognostic
-        zeta_a = self.f_zeta_a(self._substep_time)
+        zeta_a = self.interp(self.lap(self.f_zeta_a(self._substep_time)))
 
         u_g, v_g = self.gradp(psi_g)
         u_g /= self.space.dy
