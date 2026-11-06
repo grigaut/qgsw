@@ -5,6 +5,7 @@ from typing import Any
 import torch
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
+from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.gaussian import (
     GaussianSupport,
     NormalizedGaussianSupport,
@@ -220,3 +221,85 @@ class GaussianExpBasis(
         return GaussianTimeSupport(time_params, space_fields)
 
     generate_time_support = _generate_time_support
+
+
+def invert_basis_coefs(
+    basis: GaussianExpBasis,
+    ys: torch.Tensor,
+    ts: torch.Tensor,
+    space_xy: tuple[torch.Tensor, torch.Tensor],
+) -> tuple[DecompositionCoefs, torch.Tensor]:
+    """Retrieve basis coef from inverison of direct field values.
+
+    Args:
+        basis (GaussianExpBasis): BAsis, must be or order 1.
+        ys (torch.Tensor): Targets.
+        ts (torch.Tensor): Times to evaluate at.
+        space_xy (tuple[torch.Tensor, torch.Tensor]): Space to evaluate on.
+
+    Raises:
+        ValueError: If the basis is not of order 1.
+
+    Returns:
+        tuple[DecompositionCoefs, torch.Tensor]: Coefs, residual.
+    """
+    if basis.type != GaussianExpBasis.type:
+        msg = "Inversion is only possible for Gaussian-exps bases."
+        raise ValueError(msg)
+
+    if basis.order != 1:
+        msg = "Inversion is only possible for order 1 bases."
+        raise ValueError(msg)
+    S = basis.retrieve_space_supports(*space_xy)[0]
+    T = basis.localize(*space_xy).retrieve_supports(ts)[0]
+
+    Z: torch.Tensor = (
+        torch.linalg.pinv(T)
+        @ ys.flatten(-2, -1)
+        @ torch.linalg.pinv(S.field.flatten(-2, -1))
+    )
+
+    ys_ = (T @ Z @ S.field.flatten(-2, -1)).reshape(ys.shape)
+    res = (ys_ - ys).norm() / ys.norm()
+    return DecompositionCoefs.from_dict({0: Z}), res
+
+
+def invert_basis_coefs_from_laplacian(
+    basis: GaussianExpBasis,
+    ys: torch.Tensor,
+    ts: torch.Tensor,
+    space_xy: tuple[torch.Tensor, torch.Tensor],
+) -> tuple[DecompositionCoefs, torch.Tensor]:
+    """Retrieve basis coef from inverison of laplacian field values.
+
+    Args:
+        basis (GaussianExpBasis): BAsis, must be or order 1.
+        ys (torch.Tensor): Targets.
+        ts (torch.Tensor): Times to evaluate at.
+        space_xy (tuple[torch.Tensor, torch.Tensor]): Space to evaluate on.
+
+    Raises:
+        ValueError: If the basis is not of order 1.
+
+    Returns:
+        tuple[DecompositionCoefs, torch.Tensor]: Coefs, residual.
+    """
+    if basis.type != GaussianExpBasis.type:
+        msg = "Inversion is only possible for Gaussian-exps bases."
+        raise ValueError(msg)
+
+    if basis.order != 1:
+        msg = "Inversion is only possible for order 1 bases."
+        raise ValueError(msg)
+    S = basis.retrieve_space_supports(*space_xy)[0]
+    T = basis.localize(*space_xy).retrieve_supports(ts)[0]
+
+    Z: torch.Tensor = (
+        torch.linalg.pinv(T)
+        @ ys.flatten(-2, -1)
+        @ torch.linalg.pinv((S.dx2 + S.dy2).flatten(-2, -1))
+    )
+
+    ys_ = (T @ Z @ (S.dx2 + S.dy2).flatten(-2, -1)).reshape(ys.shape)
+    res = (ys_ - ys).norm() / ys.norm()
+    return DecompositionCoefs.from_dict({0: Z}), res
