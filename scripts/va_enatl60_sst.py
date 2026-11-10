@@ -215,11 +215,10 @@ if __name__ == "__main__":
         dx=args.dx,
         dy=args.dy,
     )
-    xs, ys = lonlat_to_xy(lons, lats)
+    xs, ys, lons0, lat0 = lonlat_to_xy(lons, lats)
 
     ### Compute β-plane parameters
 
-    lat0 = (lats.max() + lats.min()) / 2
     beta_plane = BetaPlane(
         f0=2 * EARTH_ANGULAR_ROTATION * np.sin(lat0),
         beta=2 * EARTH_ANGULAR_ROTATION * np.cos(lat0) / EARTH_RADIUS,
@@ -232,10 +231,9 @@ if __name__ == "__main__":
     sst_regridder = build_regridder(ds, interpolate(lons), interpolate(lats))
 
     ## Areas
-    xx = torch.tensor(xs.round(), **specs)
     space_2d = SpaceDiscretization2D.from_psi_grid(
         Grid2D(
-            x=xx - xx[0, :],
+            x=torch.tensor(xs.round(), **specs),
             y=torch.tensor(ys.round(), **specs),
         )
     )
