@@ -334,7 +334,9 @@ def set_rowtitles(
     return row_titles
 
 
-def clamp_ylims(bottom: float, top: float, ax: Axes | np.ndarray) -> None:
+def clamp_ylims(
+    bottom: float, top: float, ax: Axes | np.ndarray = None
+) -> None:
     """Clamp y lims.
 
     Args:
@@ -342,6 +344,7 @@ def clamp_ylims(bottom: float, top: float, ax: Axes | np.ndarray) -> None:
         top (float): Top value.
         ax (Axes | np.ndarray): Axes or array of axes.
     """
+    ax = plt.gca() if ax is None else ax
     if isinstance(ax, np.ndarray):
         for a in ax.flatten():
             clamp_ylims(bottom, top, a)
@@ -359,7 +362,7 @@ def clamp_ylims(bottom: float, top: float, ax: Axes | np.ndarray) -> None:
     ax.set_ylim(y0 - pad, y1 + pad)
 
 
-def set_ylims(bottom: float, top: float, ax: Axes | np.ndarray) -> None:
+def set_ylims(bottom: float, top: float, ax: Axes | np.ndarray = None) -> None:
     """Set y lims.
 
     Args:
@@ -367,6 +370,7 @@ def set_ylims(bottom: float, top: float, ax: Axes | np.ndarray) -> None:
         top (float): Top value.
         ax (Axes | np.ndarray): Axes or array of axes.
     """
+    ax = plt.gca() if ax is None else ax
     if isinstance(ax, np.ndarray):
         for a in ax.flatten():
             clamp_ylims(bottom, top, a)
