@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
     """Basis using VarDyn's basis specs."""
 
-    type = "basis-vd"
+    type = "wavelets-vd"
     _n_theta = 10
 
     @property
@@ -220,61 +220,71 @@ class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
 
     def _build_space(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
         supports = self._retrieve_space_supports(xx, yy)
 
         fields = {}
 
         for lvl, s in supports.items():
-            fields[lvl] = torch.sparse.mm(s.field, self._coefs[lvl].T)
+            fields[lvl] = (s.field, self._coefs[lvl])
 
         return fields, {lvl: s.layout for lvl, s in supports.items()}
 
     def _build_space_dx(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
         supports = self._retrieve_space_supports(xx, yy)
 
         fields = {}
 
         for lvl, s in supports.items():
-            fields[lvl] = torch.sparse.mm(s.dx, self._coefs[lvl].T)
+            fields[lvl] = (s.dx, self._coefs[lvl])
 
         return fields, {lvl: s.layout for lvl, s in supports.items()}
 
     def _build_space_dy(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
         supports = self._retrieve_space_supports(xx, yy)
 
         fields = {}
 
         for lvl, s in supports.items():
-            fields[lvl] = torch.sparse.mm(s.dy, self._coefs[lvl].T)
+            fields[lvl] = (s.dy, self._coefs[lvl])
 
         return fields, {lvl: s.layout for lvl, s in supports.items()}
 
     def _build_space_dx2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
         supports = self._retrieve_space_supports(xx, yy)
 
         fields = {}
 
         for lvl, s in supports.items():
-            fields[lvl] = torch.sparse.mm(s.dx2, self._coefs[lvl].T)
+            fields[lvl] = (s.dx2, self._coefs[lvl])
 
         return fields, {lvl: s.layout for lvl, s in supports.items()}
 
     def _build_space_dy2(
         self, xx: torch.Tensor, yy: torch.Tensor
-    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
         supports = self._retrieve_space_supports(xx, yy)
 
         fields = {}
 
         for lvl, s in supports.items():
-            fields[lvl] = torch.sparse.mm(s.dy2, self._coefs[lvl].T)
+            fields[lvl] = (s.dy2, self._coefs[lvl])
 
         return fields, {lvl: s.layout for lvl, s in supports.items()}
 
@@ -330,6 +340,7 @@ class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
                 "lons0": self.lons0,
                 "lat0": self.lat0,
             },
+            "n_theta": self.n_theta,
         }
 
     @classmethod
@@ -342,11 +353,14 @@ class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
         Returns:
             Self: Instance of class.
         """
-        return cls(
+        n_theta = params["n_theta"]
+        basis = cls(
             space_params=params["space"],
             time_params=params["time"],
             **params["kwargs"],
         )
+        basis.n_theta = n_theta
+        return basis
 
 
 class MIOSTBasis(

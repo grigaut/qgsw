@@ -34,7 +34,7 @@ class VDTimeSupport(TimeSupportFunction):
     def __init__(
         self,
         time_params: dict[int, dict],
-        space_fields: dict[int, torch.Tensor],
+        space_fields: dict[int, tuple[torch.Tensor, torch.Tensor]],
         layouts: dict[int, SupportLayout],
         space_shape: tuple[int, ...] = (-1,),
     ) -> None:
@@ -52,7 +52,7 @@ class VDTimeSupport(TimeSupportFunction):
         self.shape = space_shape
         self._cache = {}
         for lvl, p in time_params.items():
-            ref = space_fields[lvl]
+            ref = space_fields[lvl][1]
             spec = {"dtype": ref.dtype, "device": ref.device}
             centers = torch.as_tensor(p["centers"], **spec)
             nan = torch.isnan(centers)
@@ -93,13 +93,25 @@ class VDTimeSupport(TimeSupportFunction):
         """Retrieve dt supports."""
         return {lvl: self.retrieve_dt_support(lvl, t) for lvl in self.params}
 
-    def _contract(self, lvl: int, w: torch.Tensor) -> torch.Tensor:
-        """Sum over (e, p) then scatter on grid points: (*t.shape, nphys)."""
+    def _contract(self, lvl: int, Ft: torch.Tensor) -> torch.Tensor:
+        """Ft : (T, NP, Ne) -> (T, nphys)."""
         d = self._cache[lvl]
-        Y = self._space[lvl]  # (nsupp, Nt)
-        contrib = torch.einsum("...se,se->...s", w[..., d["ip"], :], Y)
-        out = contrib.new_zeros(*contrib.shape[:-1], d["nphys"])
-        return out.index_add(contrib.dim() - 1, d["ix"], contrib)
+        A, X = self._space[lvl]  # (S, nc), (Ne, nc)
+        *batch, NP, Ne = Ft.shape
+        Xv = X.reshape(Ne, NP, -1)  # (Ne, NP, 2*ntheta)
+
+        # somme sur e, avec Ft propre à chaque p
+        coef = torch.einsum(
+            "...pe,epk->...pk", Ft, Xv
+        )  # (*batch, NP, 2*ntheta)
+        coef = coef.reshape(
+            -1, NP * Xv.shape[-1]
+        )  # (B, nc), B = prod(batch), 1 si batch = []
+
+        contrib = torch.sparse.mm(A, coef.T).T  # (B, S)
+        out = contrib.new_zeros(contrib.shape[0], d["nphys"])
+        out = out.index_add(1, d["ix"], contrib)  # (B, nphys)
+        return out.reshape(*batch, d["nphys"])
 
     def decompose(self, t: torch.Tensor) -> dict[int, torch.Tensor]:
         """Decompose time fields over scales.
@@ -112,7 +124,8 @@ class VDTimeSupport(TimeSupportFunction):
         """
         return {
             lvl: self._contract(lvl, self.retrieve_support(lvl, t)).reshape(
-                (-1, *self.shape)
+                *t.shape,
+                *self.shape,  # self.shape = (nx, ny)
             )
             for lvl in self.params
         }
@@ -128,7 +141,8 @@ class VDTimeSupport(TimeSupportFunction):
         """
         return {
             lvl: self._contract(lvl, self.retrieve_dt_support(lvl, t)).reshape(
-                (-1, *self.shape)
+                *t.shape,
+                *self.shape,  # self.shape = (nx, ny)
             )
             for lvl in self.params
         }
