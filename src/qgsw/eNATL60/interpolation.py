@@ -118,17 +118,17 @@ def lonlat_to_xy(
     """Convert regular longitude/latitude to cartesian x and ys.
 
     Args:
-        lons (np.ndarray | torch.Tensor): Longitudes.
-        lats (np.ndarray | torch.Tensor): Latitudes.
+        lons (np.ndarray | torch.Tensor): Longitudes (rad).
+        lats (np.ndarray | torch.Tensor): Latitudes (rad).
 
     Returns:
         tuple[np.ndarray, np.ndarray, float, np.ndarray] | tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: X,Y, reference longitudes, reference latitude.
     """  # noqa: E501
     lat0 = retrieve_lat0(lats)
-    lons0 = lons[0, :1]
+    lons0 = lons[:1, :]
     ys = EARTH_RADIUS * (lats - lat0)
     cos = torch.cos if isinstance(lats, torch.Tensor) else np.cos
-    xs = EARTH_RADIUS * lons * cos(lats)
+    xs = EARTH_RADIUS * (lons - lons0) * cos(lats)
 
     return xs, ys, lons0, lat0
 
