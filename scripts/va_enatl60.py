@@ -489,8 +489,8 @@ if __name__ == "__main__":
         bases, Qs = setup_basis(
             bases_parsers,
             (
-                interpolate(crop(np.rad2deg(lons), b)),
-                interpolate(crop(np.rad2deg(lats), b)),
+                interpolate(crop(np.rad2deg(lons), 1)),
+                interpolate(crop(np.rad2deg(lats), 1)),
             ),
             space_interior,
             dt,
