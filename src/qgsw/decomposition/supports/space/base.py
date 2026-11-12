@@ -9,6 +9,10 @@ import torch
 class SpaceSupportFunction(ABC):
     """Support for space functions."""
 
+    def __getitem__(self, key: int | slice) -> torch.Tensor:
+        """__getitem__ implementation."""
+        return self.field.__getitem__(key)
+
     @cached_property
     def field(self) -> torch.Tensor:
         """Field."""
@@ -106,4 +110,48 @@ class SpaceSupportFunction(ABC):
 
     def _compute_dxdy2(self) -> torch.Tensor:
         msg = "This space support does not implement xyy-derivative."
+        raise NotImplementedError(msg)
+
+
+class SpaceSupportFunction1D(ABC):
+    """Support for space functions."""
+
+    def __getitem__(self, key: int | slice) -> torch.Tensor:
+        """__getitem__ implementation."""
+        return self.field.__getitem__(key)
+
+    @cached_property
+    def field(self) -> torch.Tensor:
+        """Field."""
+        return self._compute()
+
+    @cached_property
+    def dx(self) -> torch.Tensor:
+        """X-derivative."""
+        return self._compute_dx()
+
+    @cached_property
+    def dx2(self) -> torch.Tensor:
+        """Second X-derivative."""
+        return self._compute_dx2()
+
+    @cached_property
+    def dx3(self) -> torch.Tensor:
+        """Third X-derivative."""
+        return self._compute_dx3()
+
+    @abstractmethod
+    def _compute(self) -> torch.Tensor:
+        """Method to compute field."""
+
+    def _compute_dx(self) -> torch.Tensor:
+        msg = "This space support does not implement x-derivative."
+        raise NotImplementedError(msg)
+
+    def _compute_dx2(self) -> torch.Tensor:
+        msg = "This space support does not implement xx-derivative."
+        raise NotImplementedError(msg)
+
+    def _compute_dx3(self) -> torch.Tensor:
+        msg = "This space support does not implement xxx-derivative."
         raise NotImplementedError(msg)
