@@ -135,21 +135,64 @@ class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
         """
         self._coefs = coefs
 
-    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> VDTimeSupport:
-        """Localize wavelets.
-
-        Args:
-            xx (torch.Tensor): X locations.
-            yy (torch.Tensor): Y locations.
-
-        Returns:
-            TimeSupport: Time support function.
-        """
+    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> VDTimeSupport:  # noqa: D102
         space_fields, layouts = self._build_space(xx=xx, yy=yy)
 
         return self.generate_time_support(
             self._time, space_fields, layouts=layouts, shape=xx.shape
         )
+
+    localize.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize.__doc__
+
+    def localize_dx(self, xx: torch.Tensor, yy: torch.Tensor) -> VDTimeSupport:  # noqa: D102
+        space_fields, layouts = self._build_space_dx(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dx.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dx.__doc__
+
+    def localize_dy(self, xx: torch.Tensor, yy: torch.Tensor) -> VDTimeSupport:  # noqa: D102
+        space_fields, layouts = self._build_space_dy(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dy.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dy.__doc__
+
+    def localize_dx2(  # noqa: D102
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> VDTimeSupport:
+        space_fields, layouts = self._build_space_dx2(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dx2.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dx2.__doc__
+
+    def localize_dy2(  # noqa: D102
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> VDTimeSupport:
+        space_fields, layouts = self._build_space_dy2(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dy2.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dy2.__doc__
 
     def _retrieve_space_supports(
         self, xx: torch.Tensor, yy: torch.Tensor
@@ -187,12 +230,60 @@ class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
 
         return fields, {lvl: s.layout for lvl, s in supports.items()}
 
+    def _build_space_dx(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = torch.sparse.mm(s.dx, self._coefs[lvl].T)
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def _build_space_dy(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = torch.sparse.mm(s.dy, self._coefs[lvl].T)
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def _build_space_dx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = torch.sparse.mm(s.dx2, self._coefs[lvl].T)
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def _build_space_dy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[dict[int, torch.Tensor], dict[int, SupportLayout]]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = torch.sparse.mm(s.dy2, self._coefs[lvl].T)
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
     def generate_time_support(
         self,
         time_params: dict[int, list[torch.Tensor]],
         space_fields: dict[int, torch.Tensor],
         layouts: dict[int:SupportLayout],
-        shape: tuple[int, ...] = (-1,),
+        shape: tuple[int, ...],
     ) -> VDTimeSupport:
         """Generate time support.
 
