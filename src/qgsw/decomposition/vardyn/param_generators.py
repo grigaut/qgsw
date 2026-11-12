@@ -6,6 +6,7 @@ import numpy as np
 import torch
 
 from qgsw.decomposition.vardyn.basis import Basis_miost
+from qgsw.eNATL60.interpolation import lonlat_to_xy
 from qgsw.specs import defaults
 
 
@@ -13,8 +14,6 @@ def vardyn_like_params(
     config: dict,
     lons: np.ndarray,
     lats: np.ndarray,
-    xx: torch.Tensor,
-    yy: torch.Tensor,
     dt: float,
     n_steps: int,
     *,
@@ -43,9 +42,7 @@ def vardyn_like_params(
         tuple[ dict[int, torch.Tensor], dict[int, list[torch.Tensor]], dict[str, Any], dict[int, torch.Tensor], ]: Space_params, time_params, keywords args and correlation matrix.
     """  # noqa: E501
     specs = defaults.get(dtype=dtype, device=device)
-    assert xx.shape == yy.shape
-    assert xx.shape == lons.shape
-    assert yy.shape == lats.shape
+
     basis_ref = Basis_miost(
         config,
         lons,
@@ -66,24 +63,37 @@ def vardyn_like_params(
         k: torch.from_numpy(q[bounds[k] : bounds[k + 1]]).to(**specs)
         for k in range(basis_ref.nf)
     }
+    _, _, lons0, lat0 = lonlat_to_xy(
+        torch.tensor(np.deg2rad(lons), **specs),
+        torch.tensor(np.deg2rad(lats), **specs),
+    )
     return (
-        dict(enumerate(basis_ref.Gx)),
         {
-            k: [
-                torch.from_numpy(basis_ref.Gt[t][k]).to(**specs)
-                for t in basis_ref.Gt
-            ]
-            for k in range(basis_ref.nf)
+            lvl: {
+                "centers": [
+                    (
+                        np.deg2rad(basis_ref.ENSLON[lvl][i]),
+                        np.deg2rad(basis_ref.ENSLAT[lvl][i]),
+                    )
+                    for i in range(basis_ref.ENSLON[lvl].shape[0])
+                ],
+                "k": basis_ref.k[lvl] / 1000,  # rad.m⁻¹
+                "Lx": basis_ref.DX[lvl] * 1000,  # m
+            }
+            for lvl in range(basis_ref.nf)
         },
         {
-            "xx": xx,
-            "yy": yy,
-            "dt": dt,
-            "Nt": {
-                k: [basis_ref.Nt[t][k] for t in basis_ref.Nt]
-                for k in range(basis_ref.nf)
-            },
-            "Nx": basis_ref.Nx,
+            lvl: {
+                "centers": torch.as_tensor(basis_ref.enst[lvl], **specs)
+                * 3600
+                * 24,
+                "tdec": torch.as_tensor(basis_ref.tdec[lvl], **specs)
+                * 3600
+                * 24,
+                "norm": torch.as_tensor(basis_ref.norm_fact[lvl], **specs),
+            }
+            for lvl in range(basis_ref.nf)
         },
+        {"lons0": lons0, "lat0": lat0, "n_theta": basis_ref.ntheta},
         Q,
     )
