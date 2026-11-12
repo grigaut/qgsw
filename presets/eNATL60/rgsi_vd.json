@@ -1,0 +1,34 @@
+{
+    "model_type":"RGSI",
+    "prefix": "eNATL60",
+    "cycles": 4,
+    "separation":0,
+
+    "obs_track":true,
+
+    "dt": 7200,
+    "dx":10000,
+    "dy":10000,
+
+    "optim":10,
+    "optimizer":"lbfgs",
+
+    "sigma_bc":14,
+    "sigma_ic":14,
+
+    "basis_dyn": "wavelets-vd",
+    "basis_dyn_lr":1e5,
+    "basis_dyn_bkg_reg":false,
+    "basis_dyn_no_optim":false,
+
+    "alpha_no_optim":false,
+    "alpha_lr":1e-2,
+
+    "dyn_reg_qg":true,
+    "gamma_dyn_qg":1e-3,
+
+    "no_reg":false,
+    "no_wind":true,
+
+    "wind_no_optim":true
+}

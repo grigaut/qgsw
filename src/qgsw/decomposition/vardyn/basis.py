@@ -236,7 +236,7 @@ class Basis_miost:
 
         for iff in range(nf):
             logger.info(
-                f"[Wavelet order {iff + 1}] {1 / ff[iff]:.0f} km, spacing: {DXG[iff]}"
+                f"[Wavelet order {iff + 1}] {1 / ff[iff]:.0f} km, spacing: {DXG[iff]:.0f}"
             )
 
             ENSLON[iff] = []

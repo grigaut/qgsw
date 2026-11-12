@@ -188,7 +188,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             msg = (
                 f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
                 f" [{step(self.epoch + 1, self.max_epoch)} |"
-                f" {self.eval + 1} ]"
+                f" {str(self.eval + 1).zfill(len(str(self.max_eval)))} ]"
                 f" Loss: {tot_:>#10.5g}"
                 f" ({best:>#10.5g})"
             )

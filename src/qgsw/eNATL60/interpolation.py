@@ -1,6 +1,9 @@
 """Data interpolation tools."""
 
+from typing import overload
+
 import numpy as np
+import torch
 import xarray as xr
 import xesmf as xe
 
@@ -73,25 +76,96 @@ def compute_lonlat_from_regular_xy_grid(
     return lons_, np.tile(lats_.reshape(1, -1), (int(nlon) + 1, 1))
 
 
-def lonlat_to_xy(
-    lons: np.ndarray, lats: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    """Convert lon/lat grid to xy grid.
+@overload
+def retrieve_lat0(
+    lats: np.ndarray,
+) -> np.ndarray: ...
+@overload
+def retrieve_lat0(
+    lats: torch.Tensor,
+) -> torch.Tensor: ...
+
+
+def retrieve_lat0(
+    lats: np.ndarray | torch.Tensor,
+) -> np.ndarray | torch.Tensor:
+    """Retrieve reference latitude.
 
     Args:
-        lons (np.ndarray): Longitudes.
-        lats (np.ndarray): Latitudes.
+        lats (np.ndarray | torch.Tensor): Latitudes.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: Xs, Ys
+        np.ndarray | torch.Tensor: Reference latitude.
     """
-    lat0 = (lats.max() + lats.min()) / 2
+    return (lats.max() + lats.min()) / 2
 
+
+@overload
+def lonlat_to_xy(
+    lons: np.ndarray, lats: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]: ...
+@overload
+def lonlat_to_xy(
+    lons: torch.Tensor, lats: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: ...
+def lonlat_to_xy(
+    lons: np.ndarray | torch.Tensor,
+    lats: np.ndarray | torch.Tensor,
+) -> (
+    tuple[np.ndarray, np.ndarray]
+    | tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+):
+    """Convert regular longitude/latitude to cartesian x and ys.
+
+    Args:
+        lons (np.ndarray | torch.Tensor): Longitudes (rad).
+        lats (np.ndarray | torch.Tensor): Latitudes (rad).
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, float, np.ndarray] | tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: X,Y, reference longitudes, reference latitude.
+    """  # noqa: E501
+    lat0 = retrieve_lat0(lats)
+    lons0 = lons[:1, :]
     ys = EARTH_RADIUS * (lats - lat0)
+    cos = torch.cos if isinstance(lats, torch.Tensor) else np.cos
+    xs = EARTH_RADIUS * (lons - lons0) * cos(lats)
 
-    xs = EARTH_RADIUS * lons * np.cos(lats)
+    return xs, ys, lons0, lat0
 
-    return xs, ys
+
+@overload
+def xy_to_lonlat(
+    xs: np.ndarray, ys: np.ndarray, lons0: np.ndarray, lat0: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]: ...
+
+
+@overload
+def xy_to_lonlat(
+    xs: torch.Tensor, ys: torch.Tensor, lons0: torch.Tensor, lat0: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]: ...
+
+
+def xy_to_lonlat(
+    xs: np.ndarray | torch.Tensor,
+    ys: np.ndarray | torch.Tensor,
+    lons0: np.ndarray | torch.Tensor,
+    lat0: np.ndarray | torch.Tensor,
+) -> tuple[np.ndarray, np.ndarray] | tuple[torch.Tensor, torch.Tensor]:
+    """Convert cartesian coordinates to longitude latitudes.
+
+    Args:
+        xs (np.ndarray | torch.Tensor): X locations.
+        ys (np.ndarray | torch.Tensor): Y locations.
+        lons0 (np.ndarray | torch.Tensor): Reference longitudes.
+        lat0 (np.ndarray | torch.Tensor): Reference latitudes.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray] | tuple[torch.Tensor, torch.Tensor]: Longitudes, latitudes.
+    """  # noqa: E501
+    lats = ys / EARTH_RADIUS + lat0
+    cos = torch.cos if isinstance(lats, torch.Tensor) else np.cos
+    lons = xs / cos(lats) / EARTH_RADIUS + lons0
+    return lons, lats
 
 
 def build_regridder(

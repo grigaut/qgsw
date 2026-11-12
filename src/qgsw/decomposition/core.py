@@ -13,7 +13,7 @@ from qgsw.decomposition.supports.space.base import SpaceSupportFunction
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
 from qgsw.decomposition.taylor.core import TaylorFullFieldBasis
 from qgsw.decomposition.taylor_exp.core import TaylorExpBasis
-from qgsw.decomposition.vardyn.core import MIOSTBasis
+from qgsw.decomposition.vardyn.core import VDBasis
 from qgsw.decomposition.vardyn.param_generators import vardyn_like_params
 from qgsw.decomposition.wavelets.core import WaveletBasis
 from qgsw.decomposition.wavelets.param_generators import dyadic_decomposition
@@ -26,7 +26,7 @@ BASES: dict[str, type[Basis]] = {
     TaylorExpBasis.type: TaylorExpBasis,
     TaylorFullFieldBasis.type: TaylorFullFieldBasis,
     GaussianExpBasis.type: GaussianExpBasis,
-    MIOSTBasis.type: MIOSTBasis,
+    VDBasis.type: VDBasis,
 }
 
 
@@ -69,14 +69,16 @@ def build_basis_from_config(
     """
     basis_kwargs = {}
     match bt := config["type"]:
-        case MIOSTBasis.type:
+        case VDBasis.type:
             if lon_lat is None:
-                msg = "MIOSTBasis can not be built without lon/lat values."
+                msg = "VDBasis can not be built without lon/lat values."
                 raise ValueError(msg)
             space_params, time_params, basis_kwargs, Q = vardyn_like_params(
-                config, *lon_lat, *space.q.xy, dt, n_steps
+                config, *lon_lat, dt, n_steps
             )
-            basis = MIOSTBasis(space_params, time_params, **basis_kwargs)
+            n_theta = basis_kwargs.pop("n_theta")
+            basis = VDBasis(space_params, time_params, **basis_kwargs)
+            basis.n_theta = n_theta
         case WaveletBasis.type:
             space_params, time_params = dyadic_decomposition(
                 config,

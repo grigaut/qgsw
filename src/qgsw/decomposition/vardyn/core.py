@@ -1,19 +1,366 @@
-"""Basis MIOST connector."""
+"""Basis VarDyn connector."""
 
 from typing import Any, Self
 
 import numpy as np
 import torch
-from scipy.sparse._csc import csc_matrix
+from scipy.sparse import csc_matrix
 
 from qgsw.decomposition.base import SpaceTimeDecomposition
 from qgsw.decomposition.coefficients import DecompositionCoefs
 from qgsw.decomposition.supports.space.base import SpaceSupportFunction
+from qgsw.decomposition.supports.space.vd import SupportLayout, VDSpaceSupport
 from qgsw.decomposition.supports.time.base import TimeSupportFunction
+from qgsw.decomposition.supports.time.vd import VDTimeSupport
+from qgsw.eNATL60.interpolation import xy_to_lonlat
 from qgsw.logging.core import getLogger
 from qgsw.specs import defaults
 
 logger = getLogger(__name__)
+
+
+class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
+    """Basis using VarDyn's basis specs."""
+
+    type = "wavelets-vd"
+    _n_theta = 10
+
+    @property
+    def n_theta(self) -> int:
+        """Number of orientations to consider."""
+        return self._n_theta
+
+    @n_theta.setter
+    def n_theta(self, n_theta: int) -> None:
+        self._n_theta = n_theta
+        self._thetas = (
+            torch.linspace(0, 1, self.n_theta + 1, **self._specs)[:-1]
+            * torch.pi
+        )
+
+    def __init__(
+        self,
+        space_params: dict[int, dict[str, Any]],
+        time_params: dict[int, dict[str, Any]],
+        *,
+        lons0: torch.Tensor,
+        lat0: torch.Tensor,
+        dtype: torch.dtype | None = None,
+        device: torch.device | None = None,
+    ) -> None:
+        """Instantiate the basis.
+
+        Args:
+            space_params (dict[int, csc_matrix]): Space parameters.
+            time_params (dict[int, list[torch.Tensor]]): Time parameters.
+            lons0 (torch.tensor): Reference longitudes.
+            lat0 (torch.Tensor): Reference latitude.
+            dtype (torch.dtype | None, optional): Data type. Defaults to None.
+            device (torch.device | None, optional): Device. Defaults to None.
+        """
+        self._check_validity(space_params, time_params)
+        msg = f"Instantiating {self.__class__.__name__}."
+        logger.info(msg)
+
+        self._specs = defaults.get(dtype=dtype, device=device)
+        self._space = space_params
+        self._time = time_params
+
+        self.lons0 = lons0
+        self.lat0 = lat0
+
+    @property
+    def order(self) -> int:
+        """Basis order."""
+        return len(self._time)
+
+    def _check_validity(
+        self,
+        space_params: dict[int, Any],
+        time_params: dict[int, Any],
+    ) -> None:
+        """Check parameters validity."""
+        if space_params.keys() != time_params.keys():
+            msg = "Mismatching keys between space and time parameters."
+            raise ValueError(msg)
+
+    def convert_to_lonlat(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Convert cartesian coordinates to longitude / latitudes.
+
+        WARNING: the lons0 tensor must be centered on the same points as xx.
+
+        Args:
+            xx (torch.Tensor): X coordinates.
+            yy (torch.Tensor): Y coordinates.
+
+        Raises:
+            ValueError: If there not enough values in lons0
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Longitudes, latitudes._
+        """
+        nx = xx.shape[1]
+        nlons0 = self.lons0.shape[1]
+
+        if nlons0 < nx:
+            msg = (
+                f"Not enough reference longitudes ({nlons0})"
+                f" to convert cartesian coordinates ({nx} points)."
+            )
+            raise ValueError(msg)
+        if (nlons0 - nx) % 2 == 1:
+            lons0 = (self.lons0[:, 1:] + self.lons0[:, :-1]) / 2
+        else:
+            lons0 = self.lons0
+
+        b = (nlons0 - nx) // 2
+        if b != 0:
+            lons0 = lons0[:, b:-b]
+
+        return xy_to_lonlat(xx, yy, lons0, self.lat0)
+
+    def set_coefs(self, coefs: DecompositionCoefs) -> None:
+        """Set coefficients values.
+
+        To ensure consistent coefficients shapes, best is to use
+        self.generate_random_coefs().
+
+        Args:
+            coefs (DecompositionCoefs): Level -> coefficients.
+                ├── 0: coefficents for level 0.
+                ├── ...
+                └── order-1: coefficient for level order-1
+        """
+        self._coefs = coefs
+
+    def localize(self, xx: torch.Tensor, yy: torch.Tensor) -> VDTimeSupport:  # noqa: D102
+        space_fields, layouts = self._build_space(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize.__doc__
+
+    def localize_dx(self, xx: torch.Tensor, yy: torch.Tensor) -> VDTimeSupport:  # noqa: D102
+        space_fields, layouts = self._build_space_dx(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dx.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dx.__doc__
+
+    def localize_dy(self, xx: torch.Tensor, yy: torch.Tensor) -> VDTimeSupport:  # noqa: D102
+        space_fields, layouts = self._build_space_dy(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dy.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dy.__doc__
+
+    def localize_dx2(  # noqa: D102
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> VDTimeSupport:
+        space_fields, layouts = self._build_space_dx2(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dx2.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dx2.__doc__
+
+    def localize_dy2(  # noqa: D102
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> VDTimeSupport:
+        space_fields, layouts = self._build_space_dy2(xx=xx, yy=yy)
+
+        return self.generate_time_support(
+            self._time, space_fields, layouts=layouts, shape=xx.shape
+        )
+
+    localize_dy2.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_dy2.__doc__
+
+    def _retrieve_space_supports(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> dict[int, VDSpaceSupport]:
+
+        lons, lats = self.convert_to_lonlat(xx, yy)
+
+        space_fields = {}
+
+        for lvl, params in self._space.items():
+            centers = params["centers"]
+            lonsc = torch.tensor([c[0] for c in centers], **self._specs)
+            latsc = torch.tensor([c[1] for c in centers], **self._specs)
+
+            k = params["k"]
+            Lx = params["Lx"]
+
+            space = VDSpaceSupport(
+                lons, lats, lonsc, latsc, k, Lx, self._thetas
+            )
+
+            space_fields[lvl] = space
+
+        return space_fields
+
+    def _build_space(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = (s.field, self._coefs[lvl])
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def _build_space_dx(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = (s.dx, self._coefs[lvl])
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def _build_space_dy(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = (s.dy, self._coefs[lvl])
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def _build_space_dx2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = (s.dx2, self._coefs[lvl])
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def _build_space_dy2(
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> tuple[
+        dict[int, tuple[torch.Tensor, torch.Tensor]], dict[int, SupportLayout]
+    ]:
+        supports = self._retrieve_space_supports(xx, yy)
+
+        fields = {}
+
+        for lvl, s in supports.items():
+            fields[lvl] = (s.dy2, self._coefs[lvl])
+
+        return fields, {lvl: s.layout for lvl, s in supports.items()}
+
+    def generate_time_support(
+        self,
+        time_params: dict[int, list[torch.Tensor]],
+        space_fields: dict[int, torch.Tensor],
+        layouts: dict[int:SupportLayout],
+        shape: tuple[int, ...],
+    ) -> VDTimeSupport:
+        """Generate time support.
+
+        Args:
+            time_params (dict[int, list[torch.Tensor]]): Time params.
+            space_fields (dict[int, torch.Tensor]): Space fields.
+            layouts (dict[int, SupportLayout]): Layouts.
+            shape (tuple[int, ...]): Output shape (nx, ny).
+
+        Returns:
+            VDTimeSupport: Time support function.
+        """
+        return VDTimeSupport(
+            time_params,
+            space_fields,
+            layouts,
+            shape,
+        )
+
+    def shapes(self) -> dict[int, torch.Size]:  # noqa: D102
+        return {
+            k: (
+                len(self._time[k]["centers"][0]),
+                2 * self.n_theta * len(self._space[k]["centers"]),
+            )
+            for k in self._space
+        }
+
+    shapes.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].shapes.__doc__
+
+    def get_params(self) -> dict[str, Any]:
+        """Return decomposition params as dict.
+
+        Returns:
+            dict[str, Any]: Decomposition params.
+        """
+        return {
+            "type": self.type,
+            "space": self._space,
+            "time": self._time,
+            "kwargs": {
+                "lons0": self.lons0,
+                "lat0": self.lat0,
+            },
+            "n_theta": self.n_theta,
+        }
+
+    @classmethod
+    def from_params(cls, params: dict[str, Any]) -> Self:
+        """Build class from params dict.
+
+        Args:
+            params (dict[str, Any]): Decomposition params.
+
+        Returns:
+            Self: Instance of class.
+        """
+        n_theta = params["n_theta"]
+        basis = cls(
+            space_params=params["space"],
+            time_params=params["time"],
+            **params["kwargs"],
+        )
+        basis.n_theta = n_theta
+        return basis
 
 
 class MIOSTBasis(
