@@ -8,7 +8,7 @@ import torch
 from qgsw.cli import OptimBasisParser
 from qgsw.decomposition.config import BASIS_CONFIGS
 from qgsw.decomposition.core import Basis, build_basis_from_config
-from qgsw.decomposition.vardyn.core import MIOSTBasis
+from qgsw.decomposition.vardyn.core import MIOSTBasis, VDBasis
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -99,7 +99,7 @@ def setup_basis(
     for k, b in basis_type.items():
         v = b.type
         basis_config = BASIS_CONFIGS[v]
-        if v == MIOSTBasis.type:
+        if v in [MIOSTBasis.type, VDBasis.type]:
             basis_config["file_aux"] = file_aux
             basis_config["filec_aux"] = filec_aux
         basis, Q = build_basis_from_config(
