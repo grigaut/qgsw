@@ -18,9 +18,9 @@ cd $SRCDIR
 
 date
 
-echo Running: \".venv/bin/python3 -u scripts/va_enatl60.py $@\"
+echo Running: \".venv/bin/python3 -u scripts/fitting/va_enatl60.py $@\"
 
-LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/va_enatl60.py $@
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/fitting/va_enatl60.py $@
 
 date
 

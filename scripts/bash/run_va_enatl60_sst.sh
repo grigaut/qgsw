@@ -6,7 +6,7 @@
 #OAR -E logs/OAR.%jobid%.stderr
 #OAR --notify mail:gaetan.rigaut@inria.fr
 
-# To run with arguments use quotes: oarsub -S "./run_va_psi2.sh --config=config/variational_analysis.toml -vv"
+# To run with arguments use quotes: oarsub -S "./run_va_enatl60.sh --config=config/enatl60.toml -vv --presets=presets/eNATL60/rgsi.json"
 
 lscpu | grep 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1'
 
@@ -18,9 +18,9 @@ cd $SRCDIR
 
 date
 
-echo Running: \".venv/bin/python3 -u scripts/variational_analysis_enatl60_sst_adv_hr.py $@\"
+echo Running: \".venv/bin/python3 -u scripts/fitting/va_enatl60_sst.py $@\"
 
-LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/variational_analysis_enatl60_sst_adv_hr.py $@
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/fitting/va_enatl60_sst.py $@
 
 date
 
