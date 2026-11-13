@@ -18,9 +18,14 @@ cd $SRCDIR
 
 date
 
-echo Running: \".venv/bin/python3 -u scripts/fitting/fit_qg3l.py $@\"
+echo Running: \".venv/bin/python3 -u scripts/python/fitting/fit_qg3l.py --run-id=$OAR_JOB_ID $@\"
 
-LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/fitting/fit_qg3l.py $@
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/fitting/fit_qg3l.py --run-id=$OAR_JOB_ID $@
+
+echo Running validation script
+
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/validation/validate_qg3l.py --run-id=$OAR_JOB_ID
+
 
 date
 
