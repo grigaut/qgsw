@@ -95,7 +95,7 @@ def build_basis_from_config(
                     / space.dx
                     / space.dy
                 )
-                ** (exp_cov)
+                ** ((exp_cov) / 2)
                 for k, s in basis.shapes().items()
             }
 
@@ -112,7 +112,7 @@ def build_basis_from_config(
                     / space.dx
                     / space.dy
                 )
-                ** (exp_cov)
+                ** ((exp_cov) / 2)
                 for k, s in basis.shapes().items()
             }
 
