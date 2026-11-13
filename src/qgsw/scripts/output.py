@@ -1,6 +1,7 @@
 """Tools for outputs."""
 
 import json
+import shutil
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ import pytz
 import torch
 
 from qgsw.logging.core import getLogger
+from qgsw.logging.utils import box
 
 logger = getLogger(__name__)
 
@@ -135,10 +137,44 @@ class OutputFolder(NamedTuple):
     """Output folder."""
 
     folder: Path
+    config: Path
     params: OutputFile
     results: OutputFile
     basis: OutputFile
     optim: OutputFile
+    scores: OutputFile
+
+    @property
+    def dry_run(self) -> bool:
+        """Whether to perform dry run or not."""
+        return (
+            self.params.dry_run
+            and self.results.dry_run
+            and self.basis.dry_run
+            and self.optim.dry_run
+            and self.scores.dry_run
+        )
+
+    def get_repr_parts(self) -> list[str]:
+        """Get representation parts."""
+        return (
+            [f"Folder : {self.folder}"]
+            + [
+                f"\t├── {s.capitalize()}: {getattr(self, s).file}"
+                for s in [
+                    "params",
+                    "results",
+                    "basis",
+                    "optim",
+                    "scores",
+                ]
+            ]
+            + [f"\t└── Config: {self.config}"]
+        )
+
+    def __repr__(self) -> str:
+        """String representation."""
+        return "\n".join(self.get_repr_parts())
 
     def files_exist(self) -> bool:
         """Check that all file exist."""
@@ -146,15 +182,24 @@ class OutputFolder(NamedTuple):
         rexists = self.results.file.exists()
         bexists = self.basis.file.exists()
         oexists = self.optim.file.exists()
-        return pexists and rexists and bexists and oexists
+        sexists = self.scores.file.exists()
+        return pexists and rexists and bexists and oexists and sexists
+
+    def copy_config(self, config_path: Path) -> None:
+        """Copy config file."""
+        if self.dry_run:
+            return
+        shutil.copy2(config_path, self.config)
 
 
 def build_output_folder(
     output_folder: Path | str,
+    config: str = "config",
     params: str = "params",
     results: str = "results",
     basis: str = "basis",
     optim: str = "optim",
+    scores: str = "scores",
     *,
     dry_run: bool = False,
 ) -> OutputFolder:
@@ -162,11 +207,13 @@ def build_output_folder(
 
     Args:
         output_folder (Path|str): Path to output folder
+        config (str): Name of the config file. Defaults to "config".
         params (str, optional): Name of the params file. Defaults to "params".
         results (str, optional): Name of the results file.
             Defaults to "results".
         basis (str, optional): Name of the basis file. Defaults to "basis".
         optim (str, optional): Name of the optim file. Defaults to "optim".
+        scores (str, optional): Name of the scores file. Defaults to "scores".
         dry_run (bool, optional): NOthing will be saved if True.
                 Defaults to False.
 
@@ -176,15 +223,92 @@ def build_output_folder(
     output_folder = Path(output_folder)
     if not output_folder.exists() and not dry_run:
         msg = "The output folder does not exist."
-        raise ValueError(msg)
+        raise FileNotFoundError(msg)
+    configf = output_folder / f"{config}.toml"
     paramsf = OutputFile(output_folder / f"{params}.json", dry_run=dry_run)
     resultsf = OutputFile(output_folder / f"{results}.pt", dry_run=dry_run)
     basisf = OutputFile(output_folder / f"{basis}.pt", dry_run=dry_run)
     optimf = OutputFile(output_folder / f"{optim}.json", dry_run=dry_run)
+    scoresf = OutputFile(output_folder / f"{scores}.pt", dry_run=dry_run)
     return OutputFolder(
         folder=output_folder,
+        config=configf,
         params=paramsf,
         results=resultsf,
         basis=basisf,
         optim=optimf,
+        scores=scoresf,
     )
+
+
+def get_tracking_filename(run_id: str) -> Path:
+    """Get filename for tracking file.
+
+    Args:
+        run_id (str): Run ID.
+
+    Returns:
+        Path: Tracking filename.
+    """
+    tracking_folder = Path.cwd() / "tracking"
+    if not tracking_folder.is_dir():
+        tracking_folder.mkdir(parents=True)
+        gitignore = tracking_folder.joinpath(".gitignore")
+        with gitignore.open("w") as file:
+            file.write("*")
+    return tracking_folder / f"track_{run_id}.json"
+
+
+def track_output(output: OutputFolder, run_id: str | None) -> Path | None:
+    """Output tracking file.
+
+    Args:
+        output (OutputFolder): Output folder.
+        run_id (str | None): Run ID.
+
+    Returns:
+        Path | None: Path of tracking file.
+    """
+    if run_id is None:
+        return None
+    output_folder = output.folder.absolute()
+    track_file = get_tracking_filename(run_id)
+    msg = f"Output folder tracked through {track_file}"
+    if output.dry_run:
+        msg = "[dry-run] " + msg
+    logger.info(msg)
+    if output.dry_run:
+        return None
+    with track_file.open("w") as f:
+        json.dump(
+            {"folder": output_folder}, f, default=default_serializer, indent=4
+        )
+    return track_file
+
+
+def retrieve_output_folder(
+    output_folder: Path | None, run_id: str | None = None
+) -> OutputFolder:
+    """Retrieve output folder.
+
+    Args:
+        output_folder (Path | None): Output folder.
+        run_id (str | None, optional): Run ID. Defaults to None.
+
+    Raises:
+        ValueError: IF both output and run_id are None.
+
+    Returns:
+        OutputFolder: Output folder.
+    """
+    if output_folder is None and run_id is None:
+        msg = "Specify either an output folder or a run id."
+        raise ValueError(msg)
+    if output_folder is None:
+        tracking_file = get_tracking_filename(run_id)
+        with tracking_file.open("r") as f:
+            output_folder = json.load(f)["folder"]
+    output = build_output_folder(output_folder)
+    msg = f"Loading outputs from {output_folder}."
+    logger.info(box(msg))
+    return output

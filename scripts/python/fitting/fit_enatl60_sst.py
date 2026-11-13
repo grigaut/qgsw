@@ -17,6 +17,7 @@ from qgsw.cli import (
     OptimParamParser,
     ScriptsArgsParser,
     parse_presets,
+    parse_run_id,
 )
 from qgsw.configs.core import Configuration
 from qgsw.decomposition.coefficients import DecompositionCoefs
@@ -70,7 +71,11 @@ from qgsw.scripts.eNATL60 import (
 )
 from qgsw.scripts.loss import mse
 from qgsw.scripts.model_interactions import get_As, get_psi_g, init_model
-from qgsw.scripts.output import build_output_folder, create_output_folder
+from qgsw.scripts.output import (
+    build_output_folder,
+    create_output_folder,
+    track_output,
+)
 from qgsw.scripts.parameterizations import kappa_to_alpha
 from qgsw.scripts.pv import build_pv_funcs
 from qgsw.scripts.setups.bases import (
@@ -104,6 +109,7 @@ if __name__ == "__main__":
     ## Config
 
     presets = parse_presets()
+    run_id = parse_run_id()
 
     args = ScriptsArgsParser.va_setup(
         prefix_default="eNATL60",
@@ -155,7 +161,7 @@ if __name__ == "__main__":
     dyn_regs["div"] = args.dyn_reg_div and (not args.no_reg)
     dyn_gammas = {"qg": args.gamma_dyn_qg, "div": args.gamma_dyn_div}
 
-    ROOT_PATH = Path(__file__).parent.parent
+    ROOT_PATH = Path(__file__).parent.parent.parent.parent
     config = Configuration.from_toml(ROOT_PATH.joinpath(args.config))
 
     output_folder = create_output_folder(
@@ -165,6 +171,8 @@ if __name__ == "__main__":
     )
 
     output = build_output_folder(output_folder, dry_run=args.dry_run)
+    output.copy_config(ROOT_PATH.joinpath(args.config))
+    tracking_file = track_output(output, run_id)
 
     # Simulation parameters
     dt = args.dt

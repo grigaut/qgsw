@@ -37,6 +37,28 @@ def parse_presets() -> dict[str, Any]:
         return json.load(f)
 
 
+def parse_run_id() -> str:
+    """Parse run ID."""
+    parser = argparse.ArgumentParser(
+        description="Retrieve run ID.",
+    )
+    parser.add_argument("--run-id", type=str, help="Run ID")
+    args, _ = parser.parse_known_args()
+    return args.run_id
+
+
+def parse_output_folder() -> Path | None:
+    """Parse output folder."""
+    parser = argparse.ArgumentParser(
+        description="Retrieve output folder.",
+    )
+    parser.add_argument("--output-folder", type=Path, help="Output folder")
+    args, _ = parser.parse_known_args()
+    if args.output_folder:
+        return Path.cwd() / args.output_folder
+    return None
+
+
 class ScriptsArgsParser:
     """Scripts arguments parser."""
 
