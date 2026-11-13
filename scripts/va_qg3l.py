@@ -388,14 +388,7 @@ if __name__ == "__main__":
             wind_parser=None,
         )
 
-        coefs_scaling_fns = retrieve_scaling_func(
-            bases_parsers,
-            model.get_type(),
-            L,
-            U,
-            psi0_mean,
-            n_steps_per_cyle * dt,
-        )
+        coefs_scaling_fns = retrieve_scaling_func(bases_parsers, Qs)
         for k, coef in coefs_params.items():
             coef.with_scaling(coefs_scaling_fns[k])
 
@@ -433,7 +426,7 @@ if __name__ == "__main__":
                 T,
                 wide=True,
             )
-            bkg_reg_fns = setup_background_regs(bases_parsers, Qs)
+            bkg_reg_fns = setup_background_regs(bases_parsers)
 
             init_model(model, psi0, psi_bcs, psi_bcs_w, build_q_rg, times, b)
 
