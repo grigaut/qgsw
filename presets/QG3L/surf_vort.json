@@ -8,12 +8,12 @@
 
     "obs_track":true,
 
-    "basis_psi": "wavelets",
-    "basis_psi_lr":1e0,
+    "basis_psi": "gaussian-exps",
+    "basis_psi_lr":1e6,
     "basis_psi_bkg_reg":false,
     "basis_psi_no_optim":false,
-    "basis_chi": "wavelets",
-    "basis_chi_lr":1e0,
+    "basis_chi": "gaussian-exps",
+    "basis_chi_lr":1e6,
     "basis_chi_bkg_reg":false,
 
     "dyn_reg_div":true,

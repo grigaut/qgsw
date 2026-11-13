@@ -17,7 +17,7 @@
     "sigma_ic":14,
 
     "basis_dyn": "wavelets-vd",
-    "basis_dyn_lr":1e5,
+    "basis_dyn_lr":1e7,
     "basis_dyn_bkg_reg":false,
     "basis_dyn_no_optim":false,
 
