@@ -194,6 +194,25 @@ class VDBasis(SpaceTimeDecomposition[VDSpaceSupport, VDTimeSupport]):
         VDSpaceSupport, VDTimeSupport
     ].localize_dy2.__doc__
 
+    def localize_laplacian(  # noqa: D102
+        self, xx: torch.Tensor, yy: torch.Tensor
+    ) -> VDTimeSupport:
+        dx2, layouts = self._build_space_dx2(xx=xx, yy=yy)
+        dy2, _ = self._build_space_dy2(xx=xx, yy=yy)
+
+        lap = {
+            lvl: (dx2[lvl][0] + dy2[lvl][0], dx2[lvl][1])
+            for lvl in range(self.order)
+        }
+
+        return self.generate_time_support(
+            self._time, lap, layouts=layouts, shape=xx.shape
+        )
+
+    localize_laplacian.__doc__ = SpaceTimeDecomposition[
+        VDSpaceSupport, VDTimeSupport
+    ].localize_laplacian.__doc__
+
     def _retrieve_space_supports(
         self, xx: torch.Tensor, yy: torch.Tensor
     ) -> dict[int, VDSpaceSupport]:
