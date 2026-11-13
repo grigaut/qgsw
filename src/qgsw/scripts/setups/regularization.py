@@ -19,7 +19,6 @@ DynRegFn = Callable[[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
 
 def setup_background_regs(
     bases_parsers: dict[str, OptimBasisParser],
-    Qs: dict[str, dict[str, torch.Tensor]],
 ) -> dict[str, Callable[[DecompositionCoefs], torch.Tensor]]:
     """Setup background regularizations.
 
@@ -34,7 +33,7 @@ def setup_background_regs(
     fns = {}
     for k, basis in bases_parsers.items():
         if basis.with_background:
-            fns[k] = background_reg(Qs[k])
+            fns[k] = background_reg()
     return fns
 
 
@@ -75,9 +74,7 @@ def setup_dynamical_regs(
     return fns
 
 
-def background_reg(
-    Q: dict[int, torch.Tensor],
-) -> Callable[[DecompositionCoefs], torch.Tensor]:
+def background_reg() -> Callable[[], torch.Tensor]:
     """Backgroung regularization.
 
     Args:
@@ -89,7 +86,7 @@ def background_reg(
 
     def compute_reg(coefs: DecompositionCoefs) -> torch.Tensor:
         return torch.concatenate(
-            [(coefs[k].square() / Q[k]).flatten() for k in coefs.keys()]  # noqa: SIM118
+            [c.square().flatten() for c in coefs.values()]
         ).sum()
 
     return compute_reg

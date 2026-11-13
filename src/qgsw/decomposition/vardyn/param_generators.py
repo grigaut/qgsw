@@ -60,7 +60,14 @@ def vardyn_like_params(
     _, q = basis_ref.set_basis(times_day, return_q=True)
     bounds = basis_ref.iff_wavebounds
     Q = {
-        k: torch.from_numpy(q[bounds[k] : bounds[k + 1]]).to(**specs)
+        k: torch.from_numpy(q[bounds[k] : bounds[k + 1]])
+        .to(**specs)
+        .reshape(
+            (
+                len(basis_ref.enst[k][0]),
+                2 * basis_ref.ntheta * len(basis_ref.ENSLAT[k]),
+            ),
+        )
         for k in range(basis_ref.nf)
     }
     _, _, lons0, lat0 = lonlat_to_xy(

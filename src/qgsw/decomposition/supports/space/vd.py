@@ -42,10 +42,10 @@ class VDSpaceSupport(SpaceSupportFunction):
         Args:
             lons (torch.Tensor): Grid longitudes coordinates (rad).
             lats (torch.Tensor): Grid latitudes coordinates (rad).
-            lons_centers (torch.Tensor): Wavelet latitudes centers (rad).
-            lats_centers (torch.Tensor): Wavelet longitudes centers (rad).
-            k (torch.Tensor): Wavenumber (rad/km).
-            Lx (float): Horizontal scale (km).
+            lons_centers (torch.Tensor): Wavelet longitudes centers (rad).
+            lats_centers (torch.Tensor): Wavelet latitudes centers (rad).
+            k (torch.Tensor): Wavenumber (rad/m).
+            Lx (float): Horizontal scale (m).
             thetas (torch.Tensor): Orientations (ntheta,).
         """
         self.device = specs.from_tensor(lons)["device"]
