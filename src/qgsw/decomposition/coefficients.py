@@ -81,7 +81,7 @@ class DecompositionCoefs:
         """Return coefs keys."""
         return self._coefs.keys()
 
-    def scale(self, *scales: float) -> "DecompositionCoefs":
+    def scale(self, *scales: float | torch.Tensor) -> "DecompositionCoefs":
         """Scale coeffcients.
 
         Args:
