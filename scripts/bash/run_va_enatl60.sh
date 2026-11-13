@@ -18,9 +18,13 @@ cd $SRCDIR
 
 date
 
-echo Running: \".venv/bin/python3 -u scripts/va_enatl60.py $@\"
+echo Running: \".venv/bin/python3 -u scripts/python/fitting/fit_enatl60.py --run-id=$OAR_JOB_ID $@\"
 
-LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/va_enatl60.py $@
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/fitting/fit_enatl60.py --run-id=$OAR_JOB_ID $@
+
+echo Running validation script
+
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/validation/validate_enatl60.py --run-id=$OAR_JOB_ID
 
 date
 

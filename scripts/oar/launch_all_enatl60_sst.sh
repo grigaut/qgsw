@@ -2,14 +2,22 @@
 SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd $SRCDIR
 
-# RGSI SST
+# RGSI
 
-./scripts/oar/run_var_analysis_enatl60_sst_hr.sh --config=config/enatl60.toml -v --obs-track --gamma=0.01 --gamma-sst=0.01 "$@"
+./scripts/oar/run_va_enatl60_sst.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgsi.json "$@"
 
-# RGSI SST Adv
+# Surface Vorticity
 
-./scripts/oar/run_var_analysis_enatl60_sst_adv_hr.sh --config=config/enatl60.toml -v --obs-track --gamma=0.01 --gamma-sst=0.01 "$@"
+./scripts/oar/run_va_enatl60_sst.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/surf_vort.json "$@"
 
-# Forced SST Adv
+# RGF
 
-./scripts/oar/run_var_analysis_enatl60_forced_sst_hr.sh --config=config/enatl60.toml -v --obs-track --gamma=1e3 --gamma-sst=0.01 "$@"
+./scripts/oar/run_va_enatl60_sst.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgf.json "$@"
+
+# RGF-VD
+
+./scripts/oar/run_va_enatl60_sst.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgf_vd.json "$@"
+
+# RGFSI
+
+./scripts/oar/run_va_enatl60_sst.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgfsi.json "$@"
