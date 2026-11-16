@@ -13,3 +13,7 @@ cd $SRCDIR
 # RGFSI
 
 ./scripts/oar/run_va_qg3l.sh --config=config/variational_analysis.toml -v --presets=presets/QG3L/rgfsi.json "$@"
+
+# RG0
+
+./scripts/oar/run_va_qg3l.sh --config=config/variational_analysis.toml -v --presets=presets/QG3L/rg0.json "$@"

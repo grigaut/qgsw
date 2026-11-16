@@ -1,0 +1,7 @@
+{
+    "model_type":"RG0",
+    "prefix": "QG3L",
+    "cycles": 12,
+    "separation":250,
+    "no_wind":false
+}

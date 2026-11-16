@@ -181,7 +181,7 @@ if __name__ == "__main__":
         imin - b, imax + b + 1, jmin - b, jmax + b + 1
     )
 
-    separation = int(params["separation"] * dt / 3600 / 24)
+    separation = params["separation"]
 
     # Parameters
 
@@ -275,7 +275,9 @@ if __name__ == "__main__":
         space_slice_wide.nx,
     )
 
-    outputs = []
+    outputs: dict[str, int | list[torch.Tensor]] = {
+        "data_dt": dt,
+    }
 
     for c in range(n_cycles):
         msg = f"Computing loss for cycle {step(c + 1, n_cycles)}"
@@ -330,7 +332,9 @@ if __name__ == "__main__":
         )
         logger.info(box(msg_mem, style="="))
 
-        outputs.append(losses.losses)
+        for n, s in losses.losses.items():
+            outputs.setdefault(n, []).append(s)
+
         output.scores.save(outputs)
 
         for _ in range(separation):

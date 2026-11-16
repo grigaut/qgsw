@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import gc
+import os
+import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -48,6 +50,7 @@ from qgsw.eNATL60.var_keys import (
 from qgsw.eNATL60.wind import compute_windstress
 from qgsw.exceptions import BackwardPassError
 from qgsw.logging import getLogger, setup_root_logger
+from qgsw.logging.environments import in_oar
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
@@ -349,6 +352,16 @@ if __name__ == "__main__":
         )
     )
 
+    if args.model_type == "RG0":
+        msg = "RG0 -> No optimization required"
+        logger.info(box(msg))
+
+        output.results.save([None] * args.cycles)
+        output.basis.save([None] * args.cycles)
+        output.optim.save([None] * args.cycles)
+
+        sys.exit(0)
+
     # Parameters
 
     H = config.model.h
@@ -633,7 +646,6 @@ if __name__ == "__main__":
             }
 
         optimizer.set_closure(closure)
-        epoch_restart = ""
         runtime_error = False
 
         for _ in range(args.optim):
@@ -645,18 +657,17 @@ if __name__ == "__main__":
                 runtime_error = isinstance(e, RuntimeError)
                 break
             except (OverflowError, BackwardPassError) as e:
-                epoch_repr = optimizer.epoch_repr
                 err_type = (
                     "overflow error"
                     if isinstance(e, OverflowError)
                     else "backward pass error"
                 )
-                if epoch_repr == epoch_restart:
+                if optimizer.since_restart <= 1:
                     msg = f"Unable to solve {err_type} with optimizer restart."
                     logger.warning(box(msg))
                     runtime_error = True
                     break
-                epoch_restart = epoch_repr
+                epoch_repr = optimizer.epoch_repr
                 msg = f"Restarting optimizer after {err_type} at {epoch_repr}."
                 logger.info(msg)
                 params_tracker.restore_best()
@@ -696,6 +707,7 @@ if __name__ == "__main__":
                 "losses": optimizer.losses,
                 "runtime_error": runtime_error,
                 "elapsed": time.time() - time0,
+                "oar": {"id": os.environ["OAR_JOB_ID"]} if in_oar() else None,
             }
         )
 

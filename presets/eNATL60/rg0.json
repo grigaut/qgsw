@@ -1,0 +1,15 @@
+{
+    "model_type":"RG0",
+    "prefix": "eNATL60",
+    "cycles": 4,
+    "separation":0,
+
+    "dt": 7200,
+    "dx":10000,
+    "dy":10000,
+
+    "sigma_bc":14,
+    "sigma_ic":14,
+
+    "no_wind":true
+}

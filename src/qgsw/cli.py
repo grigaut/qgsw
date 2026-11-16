@@ -11,6 +11,7 @@ from typing import Any
 from qgsw.decomposition.exp_exp.core import GaussianExpBasis
 from qgsw.decomposition.vardyn.core import MIOSTBasis
 from qgsw.decomposition.wavelets.core import WaveletBasis
+from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -692,6 +693,7 @@ class ScriptsArgsParser:
             "--model-type",
             type=str,
             choices=[
+                ModelName.RG0,
                 QGPSIQForced.get_type(),
                 QGPSIQRGPsi2TransportDR.get_type(),
                 QGPSIQForcedSurfML.get_type(),

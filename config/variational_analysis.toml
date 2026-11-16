@@ -43,7 +43,7 @@ perturbation_magnitude = 0.001
 type = "interval"
 save = true
 interval_duration = 86400.0
-directory = "param_optim"
+directory = "assimilation"
 
 [simulation.startup]
 file = "data/double_gyre_long_final.pt"
