@@ -181,7 +181,7 @@ if __name__ == "__main__":
         imin - b, imax + b + 1, jmin - b, jmax + b + 1
     )
 
-    separation = int(params["separation"] * dt / 3600 / 24)
+    separation = params["separation"]
 
     # Parameters
 
