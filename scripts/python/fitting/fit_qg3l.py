@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import sys
 import time
 from pathlib import Path
@@ -24,6 +25,7 @@ from qgsw.exceptions import BackwardPassError
 from qgsw.fields.variables.tuples import UVH
 from qgsw.forcing.wind import WindForcing
 from qgsw.logging import getLogger, setup_root_logger
+from qgsw.logging.environments import in_oar
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.masks import Masks
 from qgsw.models.qg.psiq.core import QGPSIQ
@@ -562,6 +564,7 @@ if __name__ == "__main__":
                 "losses": optimizer.losses,
                 "runtime_error": runtime_error,
                 "elapsed": time.time() - time0,
+                "oar": {"id": os.environ["OAR_JOB_ID"]} if in_oar() else None,
             }
         )
 

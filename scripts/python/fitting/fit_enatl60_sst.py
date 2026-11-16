@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import sys
 import time
 from pathlib import Path
@@ -49,6 +50,7 @@ from qgsw.eNATL60.var_keys import (
 )
 from qgsw.eNATL60.wind import compute_windstress
 from qgsw.logging import getLogger, setup_root_logger
+from qgsw.logging.environments import in_oar
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
@@ -766,6 +768,7 @@ if __name__ == "__main__":
                 "losses": optimizer.losses,
                 "overflow": overflow_encountered,
                 "elapsed": time.time() - time0,
+                "oar": {"id": os.environ["OAR_JOB_ID"]} if in_oar() else None,
             }
         )
 
