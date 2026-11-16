@@ -49,6 +49,7 @@ from qgsw.eNATL60.var_keys import (
     ZONAL_WIND_10M,
 )
 from qgsw.eNATL60.wind import compute_windstress
+from qgsw.exceptions import BackwardPassError
 from qgsw.logging import getLogger, setup_root_logger
 from qgsw.logging.environments import in_oar
 from qgsw.logging.utils import box, sec2text, step
@@ -712,7 +713,6 @@ if __name__ == "__main__":
             }
 
         optimizer.set_closure(closure)
-        epoch_restart = ""
         overflow_encountered = False
         for _ in range(args.optim):
             try:
@@ -721,14 +721,18 @@ if __name__ == "__main__":
                 msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)
                 break
-            except OverflowError:
-                epoch_repr = optimizer.epoch_repr
-                if epoch_repr == epoch_restart:
-                    msg = "Unable to solve overflow with optimizer restart."
+            except (OverflowError, BackwardPassError) as e:
+                err_type = (
+                    "overflow error"
+                    if isinstance(e, OverflowError)
+                    else "backward pass error"
+                )
+                if optimizer.since_restart <= 1:
+                    msg = f"Unable to solve {err_type} with optimizer restart."
                     logger.warning(box(msg))
-                    overflow_encountered = True
+                    runtime_error = True
                     break
-                epoch_restart = epoch_repr
+                epoch_repr = optimizer.epoch_repr
                 msg = f"Overflow at {epoch_repr}, restarting optimizer."
                 logger.info(msg)
                 params_tracker.restore_best()

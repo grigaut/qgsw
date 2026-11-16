@@ -36,6 +36,7 @@ class OptimizerWrapper(
 ):
     """Optimizer base class."""
 
+    since_restart = 0
     eps = 1e-12
     optimizer: torch.optim.Optimizer
     _pre_closure: Callable[[], ClosureInput]
@@ -78,6 +79,7 @@ class OptimizerWrapper(
         self.optimizer.state.clear()
         msg = "Optimizer restarted"
         logger.info(msg)
+        self.since_restart = 0
 
     @abstractmethod
     def restart_from_params(self, params: list[torch.Tensor]) -> None:
@@ -116,6 +118,7 @@ class OptimizerWrapper(
         def optim_closure() -> torch.Tensor:
             closure_input = pre_closure_callback()
             closure_output = closure(closure_input)
+            self.since_restart += 1
             return post_closure_callback(closure_output)
 
         self.closure = optim_closure
@@ -220,6 +223,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             history_size=self.history_size,
             max_iter=self.max_iter,
         )
+        self.since_restart = 0
 
 
 class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
@@ -294,6 +298,7 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             self.optimizer, factor=0.5, patience=5
         )
         self.lr_callback = LRChangeCallback(self.optimizer)
+        self.since_restart = 0
 
 
 def build_optimizer(

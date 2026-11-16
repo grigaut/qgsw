@@ -502,7 +502,6 @@ if __name__ == "__main__":
             }
 
         optimizer.set_closure(closure)
-        epoch_restart = ""
         runtime_error = False
         for _ in range(args.optim):
             try:
@@ -513,18 +512,17 @@ if __name__ == "__main__":
                 runtime_error = isinstance(e, RuntimeError)
                 break
             except (OverflowError, BackwardPassError) as e:
-                epoch_repr = optimizer.epoch_repr
                 err_type = (
                     "overflow error"
                     if isinstance(e, OverflowError)
                     else "backward pass error"
                 )
-                if epoch_repr == epoch_restart:
+                if optimizer.since_restart <= 1:
                     msg = f"Unable to solve {err_type} with optimizer restart."
                     logger.warning(box(msg))
                     runtime_error = True
                     break
-                epoch_restart = epoch_repr
+                epoch_repr = optimizer.epoch_repr
                 msg = f"Restarting optimizer after {err_type} at {epoch_repr}."
                 logger.info(msg)
                 params_tracker.restore_best()
