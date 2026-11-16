@@ -21,3 +21,7 @@ cd $SRCDIR
 # RGFSI
 
 ./scripts/oar/run_va_enatl60.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgfsi.json "$@"
+
+# RG0
+
+./scripts/oar/run_va_enatl60.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rg0.json "$@"
