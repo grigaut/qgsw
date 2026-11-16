@@ -176,13 +176,13 @@ class OutputFolder(NamedTuple):
         """String representation."""
         return "\n".join(self.get_repr_parts())
 
-    def files_exist(self) -> bool:
+    def files_exist(self, *, no_score: bool = False) -> bool:
         """Check that all file exist."""
         pexists = self.params.file.exists()
         rexists = self.results.file.exists()
         bexists = self.basis.file.exists()
         oexists = self.optim.file.exists()
-        sexists = self.scores.file.exists()
+        sexists = self.scores.file.exists() or no_score
         return pexists and rexists and bexists and oexists and sexists
 
     def copy_config(self, config_path: Path) -> None:

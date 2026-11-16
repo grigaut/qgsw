@@ -13,6 +13,7 @@ import streamlit as st
 from st_copy import copy_button
 
 from qgsw.logging.utils import sec2text
+from qgsw.models.names import ModelName
 from qgsw.scripts.output import build_output_folder
 from qgsw.utils.storage import get_path_from_env
 
@@ -112,7 +113,7 @@ if folder is not None:
 
     output_folder = build_output_folder(folder)
 
-    if not output_folder.files_exist():
+    if not output_folder.files_exist(no_score=True):
         st.error("Output folder files don't exist")
         st.stop()
 
@@ -165,6 +166,7 @@ if folder is not None:
         st.markdown(" ".join(badges))
 
     model_type = params["model_type"]
+
     st.header(f"Model type: {model_type}", text_alignment="center")
 
     st.header("Bases")
@@ -215,6 +217,9 @@ if folder is not None:
 
     with st.expander("Parameters JSON", expanded=False):
         st.write(params)
+
+    if model_type == ModelName.RG0:
+        st.stop()
 
     st.divider()
     ### Optimization results
