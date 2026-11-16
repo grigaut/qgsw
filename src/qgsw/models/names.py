@@ -6,6 +6,7 @@ from qgsw.utils.named_object import Name
 class ModelName(Name):
     """Model names."""
 
+    RG0 = "RG0"
     SHALLOW_WATER = "SW"
     QUASI_GEOSTROPHIC_USUAL = "QGPSIQ"
     QUASI_GEOSTROPHIC_ML = "QGPSIQML"

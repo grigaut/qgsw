@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import gc
+import sys
 import time
 from pathlib import Path
 
@@ -231,6 +232,16 @@ if __name__ == "__main__":
     logger.info(
         box(msg_simu, msg_area, msg_obs, msg_reg, msg_output, style="=")
     )
+
+    if args.model_type == "RG0":
+        msg = "RG0 -> No optimization required"
+        logger.info(box(msg))
+
+        output.results.save([None] * n_cycles)
+        output.basis.save([None] * n_cycles)
+        output.optim.save([None] * n_cycles)
+
+        sys.exit(0)
 
     # Parameters
 

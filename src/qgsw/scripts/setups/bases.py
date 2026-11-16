@@ -9,6 +9,7 @@ from qgsw.cli import OptimBasisParser
 from qgsw.decomposition.config import BASIS_CONFIGS
 from qgsw.decomposition.core import Basis, build_basis_from_config
 from qgsw.decomposition.vardyn.core import MIOSTBasis, VDBasis
+from qgsw.models.names import ModelName
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
@@ -40,6 +41,8 @@ def retrieve_bases_params(
     Returns:
         dict[str, OptimBasisParser]: Bases types mapping.
     """
+    if model_type == ModelName.RG0:
+        return {}
     without_bdyn = basis_dynamical.type is None
     without_bext = basis_external.type is None
     without_bpsi = basis_psi_a.type is None
