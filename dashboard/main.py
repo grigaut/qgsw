@@ -42,7 +42,7 @@ output_source = (
         format_func=lambda p: p.name,
         default=g5k_storage,
     )
-    / "param_optim"
+    / "assimilation"
 )
 
 matching_folders = sorted(
