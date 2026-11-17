@@ -807,7 +807,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             dprog = self.compute_time_derivatives_homogeneous(prognostic)
         if self.time_stepper != "rk3" or self._rk3_step == 0:
             self.dprog = dprog
-        elif self.time_stepper == "rk3":
+        if self.time_stepper == "rk3":
             self._rk3_step += 1
         return dprog
 
