@@ -241,7 +241,10 @@ if __name__ == "__main__":
 
         output.results.save([None] * n_cycles)
         output.basis.save([None] * n_cycles)
-        output.optim.save([None] * n_cycles)
+        output.optim.save(
+            [{"oar": {"id": os.environ["OAR_JOB_ID"]} if in_oar() else None}]
+            * n_cycles
+        )
 
         sys.exit(0)
 
