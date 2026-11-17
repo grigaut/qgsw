@@ -53,6 +53,10 @@ class BaseTuple:
         """Right multiplication."""
         return self.__mul__(other)
 
+    def __truediv__(self, other: float) -> Self:
+        """Division."""
+        return self.__class__(*[v / other for v in self])
+
     def __add__(self, other: Self) -> Self:
         """Addition."""
         return self.__class__(*[s + o for s, o in zip(self, other)])
