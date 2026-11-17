@@ -113,6 +113,14 @@ if folder is not None:
 
     output_folder = build_output_folder(folder)
 
+    if output_folder.optim.file.exists():
+        oar_specs = output_folder.optim.load()[0]["oar"]
+
+    if oar_specs is None:
+        st.subheader("Local run")
+    else:
+        st.subheader(f"OAR_JOB_ID={oar_specs['id']}")
+
     if not output_folder.files_exist(no_score=True):
         st.error("Output folder files don't exist")
         st.stop()
