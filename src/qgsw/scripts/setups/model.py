@@ -47,7 +47,7 @@ def setup_model(
     beta_plane: BetaPlane,
     dt: float,
     slip_coef: float,
-) -> QGPSIQ:
+) -> QGPSIQ | SurfaceVorticity:
     """Setup model.
 
     Args:
