@@ -43,6 +43,9 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     """Surface vorticity model."""
 
     _type = ModelName.SURFACE_VORTICITY
+
+    _time_stepper = "rk3"
+
     wide = True
     implements_alpha = False
     advect_sst = False
