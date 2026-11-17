@@ -956,13 +956,22 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
                 ├── zeta : (n_ens, nl, nx, ny)-shaped
                 └── sst : (n_ens, nl, nx, ny)-shaped
         """
-        assert self.time_stepper == "rk3"
-        self._rk3_step = 0
-        psizsst = time_steppers.rk3_ssp(
-            prog=prognostic,
-            dt=self.dt,
-            time_derivation_func=self.compute_time_derivatives,
-        )
+        if self.time_stepper == "rk3":
+            self._rk3_step = 0
+            psizsst = time_steppers.rk3_ssp(
+                prog=prognostic,
+                dt=self.dt,
+                time_derivation_func=self.compute_time_derivatives,
+            )
+        elif self.time_stepper == "euler":
+            psizsst = time_steppers.euler(
+                prog=prognostic,
+                dt=self.dt,
+                time_derivation_func=self.compute_time_derivatives,
+            )
+        else:
+            msg = f"Invalid time stepper: {self.time_stepper}"
+            raise ValueError(msg)
         self.time += self.dt
         return psizsst
 
