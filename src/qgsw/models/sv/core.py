@@ -618,7 +618,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             boundary = self.sf_bc_interp(self.time.item())
             psi_with_bc = boundary.get_band(1).expand(psi)
             self.p = psi_with_bc
-            lap_psi = self.lap(psi_with_bc, self.space.dx, self.space.dy)
+            lap_psi = self.lap(psi_with_bc)
             return self.masks.h * self.interp(lap_psi)
         lap_psi = self.lap_h(psi)
         return self.masks.h * (
@@ -841,7 +841,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
                 └── dsst : (n_ens, nl, nx, ny)-shaped
         """
         psi_g, zeta_g, sst_anom = prognostic
-        zeta_a = self.interp(self.lap(self.f_zeta_a(self._substep_time)))
+        zeta_a = self.f_zeta_a(self._substep_time)
 
         u_g, v_g = self.gradp(psi_g)
         u_g /= self.space.dy
