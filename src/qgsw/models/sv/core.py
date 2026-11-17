@@ -1,6 +1,7 @@
 """Surface vorticity model."""
 
 import torch
+from git import TYPE_CHECKING
 
 from qgsw import specs
 from qgsw.decomposition.base import SpaceTimeDecomposition
@@ -31,6 +32,9 @@ from qgsw.spatial.core.grid_conversion import interpolate
 from qgsw.utils.interpolation import ConstantInterpolation, _Interpolation
 from qgsw.utils.named_object import NamedObject
 from qgsw.utils.reshaping import crop
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = getLogger(__name__)
 
@@ -345,8 +349,12 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         Args:
             compile_fns (bool): Whether to compile_fns or not.
         """
-        lap_h = lambda t: laplacian_h(t, self.space.dx, self.space.dy)
-        lap = lambda t: laplacian(t, self.space.dx, self.space.dy)
+        lap_h: Callable[[torch.Tensor], torch.Tensor] = lambda t: laplacian_h(
+            t, self.space.dx, self.space.dy
+        )
+        lap: Callable[[torch.Tensor], torch.Tensor] = lambda t: laplacian(
+            t, self.space.dx, self.space.dy
+        )
         if compile_fns:
             with logger.section("Compiling functions..."):
                 self.grad = OptimizableFunction(grad)
@@ -358,8 +366,8 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             self.grad = grad
             self.gradp = grad_perp
             self.interp = interpolate
-            self.lap_h = laplacian_h
-            self.lap = laplacian
+            self.lap_h = lap_h
+            self.lap = lap
 
     def set_flux(self) -> None:
         """Set the fluxes utils."""
