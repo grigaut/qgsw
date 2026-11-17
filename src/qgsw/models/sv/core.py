@@ -922,9 +922,13 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
                 ├── zeta : (n_ens, nl, nx, ny)-shaped
                 └── sst : (n_ens, nl, nx, ny)-shaped
         """
+        prognostic_ = prognostic
         if self.with_bc:
-            return self.update_inhomogeneous(prognostic)
-        return self.update_homogeneous(prognostic)
+            prognostic = self.update_inhomogeneous(prognostic)
+        else:
+            prognostic = self.update_homogeneous(prognostic)
+        self.dprog = (prognostic - prognostic_) / self.dt
+        return prognostic
 
     def timestep(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Timesteps prognostic variables.

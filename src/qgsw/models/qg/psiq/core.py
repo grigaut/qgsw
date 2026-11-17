@@ -1015,9 +1015,13 @@ class QGPSIQ(NamedObject[ModelName], metaclass=ABCCounter):
                 ├──  q : (n_ens, nl, nx, ny)-shaped
                 └── sst: (n_ens, nl, nx, ny)-shaped
         """
+        prognostic_ = prognostic
         if self.with_bc:
-            return self._update_inhomogeneous(prognostic)
-        return self._update_homogeneous(prognostic)
+            prognostic = self._update_inhomogeneous(prognostic)
+        else:
+            prognostic = self._update_homogeneous(prognostic)
+        self.dprog = (prognostic - prognostic_) / self.dt
+        return prognostic
 
     def _timestep(self, prognostic: PSIQSST) -> PSIQSST:
         if self.time_stepper == "rk3":
