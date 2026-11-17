@@ -382,7 +382,7 @@ if __name__ == "__main__":
         gc.collect()
 
         if with_wind:
-            uv10_to_uvsurf = output.optim.load()[c]["uv10_to_uvsurf"]
+            uv10_to_uvsurf = output.results.load()[c]["uv10_to_uvsurf"]
             tauxs, tauys = compute_windstress(
                 uv10,
                 uv10_to_uvsurf,
