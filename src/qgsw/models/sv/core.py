@@ -270,7 +270,15 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     @property
     def time_stepper(self) -> str:
         """Time stepper."""
-        return "rk3"
+        return self._time_stepper
+
+    @time_stepper.setter
+    def time_stepper(self, time_stepper: str) -> None:
+        """Time stepper setter."""
+        time_steppers.validate(time_stepper)
+        self._time_stepper = time_stepper
+        msg = "Time stepper set to: " + time_stepper
+        logger.info(msg)
 
     def __init__(
         self,
