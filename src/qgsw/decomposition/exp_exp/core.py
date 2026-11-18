@@ -250,6 +250,10 @@ def invert_basis_coefs(
     if basis.order != 1:
         msg = "Inversion is only possible for order 1 bases."
         raise ValueError(msg)
+
+    if not basis.has_coefs:
+        basis.set_coefs(basis.generate_random_coefs())
+
     S = basis.retrieve_space_supports(*space_xy)[0]
     T = basis.localize(*space_xy).retrieve_supports(ts)[0]
 
@@ -291,6 +295,10 @@ def invert_basis_coefs_from_laplacian(
     if basis.order != 1:
         msg = "Inversion is only possible for order 1 bases."
         raise ValueError(msg)
+
+    if not basis.has_coefs:
+        basis.set_coefs(basis.generate_random_coefs())
+
     S = basis.retrieve_space_supports(*space_xy)[0]
     T = basis.localize(*space_xy).retrieve_supports(ts)[0]
 

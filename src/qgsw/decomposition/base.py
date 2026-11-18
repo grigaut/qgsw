@@ -33,6 +33,8 @@ logger = getLogger(__name__)
 class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
     """Space-time decomposition."""
 
+    has_coefs = False
+
     type: str
 
     @cached_property
@@ -120,6 +122,7 @@ class SpaceTimeDecomposition(ABC, Generic[SpaceSupport, TimeSupport]):
                 └── order-1: coefficient for level order-1
         """
         self._coefs = coefs
+        self.has_coefs = True
 
     @abstractmethod
     def generate_time_support(
