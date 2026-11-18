@@ -346,7 +346,7 @@ def build_optimizer(
         case OptimizerName.LBFGS:
             return LBFGS(params, max_iter=20, max_eval=30, history_size=20)
         case OptimizerName.ADAM:
-            return Adam(params, lr=1e-3)
+            return Adam(params, lr=1)
         case _:
             msg = f"Unrecognized optimizer type: {optimizer_type}."
             raise ValueError(msg)
