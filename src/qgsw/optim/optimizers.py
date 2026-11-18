@@ -22,6 +22,10 @@ class EarlyStopError(Exception):
     """Exception for early stop."""
 
 
+class LossPlateauError(Exception):
+    """Exception for early stop."""
+
+
 class OptimizerName(Name):
     """Optimizer names."""
 
@@ -35,6 +39,8 @@ class OptimizerWrapper(
     Generic[ClosureInput, ClosureOutput],
 ):
     """Optimizer base class."""
+
+    plateaued = False
 
     since_restart = 0
     eps = 1e-12
@@ -191,7 +197,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             msg = (
                 f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
                 f" [{step(self.epoch + 1, self.max_epoch)} |"
-                f" {str(self.eval + 1).zfill(len(str(self.max_eval)))} ]"
+                f" {str(self.eval + 1).zfill(len(str(self.max_eval)))}]"
                 f" Loss: {tot_:>#10.5g}"
                 f" ({best:>#10.5g})"
             )
@@ -200,9 +206,13 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             if msg_parts:
                 msg = "\t└─ " + " | ".join(msg_parts)
                 logger.detail(msg)
-            if self.early_stop.step(tot_):
+            if self.early_stop.step(tot_) and self.plateaued:
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
+            if self.early_stop.step(tot):
+                self.plateaued = True
+                msg = "Plateau reached"
+                raise LossPlateauError(msg)
             self.eval += 1
             return tot_
 
@@ -223,6 +233,7 @@ class LBFGS(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             history_size=self.history_size,
             max_iter=self.max_iter,
         )
+        self.early_stop = EarlyStop()
         self.since_restart = 0
 
 
@@ -230,6 +241,7 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
     """Adam optimizer wrapper."""
 
     _type = OptimizerName.ADAM
+    _max_eval = 10
 
     def __init__(
         self,
@@ -273,7 +285,8 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
 
             msg = (
                 f"Cycle: {step(self.cycle + 1, self.max_cycle)}"
-                f" [{step(self.epoch + 1, self.max_epoch)}]"
+                f" [{step(self.epoch + 1, self.max_epoch)} |"
+                f" {str(self.eval + 1).zfill(len(str(self._max_eval)))}]"
                 f" Loss: {tot_:>#10.5g}"
                 f" ({best:>#10.5g})"
             )
@@ -281,9 +294,14 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             if msg_parts:
                 msg = "\t└─ " + " | ".join(msg_parts)
                 logger.detail(msg)
-            if self.early_stop.step(tot_):
+            if self.early_stop.step(tot_) and self.plateaued:
                 msg = "Convergence reached"
                 raise EarlyStopError(msg)
+            if self.early_stop.step(tot):
+                self.plateaued = True
+                msg = "Plateau reached"
+                raise LossPlateauError(msg)
+
             self.scheduler.step(tot)
             self.lr_callback.step()
             return tot_
@@ -298,7 +316,15 @@ class Adam(OptimizerWrapper[None, dict[str, list[torch.Tensor]]]):
             self.optimizer, factor=0.5, patience=5
         )
         self.lr_callback = LRChangeCallback(self.optimizer)
+        self.early_stop = EarlyStop()
         self.since_restart = 0
+
+    def _step(self) -> torch.Tensor:
+        self.eval = 0
+        for _ in range(self._max_eval):
+            self.optimizer.step(closure=self.closure)
+            self.eval += 1
+        self.epoch += 1
 
 
 def build_optimizer(
@@ -320,7 +346,7 @@ def build_optimizer(
         case OptimizerName.LBFGS:
             return LBFGS(params, max_iter=20, max_eval=30, history_size=20)
         case OptimizerName.ADAM:
-            return Adam(params, lr=1)
+            return Adam(params, lr=1e-3)
         case _:
             msg = f"Unrecognized optimizer type: {optimizer_type}."
             raise ValueError(msg)
