@@ -403,6 +403,8 @@ if __name__ == "__main__":
                 d_squared = div**2 / 2
 
                 f_zeta = -vort * filt(ds["corio_t"])
+                f_zeta_g = -vort_g * filt(ds["corio_t"])
+                f_zeta_a = f_zeta - f_zeta_g
 
                 grad_f_u = u_ * interpf(dy(ds["corio_t"])) - v_ * interpf(
                     dx(ds["corio_t"])
@@ -420,6 +422,8 @@ if __name__ == "__main__":
                 Q_squared_rms = rms(Q_squared[:-1])
                 d_squared_rms = rms(d_squared[:-1])
                 f_zeta_rms = rms(f_zeta[:-1])
+                f_zeta_g_rms = rms(f_zeta_g[:-1])
+                f_zeta_a_rms = rms(f_zeta_a[:-1])
                 grad_f_u_rms = rms(grad_f_u[:-1])
                 lap_geop_rms = rms(lap_geop[:-1])
                 diff_lap_geop_fz = rms(lap_geop[:-1] + f_zeta[:-1])
@@ -447,6 +451,8 @@ if __name__ == "__main__":
                 "sigma_squared": (sigma_squared_rms, r"$\sigma^2/2$"),
                 "zeta_squared": (zeta_squared_rms, r"$\zeta^2/2$"),
                 "f_zeta": (f_zeta_rms, r"$-f\zeta$"),
+                "f_zeta_g": (f_zeta_g_rms, r"$-f\zeta$"),
+                "f_zeta_a": (f_zeta_a_rms, r"$-f\zeta$"),
                 "grad_f_u": (
                     grad_f_u_rms,
                     r"$-\nabla^{\perp}f \cdot {\bf{u}}$",

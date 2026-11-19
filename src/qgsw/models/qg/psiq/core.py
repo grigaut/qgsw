@@ -361,14 +361,14 @@ class QGPSIQ(NamedObject[ModelName], metaclass=ABCCounter):
         Args:
             compile_fns (bool): Whether to compile_fns or not.
         """
+        lap_h = lambda t: laplacian_h(t, self.space.dx, self.space.dy)
+        lap = lambda t: laplacian(t, self.space.dx, self.space.dy)
         if compile_fns:
             with logger.section("Compiling functions..."):
                 self.grad = OptimizableFunction(grad)
                 self.gradp = OptimizableFunction(grad_perp)
                 self.interp = OptimizableFunction(interpolate)
-                lap_h = lambda t: laplacian_h(t, self.space.dx, self.space.dy)
                 self.lap_h = OptimizableFunction(lap_h)
-                lap = lambda t: laplacian(t, self.space.dx, self.space.dy)
                 self.lap = OptimizableFunction(lap)
         else:
             self.grad = grad
@@ -893,9 +893,7 @@ class QGPSIQ(NamedObject[ModelName], metaclass=ABCCounter):
             dprog = self.compute_time_derivatives_inhomogeneous(prognostic)
         else:
             dprog = self.compute_time_derivatives_homogeneous(prognostic)
-        if self.time_stepper != "rk3" or self._rk3_step == 0:
-            self.dprog = dprog
-        elif self.time_stepper == "rk3":
+        if self.time_stepper == "rk3":
             self._rk3_step += 1
         return dprog
 
@@ -1015,9 +1013,13 @@ class QGPSIQ(NamedObject[ModelName], metaclass=ABCCounter):
                 ├──  q : (n_ens, nl, nx, ny)-shaped
                 └── sst: (n_ens, nl, nx, ny)-shaped
         """
+        prognostic_ = prognostic
         if self.with_bc:
-            return self._update_inhomogeneous(prognostic)
-        return self._update_homogeneous(prognostic)
+            prognostic = self._update_inhomogeneous(prognostic)
+        else:
+            prognostic = self._update_homogeneous(prognostic)
+        self.dprog = (prognostic - prognostic_) / self.dt
+        return prognostic
 
     def _timestep(self, prognostic: PSIQSST) -> PSIQSST:
         if self.time_stepper == "rk3":

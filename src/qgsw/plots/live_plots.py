@@ -293,6 +293,8 @@ class LivePlot:
 
     def _close(self) -> None:
         """Close figure."""
-        plt.close()
+        plt.close(self.state_fig)
+        plt.close(self.vel_fig)
+        plt.close(self.sst_fig)
 
     close = _close

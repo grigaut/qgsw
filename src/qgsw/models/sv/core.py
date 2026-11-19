@@ -1,6 +1,7 @@
 """Surface vorticity model."""
 
 import torch
+from git import TYPE_CHECKING
 
 from qgsw import specs
 from qgsw.decomposition.base import SpaceTimeDecomposition
@@ -32,6 +33,9 @@ from qgsw.utils.interpolation import ConstantInterpolation, _Interpolation
 from qgsw.utils.named_object import NamedObject
 from qgsw.utils.reshaping import crop
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 logger = getLogger(__name__)
 
 
@@ -39,6 +43,9 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     """Surface vorticity model."""
 
     _type = ModelName.SURFACE_VORTICITY
+
+    _time_stepper = "rk3"
+
     wide = True
     implements_alpha = False
     advect_sst = False
@@ -270,7 +277,15 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
     @property
     def time_stepper(self) -> str:
         """Time stepper."""
-        return "rk3"
+        return self._time_stepper
+
+    @time_stepper.setter
+    def time_stepper(self, time_stepper: str) -> None:
+        """Time stepper setter."""
+        time_steppers.validate(time_stepper)
+        self._time_stepper = time_stepper
+        msg = "Time stepper set to: " + time_stepper
+        logger.info(msg)
 
     def __init__(
         self,
@@ -337,8 +352,12 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
         Args:
             compile_fns (bool): Whether to compile_fns or not.
         """
-        lap_h = lambda t: laplacian_h(t, self.space.dx, self.space.dy)
-        lap = lambda t: laplacian(t, self.space.dx, self.space.dy)
+        lap_h: Callable[[torch.Tensor], torch.Tensor] = lambda t: laplacian_h(
+            t, self.space.dx, self.space.dy
+        )
+        lap: Callable[[torch.Tensor], torch.Tensor] = lambda t: laplacian(
+            t, self.space.dx, self.space.dy
+        )
         if compile_fns:
             with logger.section("Compiling functions..."):
                 self.grad = OptimizableFunction(grad)
@@ -350,8 +369,8 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             self.grad = grad
             self.gradp = grad_perp
             self.interp = interpolate
-            self.lap_h = laplacian_h
-            self.lap = laplacian
+            self.lap_h = lap_h
+            self.lap = lap
 
     def set_flux(self) -> None:
         """Set the fluxes utils."""
@@ -599,7 +618,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             boundary = self.sf_bc_interp(self.time.item())
             psi_with_bc = boundary.get_band(1).expand(psi)
             self.p = psi_with_bc
-            lap_psi = self.lap(psi_with_bc, self.space.dx, self.space.dy)
+            lap_psi = self.lap(psi_with_bc)
             return self.masks.h * self.interp(lap_psi)
         lap_psi = self.lap_h(psi)
         return self.masks.h * (
@@ -799,7 +818,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
             dprog = self.compute_time_derivatives_homogeneous(prognostic)
         if self.time_stepper != "rk3" or self._rk3_step == 0:
             self.dprog = dprog
-        elif self.time_stepper == "rk3":
+        if self.time_stepper == "rk3":
             self._rk3_step += 1
         return dprog
 
@@ -822,7 +841,7 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
                 └── dsst : (n_ens, nl, nx, ny)-shaped
         """
         psi_g, zeta_g, sst_anom = prognostic
-        zeta_a = self.interp(self.lap(self.f_zeta_a(self._substep_time)))
+        zeta_a = self.f_zeta_a(self._substep_time)
 
         u_g, v_g = self.gradp(psi_g)
         u_g /= self.space.dy
@@ -914,9 +933,13 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
                 ├── zeta : (n_ens, nl, nx, ny)-shaped
                 └── sst : (n_ens, nl, nx, ny)-shaped
         """
+        prognostic_ = prognostic
         if self.with_bc:
-            return self.update_inhomogeneous(prognostic)
-        return self.update_homogeneous(prognostic)
+            prognostic = self.update_inhomogeneous(prognostic)
+        else:
+            prognostic = self.update_homogeneous(prognostic)
+        self.dprog = (prognostic - prognostic_) / self.dt
+        return prognostic
 
     def timestep(self, prognostic: PSIZetaSST) -> PSIZetaSST:
         """Timesteps prognostic variables.
@@ -933,13 +956,22 @@ class SurfaceVorticity(NamedObject[ModelName], metaclass=ABCCounter):
                 ├── zeta : (n_ens, nl, nx, ny)-shaped
                 └── sst : (n_ens, nl, nx, ny)-shaped
         """
-        assert self.time_stepper == "rk3"
-        self._rk3_step = 0
-        psizsst = time_steppers.rk3_ssp(
-            prog=prognostic,
-            dt=self.dt,
-            time_derivation_func=self.compute_time_derivatives,
-        )
+        if self.time_stepper == "rk3":
+            self._rk3_step = 0
+            psizsst = time_steppers.rk3_ssp(
+                prog=prognostic,
+                dt=self.dt,
+                time_derivation_func=self.compute_time_derivatives,
+            )
+        elif self.time_stepper == "euler":
+            psizsst = time_steppers.euler(
+                prog=prognostic,
+                dt=self.dt,
+                time_derivation_func=self.compute_time_derivatives,
+            )
+        else:
+            msg = f"Invalid time stepper: {self.time_stepper}"
+            raise ValueError(msg)
         self.time += self.dt
         return psizsst
 
