@@ -9,6 +9,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
+    QGPSIQTot,
 )
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -20,6 +21,7 @@ MODELS = {
     QGPSIQForcedSurfML.get_type(): QGPSIQForcedSurfML,
     SurfaceVorticity.get_type(): SurfaceVorticity,
     "RG0": QGPSIQ,
+    QGPSIQTot.get_type(): QGPSIQTot,
 }
 
 M = TypeVar("M", bound=QGPSIQ)
@@ -64,7 +66,7 @@ def setup_model(
     """
     if model_type == QGPSIQForced.get_type():
         model = _setup_forced(model_type, space, H, g_prime, beta_plane)
-    elif model_type == "RG0":
+    elif model_type == "RG0" or model_type == QGPSIQTot.get_type():
         model = _setup_rg0(model_type, space, H, g_prime, beta_plane)
     elif model_type == SurfaceVorticity.get_type():
         model = _setup_surface_vorticity(model_type, space, H, beta_plane)

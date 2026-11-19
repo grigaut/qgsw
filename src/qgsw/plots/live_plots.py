@@ -8,6 +8,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
+    QGPSIQTot,
 )
 from qgsw.models.sv.core import SurfaceVorticity
 
@@ -58,6 +59,20 @@ class LivePlot:
                 ["Zonal velocity", "Meridional velocity"], self.vel_axs
             )
             self._plot = self._plot_rgsi
+        elif model.get_type() == QGPSIQTot.get_type():
+            self.state_fig, self.state_axs = plots.subplots(3, 3, num="State")
+            plots.set_coltitles(["ѱ", "q", "ζ"], self.state_axs)
+            plots.set_rowtitles(
+                ["Total", "Geostrophic", "Ageostrophic"], self.state_axs
+            )
+            self.vel_fig, self.vel_axs = plots.subplots(3, 2, num="Velocity")
+            plots.set_coltitles(
+                ["Zonal velocity", "Meridional velocity"], self.vel_axs
+            )
+            plots.set_rowtitles(
+                ["Total", "Geostrophic", "Ageostrophic"], self.vel_axs
+            )
+            self._plot = self._plot_rgqtot
         elif model.get_type() == QGPSIQForced.get_type():
             self.state_fig, self.state_axs = plots.subplots(1, 4, num="State")
             plots.set_coltitles(["ѱ_1", "q", "ζ_1", "f"], self.state_axs)
@@ -146,6 +161,68 @@ class LivePlot:
 
         plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[0, 0])
         plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[0, 1])
+        plt.tight_layout()
+        plt.pause(0.05)
+
+    def _plot_rgqtot(self) -> None:
+        model: QGPSIQTot = self.model
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
+
+        plots.imshow(
+            model.sst_anom[0, 0],
+            ax=self.sst_axs[0, 0],
+            cmap="magma",
+            center_cbar=False,
+        )
+        plots.imshow(
+            model.psi_tot[0, 0],
+            ax=self.state_axs[0, 0],
+        )
+        plots.imshow(
+            model.q_tot[0, 0],
+            ax=self.state_axs[0, 1],
+        )
+        plots.imshow(
+            model.zeta_tot[0, 0],
+            ax=self.state_axs[0, 2],
+        )
+        plots.imshow(
+            model.psi[0, 0],
+            ax=self.state_axs[1, 0],
+        )
+        plots.imshow(
+            model.q[0, 0],
+            ax=self.state_axs[1, 1],
+        )
+        plots.imshow(
+            model.zeta[0, 0],
+            ax=self.state_axs[1, 2],
+        )
+        plots.imshow(
+            model.psi_a[0, 0],
+            ax=self.state_axs[2, 0],
+        )
+        plots.imshow(
+            model.q_a[0, 0],
+            ax=self.state_axs[2, 1],
+        )
+        plots.imshow(
+            model.zeta_a[0, 0],
+            ax=self.state_axs[2, 2],
+        )
+
+        plots.imshow(model.uv_tot[0][0, 0], ax=self.vel_axs[0, 0])
+        plots.imshow(model.uv_tot[1][0, 0], ax=self.vel_axs[0, 1])
+        plots.imshow(model.uv[0][0, 0], ax=self.vel_axs[1, 0])
+        plots.imshow(model.uv[1][0, 0], ax=self.vel_axs[1, 1])
+        plots.imshow(model.uv_a[0][0, 0], ax=self.vel_axs[2, 0])
+        plots.imshow(model.uv_a[1][0, 0], ax=self.vel_axs[2, 1])
         plt.tight_layout()
         plt.pause(0.05)
 

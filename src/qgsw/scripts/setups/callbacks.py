@@ -9,6 +9,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
+    QGPSIQTot,
 )
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.scripts.setups.types import Bases, Coefs
@@ -39,6 +40,8 @@ def pre_cycle_bases_setup(
             model.basis_external = bases["external"]
         case QGPSIQRGPsi2TransportDR._type:
             model.alpha = alpha
+            model.basis_dynamical = bases["dynamical"]
+        case QGPSIQTot._type:
             model.basis_dynamical = bases["dynamical"]
         case QGPSIQForcedSurfML._type:
             model.alpha = alpha

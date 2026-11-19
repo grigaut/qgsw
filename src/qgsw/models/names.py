@@ -14,6 +14,7 @@ class ModelName(Name):
     RGF = "RGF"
     RGSI = "RGSI"
     RGFSI = "RGFSI"
+    RGQTOT = "RGQTOT"
     SURFACE_VORTICITY = "SurfVort"
     QG_COLLINEAR_SF = "QGCollinearSF"
     QG_COLLINEAR_PV = "QGCollinearPV"
