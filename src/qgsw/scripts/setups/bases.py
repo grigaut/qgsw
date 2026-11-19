@@ -14,6 +14,7 @@ from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
     QGPSIQForcedSurfML,
     QGPSIQRGPsi2TransportDR,
+    QGPSIQTot,
 )
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
@@ -47,7 +48,10 @@ def retrieve_bases_params(
     without_bext = basis_external.type is None
     without_bpsi = basis_psi_a.type is None
     without_bchi = basis_chi_a.type is None
-    if model_type == QGPSIQRGPsi2TransportDR.get_type():
+    if (
+        model_type == QGPSIQRGPsi2TransportDR.get_type()
+        or model_type == QGPSIQTot.get_type()
+    ):
         if without_bdyn:
             msg = "Dynamical basis was not given to script."
             raise ValueError(msg)
