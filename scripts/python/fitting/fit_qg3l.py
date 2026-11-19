@@ -390,7 +390,7 @@ if __name__ == "__main__":
             space_slice,
             dt,
             n_steps_per_cyle,
-            2,
+            1,
             None,
             None,
         )

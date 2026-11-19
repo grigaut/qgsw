@@ -519,7 +519,7 @@ if __name__ == "__main__":
             space_interior,
             dt,
             n_steps_per_cyle,
-            2,
+            1,
             data_folder / "aux_reduced_basis_MIOST.nc",
             data_folder / "aux_first_baroclinic_speed.nc",
         )
