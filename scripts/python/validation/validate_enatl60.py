@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import numpy as np
 import torch
+import xarray as xr
 
 from qgsw.cli import parse_output_folder, parse_run_id
 from qgsw.configs.core import Configuration
@@ -64,7 +65,6 @@ from qgsw.scripts.pv import build_pv_funcs
 from qgsw.scripts.setups.model import setup_model
 from qgsw.scripts.validation import Losses
 from qgsw.solver.boundary_conditions.base import Boundaries
-from qgsw.solver.finite_diff import grad_perp
 from qgsw.spatial.core.discretization import SpaceDiscretization2D
 from qgsw.spatial.core.grid import Grid2D
 from qgsw.specs import defaults, from_tensor
@@ -238,6 +238,153 @@ if __name__ == "__main__":
 
     psi_regridder = build_regridder(ds, lons, lats)
 
+    def format_dsu(ds: xr.Dataset) -> xr.Dataset:
+        """Format Dataset."""
+        # Drop useless variables
+        if "axis_nbounds" in ds.dims:
+            ds = ds.drop_dims("axis_nbounds")
+        if "time_centered" in ds.coords:
+            ds = ds.reset_coords("time_centered", drop=True)
+        # Rename
+        ds = ds.rename(
+            {
+                "time_counter": TIME,
+                "nav_lon": LONGITUDE,
+                "nav_lat": LATITUDE,
+                "x": "i",
+                "y": "j",
+                "sozocrtx": "u",
+            }
+        )
+        ds = ds.transpose(TIME, "i", "j")
+        return ds.set_coords([LONGITUDE, LATITUDE])
+
+    def format_dsv(ds: xr.Dataset) -> xr.Dataset:
+        """Format Dataset."""
+        # Drop useless variables
+        if "axis_nbounds" in ds.dims:
+            ds = ds.drop_dims("axis_nbounds")
+        if "time_centered" in ds.coords:
+            ds = ds.reset_coords("time_centered", drop=True)
+        # Rename
+        ds = ds.rename(
+            {
+                "time_counter": TIME,
+                "nav_lon": LONGITUDE,
+                "nav_lat": LATITUDE,
+                "x": "i",
+                "y": "j",
+                "somecrty": "v",
+            }
+        )
+        ds = ds.transpose(TIME, "i", "j")
+        return ds.set_coords([LONGITUDE, LATITUDE])
+
+    ys_ = EARTH_RADIUS * (lats - lat0)
+    cos = torch.cos if isinstance(lats, torch.Tensor) else np.cos
+    xs_ = EARTH_RADIUS * (lons) * cos(lats)
+
+    space_no_xoffset = SpaceDiscretization2D.from_psi_grid(
+        Grid2D(
+            x=torch.tensor(xs_.round(), **specs),
+            y=torch.tensor(ys_.round(), **specs),
+        )
+    )
+
+    ux, uy = space_no_xoffset.u.xy
+    ux = ux.cpu().numpy()
+    uy = uy.cpu().numpy()
+
+    latsu = (uy / EARTH_RADIUS) + lat0
+    lonsu = ux / EARTH_RADIUS / np.cos(latsu)
+
+    vx, vy = space_no_xoffset.v.xy
+    vx = vx.cpu().numpy()
+    vy = vy.cpu().numpy()
+
+    latsv = (vy / EARTH_RADIUS) + lat0
+    lonsv = vx / EARTH_RADIUS / np.cos(latsv)
+
+    ufiles = list(
+        (data_folder / "MEANDERS" / "gridU").glob("*.nc"),
+    )
+    ufiles = sort_files_by_dates(*ufiles)
+
+    vfiles = list(
+        (data_folder / "MEANDERS" / "gridV").glob("*.nc"),
+    )
+    vfiles = sort_files_by_dates(*vfiles)
+
+    dsu_init = load_datasets(ufiles[0], format_func=format_dsu)
+    u_regridder = build_regridder(dsu_init, lonsu, latsu)
+    dsv_init = load_datasets(vfiles[0], format_func=format_dsv)
+    v_regridder = build_regridder(dsv_init, lonsv, latsv)
+
+    def load_cycle_uv_data(
+        ufiles: np.ndarray, vfiles: np.ndarray, c: int
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
+        """Load uv."""
+        start_cycle = c * n_file_per_cycle + c * separation
+        end_cycle = (c + 1) * n_file_per_cycle + c * separation
+
+        if end_cycle > len(ufiles):
+            msg = f"Not enough ufiles to perform cycle {c} and above."
+            logger.warning(msg)
+            return None
+
+        ufiles_for_cycle = ufiles[start_cycle:end_cycle]
+
+        start_cycle = c * n_file_per_cycle + c * separation
+        end_cycle = (c + 1) * n_file_per_cycle + c * separation
+
+        if end_cycle > len(vfiles):
+            msg = f"Not enough vfiles to perform cycle {c} and above."
+            logger.warning(msg)
+            return None
+
+        vfiles_for_cycle = vfiles[start_cycle:end_cycle]
+
+        dsu = load_datasets(*ufiles_for_cycle, format_func=format_dsu)
+
+        with logger.timeit("Interpolating u"):
+            regridded_u: xr.DataArray = u_regridder(dsu["u"])
+            dsu_interp = xr.Dataset(
+                {
+                    LONGITUDE: (["i", "j"], lonsu),
+                    LATITUDE: (["i", "j"], latsu),
+                    "u": ([TIME, "i", "j"], regridded_u.data),
+                },
+                regridded_u.coords,
+            )
+            dsu_interp = dsu_interp.set_coords([LONGITUDE, LATITUDE])
+            dsu_interp = dsu_interp.load()
+
+        dsv = load_datasets(*vfiles_for_cycle, format_func=format_dsv)
+
+        with logger.timeit("Interpolating v"):
+            regridded_v: xr.DataArray = v_regridder(dsv["v"])
+            dsv_interp = xr.Dataset(
+                {
+                    LONGITUDE: (["i", "j"], lonsv),
+                    LATITUDE: (["i", "j"], latsv),
+                    "v": ([TIME, "i", "j"], regridded_v.data),
+                },
+                regridded_v.coords,
+            )
+            dsv_interp = dsv_interp.set_coords([LONGITUDE, LATITUDE])
+            dsv_interp = dsv_interp.load()
+
+        u_refs = [
+            torch.tensor(u, **specs).unsqueeze(0).unsqueeze(0)
+            for u in dsu_interp["u"].to_numpy()
+        ]
+        v_refs = [
+            torch.tensor(v, **specs).unsqueeze(0).unsqueeze(0)
+            for v in dsv_interp["v"].to_numpy()
+        ]
+
+        return u_refs, v_refs
+
     ## Areas
 
     space_2d = SpaceDiscretization2D.from_psi_grid(
@@ -390,9 +537,11 @@ if __name__ == "__main__":
                 rho_air=1.225,
             )
 
-        u_refs, v_refs = grad_perp(psis_ref)
-        u_refs /= dy
-        v_refs /= dx
+        u_refs, v_refs = load_cycle_uv_data(
+            ufiles[in_season],
+            vfiles[in_season],
+            c,
+        )
 
         losses.compute_loss(model, crop(psis_ref[0], b))
         losses.compute_uv_losses(model, crop(u_refs[0], b), crop(v_refs[0], b))
