@@ -6,9 +6,9 @@ cd $SRCDIR
 
 ./scripts/oar/run_va_enatl60.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgsi.json "$@"
 
-# Surface Vorticity
+# RGSI
 
-./scripts/oar/run_va_enatl60.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/surf_vort.json "$@"
+./scripts/oar/run_va_enatl60.sh --config=config/enatl60.toml -v --presets=presets/eNATL60/rgsi_vd.json "$@"
 
 # RGF
 
