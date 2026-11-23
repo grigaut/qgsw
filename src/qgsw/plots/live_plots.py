@@ -99,6 +99,7 @@ class LivePlot:
                 ["Zonal velocity", "Meridional velocity"], self.vel_axs
             )
             self._plot = self._plot_qg
+        self.close = self._close
 
     def _plot_qg(self) -> None:
         model: QGPSIQ = self.model
