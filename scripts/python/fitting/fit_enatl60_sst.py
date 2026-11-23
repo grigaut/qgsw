@@ -55,7 +55,11 @@ from qgsw.logging.environments import in_oar
 from qgsw.logging.utils import box, sec2text, step
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
-from qgsw.optim.optimizers import EarlyStopError, build_optimizer
+from qgsw.optim.optimizers import (
+    EarlyStopError,
+    LossPlateauError,
+    build_optimizer,
+)
 from qgsw.optim.utils import TrackParams
 from qgsw.physics.constants import EARTH_ANGULAR_ROTATION, EARTH_RADIUS
 from qgsw.physics.coriolis.beta_plane import BetaPlane
@@ -720,6 +724,12 @@ if __name__ == "__main__":
         for _ in range(args.optim):
             try:
                 optimizer.step()
+            except LossPlateauError as e:
+                msg = f"{e} at {optimizer.epoch_repr}"
+                logger.info(msg)
+                params_tracker.restore_best()
+                optimizer.restart_from_params(params_tracker.get_optim_list())
+                continue
             except EarlyStopError as e:
                 msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)

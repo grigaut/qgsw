@@ -33,7 +33,11 @@ from qgsw.models.qg.stretching_matrix import compute_A
 from qgsw.models.qg.uvh.projectors.core import QGProjector
 from qgsw.models.sv.core import SurfaceVorticity
 from qgsw.observations import FullDomainMask, SatelliteTrackMask
-from qgsw.optim.optimizers import EarlyStopError, build_optimizer
+from qgsw.optim.optimizers import (
+    EarlyStopError,
+    LossPlateauError,
+    build_optimizer,
+)
 from qgsw.optim.utils import TrackParams
 from qgsw.plots.live_plots import LivePlot
 from qgsw.scripts.boundaries import (
@@ -509,10 +513,15 @@ if __name__ == "__main__":
         for _ in range(args.optim):
             try:
                 optimizer.step()
+            except LossPlateauError as e:
+                msg = f"{e} at {optimizer.epoch_repr}"
+                logger.info(msg)
+                params_tracker.restore_best()
+                optimizer.restart_from_params(params_tracker.get_optim_list())
+                continue
             except EarlyStopError as e:
                 msg = f"{e} at {optimizer.epoch_repr}"
                 logger.info(msg)
-                runtime_error = isinstance(e, RuntimeError)
                 break
             except (OverflowError, BackwardPassError) as e:
                 err_type = (
