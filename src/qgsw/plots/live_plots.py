@@ -30,8 +30,9 @@ class LivePlot:
         """
         if not active:
             self._plot = self._no_plot
-            self._close = self._no_plot
+            self.close = self._no_plot
             return
+
         if not plt.isinteractive():
             plt.ion()
 
@@ -226,6 +227,8 @@ class LivePlot:
         plt.tight_layout()
         plt.pause(0.05)
 
+        self.close = self._close
+
     def _plot_rgf(self) -> None:
         model: QGPSIQForced = self.model
 
@@ -373,5 +376,3 @@ class LivePlot:
         plt.close(self.state_fig)
         plt.close(self.vel_fig)
         plt.close(self.sst_fig)
-
-    close = _close
