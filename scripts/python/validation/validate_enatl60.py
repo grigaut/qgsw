@@ -488,10 +488,7 @@ if __name__ == "__main__":
             psi0 = da_to_tensor(psi0_filt_da, **specs) / f0
             psis_f = da_to_tensor(ds_interp["psi_filt"], **specs) / f0
             # Reference (unfiltered) streamfunction, shape (T, 1, 1, nx, ny)
-            psis_ref = (
-                da_to_tensor(ds_interp[STREAMFUNCTION], **specs)[:, None, None]
-                / f0
-            )
+            psis_ref = da_to_tensor(ds_interp[STREAMFUNCTION], **specs) / f0
             t0 = ds_interp[TIME][0]
             times = (ds_interp[TIME] - t0).dt.total_seconds().to_numpy()
             times = torch.tensor(times, **specs)
