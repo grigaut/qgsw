@@ -9,7 +9,7 @@ chmod +x $SCRIPT
 
 load_env "$SRCDIR"
 # Compute walltime
-walltime=6
+walltime=15
 
 OAR_OPTS=(
     -q production
