@@ -12,7 +12,6 @@ import pandas as pd
 import scipy.sparse as sp
 import torch
 import xarray as xr
-import xgcm
 from scipy.interpolate import LinearNDInterpolator
 from scipy.sparse.linalg import spsolve
 from scipy.spatial import Delaunay
@@ -373,14 +372,6 @@ if __name__ == "__main__":
         dg = dg.drop_dims(["z_c", "z_l"])
         dg = dg.chunk(dict.fromkeys(dg.dims, -1))
         dg = dg.sel({d: domain_bounds[d[0]] for d in dg.dims if d[0] in "xy"})
-        grid = xgcm.Grid(
-            dg,
-            metrics={
-                ("X",): ["e1t", "e1u", "e1v", "e1f"],
-                ("Y",): ["e2t", "e2u", "e2v", "e2f"],
-            },
-            padding="extend",
-        )
 
     for season, months in season_map.items():
         msg = f"Loading {season} files"
