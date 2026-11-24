@@ -7,7 +7,6 @@ import calendar
 from pathlib import Path
 from typing import Any
 
-import gsw
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -406,9 +405,6 @@ if __name__ == "__main__":
             )
             ds = ds.assign_coords(
                 {c: dg[c] for c in dg.coords if c[:2] != "ll"}
-            )
-            ds = ds.assign_coords(
-                corio_t=gsw.f(ds.llat_cc), corio_f=gsw.f(ds.llat_rr)
             )
             with logger.timeit("Performing Helmholtz decompositon"):
                 decomp = helmholtz(
