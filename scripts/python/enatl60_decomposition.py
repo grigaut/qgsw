@@ -385,8 +385,8 @@ if __name__ == "__main__":
             ds = xr.merge([dsh, dsu, dsv])
             with logger.timeit("Performing Helmholtz decompositon"):
                 decomp = helmholtz(
-                    ds["u"][:2],
-                    ds["v"][:2],
+                    ds["u"],
+                    ds["v"],
                     lon_u="llon_cr",
                     lat_u="llat_cr",
                     lon_v="llon_rc",
@@ -400,3 +400,4 @@ if __name__ == "__main__":
 
             msg = f"Saved to {out_file}."
             logger.info(msg)
+            logger.end_section(m_token)
