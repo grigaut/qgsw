@@ -4,6 +4,7 @@ Decomposition functions made by Claude.
 """
 
 import calendar
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -379,25 +380,36 @@ if __name__ == "__main__":
                 logger.warning(msg)
                 logger.end_section(m_token)
                 continue
-            dsh = load(files, "gridT")
-            dsu = load(ufiles, "gridU")
-            dsv = load(vfiles, "gridV")
-            ds = xr.merge([dsh, dsu, dsv])
-            with logger.timeit("Performing Helmholtz decompositon"):
-                decomp = helmholtz(
-                    ds["u"],
-                    ds["v"],
-                    lon_u="llon_cr",
-                    lat_u="llat_cr",
-                    lon_v="llon_rc",
-                    lat_v="llat_rc",
+            for ufile, vfile in zip(ufiles, vfiles):
+                udates = ufile.name[-20:-12]
+                vdates = vfile.name[-20:-12]
+
+                assert udates == vdates, "Files dates don't match."
+
+                msg = (
+                    f"Loading surface velocities from "
+                    f"{datetime.strptime(udates, '%Y%m%d').date()}"  # noqa: DTZ007
                 )
-            out_file = output_dir / (
-                f"{calendar.month_name[month].lower()}.nc"
-            )
+                logger.info(msg)
+                dsu = load(ufile, "gridU")
+                dsv = load(vfile, "gridV")
+                ds = xr.merge([dsu, dsv])
+                with logger.timeit("Performing Helmholtz decompositon"):
+                    decomp = helmholtz(
+                        ds["u"],
+                        ds["v"],
+                        lon_u="llon_cr",
+                        lat_u="llat_cr",
+                        lon_v="llon_rc",
+                        lat_v="llat_rc",
+                    )
+                out_file = output_dir / (
+                    f"eNATL60-BLB002X-surface-decomposition-2D_{udates}.nc"
+                )
 
-            decomp.to_netcdf(out_file)
+                decomp.to_netcdf(out_file)
 
-            msg = f"Saved to {out_file}."
-            logger.info(msg)
+                msg = f"Saved to {out_file}."
+                logger.info(msg)
+
             logger.end_section(m_token)
