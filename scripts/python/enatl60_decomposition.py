@@ -365,14 +365,6 @@ if __name__ == "__main__":
             (data_folder / "MEANDERS" / "gridV").glob("*.nc"),
         )
         all_vfiles = sort_files_by_dates(*all_vfiles)
-    with logger.timeit("Loading grid"):
-        dg = xr.open_zarr(data_folder / "eNATL60_rest_grid.zarr")
-        dg = dg.assign_coords(hbot=dg.e3t.where(dg.tmask).sum("z_c"))
-        dg["tmask"], dg["e3t"] = dg.tmask.isel(z_c=0), dg.e3t.isel(z_c=0)
-        dg = dg.drop_dims(["z_c", "z_l"])
-        dg = dg.chunk(dict.fromkeys(dg.dims, -1))
-        dg = dg.sel({d: domain_bounds[d[0]] for d in dg.dims if d[0] in "xy"})
-
     for season, months in season_map.items():
         msg = f"Loading {season} files"
         s_token = logger.start_section(msg)
@@ -391,22 +383,18 @@ if __name__ == "__main__":
             dsu = load(ufiles, "gridU")
             dsv = load(vfiles, "gridV")
             ds = xr.merge([dsh, dsu, dsv])
-            ds = ds.assign_coords(
-                {v: dg[v] for v in ["x_c", "y_c", "x_r", "y_r"]}
-            )
-            ds = ds.assign_coords(
-                {c: dg[c] for c in dg.coords if c[:2] != "ll"}
-            )
             with logger.timeit("Performing Helmholtz decompositon"):
                 decomp = helmholtz(
-                    ds["u"],
-                    ds["v"],
+                    ds["u"][:2],
+                    ds["v"][:2],
                     lon_u="llon_cr",
                     lat_u="llat_cr",
                     lon_v="llon_rc",
                     lat_v="llat_rc",
                 )
-            out_file = output_dir / (f"{calendar.month_name[month]}.nc")
+            out_file = output_dir / (
+                f"{calendar.month_name[month].lower()}.nc"
+            )
 
             decomp.to_netcdf(out_file)
 
