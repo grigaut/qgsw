@@ -420,3 +420,4 @@ if __name__ == "__main__":
                 logger.info(msg)
 
             logger.end_section(m_token)
+        logger.end_section(s_token)
