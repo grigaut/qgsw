@@ -375,6 +375,7 @@ if __name__ == "__main__":
             files, ufiles, vfiles = load_season_files(
                 [month], all_files, all_ufiles, all_vfiles
             )
+
             if not files or not ufiles or not vfiles:
                 msg = f"No files found for {calendar.month_name[month]}"
                 logger.warning(msg)
@@ -391,6 +392,15 @@ if __name__ == "__main__":
                     f"{datetime.strptime(udates, '%Y%m%d').date()}"  # noqa: DTZ007
                 )
                 logger.info(msg)
+
+                out_file = output_dir / (
+                    f"eNATL60-BLB002X-surface-decomposition-2D_{udates}.nc"
+                )
+                if out_file.exists():
+                    msg = "Already computed"
+                    logger.info(msg)
+                    continue
+
                 dsu = load(ufile, "gridU")
                 dsv = load(vfile, "gridV")
                 ds = xr.merge([dsu, dsv])
@@ -403,9 +413,6 @@ if __name__ == "__main__":
                         lon_v="llon_rc",
                         lat_v="llat_rc",
                     )
-                out_file = output_dir / (
-                    f"eNATL60-BLB002X-surface-decomposition-2D_{udates}.nc"
-                )
 
                 decomp.to_netcdf(out_file)
 
