@@ -58,9 +58,11 @@ parse_enatl60_flags() {
     autumn=false
     winter=false
     spring=false
+    HR=false
     args=()
     for arg in "$@"; do
         case "$arg" in
+            --HR)          HR=true ;;
             --contiguous)  contiguous=true ;;
             --long-optim)  long_optim=true ;;
             --summer)      summer=true ; any_season=true ;;

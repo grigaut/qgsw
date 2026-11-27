@@ -55,6 +55,9 @@ clean-venv:
 
 clean-logs:
 	@rm logs/*
+	
+clean-tracking:
+	@rm tracking/*
 
 
 ${VENV}:
