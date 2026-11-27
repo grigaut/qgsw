@@ -821,4 +821,4 @@ if __name__ == "__main__":
         videos.mkdir(parents=True, exist_ok=True)
 
         anim = FuncAnimation(fig, update, frames=len(psis), blit=True)
-        anim.save(videos / f"cycle_{c + 1}.mp4", fps=15)
+        anim.save(videos / f"psd_cycle_{c + 1}.mp4", fps=15)
