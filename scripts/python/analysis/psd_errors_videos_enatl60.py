@@ -5,6 +5,7 @@
 import gc
 import sys
 from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import torch
@@ -43,8 +44,9 @@ from qgsw.eNATL60.var_keys import (
     ZONAL_WIND_10M,
 )
 from qgsw.eNATL60.wind import compute_windstress
+from qgsw.filters.gaussian import GaussianFilter2D
 from qgsw.logging.core import getLogger, setup_root_logger
-from qgsw.logging.utils import box, step
+from qgsw.logging.utils import box, sec2text, step
 from qgsw.models.qg.psiq.core import QGPSIQ
 from qgsw.models.qg.psiq.modified.forced import (
     QGPSIQForced,
@@ -462,11 +464,6 @@ if __name__ == "__main__":
         """PSD Error for vorticity."""
         return psd_v.iso_spec_w(f - f_ref) / psd_v.iso_spec_w(f_ref)
 
-    from typing import Any
-
-    from qgsw.filters.gaussian import GaussianFilter2D
-    from qgsw.logging.utils import sec2text
-
     for c in range(n_cycles):
         start_cycle = c * n_file_per_cycle + c * separation
         end_cycle = (c + 1) * n_file_per_cycle + c * separation
@@ -783,11 +780,11 @@ if __name__ == "__main__":
                 f"\nTime: {sec2text(times[0].item())}"
             ),
             fig,
-            psi_ref,
+            psi_diff,
             y=0.975,
         )
 
-        fig.tight_layout()
+        plt.tight_layout()
 
         def update(frame: int) -> tuple[Any]:
             """Update function."""

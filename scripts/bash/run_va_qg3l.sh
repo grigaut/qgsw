@@ -26,6 +26,10 @@ echo Running validation script
 
 LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/validation/validate_qg3l.py --run-id=$OAR_JOB_ID
 
+echo Removing tracking file
+
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/remove_tracking_file.py --run-id=$OAR_JOB_ID
+
 
 date
 

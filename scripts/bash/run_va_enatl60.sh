@@ -26,6 +26,22 @@ echo Running validation script
 
 LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/validation/validate_enatl60.py --run-id=$OAR_JOB_ID
 
+echo Building PSD videos
+
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/psd_errors_videos_enatl60.py --run-id=$OAR_JOB_ID
+
+echo Building ageostrophy videos
+
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/ageostrophy_videos_enatl60.py --run-id=$OAR_JOB_ID
+
+echo Building decomposition videos
+
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/decomposition_videos_enatl60.py --run-id=$OAR_JOB_ID
+
+echo Removing tracking file
+
+LD_PRELOAD=./.venv/lib/libstdc++.so.6 .venv/bin/python3 -u scripts/python/remove_tracking_file.py --run-id=$OAR_JOB_ID
+
 date
 
 exit 0
