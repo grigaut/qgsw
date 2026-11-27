@@ -20,6 +20,7 @@ n_seasons=0
 # Compute walltime
 walltime=24
 [ "$long_optim" = true ] && (( walltime *= 4 ))
+[ "$HR" = true ] && (( walltime *= 4 ))
 [ "$contiguous" = true ] && (( walltime *= n_seasons ))
 
 build_oar_opts "$walltime"
@@ -34,6 +35,9 @@ done
 optim_args=""
 if [ "$long_optim" = true ]; then
     optim_args+=" -o 800"
+fi
+if [ "$HR" = true ]; then
+    optim_args+=" --dt 2400 --dx 5000 --dy 5000 --sigma-ic 12 --sigma-bc 12"
 fi
 
 # Build the four command variants
