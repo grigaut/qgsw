@@ -169,6 +169,16 @@ if folder is not None:
         )
     if "season" in params:
         badges.append(f":violet-badge[Season: {params['season']}]")
+    if "dx" in params:
+        badges.append(f":orange-badge[dx: {params['dx']}]")
+    if "dy" in params:
+        badges.append(f":orange-badge[dy: {params['dy']}]")
+    if "dt" in params:
+        badges.append(f":orange-badge[dt: {params['dt']}]")
+    if "sigma_ic" in params:
+        badges.append(f":blue-badge[𝜎_IC: {params['sigma_ic']}]")  # noqa: RUF001
+    if "sigma_bc" in params:
+        badges.append(f":blue-badge[𝜎_BC: {params['sigma_bc']}]")  # noqa: RUF001
 
     if badges:
         st.markdown(" ".join(badges))
