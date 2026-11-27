@@ -58,7 +58,6 @@ from qgsw.scripts.eNATL60 import (
 from qgsw.scripts.model_interactions import init_model
 from qgsw.scripts.output import (
     OutputFolder,
-    get_tracking_filename,
     retrieve_output_folder,
 )
 from qgsw.scripts.pv import build_pv_funcs
@@ -567,9 +566,3 @@ if __name__ == "__main__":
             outputs.setdefault(n, []).append(s)
 
         output.scores.save(outputs)
-
-    if run_id is not None:
-        tracking_file = get_tracking_filename(run_id)
-        tracking_file.unlink(missing_ok=True)
-        msg = "Tracking file removed."
-        logger.info(box(msg))

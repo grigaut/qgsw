@@ -28,7 +28,6 @@ from qgsw.scripts.boundaries import extract_psi_bc, extract_wide_psi_bc
 from qgsw.scripts.model_interactions import init_model
 from qgsw.scripts.output import (
     OutputFolder,
-    get_tracking_filename,
     retrieve_output_folder,
 )
 from qgsw.scripts.pv import build_pv_funcs
@@ -339,8 +338,3 @@ if __name__ == "__main__":
 
         for _ in range(separation):
             model_3l.step()
-    if run_id is not None:
-        tracking_file = get_tracking_filename(run_id)
-        tracking_file.unlink(missing_ok=True)
-        msg = "Tracking file removed."
-        logger.info(box(msg))
